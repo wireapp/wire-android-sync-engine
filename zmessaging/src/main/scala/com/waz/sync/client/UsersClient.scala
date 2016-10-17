@@ -17,7 +17,7 @@
  */
 package com.waz.sync.client
 
-import com.waz.HockeyApp.NoReporting
+import com.waz.Analytics.NoReporting
 import com.waz.ZLog._
 import com.waz.api.impl.ErrorResponse
 import com.waz.model._

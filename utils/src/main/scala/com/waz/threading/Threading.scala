@@ -18,12 +18,10 @@
 package com.waz.threading
 
 import java.util.Timer
-
-import android.os.{Handler, HandlerThread, Looper}
 import java.util.concurrent.{Executor, ExecutorService, Executors}
 
-import com.waz.ZLog._
-import com.waz.api.ZmsVersion
+import android.os.{Handler, HandlerThread, Looper}
+import com.waz.ZLog.error
 
 import scala.concurrent.{ExecutionContext, Future, Promise, blocking}
 
@@ -36,7 +34,7 @@ object Threading {
     implicit val BlockingIO: ExecutionContext = Threading.BlockingIO
   }
 
-  var AssertsEnabled = ZmsVersion.DEBUG
+  var AssertsEnabled = true //to be set by application
 
   val Cpus = math.max(2, Runtime.getRuntime.availableProcessors())
 

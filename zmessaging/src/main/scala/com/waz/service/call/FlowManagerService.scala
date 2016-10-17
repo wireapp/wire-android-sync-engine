@@ -19,7 +19,7 @@ package com.waz.service.call
 
 import android.content.Context
 import android.view.View
-import com.waz.HockeyApp
+import com.waz.{Analytics, HockeyApp}
 import com.waz.ZLog._
 import com.waz.api._
 import com.waz.call._
@@ -206,7 +206,7 @@ class FlowManagerService(context: Context, netClient: ZNetClient, websocket: Web
   def acquireFlows(convId: RConvId, selfId: UserId, participantIds: Set[UserId], sessionId: Option[CallSessionId]): Future[Unit] = Future {
     debug(s"acquireFlows($convId), self: $selfId, participants: $participantIds, active: ${activeFlows(convId)}")
     flowManager.fold {
-      HockeyApp.saveException(new IllegalStateException("flow manager not initialized"), s"Trying to acquire flows, but flowManager is not initialized, most likely due to native library loading issues")
+      Analytics.saveException(new IllegalStateException("flow manager not initialized"), s"Trying to acquire flows, but flowManager is not initialized, most likely due to native library loading issues")
     } { fm =>
       activeFlows += convId
 
@@ -300,7 +300,7 @@ class FlowManagerService(context: Context, netClient: ZNetClient, websocket: Web
     scheduleWithoutRecovery(op) .recoverWithLog(reportHockey = true)
 
   private def scheduleOr[T](op: FlowManager => T, fallback: => T)(implicit dispatcher: ExecutionContext): Future[T] =
-    scheduleWithoutRecovery(op) recover { LoggedTry.errorHandler(reportHockey = true) andThen (_.getOrElse(fallback)) }
+    scheduleWithoutRecovery(op) recover { LoggedTry.errorHandler(reportError = true) andThen (_.getOrElse(fallback)) }
 
   private def scheduleWithoutRecovery[T](op: FlowManager => T)(implicit dispatcher: ExecutionContext): Future[T] =
     flowManager.fold[Future[T]] { Future.failed(new IllegalStateException("unable to access flow manager")) } { fm => Future(op(fm)) (dispatcher) }

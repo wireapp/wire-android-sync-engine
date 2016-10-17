@@ -21,7 +21,7 @@ import java.io._
 import java.security.SecureRandom
 import javax.crypto.Mac
 
-import com.waz.HockeyApp
+import com.waz.Analytics
 import com.waz.ZLog._
 import com.waz.cache.{CacheService, LocalData}
 import com.waz.content.{MembersStorage, OtrClientsStorage}
@@ -144,7 +144,7 @@ class OtrService(selfUserId: UserId, clientId: ClientId, val clients: OtrClients
   // update client info and send error report to hockey, we want client info to somehow track originating platform
   private def reportOtrError(e: CryptoException, ev: OtrEvent) = sync.syncClients(ev.from) map { _ =>
     clients.getClient(ev.from, ev.sender) foreach { client =>
-      HockeyApp.saveException(e, s"event: $ev, client: $client")
+      Analytics.saveException(e, s"event: $ev, client: $client")
     }
   }
 
@@ -203,7 +203,7 @@ class OtrService(selfUserId: UserId, clientId: ClientId, val clients: OtrClients
             client.id -> session.encrypt(msgData)
           } recover {
             case e: Throwable =>
-              HockeyApp.saveException(e, s"encryption failed for user: $user, client: $client")
+              Analytics.saveException(e, s"encryption failed for user: $user, client: $client")
               if (useFakeOnError) Some(client.id -> EncryptionFailedMsg)
               else None
           }

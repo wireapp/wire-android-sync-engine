@@ -17,7 +17,7 @@
  */
 package com.waz.service.conversation
 
-import com.waz.HockeyApp
+import com.waz.Analytics
 import com.waz.ZLog._
 import com.waz.content._
 import com.waz.model.ConversationData.{ConversationStatus, ConversationType}
@@ -187,7 +187,7 @@ class ConversationsContentUpdater(val storage: ConversationStorage, users: UserS
       case Some(conv) => processor(conv)
       case None if retryCount > 3 =>
         val ex = new NoSuchElementException("No conversation data found") with NoStackTrace
-        HockeyApp.saveException(ex, s"remoteId: $remoteId")
+        Analytics.saveException(ex, s"remoteId: $remoteId")
         Future.failed(ex)
       case None =>
         warn(s"No conversation data found for remote id: $remoteId on try: $retryCount")

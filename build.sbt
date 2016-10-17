@@ -1,13 +1,14 @@
 import java.lang.Runtime._
 
+import SharedSettings._
 import android.Keys._
 import com.android.tools.lint.checks.ApiDetector
 import sbt.Keys._
 import sbt._
 import sbtassembly.MappingSet
-import SharedSettings._
 
 val MajorVersion = "81"
+val androidSdkLevel = "android-23"
 
 version in ThisBuild := {
   val jobName = sys.env.get("JOB_NAME")
@@ -26,7 +27,7 @@ scalaVersion in ThisBuild := "2.11.8"
 javacOptions in ThisBuild ++= Seq("-source", "1.7", "-target", "1.7", "-encoding", "UTF-8")
 scalacOptions in ThisBuild ++= Seq("-feature", "-target:jvm-1.7", "-Xfuture", "-deprecation", "-Yinline-warnings", "-Ywarn-unused-import", "-encoding", "UTF-8")
 
-platformTarget in ThisBuild := "android-23"
+platformTarget in ThisBuild := androidSdkLevel
 
 licenses in ThisBuild += ("GPL-3.0", url("https://opensource.org/licenses/GPL-3.0"))
 
@@ -45,7 +46,7 @@ resolvers in ThisBuild ++= Seq(
 lazy val licenseHeaders = HeaderPlugin.autoImport.headers := Set("scala", "java", "rs") .map { _ -> GPLv3("2016", "Wire Swiss GmbH") } (collection.breakOut)
 
 lazy val root = Project("zmessaging-android", file("."))
-  .aggregate(macrosupport, zmessaging, actors, testutils, unit, mocked, integration, actors, actors_android, actors_app, testapp)
+  .aggregate(macrosupport, utils, zmessaging, actors, testutils, unit, mocked, integration, actors, actors_android, actors_app, testapp)
   .settings(
     aggregate := false,
     aggregate in clean := true,
@@ -81,12 +82,13 @@ lazy val root = Project("zmessaging-android", file("."))
 lazy val zmessaging = project
   .enablePlugins(AutomateHeaderPlugin).settings(licenseHeaders)
   .dependsOn(macrosupport)
+  .dependsOn(utils)
   .settings(android.Plugin.androidBuildAar: _*)
   .settings(publishSettings: _*)
   .settings(
     name := "zmessaging-android",
     crossPaths := false,
-    platformTarget := "android-23",
+    platformTarget := androidSdkLevel,
     lintDetectors := Seq(ApiDetector.UNSUPPORTED),
     lintStrict := true,
     libraryProject := true,
@@ -198,7 +200,7 @@ lazy val testapp = project.in(file("tests") / "app")
     name := "testapp",
     crossPaths := false,
     libraryProject := false,
-    platformTarget := "android-23",
+    platformTarget := androidSdkLevel,
     proguardConfig ++= IO.readLines(file("tests") / "app" / "proguard.txt"),
     proguardCache := Seq(),
     typedResources := false,
@@ -243,7 +245,7 @@ lazy val actors_android = project.in(file("actors") / "android_app")
     name := "androidactors",
     crossPaths := false,
     libraryProject := false,
-    platformTarget := "android-23",
+    platformTarget := androidSdkLevel,
     proguardOptions ++= IO.readLines(file("actors") / "android_app" / "proguard.txt"),
     proguardCache := Seq(),
     useProguard := true,
@@ -364,6 +366,26 @@ lazy val macrosupport = project
     libraryDependencies ++= Seq(
       "org.scala-lang" % "scala-reflect" % (scalaVersion in ThisBuild).value % Provided,
       "org.robolectric" % "android-all" % RobolectricVersion % Provided
+    )
+  )
+
+lazy val utils = project
+  .enablePlugins(AutomateHeaderPlugin).settings(licenseHeaders)
+  .settings(publishSettings: _*)
+  .settings(android.Plugin.androidBuildAar: _*)
+  .dependsOn(macrosupport)
+  .settings(
+    version := "1.0",
+    name := "zmessaging-android-utils",
+    bintrayRepository := "releases",
+    crossPaths := false,
+    platformTarget := androidSdkLevel,
+    lintDetectors := Seq(ApiDetector.UNSUPPORTED),
+    lintStrict := true,
+    libraryProject := true,
+    typedResources := false,
+    libraryDependencies ++= Seq(
+      "org.threeten" % "threetenbp" % "1.3" % Provided
     )
   )
 

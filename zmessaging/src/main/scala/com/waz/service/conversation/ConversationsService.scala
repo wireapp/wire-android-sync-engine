@@ -19,7 +19,7 @@ package com.waz.service.conversation
 
 import android.content.Context
 import com.softwaremill.macwire._
-import com.waz.HockeyApp
+import com.waz.Analytics
 import com.waz.ZLog._
 import com.waz.api.ErrorType
 import com.waz.api.Verification._
@@ -108,7 +108,7 @@ class ConversationsService(context: Context, push: PushServiceSignals, users: Us
       convByRemoteId(rConvId) flatMap {
         case Some(conv) => processUpdateEvent(conv, ev)
         case None if retryCount > 3 =>
-          HockeyApp.saveException(new Exception("No conversation data found for event") with NoStackTrace, s"event: $ev")
+          Analytics.saveException(new Exception("No conversation data found for event") with NoStackTrace, s"event: $ev")
           successful(())
         case None =>
           ev match {

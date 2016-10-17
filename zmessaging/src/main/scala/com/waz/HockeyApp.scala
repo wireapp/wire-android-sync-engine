@@ -19,15 +19,16 @@ package com.waz
 
 import android.content.Context
 import android.renderscript.RSRuntimeException
+import com.waz.Analytics.NoReporting
 import com.waz.ZLog.{LogTag, error}
 import com.waz.service.ZMessaging
 import net.hockeyapp.android.{CrashManagerListener, ExceptionHandler}
 
 import scala.util.Try
 
-object HockeyApp {
+object HockeyApp extends Analytics {
 
-  def saveException(t: Throwable, description: String)(implicit tag: LogTag): Unit = {
+  override def saveException(t: Throwable, description: String)(implicit tag: LogTag): Unit = {
     error(description, t)
     if (shouldReport(t)) {
       ExceptionHandler.saveException(t, new CrashManagerListener {
@@ -38,9 +39,7 @@ object HockeyApp {
     }
   }
 
-  trait NoReporting { self: Throwable => }
-
-  def shouldReport(t: Throwable) = t match {
+  override def shouldReport(t: Throwable) = t match {
     case _: NoReporting => false
     case _: RSRuntimeException => false
     case _ => true

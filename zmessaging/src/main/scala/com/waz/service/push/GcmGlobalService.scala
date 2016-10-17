@@ -22,10 +22,10 @@ import com.google.android.gms.common.{ConnectionResult, GooglePlayServicesUtil}
 import com.google.android.gms.gcm.GoogleCloudMessaging
 import com.google.android.gms.iid.InstanceID
 import com.localytics.android.Localytics
-import com.waz.HockeyApp
-import com.waz.HockeyApp.NoReporting
-import com.waz.ZLog._
+import com.waz.Analytics
+import com.waz.Analytics.NoReporting
 import com.waz.ZLog.ImplicitTag._
+import com.waz.ZLog._
 import com.waz.model._
 import com.waz.service.push.GcmGlobalService.{GcmRegistration, GcmSenderId}
 import com.waz.service.{BackendConfig, MetaDataService, PreferenceService}
@@ -94,7 +94,7 @@ class GcmGlobalService(context: Context, prefs: PreferenceService, metadata: Met
           case NonFatal(ex) =>
             setGcmRegistration("", AccountId(""))
             warn(s"registerGcm failed for sender: '$gcmSenderId'", ex)
-            HockeyApp.saveException(ex, s"unable to register gcm for sender $gcmSenderId")
+            Analytics.saveException(ex, s"unable to register gcm for sender $gcmSenderId")
             CancellableFuture.successful(None)
         }
         CancellableFuture successful None

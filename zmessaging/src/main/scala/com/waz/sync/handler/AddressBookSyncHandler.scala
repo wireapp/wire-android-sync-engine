@@ -17,7 +17,7 @@
  */
 package com.waz.sync.handler
 
-import com.waz.HockeyApp
+import com.waz.Analytics
 import com.waz.ZLog._
 import com.waz.model.AddressBook
 import com.waz.service._
@@ -43,13 +43,13 @@ class AddressBookSyncHandler(contacts: ContactsService, client: AddressBookClien
         result <- postRes match {
           case Left(error) =>
             debug(s"postAddressBook failed with error: $error")
-            if (error.isFatal) HockeyApp.saveException(new RuntimeException(s"upload failed: ${error.code}") with NoStackTrace, error.toString)
+            if (error.isFatal) Analytics.saveException(new RuntimeException(s"upload failed: ${error.code}") with NoStackTrace, error.toString)
             Future.successful(SyncResult(error))
           case Right(users) =>
             debug("postAddressBook successful")
             contacts.onAddressBookUploaded(ab, users) map (_ => SyncResult.Success) recover {
               case e: Throwable =>
-                HockeyApp.saveException(e, s"address book upload result processing failed")
+                Analytics.saveException(e, s"address book upload result processing failed")
                 SyncResult.Failure(None, shouldRetry = false)
             }
         }
