@@ -28,7 +28,7 @@ import com.koushikdutta.async.callback.DataCallback.NullDataCallback
 import com.koushikdutta.async.callback.{CompletedCallback, DataCallback}
 import com.koushikdutta.async.http._
 import com.koushikdutta.async.http.callback.HttpConnectCallback
-import com.waz.HockeyApp.NoReporting
+import com.waz.Analytics.NoReporting
 import com.waz.ZLog._
 import com.waz.api
 import com.waz.api.impl.ProgressIndicator

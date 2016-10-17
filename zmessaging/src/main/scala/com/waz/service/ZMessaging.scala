@@ -19,6 +19,7 @@ package com.waz.service
 
 import android.content.Context
 import com.softwaremill.macwire._
+import com.waz.{Analytics, HockeyApp}
 import com.waz.ZLog._
 import com.waz.api.NotificationsHandler.NotificationsHandlerFactory
 import com.waz.api._
@@ -41,7 +42,7 @@ import com.waz.service.tracking.{TrackingEventsService, TrackingService}
 import com.waz.sync.client._
 import com.waz.sync.handler._
 import com.waz.sync.otr.OtrSyncHandler
-import com.waz.threading.{SerialDispatchQueue, Threading}
+import com.waz.threading.{DispatchQueueStats, SerialDispatchQueue, Threading}
 import com.waz.ui.UiModule
 import com.waz.utils.Locales
 import com.waz.utils.events.EventContext
@@ -306,6 +307,10 @@ object ZMessaging { self =>
   private implicit val logTag: LogTag = logTagFor(ZMessaging)
 
   require(LogLevel.initialized)
+
+  Threading.AssertsEnabled = ZmsVersion.DEBUG
+  DispatchQueueStats.Debug = ZmsVersion.DEBUG
+  Analytics.instance = HockeyApp
 
   private[waz] var context: Context = _
 

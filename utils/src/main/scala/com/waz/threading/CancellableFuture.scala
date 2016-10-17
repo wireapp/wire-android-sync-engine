@@ -19,8 +19,8 @@ package com.waz.threading
 
 import java.util.TimerTask
 
-import com.waz.HockeyApp.NoReporting
-import com.waz.ZLog._
+import com.waz.Analytics.NoReporting
+import com.waz.ZLog.LogTag
 import com.waz.utils.LoggedTry
 
 import scala.collection.generic.CanBuild

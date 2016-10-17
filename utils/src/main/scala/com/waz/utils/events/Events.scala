@@ -17,10 +17,11 @@
  */
 package com.waz.utils.events
 
-import scala.concurrent.{Future, ExecutionContext}
-import scala.ref.WeakReference
 import com.waz.threading.Threading
 import com.waz.utils.{LoggedTry, returning}
+
+import scala.concurrent.{ExecutionContext, Future}
+import scala.ref.WeakReference
 
 object Events {
   type Subscriber[-E] = E => Unit

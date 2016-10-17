@@ -17,26 +17,26 @@
  */
 package com.waz.utils
 
-import com.waz.HockeyApp.NoReporting
+import com.waz.Analytics.NoReporting
 import com.waz.ZLog._
-import com.waz.{HockeyApp, ZLog}
+import com.waz.{Analytics, ZLog}
 
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success, Try}
 
 object LoggedTry {
-  def apply[A](f: => A)(implicit tag: LogTag): Try[A] = try Success(f) catch errorHandler(reportHockey = true)
+  def apply[A](f: => A)(implicit tag: LogTag): Try[A] = try Success(f) catch errorHandler(reportError = true)
 
-  def local[A](f: => A)(implicit tag: LogTag): Try[A] = try Success(f) catch errorHandler(reportHockey = false)
+  def local[A](f: => A)(implicit tag: LogTag): Try[A] = try Success(f) catch errorHandler(reportError = false)
 
-  def errorHandler[A](reportHockey: Boolean = false)(implicit tag: LogTag): PartialFunction[Throwable, Try[A]] = {
+  def errorHandler[A](reportError: Boolean = false)(implicit tag: LogTag): PartialFunction[Throwable, Try[A]] = {
     case NonFatal(e) =>
       ZLog.warn("logged try failed", e)
-      if (reportHockey) HockeyApp.saveException(e, "logged try failed (non-fatal)")
+      if (reportError) Analytics.saveException(e, "logged try failed (non-fatal)")
       Failure(e)
     case e: Throwable =>
       ZLog.error("logged try got fatal error", e)
-      if (reportHockey) HockeyApp.saveException(e, "logged try failed (fatal)")
+      if (reportError) Analytics.saveException(e, "logged try failed (fatal)")
       Failure(BoxedError(e))
   }
 }

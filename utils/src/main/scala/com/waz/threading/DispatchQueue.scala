@@ -21,11 +21,11 @@ import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicInteger
 
 import android.os.{Handler, Looper}
-import com.waz.ZLog._
 
 import scala.annotation.tailrec
 import scala.concurrent.ExecutionContext
 import scala.util.Random
+import com.waz.ZLog._
 
 trait DispatchQueue extends ExecutionContext {
 

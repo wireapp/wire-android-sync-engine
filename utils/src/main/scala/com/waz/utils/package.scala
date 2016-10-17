@@ -25,7 +25,6 @@ import java.util.concurrent.atomic.AtomicReference
 import android.net.Uri
 import android.util.Base64
 import com.waz.ZLog.LogTag
-import com.waz.api.UpdateListener
 import com.waz.threading.{CancellableFuture, Threading}
 import org.threeten.bp
 import org.threeten.bp.Instant
@@ -33,8 +32,8 @@ import org.threeten.bp.Instant.now
 
 import scala.annotation.tailrec
 import scala.collection.Searching.{Found, InsertionPoint, SearchResult}
-import scala.collection.{GenIterable, SeqView}
 import scala.collection.generic.CanBuild
+import scala.collection.{GenIterable, SeqView}
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.language.{higherKinds, implicitConversions}
@@ -57,10 +56,6 @@ package object utils {
     } else {
       s"$startN$name(${c.take(3).mkString(n)}$n...hiding ${c.size - max} elements...$n${c.toVector.takeRight(3).mkString(n)})"
     }
-  }
-
-  def updateListener(body: => Unit) = new UpdateListener {
-    def updated() = body
   }
 
   def sha2(s: String): String = Base64.encodeToString(MessageDigest.getInstance("SHA-256").digest(s.getBytes("utf8")), Base64.NO_WRAP)

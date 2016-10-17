@@ -48,7 +48,7 @@ import com.waz.sync.SyncServiceHandle
 import com.waz.threading.{CancellableFuture, Threading}
 import com.waz.utils._
 import com.waz.utils.events.Signal
-import com.waz.{HockeyApp, PermissionsService, api}
+import com.waz.{Analytics, PermissionsService, api}
 import org.threeten.bp.Instant
 
 import scala.collection.breakOut
@@ -150,7 +150,7 @@ class AssetService(val storage: AssetsStorage, generator: ImageAssetGenerator, c
     storage.updateOrCreate(id, {
       case data @ AnyAssetData(`id`, `convId`, _, _, _, _, _, _, _, _, _) => data.updated(AnyAssetData(id, convId, asset, dataId, time.instant))
       case data =>
-        HockeyApp.saveException(new Exception(s"Unexpected asset data in updateAsset()"), s"data: $data, asset: $id, conv: $convId")
+        Analytics.saveException(new Exception(s"Unexpected asset data in updateAsset()"), s"data: $data, asset: $id, conv: $convId")
         data
     }, AnyAssetData(id, convId, asset, dataId, time.instant))
 
@@ -160,7 +160,7 @@ class AssetService(val storage: AssetsStorage, generator: ImageAssetGenerator, c
     storage.updateOrCreate(id, {
       case im @ ImageAssetData(`id`, _, _) => im.updated(image).copy(convId = convId)
       case data =>
-        HockeyApp.saveException(new Exception(s"Unexpected asset data in updateImageAsset()"), s"data: $data, asset: $id, conv: $convId")
+        Analytics.saveException(new Exception(s"Unexpected asset data in updateImageAsset()"), s"data: $data, asset: $id, conv: $convId")
         data
     }, ImageAssetData(id, convId, Seq(image)))
   }

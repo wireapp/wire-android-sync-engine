@@ -19,7 +19,7 @@ package com.waz.content
 
 import android.database.Cursor
 import android.support.v4.util.LruCache
-import com.waz.HockeyApp
+import com.waz.Analytics
 import com.waz.ZLog._
 import com.waz.content.MessagesCursor.Entry
 import com.waz.db.{Reader, ReverseCursorIterator}
@@ -142,7 +142,7 @@ class MessagesCursor(conv: ConvId, cursor: Cursor, override val lastReadIndex: I
     val window = loadWindow(index)
 
     if (! window.contains(index)) {
-      HockeyApp.saveException(new RuntimeException(s"cursor window loading failed, requested index: $index, got window with offset: ${window.offset} and size: ${window.msgs.size}"), "")
+      Analytics.saveException(new RuntimeException(s"cursor window loading failed, requested index: $index, got window with offset: ${window.offset} and size: ${window.msgs.size}"), "")
       MessageAndLikes.Empty
     } else {
       val fetching = if (prevWindow != window) {
@@ -172,7 +172,7 @@ class MessagesCursor(conv: ConvId, cursor: Cursor, override val lastReadIndex: I
     val window = loadWindow(offset + count / 2)
 
     if (! window.contains(offset) || !window.contains(end - 1))
-      HockeyApp.saveException(new RuntimeException(s"cursor window loading failed, requested [$offset, $end), got window with offset: ${window.offset} and size: ${window.msgs.size}"), "")
+      Analytics.saveException(new RuntimeException(s"cursor window loading failed, requested [$offset, $end), got window with offset: ${window.offset} and size: ${window.msgs.size}"), "")
 
     window.msgs.slice(offset - window.offset, end - window.offset)
   }

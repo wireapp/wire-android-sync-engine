@@ -21,7 +21,7 @@ import java.io._
 import java.lang.System._
 
 import android.content.Context
-import com.waz.HockeyApp
+import com.waz.Analytics
 import com.waz.ZLog._
 import com.waz.cache.CacheEntryData.CacheEntryDao
 import com.waz.content.Database
@@ -31,8 +31,8 @@ import com.waz.threading.{CancellableFuture, Threading}
 import com.waz.utils.crypto.AESUtils
 import com.waz.utils.{IoUtils, returning}
 
-import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration._
+import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
 
 class CacheEntry(val data: CacheEntryData, service: CacheService) extends LocalData {
@@ -114,7 +114,7 @@ class CacheService(context: Context, storage: Database) {
         case Failure(c: CancelException) =>
           Future.failed(c)
         case Failure(e) =>
-          HockeyApp.saveException(e, s"addStream($key) failed")
+          Analytics.saveException(e, s"addStream($key) failed")
           Future.failed(e)
       }
     }
@@ -125,7 +125,7 @@ class CacheService(context: Context, storage: Database) {
         if (moveFile) src.delete()
         add(CacheEntryData(key, timeout = timeout.timeout, path = Some(path), fileId = fileId, encKey = encKey, fileName = name, mimeType = mime, length = Some(len)))
       case Failure(e) =>
-        HockeyApp.saveException(e, s"addFile($key) failed")
+        Analytics.saveException(e, s"addFile($key) failed")
         throw new Exception(s"addFile($key) failed", e)
     }
 
