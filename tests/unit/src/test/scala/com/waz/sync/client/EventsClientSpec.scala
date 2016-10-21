@@ -17,17 +17,122 @@
  */
 package com.waz.sync.client
 
+import java.util.concurrent.{CountDownLatch, TimeUnit}
+
 import com.waz.model._
-import com.waz.sync.client.EventsClient.{PagedNotificationsResponse, NotificationsResponse}
+import com.waz.sync.client.EventsClient.{LoadNotificationsResponse, NotificationsResponse, PagedNotificationsResponse}
+import com.waz.threading.Threading
 import com.waz.utils.JsonDecoder
-import com.waz.znet.JsonObjectResponse
+import com.waz.utils.events.EventContext
+import com.waz.znet.{JsonObjectResponse, ZNetClient}
 import org.json
 import org.json.JSONObject
+import org.scalamock.scalatest.MockFactory
 import org.scalatest.{BeforeAndAfter, FeatureSpec, Matchers, RobolectricTests}
 
+import scala.concurrent.Future
+import scala.concurrent.duration._
 import scala.io.Source
 
-class EventsClientSpec extends FeatureSpec with Matchers with BeforeAndAfter with RobolectricTests {
+class EventsClientSpec extends FeatureSpec with Matchers with BeforeAndAfter with RobolectricTests with MockFactory {
+
+  implicit val executionContext = Threading.Background
+  implicit val eventContext = new EventContext {}
+
+  var pageSize: Int = _
+  var lastNot: Int = _
+  var roundTime: Int = _
+
+  val znetClient = mock[ZNetClient]
+
+  before {
+    //reset values
+    pageSize = 25
+    lastNot = 100
+    roundTime = 100
+
+    eventContext.onContextStart()
+  }
+
+  after {
+    eventContext.onContextStop()
+  }
+
+  feature("Download notifications after one trigger") {
+    scenario("download last page of notifications") {
+      clientTest(expectedPages = 1,
+        pagesTest = { (ns, _) =>
+          ns should have size pageSize
+        },
+        body = { client =>
+          znetClient.
+          client.loadNotifications(Some()).await() shouldEqual Some(NotId(lastNot))
+        })
+    }
+
+    scenario("Download a handful of notifications less than full page size") {
+      val historyToFetch = 3
+      clientTest(expectedPages = 1,
+        pagesTest = { (ns, _) =>
+          ns.size shouldEqual historyToFetch
+        },
+        body = { client =>
+          client.loadNotifications(Some(NotId(lastNot - historyToFetch))).await() shouldEqual Some(NotId(lastNot))
+        })
+    }
+
+    scenario("download last two pages of notifications") {
+      clientTest(expectedPages = 2,
+        pagesTest = { (ns, _) =>
+          ns should have size pageSize
+        },
+        body = { client =>
+          client.loadNotifications(Some(NotId(lastNot - pageSize * 2))).await() shouldEqual Some(NotId(lastNot))
+        })
+    }
+
+    scenario("Download all notifications available since just before last page") {
+      val historyToFetch = pageSize + 3
+      clientTest(expectedPages = 2,
+        pagesTest = { (ns, pageNumber) =>
+          ns.size shouldEqual (if (pageNumber == 1) pageSize else historyToFetch - pageSize)
+        },
+        body = { client =>
+          client.loadNotifications(Some(NotId(lastNot - historyToFetch))).await() shouldEqual Some(NotId(lastNot))
+        })
+    }
+
+    scenario("download all available pages of notifications") {
+      clientTest(expectedPages = lastNot / pageSize,
+        pagesTest = { (ns, _) =>
+          ns should have size pageSize
+        },
+        body = { client =>
+          client.loadNotifications(None).await() shouldEqual Some(NotId(lastNot))
+        })
+    }
+  }
+
+  feature("Multiple triggers") {
+    scenario("Should reject request for second trigger while still processing first") {
+
+      //We only expect one page, because the second request will be ignored
+      clientTest(expectedPages = 1,
+        pagesTest = { (resp, _) =>
+          //But we should still get the second notification that came through to BE while it's processing our first request
+          resp.notifications size shouldEqual 2
+        },
+        body = { client =>
+          client.loadNotifications(Some(NotId(lastNot - 1)))
+
+          //BE receives a new message sent to our client
+          znetClient.newHistory(1)
+
+          //while request is processing, we receive some delayed trigger
+          client.loadNotifications(Some(NotId(lastNot - 1))).await() shouldEqual Some(NotId(lastNot + 1))
+        })
+    }
+  }
 
   scenario("parse event time") {
     val time = JsonDecoder.parseDate("2015-07-13T13:32:04.584Z").getTime
@@ -216,5 +321,17 @@ class EventsClientSpec extends FeatureSpec with Matchers with BeforeAndAfter wit
       |    "name":"some name"
       |  }
       |}""".stripMargin
+
+  def clientTest(expectedPages: Int, pagesTest: (LoadNotificationsResponse, Int) => Unit, body: EventsClient => Unit): Unit = {
+    val client = new EventsClient(znetClient)
+
+    val latch = new CountDownLatch(expectedPages)
+    client.onNotificationsPageLoaded { ns =>
+      pagesTest(ns, expectedPages - latch.getCount.toInt + 1)
+      latch.countDown()
+    }
+    body(client)
+    latch.await(5.seconds.toMillis, TimeUnit.MILLISECONDS) shouldEqual true
+  }
 
 }

@@ -41,7 +41,7 @@ class EventsClient(netClient: ZNetClient) {
 
   val onNotificationsPageLoaded = new SourceStream[LoadNotificationsResponse]
 
-  var currentRequest: ErrorOr[(Option[Uid], Boolean)] = Future.successful(Right(Option.empty[Uid], false))
+  private var currentRequest: ErrorOr[(Option[Uid], Boolean)] = Future.successful(Right(Option.empty[Uid], false))
 
   def loadNotifications(since: Option[Uid], client: ClientId, pageSize: Int): ErrorOr[Option[Uid]] = {
 
