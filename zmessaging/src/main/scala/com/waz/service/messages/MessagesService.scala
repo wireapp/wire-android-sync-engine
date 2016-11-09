@@ -469,7 +469,7 @@ class MessagesService(selfUserId: UserId, val content: MessagesContentUpdater, e
   def addOtrUnverifiedMessage(convId: ConvId, users: Seq[UserId], change: VerificationChange): Future[Option[MessageData]] = {
       val msgType = if (change == ClientUnverified) Message.Type.OTR_UNVERIFIED else Message.Type.OTR_DEVICE_ADDED
       withSelfUserFuture { selfUser =>
-        addLocalSentMessage(MessageData(MessageId(), convId, msgType, selfUser, members = users.toSet)) map { Some(_) }
+        addLocalMessage(MessageData(MessageId(), convId, msgType, selfUser, members = users.toSet), Status.SENT) map { Some(_) }
       }
     }
 

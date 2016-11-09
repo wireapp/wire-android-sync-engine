@@ -77,14 +77,6 @@ class MessagesContentUpdater(context: Context, val messagesStorage: MessagesStor
     } yield res
   }
 
-  def addLocalSentMessage(msg: MessageData) = Serialized.future("add local message", msg.convId) {
-    verbose(s"addLocalSentMessage: $msg")
-    lastSentEventTime(msg.convId) flatMap { t =>
-      verbose(s"adding local sent message to storage, $t")
-      messagesStorage.addMessage(msg.copy(state = Status.SENT, time = t.plusMillis(1), localTime = Instant.now))
-    }
-  }
-
   private def nextLocalTime(convId: ConvId) =
     messagesStorage.getLastMessage(convId) flatMap {
       case Some(msg) => Future successful msg.time
