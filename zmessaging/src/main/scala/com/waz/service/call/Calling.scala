@@ -66,6 +66,7 @@ object Calling {
 
   @native def wcall_get_state(convid: String): Int
 
+  @native def wcall_enable_audio_cbr(enabled: Int): Unit
 
   val WCALL_REASON_NORMAL             = 0
   val WCALL_REASON_ERROR              = 1
