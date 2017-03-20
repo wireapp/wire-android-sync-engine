@@ -281,6 +281,11 @@ class CallingService(context:             Context,
     }
   }
 
+  def setAudioConstantBitRateEnabled(enabled: Int): Unit = {
+    verbose(s"setting the audio cbr to $enabled")
+    Calling.wcall_enable_audio_cbr(enabled)
+  }
+
   val callMessagesStage = EventScheduler.Stage[CallMessageEvent] {
     case (_, events) => Future.successful(events.sortBy(_.time).foreach { e =>
       receiveCallEvent(e.content, e.time.instant, e.convId, e.from, e.sender)
