@@ -94,8 +94,7 @@ object ZGlobalDB {
         prefs.editUiPreferences(_.putString(prefs.callingV3Key, "2")) //force update debug builds to calling v3
       }},
       Migration(15, 16) { db => if (ZmsVersion.DEBUG) {
-        val prefs = new PreferenceService(context)
-        prefs.editUiPreferences(_.putBoolean(prefs.sendWithAssetsV3Key, true))
+          //setting prefs.sendWithAssetsV3Key no longer needed, if you haven't updated by now, it doesn't matter
       }}
     )
 

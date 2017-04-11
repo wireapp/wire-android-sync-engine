@@ -224,20 +224,5 @@ class VideoMessageSpec extends FeatureSpec with Matchers with BeforeAndAfter wit
   @volatile private var postCancelled = false
   private val reusableLatch = new ReusableCountDownLatch
 
-  override lazy val zmessagingFactory = new ZMessagingFactory(globalModule) {
-
-    override def zmessaging(clientId: ClientId, user: UserModule): service.ZMessaging =
-      new ApiZMessaging(clientId, user) {
-
-        override lazy val assetClient = new AssetClient(zNetClient) {
-          override def postOtrAsset(convId: RConvId, metadata: OtrAssetMetadata, data: LocalData, ignoreMissing: Boolean, recipients: Option[Set[UserId]]): ErrorOrResponse[OtrAssetResponse] = {
-            postStarted = true
-            postCancelled = false
-            reusableLatch.await(10.seconds)
-            returning(super.postOtrAsset(convId, metadata, data, ignoreMissing, recipients))(_.onCancelled(postCancelled = true)(Threading.Background))
-          }
-        }
-      }
-  }
 }
 

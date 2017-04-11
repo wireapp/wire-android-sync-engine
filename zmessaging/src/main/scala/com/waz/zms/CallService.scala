@@ -19,7 +19,6 @@ package com.waz.zms
 
 import android.content.{Context, Intent}
 import com.waz.ZLog._
-import com.waz.api.VoiceChannelState
 import com.waz.api.VoiceChannelState._
 import com.waz.model.ConvId
 import com.waz.model.VoiceChannelData.{ChannelState, ConnectionState}

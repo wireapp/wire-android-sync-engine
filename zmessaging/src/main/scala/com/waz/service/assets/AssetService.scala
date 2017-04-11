@@ -140,10 +140,9 @@ class AssetService(val storage: AssetsStorage, generator: ImageAssetGenerator, c
     }
 
   def addImageAsset(image: com.waz.api.ImageAsset, convId: RConvId, isSelf: Boolean): Future[AssetData] = {
-    val convIdOpt = if (prefs.sendWithV3) None else Some(convId) //TODO Dean remove sending with v2 after testing
     image match {
         case img: ImageAsset =>
-          val asset = img.data.copy(convId = convIdOpt)
+          val asset = img.data.copy(convId = None)
           verbose(s"addImageAsset: $asset")
           val ref = new AtomicReference(image) // keep a strong reference until asset generation completes
           generator.generateWireAsset(asset, isSelf).future.flatMap { data =>
@@ -191,7 +190,7 @@ class AssetService(val storage: AssetsStorage, generator: ImageAssetGenerator, c
         sizeInBytes = size.getOrElse(0),
         name = n,
         source = uri,
-        convId = if (prefs.sendWithV3) None else Some(conv) //TODO turn off v2 toggling after transition period
+        convId = None
       ))
     } yield {
 

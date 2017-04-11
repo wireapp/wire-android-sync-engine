@@ -17,9 +17,9 @@
  */
 package com.waz.db
 
-import android.database.sqlite.{SQLiteDatabase, SQLiteTransactionListener}
-import com.waz.{HockeyApp, ZLog}
-import ZLog._
+import android.database.sqlite.SQLiteDatabase
+import com.waz.HockeyApp
+import com.waz.ZLog._
 
 import scala.util.control.NonFatal
 

@@ -111,11 +111,6 @@ class ImageAssetMessageSpec extends FeatureSpec with Matchers with ProvisionedAp
       new ZMessaging(clientId, user) {
         override lazy val assetClient = new AssetClient(zNetClient) {
 
-          override def postOtrAsset(convId: RConvId, metadata: OtrAssetMetadata, data: LocalData, ignoreMissing: Boolean, recipients: Option[Set[UserId]]): ErrorOrResponse[OtrAssetResponse] = {
-            if (metadata.inline) super.postOtrAsset(convId, metadata, data, ignoreMissing, recipients)
-            else CancellableFuture.delay(3.seconds) flatMap { _ => super.postOtrAsset(convId, metadata, data, ignoreMissing, recipients) } // delay full image request
-          }
-
           override def loadAsset(req: Request[Unit]): ErrorOrResponse[CacheEntry] = {
             downloads.incrementAndGet()
             super.loadAsset(req)

@@ -23,12 +23,12 @@ import java.util.Date
 import java.util.concurrent.{CountDownLatch, TimeUnit}
 
 import akka.pattern.ask
+import com.waz.ZLog.ImplicitTag._
 import com.waz.api.AssetStatus._
 import com.waz.api.MessageContent.Asset.{Answer, ErrorHandler}
 import com.waz.api.MessageContent.Text
 import com.waz.api._
 import com.waz.api.impl.{DoNothingAndProceed, ErrorResponse}
-import com.waz.cache.LocalData
 import com.waz.model
 import com.waz.model.AssetData.MaxAllowedAssetSizeInBytes
 import com.waz.model.AssetMetaData.{Audio, Video}
@@ -36,23 +36,19 @@ import com.waz.model.AssetStatus.{UploadCancelled, UploadDone, UploadFailed}
 import com.waz.model.otr.ClientId
 import com.waz.model.{GenericContent, Mime, AssetStatus => _, MessageContent => _, _}
 import com.waz.provision.ActorMessage._
-import com.waz.service.{UserModule, ZMessaging, ZMessagingFactory}
 import com.waz.service.conversation.ConversationsUiService.LargeAssetWarningThresholdInBytes
-import com.waz.sync.client.AssetClient
-import com.waz.sync.client.AssetClient.{OtrAssetMetadata, OtrAssetResponse}
+import com.waz.service.{UserModule, ZMessaging, ZMessagingFactory}
 import com.waz.sync.otr.OtrSyncHandler
 import com.waz.testutils.Implicits._
 import com.waz.testutils.Matchers._
 import com.waz.testutils.{DefaultPatienceConfig, FeigningAsyncClient, TestResourceContentProvider}
 import com.waz.threading.Threading
 import com.waz.utils.returning
-import com.waz.znet.ZNetClient._
 import org.robolectric.Robolectric.{getShadowApplication, shadowOf}
 import org.robolectric.shadows.ShadowContentResolver2
 import org.scalatest._
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.matchers.Matcher
-import com.waz.ZLog.ImplicitTag._
 
 import scala.concurrent.duration._
 import scala.concurrent.{Future, Promise}
@@ -669,16 +665,6 @@ class AssetMessageSpec extends FeatureSpec with BeforeAndAfter with Matchers wit
 
     override def zmessaging(clientId: ClientId, user: UserModule): ZMessaging =
       new ApiZMessaging(clientId, user) {
-
-        override lazy val assetClient = new AssetClient(zNetClient) {
-          override def postOtrAsset(convId: RConvId, metadata: OtrAssetMetadata, data: LocalData, ignoreMissing: Boolean, recipients: Option[Set[UserId]]): ErrorOrResponse[OtrAssetResponse] = {
-            postStarted = true
-            postCancelled = false
-            beforePostAsset.foreach(_ ())
-            beforePostAsset = None
-            returning(super.postOtrAsset(convId, metadata, data, ignoreMissing, recipients))(_.onCancelled(postCancelled = true)(Threading.Background))
-          }
-        }
 
         override lazy val otrSync = new OtrSyncHandler(otrClient, messagesClient, assetClient, otrService, assets, conversations, convsStorage, users, messages, errors, otrClientsSync, cache, prefs) {
           override def postOtrMessage(convId: ConvId, remoteId: RConvId, message: GenericMessage, recipients: Option[Set[UserId]], nativePush: Boolean = true): Future[Either[ErrorResponse, Date]] =

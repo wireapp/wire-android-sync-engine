@@ -34,17 +34,16 @@ import com.waz.service.messages.MessagesService
 import com.waz.service.otr.OtrService
 import com.waz.service.{ErrorsService, PreferenceService, UserService}
 import com.waz.sync.SyncResult
-import com.waz.sync.client.AssetClient.{OtrAssetMetadata, OtrAssetResponse, UploadResponse}
+import com.waz.sync.client.AssetClient.UploadResponse
 import com.waz.sync.client.MessagesClient.OtrMessage
 import com.waz.sync.client.OtrClient.{ClientMismatch, EncryptedContent, MessageResponse}
 import com.waz.sync.client.{AssetClient, MessagesClient, OtrClient}
 import com.waz.threading.CancellableFuture
-import com.waz.utils._
 import com.waz.utils.crypto.AESUtils
 import com.waz.znet.ZNetClient.ErrorOrResponse
 
+import scala.concurrent.Future
 import scala.concurrent.Future.successful
-import scala.concurrent.{Future, Promise}
 
 class OtrSyncHandler(client: OtrClient, msgClient: MessagesClient, assetClient: AssetClient, service: OtrService, assets: AssetService,
                      convs: ConversationsService, convStorage: ConversationStorage, users: UserService, messages: MessagesService,
@@ -144,52 +143,6 @@ class OtrSyncHandler(client: OtrClient, msgClient: MessagesClient, assetClient: 
         }
       case None => CancellableFuture.successful(Left(internalError("Client is not registered")))
     }
-
-  def postAssetDataV2(conv: ConversationData, key: AESKey, createMsg: Sha256 => GenericMessage, data: LocalData, nativePush: Boolean = true, recipients: Option[Set[UserId]] = None): CancellableFuture[Either[ErrorResponse, (RemoteData, Date)]] = {
-    val promise = Promise[Either[ErrorResponse, (RemoteData, Date)]]()
-
-    val future = service.clients.getSelfClient flatMap {
-      case Some(otrClient) =>
-        service.encryptAssetData(key, data) flatMap { case (sha, encrypted) =>
-          val inline = encrypted.length < MaxInlineSize
-          var imageId = Option.empty[RAssetId]
-          var assetKey = Option.empty[RemoteData]
-          val message = createMsg(sha)
-          verbose(s"Sending message: $message")
-          postEncryptedMessage(conv.id, message, recipients = recipients) { (content, retry) =>
-            val meta = new OtrAssetMetadata(otrClient.id, content, nativePush, inline)
-            val upload = imageId match {
-              case Some(imId) if !inline =>
-                // asset data has already been uploaded on previous try and we don't need to send it inline, will only resend metadata
-                // see https://github.com/wearezeta/backend-api-docs/wiki/API-Conversations-Assets#upload-otr-retry
-                assetClient.postOtrAssetMetadata(imId, conv.remoteId, meta, ignoreMissing(retry), recipients).map {
-                  case Right(OtrAssetResponse(id, msgResp)) => Right(msgResp)
-                  case Left(error) => Left(error)
-                }
-              case _ =>
-                assetClient.postOtrAsset(conv.remoteId, meta, encrypted, ignoreMissing(retry), recipients) map {
-                  case Right(OtrAssetResponse(id, msgResponse)) =>
-                    imageId = Some(id)
-                    assetKey = Some(RemoteData(Some(id), None, Some(key), Some(sha)))
-                    Right(msgResponse)
-                  case Left(err) =>
-                    Left(err)
-                }
-            }
-            promise.future.onComplete { _ => upload.cancel() }
-            upload
-          } map {
-            case Right(time) => assetKey.fold2(Left(internalError("assetKey is empty, but upload was successful")), k => Right((k, time)))
-            case Left(err) => Left(err)
-          }
-        }
-      case None =>
-        successful(Left(internalError("Client is not registered")))
-    }
-
-    promise.tryCompleteWith(future)
-    new CancellableFuture(promise)
-  }
 
   def postSessionReset(convId: ConvId, user: UserId, client: ClientId) = {
 

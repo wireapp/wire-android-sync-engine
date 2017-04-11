@@ -69,22 +69,6 @@ class AssetClient(netClient: ZNetClient) {
 
   }
 
-  def postOtrAsset(convId: RConvId, metadata: OtrAssetMetadata, data: LocalData, ignoreMissing: Boolean, recipients: Option[Set[UserId]]): ErrorOrResponse[OtrAssetResponse] = {
-    val meta = OtrAssetMetadata.OtrMetaEncoder(metadata).asInstanceOf[ByteArrayRequestContent]
-    val content = new MultipartRequestContent(Seq(new LocalDataPart(LocalData(meta.data), meta.contentType), new AssetDataPart(data, "application/octet-stream")), "multipart/mixed")
-
-    verbose(s"postOtrAsset($metadata, data: $data)")
-    netClient.withErrorHandling("postOtrAsset", Request.Post(postOtrAssetPath(convId, ignoreMissing, recipients), content))(otrAssetResponseHandler(h => RAssetId(h("Location").getOrElse(""))))
-  }
-
-  def postOtrAssetMetadata(dataId: RAssetId, convId: RConvId, metadata: OtrAssetMetadata, ignoreMissing: Boolean, recipients: Option[Set[UserId]]): ErrorOrResponse[OtrAssetResponse] =
-    netClient.withErrorHandling("postOtrAssetMetadata", Request.Post(postOtrAssetPath(convId, dataId, ignoreMissing, recipients), metadata))(otrAssetResponseHandler(_ => dataId))
-
-  private def otrAssetResponseHandler(assetId: Headers => RAssetId): PartialFunction[Response, OtrAssetResponse] = {
-    case Response(SuccessHttpStatus(), ClientMismatchResponse(mismatch), headers) => OtrAssetResponse(assetId(headers), MessageResponse.Success(mismatch))
-    case Response(HttpStatus(Status.PreconditionFailed, _), ClientMismatchResponse(mismatch), headers) => OtrAssetResponse(assetId(headers), MessageResponse.Failure(mismatch))
-  }
-
   def uploadAsset(data: LocalData, mime: Mime, public: Boolean = false, retention: Retention = Retention.Persistent): ErrorOrResponse[UploadResponse] = {
     val meta = JsonEncoder { o =>
       o.put("public", public)
@@ -128,18 +112,6 @@ object AssetClient {
   }
 
   def postAssetPath(conv: RConvId) = s"/conversations/$conv/assets"
-
-  def postOtrAssetPath(conv: RConvId, ignoreMissing: Boolean, recipients: Option[Set[UserId]]) = {
-    val base = s"/conversations/$conv/otr/assets"
-    if (ignoreMissing) s"$base?ignore_missing=true"
-    else recipients.fold(base)(uids => s"$base?report_missing=${uids.iterator.map(_.str).mkString(",")}")
-  }
-
-  def postOtrAssetPath(conv: RConvId, asset: RAssetId, ignoreMissing: Boolean, recipients: Option[Set[UserId]]) = {
-    val base = s"/conversations/$conv/otr/assets/$asset"
-    if (ignoreMissing) s"$base?ignore_missing=true"
-    else recipients.fold(base)(uids => s"$base?report_missing=${uids.iterator.map(_.str).mkString(",")}")
-  }
 
   //TODO remove asset v2 when transition period is over
   def getAssetPath(remoteId: Option[RAssetId], otrKey: Option[AESKey], conv: Option[RConvId]): Option[String] = remoteId.map { rId =>
