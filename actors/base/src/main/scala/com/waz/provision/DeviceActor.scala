@@ -29,7 +29,6 @@ import com.waz.api.OtrClient.DeleteCallback
 import com.waz.api.ZMessagingApi.RegistrationListener
 import com.waz.api._
 import com.waz.api.impl.{AccentColor, DoNothingAndProceed, ZMessagingApi}
-import com.waz.cache.LocalData
 import com.waz.content.{Database, GlobalDatabase}
 import com.waz.model.ConversationData.ConversationType
 import com.waz.model.UserData.ConnectionStatus
@@ -38,8 +37,6 @@ import com.waz.model.otr.ClientId
 import com.waz.model.{ConvId, ConversationData, Liking, RConvId, MessageContent => _, _}
 import com.waz.service.PreferenceService.Pref
 import com.waz.service._
-import com.waz.sync.client.AssetClient
-import com.waz.sync.client.AssetClient.{OtrAssetMetadata, OtrAssetResponse}
 import com.waz.testutils.CallJoinSpy
 import com.waz.testutils.Implicits.{CoreListAsScala, _}
 import com.waz.threading.{CancellableFuture, DispatchQueueStats, Threading}
@@ -47,7 +44,6 @@ import com.waz.ui.UiModule
 import com.waz.utils.RichFuture.traverseSequential
 import com.waz.utils._
 import com.waz.znet.ClientWrapper
-import com.waz.znet.ZNetClient._
 import org.threeten.bp.Instant
 
 import scala.concurrent.Future.successful
@@ -95,15 +91,7 @@ class DeviceActor(val deviceName: String,
     override lazy val factory: ZMessagingFactory = new ZMessagingFactory(this) {
       override def zmessaging(clientId: ClientId, user: UserModule): ZMessaging =
         new ZMessaging(clientId, user) {
-          import Threading.Implicits.Background
 
-          override lazy val assetClient = new AssetClient(zNetClient) {
-
-            override def postOtrAsset(convId: RConvId, metadata: OtrAssetMetadata, data: LocalData, ignoreMissing: Boolean, recipients: Option[Set[UserId]]): ErrorOrResponse[OtrAssetResponse] =
-              CancellableFuture.delay(if (delayNextAssetPosting.compareAndSet(true, false)) 10.seconds else Duration.Zero) flatMap { _ =>
-                super.postOtrAsset(convId, metadata, data, ignoreMissing, recipients)
-              }
-          }
         }
     }
   }
@@ -349,19 +337,6 @@ class DeviceActor(val deviceName: String,
         zmessaging.convsUi.sendMessage(conv.id, new Image(ui.images.createImageAssetFrom(bytes))).map { _ =>
           Successful
         }
-      }
-
-      //TODO: Dean remove after v2 transition period
-    case SetAssetToV3 =>
-      prefs.editUiPreferences { _.putBoolean(prefs.sendWithAssetsV3Key, true) }.future.map {
-        case true => Successful
-        case false => Failed("unable to set preferences to send with v3")
-      }
-
-    case SetAssetToV2 =>
-      prefs.editUiPreferences { _.putBoolean(prefs.sendWithAssetsV3Key, false) }.future.map {
-        case true => Successful
-        case false => Failed("unable to set preferences to send with v3")
       }
 
     case SendAsset(remoteId, bytes, mime, name, delay) =>

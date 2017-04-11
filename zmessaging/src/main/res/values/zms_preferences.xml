@@ -29,7 +29,6 @@
 
     <string name="zms_analytics_preference_key">PREF_KEY_PRIVACY_ANALYTICS_ENABLED</string>
     <string name="zms_auto_answer_key">PREF_KEY_AUTO_ANSWER_ENABLED</string>
-    <string name="zms_assets_v3">PREF_KEY_SEND_WITH_ASSETS_V3</string>
     <string name="zms_calling_v3">PREF_KEY_CALLING_V3</string>
     <string name="zms_gcm_enabled">PREF_KEY_GCM_ENABLED</string>
     <string name="zms_ws_foreground_service_enabled">PREF_KEY_WS_FOREGROUND_SERVICE_ENABLED</string>

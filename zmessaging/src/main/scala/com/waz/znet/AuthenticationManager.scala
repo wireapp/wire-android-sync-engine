@@ -21,7 +21,7 @@ import com.koushikdutta.async.http.AsyncHttpRequest
 import com.waz.ZLog._
 import com.waz.api.impl.{Credentials, EmailCredentials, ErrorResponse}
 import com.waz.content.Preference
-import com.waz.model.{AccountId, EmailAddress, UserId}
+import com.waz.model.{AccountId, EmailAddress}
 import com.waz.threading.{CancellableFuture, SerialDispatchQueue}
 import com.waz.utils.{JsonDecoder, JsonEncoder}
 import com.waz.znet.AuthenticationManager.{Cookie, Token}
