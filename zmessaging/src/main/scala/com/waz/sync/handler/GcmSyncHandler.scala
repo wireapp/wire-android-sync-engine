@@ -35,6 +35,13 @@ class GcmSyncHandler(user: AccountId, gcmService: GcmService, clientId: ClientId
   private implicit val tag: LogTag = logTagFor[GcmSyncHandler]
 
   def resetGcm(): Future[SyncResult] = {
+
+    gcmService.resetGcm().flatMap {
+      case Some(reg) => client.postPushToken(GcmToken(reg.token, gcmService.gcmSenderId, clientId)).future
+
+      case _ => Future.successful(SyncResult.Failure(None))
+    }
+
     def post(token: String) =
       client.postPushToken(GcmToken(token, gcmService.gcmSenderId, clientId))
 

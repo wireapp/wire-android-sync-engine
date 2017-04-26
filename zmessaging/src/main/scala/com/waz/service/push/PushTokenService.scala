@@ -1,24 +1,21 @@
 package com.waz.service.push
 
+import com.localytics.android.Localytics
+import com.waz.HockeyApp
 import com.waz.ZLog.verbose
-import com.waz.content.KeyValueStorage
-import com.waz.model.ConversationEvent
-import com.waz.service.PreferenceService
-import com.waz.service.push.GcmGlobalService.PushSenderId
-import com.waz.service.push.GcmService.GcmState
-import com.waz.sync.client.EventsClient
+import com.waz.model.GcmTokenRemoveEvent
+import com.waz.service.{EventScheduler, PreferenceService}
 import com.waz.threading.SerialDispatchQueue
-import com.waz.utils.events.{EventContext, Signal}
+import com.waz.utils._
+import com.waz.utils.events.{EventContext, EventStream, Signal}
 import com.waz.utils.wrappers.GoogleApi
 import org.threeten.bp.Instant
-import com.waz.utils._
 
 import scala.concurrent.Future
+import scala.util.control.NonFatal
 
-class PushTokenService(googleApi:     GoogleApi,
-                       senderId:      PushSenderId,
-                       prefs:         PreferenceService,
-                       eventsClient:  EventsClient) {
+class PushTokenService(googleApi: GoogleApi,
+                       prefs:     PreferenceService) {
 
   import PushTokenService._
 
@@ -26,11 +23,20 @@ class PushTokenService(googleApi:     GoogleApi,
 
   private implicit val ev = EventContext.Global
 
-  val lastReceivedConvEventTime = prefs.preference[Instant]("last_received_conv_event_time", Instant.EPOCH)
-  val lastFetchedConvEventTime  = prefs.preference[Instant]("last_fetched_conv_event_time",  Instant.ofEpochMilli(1))
-  val lastFetchedLocalTime      = prefs.preference[Instant]("last_fetched_local_time",       Instant.EPOCH)
-  val lastRegistrationTime      = prefs.preference[Instant]("push_registration_time",        Instant.EPOCH)
-  val registrationRetryCount    = prefs.preference[Int]    ("push_registration_retry_count", 0)
+  import prefs._
+
+  val lastReceivedConvEventTime = preference[Instant]("last_received_conv_event_time", Instant.EPOCH)
+  val lastFetchedConvEventTime  = preference[Instant]("last_fetched_conv_event_time",  Instant.ofEpochMilli(1))
+  val lastFetchedLocalTime      = preference[Instant]("last_fetched_local_time",       Instant.EPOCH)
+  val lastRegistrationTime      = preference[Instant]("push_registration_time",        Instant.EPOCH)
+  val registrationRetryCount    = preference[Int]    ("push_registration_retry_count", 0)
+
+  private val pushEnabled = uiPreferenceBooleanSignal(gcmEnabledKey).signal
+  private val currentTokenPref = preference[Option[String]]("push_token", None)
+
+  val onTokenRefresh = EventStream[String]()
+
+  onTokenRefresh { t => setNewToken(Some(t)) }
 
   /**
     * Current GCM state, true if we are receiving notifications on it.
@@ -40,7 +46,7 @@ class PushTokenService(googleApi:     GoogleApi,
     * GcmState will be active if the last received event is up-to-date or newer than the last fetched event, OR we have registered our GCM token since the
     * last time we fetched a message (meaning we 'just registered')
     */
-  val pushState = for {
+  private val pushState = for {
     lastFetched    <- lastFetchedConvEventTime.signal
     lastReceived   <- lastReceivedConvEventTime.signal
     localFetchTime <- lastFetchedLocalTime.signal
@@ -50,42 +56,69 @@ class PushTokenService(googleApi:     GoogleApi,
     PushState(lastFetched <= lastReceived, localFetchTime <= lastRegistered)
   }
 
-  val pushActive = googleApi.isGooglePlayServicesAvailable.flatMap {
-    case true =>
-      for {
-        st <- pushState
-        ct <- registrationRetryCount.signal
-      } yield {
-        //If we missed a gcm notification (say because the GCM server connection was down), then the state will be !active
-        //but we don't want to turn on the websocket just yet - we would then rely on web-socket and not get any updates to GCM, meaning
-        //it would be permanently disabled.
-        st.active || ct < retryFailLimit
-      }
-    case false => Signal.const(false)
+  pushState {
+    case PushState(true, _) => registrationRetryCount := 0
+    case _ =>
   }
 
-  eventsClient.onNotificationsPageLoaded.map(_.notifications.flatMap(_.events).collect { case ce: ConversationEvent => ce })
-    .filter(_.nonEmpty).on(dispatcher) { ces =>
-    Future.traverse(ces.groupBy(_.convId)) { case (convId, evs) =>
-      convsContent.convByRemoteId(convId) collect {
-        case Some(conv) if !conv.muted => evs.maxBy(_.time)
-      }
-    } foreach { evs =>
-      if (evs.nonEmpty) {
-        val last = evs.maxBy(_.time).time.instant
-        if (last != Instant.EPOCH) {
-          lastFetchedConvEventTime := last
-          lastFetchedLocalTime := Instant.now
-        }
-      }
+  private val shouldReRegister = for {
+    play    <- googleApi.isGooglePlayServicesAvailable
+    state   <- pushState
+    time    <- lastRegistrationTime.signal
+    retries <- registrationRetryCount.signal
+  } yield {
+    verbose(s"should re-register, play available: $play, state: $state, lastTry: $time, retries: $retries")
+    play && !state.active && RegistrationRetryBackoff.delay(math.max(0, retries - retryFailLimit)).elapsedSince(time)
+  }
+
+  shouldReRegister {
+    case true =>
+      (for {
+        retries <- registrationRetryCount()
+        if retries > retryFailLimit
+        _ <- setNewToken()
+      } yield retries).flatMap(retries => registrationRetryCount := retries + 1)
+
+    case false =>
+      verbose(s"shouldReRegister == false")
+  }
+
+  val currentPushToken = for {
+    push  <- pushEnabled
+    play  <- googleApi.isGooglePlayServicesAvailable
+    st    <- pushState
+    ct    <- registrationRetryCount.signal
+    token <- currentTokenPref.signal
+  } yield {
+    //If we missed a gcm notification (say because the GCM server connection was down), then the state will be !active
+    //but we don't want to turn on the websocket just yet - we would then rely on web-socket and not get any updates to GCM, meaning
+    //it would be permanently disabled.
+    if (push && play && (st.active || ct < retryFailLimit)) token else None
+  }
+
+  val eventProcessingStage = EventScheduler.Stage[GcmTokenRemoveEvent] { (convId, events) =>
+    currentTokenPref().flatMap {
+      case Some(t) if events.exists(_.token == t) =>
+        verbose("Clearing all push tokens in response to backend notification")
+        googleApi.deleteAllPushTokens()
+        (currentTokenPref := None).flatMap(_ => setNewToken())
+      case _ => Future.successful({})
     }
   }
 
-  private def updateFetchedTimes(ces: Vector[ConversationEvent]) = {
-
+  private def setNewToken(token: Option[String] = None): Future[Unit] = try {
+    val t = token.orElse(Some(googleApi.getPushToken))
+    t.foreach { t =>
+      Localytics.setPushDisabled(false)
+      Localytics.setPushRegistrationId(t)
+    }
+    verbose(s"Setting new push token: $t")
+    currentTokenPref := t
+  } catch {
+    case NonFatal(ex) => Future.successful {
+      HockeyApp.saveException(ex, s"unable to set push token")
+    }
   }
-
-
 }
 
 object PushTokenService {
@@ -105,4 +138,5 @@ object PushTokenService {
     def active = received || justRegistered
   }
 
+  case class PushSenderId(str: String) extends AnyVal
 }

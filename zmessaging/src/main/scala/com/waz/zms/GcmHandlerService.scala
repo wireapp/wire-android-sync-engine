@@ -23,7 +23,7 @@ import com.waz.ZLog.ImplicitTag._
 import com.waz.ZLog._
 import com.waz.model.{Uid, UserId}
 import com.waz.service.ZMessaging
-import com.waz.service.push.GcmGlobalService.GcmSenderId
+import com.waz.service.push.GcmGlobalService.PushSenderId
 import com.waz.sync.client.PushNotification
 import com.waz.threading.Threading
 import com.waz.utils.{JsonDecoder, LoggedTry, TimedWakeLock}
@@ -119,7 +119,7 @@ object GcmHandlerService {
   val MacExtra = "mac"
 
   object FromExtra {
-    def unapply(intent: Intent): Option[GcmSenderId] = Option(intent.getStringExtra("from")) map GcmSenderId
+    def unapply(intent: Intent): Option[PushSenderId] = Option(intent.getStringExtra("from")) map PushSenderId
   }
 
   object ContentAndMac {

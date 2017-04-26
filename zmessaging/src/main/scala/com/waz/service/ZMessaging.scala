@@ -183,6 +183,7 @@ class ZMessaging(val clientId: ClientId, val userModule: UserModule) {
   lazy val imageLoader     = wire[ImageLoader]
 
   lazy val pushSignals                            = wire[PushServiceSignals]
+  lazy val pushToken                              = wire[PushTokenService]
   lazy val push: PushService                      = wire[PushService]
   lazy val gcm: GcmService                        = wire[GcmService]
   lazy val errors                                 = wire[ErrorsService]

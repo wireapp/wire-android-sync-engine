@@ -26,12 +26,13 @@ import com.waz.HockeyApp.NoReporting
 import com.waz.ZLog._
 import com.waz.ZLog.ImplicitTag._
 import com.waz.model._
-import com.waz.service.push.GcmGlobalService.{GcmRegistration, GcmSenderId}
 import com.waz.service.{BackendConfig, MetaDataService, PreferenceServiceImpl}
+import com.waz.service.push.GcmGlobalService.{GcmRegistration, PushSenderId}
 import com.waz.threading.{CancellableFuture, SerialDispatchQueue}
-import com.waz.utils.LoggedTry
+import com.waz.utils.{LoggedTry, returning}
 import com.waz.utils.events.EventContext
 
+import scala.concurrent.Future
 import scala.util.control.{NoStackTrace, NonFatal}
 
 class GcmGlobalService(context: Context, val prefs: PreferenceServiceImpl, metadata: MetaDataService, backendConfig: BackendConfig) {
@@ -43,7 +44,7 @@ class GcmGlobalService(context: Context, val prefs: PreferenceServiceImpl, metad
   import metadata._
   import prefs._
 
-  val gcmSenderId: GcmSenderId = backendConfig.gcmSenderId
+  val gcmSenderId: PushSenderId = backendConfig.gcmSenderId
 
   lazy val gcmCheckResult = try GooglePlayServicesUtil.isGooglePlayServicesAvailable(context) catch {
     case ex: Throwable =>
@@ -71,30 +72,29 @@ class GcmGlobalService(context: Context, val prefs: PreferenceServiceImpl, metad
   }
 
   //removes the current gcm token and generates a new one - ensures that the user shouldn't be left without a GCM token
-  def resetGcm(user: AccountId): CancellableFuture[Option[GcmRegistration]] = CancellableFuture.lift(unregister()) flatMap { _ =>
+  def resetGcm(user: AccountId): Future[Option[GcmRegistration]] = unregister().flatMap { _ =>
     withGcm {
       LoggedTry {deleteInstanceId()} // if localytics registered first with only their sender id, we have to unregister so that our own additional sender id gets registered, too
       try {
         val token = getFcmToken
         Localytics.setPushDisabled(false)
         Localytics.setPushRegistrationId(token)
-        CancellableFuture.successful(Some(setGcm(token, AccountId(""))))
+        Future.successful(Some(setGcm(token, AccountId(""))))
       } catch {
         case NonFatal(ex) =>
           setGcm("", AccountId(""))
           warn(s"registerGcm failed for sender: '$gcmSenderId'", ex)
           HockeyApp.saveException(ex, s"unable to register gcm for sender $gcmSenderId")
-          CancellableFuture.successful(None)
+          Future.successful(None)
       }
     }
   }
 
-  private def setGcm(token: String, user: AccountId): GcmRegistration = {
-    val reg = GcmRegistration(token, user, appVersion)
-    verbose(s"setGcmRegistration: $reg")
-    editPreferences(reg.save(_))
-    reg
-  }
+  private def setGcm(token: String, user: AccountId): GcmRegistration =
+    returning(GcmRegistration(token, user, appVersion)) { reg =>
+      verbose(s"setGcmRegistration: $reg")
+      editPreferences(reg.save(_))
+    }
 
   //used to indicate that the token was registered properly with the BE - no user indicates it's not registered
   def updateRegisteredUser(token: String, user: AccountId) = withPreferences { prefs =>
@@ -113,7 +113,9 @@ class GcmGlobalService(context: Context, val prefs: PreferenceServiceImpl, metad
   private def withGcm[A](body: => A): A = if (gcmAvailable) body else throw new GcmGlobalService.GcmNotAvailableException
 
   //TODO do we need the scope here? GoogleCloudMessaging.INSTANCE_ID_SCOPE
-  private def getFcmToken = FirebaseInstanceId.getInstance().getToken()
+  private def getFcmToken = returning(FirebaseInstanceId.getInstance().getToken()) { t =>
+    if (t == null) throw new Exception("No FCM token was returned from the FirebaseInstanceId")
+  }
 
   //Deleting the instance id also removes any tokens the instance id was using
   private def deleteInstanceId(): Unit = LoggedTry.local { FirebaseInstanceId.getInstance().deleteInstanceId() }
@@ -121,7 +123,7 @@ class GcmGlobalService(context: Context, val prefs: PreferenceServiceImpl, metad
 
 object GcmGlobalService {
 
-  case class GcmSenderId(str: String) extends AnyVal
+  case class PushSenderId(str: String) extends AnyVal
 
   val RegistrationIdPref = "registration_id"
   val RegistrationUserPref = "registration_user"
