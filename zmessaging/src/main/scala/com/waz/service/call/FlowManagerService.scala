@@ -48,7 +48,7 @@ trait FlowManagerService {
   def flowManager: Option[FlowManager]
 }
 
-class DefaultFlowManagerService(context: Context, netClient: ZNetClient, websocket: WebSocketClientService, prefs: PreferenceService, network: DefaultNetworkModeService) extends FlowManagerService {
+class DefaultFlowManagerService(context: Context, netClient: ZNetClient, websocket: WebSocketClientService, prefs: PreferenceServiceImpl, network: DefaultNetworkModeService) extends FlowManagerService {
   import DefaultFlowManagerService._
 
   val MetricsUrlRE = "/conversations/([a-z0-9-]*)/call/metrics/complete".r

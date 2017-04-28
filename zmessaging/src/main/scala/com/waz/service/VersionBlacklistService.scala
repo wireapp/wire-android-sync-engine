@@ -27,7 +27,7 @@ import com.waz.utils.events.{EventContext, Signal}
 import scala.concurrent.Future
 import scala.concurrent.duration._
 
-class VersionBlacklistService(metadata: MetaDataService, prefs: PreferenceService, client: VersionBlacklistClient) {
+class VersionBlacklistService(metadata: MetaDataService, prefs: PreferenceServiceImpl, client: VersionBlacklistClient) {
 
   import Threading.Implicits.Background
   private implicit val tag: LogTag = logTagFor[VersionBlacklistService]

@@ -84,7 +84,7 @@ trait RemoteZmsSpec extends RobolectricTests with BeforeAndAfterAll { suite: Sui
       override val cryptoBoxDirName: String = "otr_" + dataTag
     }
 
-    override lazy val prefs: PreferenceService = new PreferenceService(context) {
+    override lazy val prefs: PreferenceServiceImpl = new PreferenceServiceImpl(context) {
       override lazy val preferences: SharedPreferences = context.getSharedPreferences("zmessaging_" + dataTag, Context.MODE_PRIVATE)
       override lazy val uiPreferences: SharedPreferences = context.getSharedPreferences("zmessaging_ui_" + dataTag, Context.MODE_PRIVATE)
     }

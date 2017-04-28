@@ -97,7 +97,7 @@ class DeviceActor(val deviceName: String,
   }
 
   lazy val instance = new Accounts(globalModule) {
-    override val currentAccountPref: Pref[String] = global.prefs.preferenceStringSignal("current_user_" + Random.nextInt().toHexString)
+    override val currentAccountPref = global.prefs.preferenceStringSignal("current_user_" + Random.nextInt().toHexString)
   }
   lazy val ui = new UiModule(instance)
   lazy val api = {

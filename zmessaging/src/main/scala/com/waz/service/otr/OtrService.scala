@@ -50,7 +50,7 @@ import scala.concurrent.duration._
 class OtrService(selfUserId: UserId, clientId: ClientId, val clients: OtrClientsService, push: PushServiceSignals,
                  cryptoBox: CryptoBoxService, members: DefaultMembersStorage, convs: DefaultConversationsContentUpdater,
                  sync: SyncServiceHandle, cache: CacheService, metadata: MetaDataService, clientsStorage : OtrClientsStorage,
-                 prefs: PreferenceService) {
+                 prefs: PreferenceServiceImpl) {
   import EventContext.Implicits.global
   import OtrService._
   import Threading.Implicits.Background

@@ -38,7 +38,7 @@ trait MediaManagerService {
   def mediaManager: Option[MediaManager]
 }
 
-class DefaultMediaManagerService(context: Context, prefs: PreferenceService) extends MediaManagerService {
+class DefaultMediaManagerService(context: Context, prefs: PreferenceServiceImpl) extends MediaManagerService {
   import com.waz.service.MediaManagerService._
 
   private implicit val dispatcher = new SerialDispatchQueue(name = "MediaManagerService")

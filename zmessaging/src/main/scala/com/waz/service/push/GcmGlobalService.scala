@@ -28,14 +28,14 @@ import com.waz.ZLog._
 import com.waz.ZLog.ImplicitTag._
 import com.waz.model._
 import com.waz.service.push.GcmGlobalService.{GcmRegistration, GcmSenderId}
-import com.waz.service.{BackendConfig, MetaDataService, PreferenceService}
+import com.waz.service.{BackendConfig, MetaDataService, PreferenceServiceImpl}
 import com.waz.threading.{CancellableFuture, SerialDispatchQueue}
 import com.waz.utils.LoggedTry
 import com.waz.utils.events.EventContext
 
 import scala.util.control.{NoStackTrace, NonFatal}
 
-class GcmGlobalService(context: Context, val prefs: PreferenceService, metadata: MetaDataService, backendConfig: BackendConfig) {
+class GcmGlobalService(context: Context, val prefs: PreferenceServiceImpl, metadata: MetaDataService, backendConfig: BackendConfig) {
 
   implicit val dispatcher = new SerialDispatchQueue(name = "GcmGlobalDispatchQueue")
 

@@ -41,7 +41,7 @@ import org.scalatest.concurrent.ScalaFutures
 import com.waz.ZLog.ImplicitTag._
 import com.waz.cache.LocalData
 import com.waz.model.GenericContent.EncryptionAlgorithm
-import com.waz.service.PreferenceService
+import com.waz.service.PreferenceServiceImpl
 
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
@@ -246,7 +246,7 @@ class OtrServiceSpec extends FeatureSpec with Matchers with OptionValues with Be
     scenario("encrypt an asset using CBC") {
 
       lazy val zms = new MockZMessaging() {
-        override lazy val prefs = new PreferenceService(context) {
+        override lazy val prefs = new PreferenceServiceImpl(context) {
           override def v31AssetsEnabled = false
         }
       }

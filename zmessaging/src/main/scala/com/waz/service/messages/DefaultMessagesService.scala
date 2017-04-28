@@ -50,7 +50,7 @@ trait MessagesService {
 }
 
 class DefaultMessagesService(selfUserId: UserId, val content: MessagesContentUpdater, edits: EditHistoryStorage, assets: AssetService,
-                             prefs: PreferenceService, users: UserService, convs: DefaultConversationsContentUpdater, reactions: ReactionsStorage,
+                             prefs: PreferenceServiceImpl, users: UserService, convs: DefaultConversationsContentUpdater, reactions: ReactionsStorage,
                              network: DefaultNetworkModeService, sync: SyncServiceHandle, verificationUpdater: VerificationStateUpdater, timeouts: Timeouts,
                              otr: OtrService) extends MessagesService {
   import Threading.Implicits.Background

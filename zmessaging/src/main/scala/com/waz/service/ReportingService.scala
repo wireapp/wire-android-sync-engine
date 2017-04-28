@@ -70,7 +70,7 @@ class ZmsReportingService(user: AccountId, global: ReportingService) extends Rep
   global.addStateReporter(generateStateReport)(s"ZMessaging[$user]")
 }
 
-class GlobalReportingService(context: Context, cache: CacheService, metadata: MetaDataService, storage: AccountsStorage, prefs: PreferenceService) extends ReportingService {
+class GlobalReportingService(context: Context, cache: CacheService, metadata: MetaDataService, storage: AccountsStorageImpl, prefs: PreferenceServiceImpl) extends ReportingService {
   import ReportingService._
   import Threading.Implicits.Background
   implicit val tag: LogTag = logTagFor[GlobalReportingService]

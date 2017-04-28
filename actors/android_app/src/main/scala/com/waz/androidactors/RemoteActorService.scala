@@ -29,7 +29,7 @@ import android.net.wifi.WifiManager
 import com.typesafe.config.ConfigFactory
 import com.waz.ZLog._
 import com.waz.provision.RemoteProcessActor
-import com.waz.service.{BackendConfig, PreferenceService}
+import com.waz.service.{BackendConfig, PreferenceServiceImpl}
 import com.waz.threading.Threading
 import com.waz.utils.{Serialized, LoggedTry}
 import com.waz.utils.events.{ServiceEventContext, Signal}
@@ -44,7 +44,7 @@ class RemoteActorService(context: Context) {
   import android.os.Build._
   import com.waz.utils.events.EventContext.Implicits.global
   private implicit val tag: LogTag = logTagFor[RemoteActorService]
-  val preferences = new PreferenceService(context)
+  val preferences = new PreferenceServiceImpl(context)
 
   val otrOnly = preferences.uiPreferenceBooleanSignal("otrOnly", false)
   val background = preferences.uiPreferenceBooleanSignal("background", false)
