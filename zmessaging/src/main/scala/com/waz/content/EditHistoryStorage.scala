@@ -32,7 +32,7 @@ import scala.util.Random
   * Edit history is only needed for short time to resolve race conditions when some message is edited on two devices at the same time.
   * We don't want to store it permanently, so will drop items older than 1 week.
   */
-class EditHistoryStorage(context: Context, storage: Database) extends CachedStorage[MessageId, EditHistory](new TrimmingLruCache(context, Fixed(512)), storage)(EditHistoryDao, "EditHistoryStorage_Cached") {
+class EditHistoryStorage(context: Context, storage: Database) extends CachedStorageImpl[MessageId, EditHistory](new TrimmingLruCache(context, Fixed(512)), storage)(EditHistoryDao, "EditHistoryStorage_Cached") {
   import EditHistoryStorage._
   import Threading.Implicits.Background
 

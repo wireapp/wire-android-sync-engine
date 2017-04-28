@@ -27,7 +27,7 @@ import com.waz.testutils.Matchers._
 import com.waz.threading.SerialDispatchQueue
 import com.waz.utils.TrimmingLruCache.Fixed
 import com.waz.utils.wrappers.{DB, DBCursor}
-import com.waz.utils.{CachedStorage, RichFuture, TrimmingLruCache}
+import com.waz.utils.{CachedStorageImpl, RichFuture, TrimmingLruCache}
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.prop.TableDrivenPropertyChecks._
 import org.scalatest.prop.Tables
@@ -59,7 +59,7 @@ class CachedStorageSpec extends FeatureSpec with Tables with Matchers with Befor
   val delayAndHalf = delay * 3 / 2
   val miniDelay = delay / 5
 
-  var storage: CachedStorage[String, Item] = _
+  var storage: CachedStorageImpl[String, Item] = _
   var created: Seq[String] = Nil
   var updated: Seq[(String, String)] = Nil
   var removed: Seq[String] = Nil
@@ -70,7 +70,7 @@ class CachedStorageSpec extends FeatureSpec with Tables with Matchers with Befor
     data ++= testData
     delay = 200.millis
 
-    storage = new CachedStorage[String, Item](new TrimmingLruCache[String, Option[Item]](context, Fixed(6)), db)(ItemDao, "CachedStorage") {
+    storage = new CachedStorageImpl[String, Item](new TrimmingLruCache[String, Option[Item]](context, Fixed(6)), db)(ItemDao, "CachedStorage") {
 
       override protected def delete(keys: Iterable[String])(implicit db: DB): Unit = {
         Thread.sleep(delay.toMillis)

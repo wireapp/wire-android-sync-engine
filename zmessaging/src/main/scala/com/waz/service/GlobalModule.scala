@@ -24,7 +24,7 @@ import com.waz.api.ZmsVersion
 import com.waz.bitmap.BitmapDecoder
 import com.waz.cache.CacheService
 import com.waz.client.RegistrationClient
-import com.waz.content.{AccountsStorage, Database, GlobalDatabase}
+import com.waz.content.{AccountsStorageImpl, Database, GlobalDatabase}
 import com.waz.service.assets.{AssetLoader, GlobalRecordAndPlayService}
 import com.waz.service.downloads.DownloadRequest.{AssetFromInputStream, UnencodedAudioAsset, VideoAsset}
 import com.waz.service.downloads._
@@ -67,7 +67,7 @@ class GlobalModule(val context: Context, val backend: BackendConfig) { global =>
 
   lazy val cacheCleanup = wire[CacheCleaningService]
 
-  lazy val accountsStorage = wire[AccountsStorage]
+  lazy val accountsStorage = wire[AccountsStorageImpl]
   lazy val mediaManager = wire[DefaultMediaManagerService]
   lazy val recordingAndPlayback = wire[GlobalRecordAndPlayService]
   lazy val tempFiles: TempFileService = wire[TempFileService]

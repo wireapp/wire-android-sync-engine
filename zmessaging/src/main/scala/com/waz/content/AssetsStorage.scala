@@ -25,11 +25,11 @@ import com.waz.model._
 import com.waz.threading.SerialDispatchQueue
 import com.waz.utils.TrimmingLruCache.Fixed
 import com.waz.utils.events.EventStream
-import com.waz.utils.{CachedStorage, TrimmingLruCache, _}
+import com.waz.utils.{CachedStorageImpl, TrimmingLruCache, _}
 
 import scala.concurrent.Future
 
-class AssetsStorage(context: Context, storage: Database) extends CachedStorage[AssetId, AssetData](new TrimmingLruCache(context, Fixed(100)), storage)(AssetDataDao, "AssetsStorage") {
+class AssetsStorage(context: Context, storage: Database) extends CachedStorageImpl[AssetId, AssetData](new TrimmingLruCache(context, Fixed(100)), storage)(AssetDataDao, "AssetsStorage") {
   private implicit val dispatcher = new SerialDispatchQueue(name = "AssetsStorage")
 
   val onUploadFailed = EventStream[AssetData]()

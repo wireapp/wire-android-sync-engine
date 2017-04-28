@@ -37,7 +37,7 @@ import scala.concurrent.Future
 import scala.util.Failure
 
 class MessagesStorage(context: Context, storage: ZmsDatabase, userId: UserId, convs: ConversationStorage, users: UsersStorage, msgAndLikes: => MessageAndLikesStorage, timeouts: Timeouts) extends
-    CachedStorage[MessageId, MessageData](new TrimmingLruCache[MessageId, Option[MessageData]](context, Fixed(MessagesStorage.cacheSize)), storage)(MessageDataDao, "MessagesStorage_Cached") {
+    CachedStorageImpl[MessageId, MessageData](new TrimmingLruCache[MessageId, Option[MessageData]](context, Fixed(MessagesStorage.cacheSize)), storage)(MessageDataDao, "MessagesStorage_Cached") {
 
   import com.waz.utils.events.EventContext.Implicits.global
 

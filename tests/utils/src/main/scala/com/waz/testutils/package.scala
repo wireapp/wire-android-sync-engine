@@ -37,7 +37,7 @@ import com.waz.service.ContactsService
 import com.waz.service.messages.MessageAndLikes
 import com.waz.threading.Threading
 import com.waz.utils.events.{EventContext, FlatMapSignal, Signal, Subscription}
-import com.waz.utils.{CachedStorage, Cleanup, Managed, returning}
+import com.waz.utils.{CachedStorageImpl, Cleanup, Managed, returning}
 import libcore.net.MimeUtils
 import org.robolectric.shadows.ShadowContentResolver2
 import org.scalactic.Equality
@@ -257,7 +257,7 @@ package object testutils {
   }
 
 
-  implicit class RichStorage[K, V](storage: CachedStorage[K, V]) {
+  implicit class RichStorage[K, V](storage: CachedStorageImpl[K, V]) {
     def deleteAll() = storage.list() flatMap { vs =>
       storage.remove(vs.map(storage.dao.idExtractor))
     }

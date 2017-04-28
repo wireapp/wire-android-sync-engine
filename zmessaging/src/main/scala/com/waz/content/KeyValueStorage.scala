@@ -23,7 +23,7 @@ import com.waz.model.KeyValueData
 import com.waz.model.KeyValueData.KeyValueDataDao
 import com.waz.threading.Threading
 import com.waz.utils.TrimmingLruCache.Fixed
-import com.waz.utils.{CachedStorage, TrimmingLruCache}
+import com.waz.utils.{CachedStorageImpl, TrimmingLruCache}
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -31,7 +31,7 @@ import scala.concurrent.{ExecutionContext, Future}
   * General preference storage in user db.
   * This can be used similarly to PreferenceService, but it keeps separate data for each logged in user as opposed to PreferenceService which uses single global preferences file.
   */
-class KeyValueStorage(context: Context, storage: ZmsDatabase) extends CachedStorage[String, KeyValueData](new TrimmingLruCache(context, Fixed(128)), storage)(KeyValueDataDao, "KeyValueStorage_Cached") {
+class KeyValueStorage(context: Context, storage: ZmsDatabase) extends CachedStorageImpl[String, KeyValueData](new TrimmingLruCache(context, Fixed(128)), storage)(KeyValueDataDao, "KeyValueStorage_Cached") {
   import KeyValueStorage._
   import Threading.Implicits.Background
 

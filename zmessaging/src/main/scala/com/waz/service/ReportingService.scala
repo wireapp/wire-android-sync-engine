@@ -24,7 +24,7 @@ import android.content.Context
 import com.waz.ZLog._
 import com.waz.api.ZmsVersion
 import com.waz.cache.{CacheService, Expiration}
-import com.waz.content.AccountsStorage
+import com.waz.content.AccountsStorageImpl
 import com.waz.content.WireContentProvider.CacheUri
 import com.waz.model.{AccountId, Mime}
 import com.waz.service.push.GcmGlobalService
