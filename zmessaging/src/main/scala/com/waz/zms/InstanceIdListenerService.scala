@@ -17,24 +17,27 @@
  */
 package com.waz.zms
 
-import com.google.firebase.iid.{FirebaseInstanceId, FirebaseInstanceIdService}
-import com.waz.ZLog.ImplicitTag._
+import com.google.firebase.iid.FirebaseInstanceIdService
 import com.waz.ZLog._
+import com.waz.ZLog.ImplicitTag._
 import com.waz.service.ZMessaging
 import com.waz.threading.Threading
+
+import scala.concurrent.Future
 
 class InstanceIdListenerService extends FirebaseInstanceIdService with ZMessagingService {
   import Threading.Implicits.Background
 
+  //TODO figure out how to test
   override def onTokenRefresh(): Unit = {
-    val token = Option(FirebaseInstanceId.getInstance().getToken())
-    info(s"onTokenRefresh() called, got token: $token")
-
-    token.foreach { t =>
-      ZMessaging.currentAccounts.getCurrentZms.map {
-        case Some(zms) => zms.pushToken.onTokenRefresh ! t
-        case None =>
-      }
+    info("FCM: onTokenRefresh() called")
+    ZMessaging.currentAccounts.getCurrentZms flatMap {
+      case Some(zms) =>
+        debug("clearing gcm token and requesting re-registration with gcm")
+        zms.sync.resetGcm()
+      case None =>
+        debug(s"ZMessaging not available, not registering")
+        Future.successful(())
     }
   }
 }

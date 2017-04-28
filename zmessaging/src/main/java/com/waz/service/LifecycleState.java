@@ -20,6 +20,6 @@ package com.waz.service;
 public enum LifecycleState {
     Stopped,    // user is logged out, this zms instance should not be used at that point, it won't be able to sync anything
     Idle,       // default state, has working database and basic net client
-    Active,     // push channel should be active (keeps WebSocket connection open)
+    Active,     // Websocket channel should be active
     UiActive    // active with UI - activity is currently in foreground (after onResume, before onPause)
 }

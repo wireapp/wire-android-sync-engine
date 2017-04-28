@@ -99,8 +99,8 @@ object SharedSettings {
       "org.apache.httpcomponents" % "httpclient" % "4.5.1", // to override version included in robolectric
       "junit" % "junit" % "4.8.2", //to override version included in robolectric
       "com.android.support" % "support-v4" % supportLibVersion,
-      "com.google.android.gms" % "play-services-base" % "7.8.0" exclude("com.android.support", "support-v4"),
-      "com.google.android.gms" % "play-services-gcm" % "7.8.0",
+      "com.google.android.gms" % "play-services-base" % "9.0.0" % Provided exclude("com.android.support", "support-v4"),
+      "com.google.firebase" % "firebase-messaging" % "9.0.0" % Provided,
       Deps.avs,
       Deps.cryptobox,
       "com.wire" % "avs-native" % avsVersion % Native,

@@ -1,21 +1,44 @@
+/*
+ * Wire
+ * Copyright (C) 2016 Wire Swiss GmbH
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ */
 package com.waz.service.push
 
-import com.localytics.android.Localytics
 import com.waz.HockeyApp
+import com.waz.ZLog.ImplicitTag._
 import com.waz.ZLog.verbose
-import com.waz.model.GcmTokenRemoveEvent
-import com.waz.service.{EventScheduler, PreferenceService}
+import com.waz.content.AccountsStorage
+import com.waz.model.{AccountId, GcmTokenRemoveEvent}
+import com.waz.service.{EventScheduler, PreferenceService, ZmsLifecycle}
+import com.waz.sync.SyncServiceHandle
 import com.waz.threading.SerialDispatchQueue
 import com.waz.utils._
 import com.waz.utils.events.{EventContext, EventStream, Signal}
-import com.waz.utils.wrappers.GoogleApi
+import com.waz.utils.wrappers.{GoogleApi, Localytics}
 import org.threeten.bp.Instant
 
 import scala.concurrent.Future
 import scala.util.control.NonFatal
 
 class PushTokenService(googleApi: GoogleApi,
-                       prefs:     PreferenceService) {
+                       prefs:     PreferenceService,
+                       lifeCycle: ZmsLifecycle,
+                       accountId: AccountId,
+                       accounts:  AccountsStorage,
+                       sync:      SyncServiceHandle) {
 
   import PushTokenService._
 
@@ -28,11 +51,13 @@ class PushTokenService(googleApi: GoogleApi,
   val lastReceivedConvEventTime = preference[Instant]("last_received_conv_event_time", Instant.EPOCH)
   val lastFetchedConvEventTime  = preference[Instant]("last_fetched_conv_event_time",  Instant.ofEpochMilli(1))
   val lastFetchedLocalTime      = preference[Instant]("last_fetched_local_time",       Instant.EPOCH)
-  val lastRegistrationTime      = preference[Instant]("push_registration_time",        Instant.EPOCH)
-  val registrationRetryCount    = preference[Int]    ("push_registration_retry_count", 0)
+  val lastTokenCreatedTime      = preference[Instant]("push_registration_time",        Instant.EPOCH)
+  //TODO check to see we don't increase the fail limit if the token hasn't been registered yet... Or maybe registration should be part of this class...
+  val lastTokenRegisteredTime   = preference[Instant]("push_registration_time",        Instant.EPOCH)
+  val tokenFailedCount          = preference[Int]    ("push_token_failure_count",      0)
 
   private val pushEnabled = uiPreferenceBooleanSignal(gcmEnabledKey).signal
-  private val currentTokenPref = preference[Option[String]]("push_token", None)
+  val currentTokenPref = preference[Option[String]]("push_token", None)
 
   val onTokenRefresh = EventStream[String]()
 
@@ -50,51 +75,61 @@ class PushTokenService(googleApi: GoogleApi,
     lastFetched    <- lastFetchedConvEventTime.signal
     lastReceived   <- lastReceivedConvEventTime.signal
     localFetchTime <- lastFetchedLocalTime.signal
-    lastRegistered <- lastRegistrationTime.signal
+    lastCreated    <- lastTokenCreatedTime.signal
   } yield {
-    verbose(s"gcmState, lastFetched: $lastFetched, lastReceived: $lastReceived, localFetchTime: $localFetchTime, lastRegistered: $lastRegistered")
-    PushState(lastFetched <= lastReceived, localFetchTime <= lastRegistered)
+    verbose(s"gcmState, lastFetched: $lastFetched, lastReceived: $lastReceived, localFetchTime: $localFetchTime, lastCreated: $lastCreated")
+    PushState(lastFetched <= lastReceived, localFetchTime <= lastCreated)
   }
 
   pushState {
-    case PushState(true, _) => registrationRetryCount := 0
+    case PushState(true, _) => tokenFailedCount := 0
     case _ =>
   }
 
-  private val shouldReRegister = for {
-    play    <- googleApi.isGooglePlayServicesAvailable
-    state   <- pushState
-    time    <- lastRegistrationTime.signal
-    retries <- registrationRetryCount.signal
-  } yield {
-    verbose(s"should re-register, play available: $play, state: $state, lastTry: $time, retries: $retries")
-    play && !state.active && RegistrationRetryBackoff.delay(math.max(0, retries - retryFailLimit)).elapsedSince(time)
-  }
+  private val shouldGenerateNewToken = (for {
+    play     <- googleApi.isGooglePlayServicesAvailable if play
+    state    <- pushState
+    time     <- lastTokenCreatedTime.signal
+    failures <- tokenFailedCount.signal
+    current  <- currentTokenPref.signal
+  } yield
+    current.isEmpty || (!state.active && RegistrationRetryBackoff.delay(math.max(0, failures - retryFailLimit)).elapsedSince(time))
+  ).orElse(Signal.const(false))
 
-  shouldReRegister {
+  shouldGenerateNewToken {
     case true =>
-      (for {
-        retries <- registrationRetryCount()
-        if retries > retryFailLimit
-        _ <- setNewToken()
-      } yield retries).flatMap(retries => registrationRetryCount := retries + 1)
-
+      for {
+        failures <- tokenFailedCount()
+        current  <- currentTokenPref.signal
+      } {
+        if (current.isEmpty || failures > retryFailLimit) {
+          verbose("No token or we've exceeded the retry fail limit - setting a new token")
+          setNewToken()
+        }
+        else if (current.isDefined && failures < retryFailLimit) {
+          verbose(s"Seems as though we missed messages $failures times in a row - increase the fail count")
+          tokenFailedCount.mutate(_ + 1)
+        }
+      }
     case false =>
       verbose(s"shouldReRegister == false")
   }
 
-  val currentPushToken = for {
-    push  <- pushEnabled
-    play  <- googleApi.isGooglePlayServicesAvailable
+  val pushActive = (for {
+    push     <- pushEnabled
+    play     <- googleApi.isGooglePlayServicesAvailable
+    lcActive <- lifeCycle.active
+    if push && play && !lcActive
     st    <- pushState
-    ct    <- registrationRetryCount.signal
-    token <- currentTokenPref.signal
+    ct    <- tokenFailedCount.signal
   } yield {
     //If we missed a gcm notification (say because the GCM server connection was down), then the state will be !active
     //but we don't want to turn on the websocket just yet - we would then rely on web-socket and not get any updates to GCM, meaning
     //it would be permanently disabled.
-    if (push && play && (st.active || ct < retryFailLimit)) token else None
-  }
+    returning(st.active || ct < retryFailLimit) { active =>
+      verbose(s"Should push be active $active")
+    }
+  }).orElse(Signal.const(false))
 
   val eventProcessingStage = EventScheduler.Stage[GcmTokenRemoveEvent] { (convId, events) =>
     currentTokenPref().flatMap {
@@ -113,10 +148,37 @@ class PushTokenService(googleApi: GoogleApi,
       Localytics.setPushRegistrationId(t)
     }
     verbose(s"Setting new push token: $t")
-    currentTokenPref := t
+    for {
+      _ <- currentTokenPref := t
+      _ <- tokenFailedCount := 0
+      _ <- lastTokenCreatedTime := Instant.now()
+    } yield {}
   } catch {
     case NonFatal(ex) => Future.successful {
       HockeyApp.saveException(ex, s"unable to set push token")
+    }
+  }
+
+  private val shouldRegister = (for {
+    userToken         <- accounts.signal(accountId).map(_.registeredPush)
+    Some(globalToken) <- currentTokenPref.signal
+  } yield {
+    userToken.isEmpty || userToken.contains(globalToken)
+  }).orElse(Signal.const(false))
+
+  shouldRegister {
+    case true => sync.registerPush()
+    case false => //
+  }
+
+  def onTokenRegistered(): Future[Unit] = {
+    currentTokenPref().flatMap {
+      case Some(token) =>
+        for {
+          _ <- accounts.update(accountId, _.copy(registeredPush = Some(token)))
+          _ <- lastTokenRegisteredTime := Instant.now()
+        } yield {}
+      case _ => Future.successful({})
     }
   }
 }
