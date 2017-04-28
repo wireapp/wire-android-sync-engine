@@ -47,6 +47,7 @@ public enum SyncCommand {
     SyncRichMedia("sync-rich-media"),
     SyncConnectedUsers("sync-connected"),
     RegisterGcmToken("register-gcm-token"),
+    RegisterPushToken("register-push-token"),
     PostSelf("post-self"),
     PostAddressBook("post-addressbook"),
     PostInvitation("post-invitation"),
