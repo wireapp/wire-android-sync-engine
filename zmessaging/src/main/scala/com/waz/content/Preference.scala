@@ -17,6 +17,8 @@
  */
 package com.waz.content
 
+import com.waz.ZLog.ImplicitTag._
+import com.waz.ZLog.verbose
 import com.waz.model.Id
 import com.waz.threading.{SerialDispatchQueue, Threading}
 import com.waz.utils.events.{Signal, SourceSignal}
@@ -50,12 +52,25 @@ object Preference {
     override def update(value: Option[A]) = Future.successful({})
   }
 
-  def inMemory[A](defaultValue: A): Preference[A] = new Preference[A] {
+  def inMemory[A](defaultValue: A, key: Option[String] = None): Preference[A] = new Preference[A] {
     override protected implicit val dispatcher = new SerialDispatchQueue()
+
+    private lazy val hash = s"@${Integer.toHexString(hashCode)}"
+
     private var value = defaultValue
+
     override def default = defaultValue
-    override def update(v: A) = Future { value = v; signal ! v }
-    override def apply() = Future { value }
+
+    override def update(v: A) = Future {
+      key.foreach(k => verbose(s"updating $k$hash: $value to $v"))
+      value = v
+      signal ! v
+    }
+
+    override def apply() = Future {
+      key.foreach(k => verbose(s"getting $k$hash: $value"))
+      value
+    }
   }
 
   def apply[A](defaultValue: A, load: => Future[A], save: A => Future[Any]): Preference[A] = new Preference[A] {

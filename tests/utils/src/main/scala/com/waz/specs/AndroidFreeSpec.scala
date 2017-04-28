@@ -19,7 +19,7 @@ package com.waz.specs
 
 import java.util.concurrent.{Executors, ThreadFactory}
 
-import com.waz.ZLog.{LogLevel, LogTag}
+import com.waz.ZLog.LogTag
 import com.waz.threading.{SerialDispatchQueue, Threading}
 import com.waz.utils.isTest
 import com.waz.utils.wrappers.{Intent, JVMIntentUtil, JavaURIUtil, URI, _}
@@ -41,7 +41,7 @@ trait AndroidFreeSpec extends BeforeAndAfterAll { this: Suite =>
 
     isTest = true
 
-    ZLog.testLogLevel = LogLevel.Error
+    ZLog.setTestLogging()
 
     Intent.setUtil(JVMIntentUtil)
 

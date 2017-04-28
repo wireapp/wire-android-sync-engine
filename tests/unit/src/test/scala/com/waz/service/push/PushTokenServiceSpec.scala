@@ -17,70 +17,129 @@
  */
 package com.waz.service.push
 
+import com.waz.ZLog
+import com.waz.ZLog.LogLevel
 import com.waz.content.{AccountsStorage, Preference}
 import com.waz.content.Preference.PrefCodec
-import com.waz.model.{AccountData, AccountId}
+import com.waz.model.{AccountData, AccountId, SyncId}
+import com.waz.service.push.PushTokenService.pushTokenPrefKey
 import com.waz.service.{PreferenceService, ZmsLifecycle}
 import com.waz.specs.AndroidFreeSpec
 import com.waz.sync.SyncServiceHandle
-import com.waz.utils.events.Signal
+import com.waz.threading.Threading
+import com.waz.utils.events.{Signal, SourceSignal}
+import com.waz.utils.returning
 import com.waz.utils.wrappers.GoogleApi
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.{FeatureSpec, Matchers}
+import org.scalatest.{BeforeAndAfter, FeatureSpec, Matchers}
 
-import scala.concurrent.Await
+import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
 
-class PushTokenServiceSpec extends FeatureSpec with AndroidFreeSpec with MockFactory with Matchers {
+class PushTokenServiceSpec extends FeatureSpec with AndroidFreeSpec with MockFactory with Matchers with BeforeAndAfter {
+
+  import PushTokenService._
 
   val gcmEnabledKey = "PUSH_ENABLED_KEY"
 
-  val google = mock[GoogleApi]
-  val prefs = mock[PreferenceService]
+  val google    = mock[GoogleApi]
+  val prefs     = mock[PreferenceService]
   val lifecycle = mock[ZmsLifecycle]
-  val accounts = mock[AccountsStorage]
+  val accounts  = mock[AccountsStorage]
+  val sync      = mock[SyncServiceHandle]
   val accountId = AccountId()
-  val sync = mock[SyncServiceHandle]
 
-  val pushEnabledPref = Preference.inMemory[Boolean](false)
-  val googlePlayAvailable = Signal(false)
-  val lifecycleActive = Signal(false)
-  val accountSignal = Signal.empty[AccountData]
+  var pushEnabledPref: Preference[Boolean] = _
+  var pushTokenPref: Preference[Option[String]] = _
+
+  var googlePlayAvailable: SourceSignal[Boolean] = _
+  var lifecycleActive: SourceSignal[Boolean] = _
+  var accountSignal: SourceSignal[AccountData] = _
 
   val defaultDuration = 5.seconds
 
-  feature("Token availability") {
+  before {
+    pushEnabledPref = Preference.inMemory[Boolean](false, if (ZLog.testLogging) Some(gcmEnabledKey) else None)
+    pushTokenPref = Preference.inMemory[Option[String]](None, if (ZLog.testLogging) Some(pushTokenPrefKey) else None)
+
+    googlePlayAvailable = Signal(false)
+    lifecycleActive = Signal(false)
+    accountSignal = Signal[AccountData]()
+  }
+
+  feature("Token generation") {
     scenario("Fetches token on init if GCM available") {
-
       val token = "token"
       (google.getPushToken _).expects().returning(token)
       val service = initTokenService()
 
       pushEnabledPref := true
       googlePlayAvailable ! true
-
-      Await.ready(service.currentTokenPref.signal.filter(_.contains(token)).head, defaultDuration)
-      Await.ready(service.tokenFailedCount.signal.filter(_ == 0).head, defaultDuration)
-    }
-
-    scenario("Fetches new token if failure count exceeds retry limit") {
-      val token = "token"
-      (google.getPushToken _).expects().returning(token)
-      val service = initTokenService()
-
-      pushEnabledPref := true
-      googlePlayAvailable ! true
-
       Await.ready(service.currentTokenPref.signal.filter(_.contains(token)).head, defaultDuration)
     }
 
-
-    scenario("Remove Push Token event should create new token and reset retry count") {
+    scenario("Remove Push Token event should create new token and delete all previous tokens") {
       fail()
     }
 
     scenario("If play services is not available, we should never query for a new token") {
       fail()
+    }
+
+    scenario("InstanceIdService refresh should generate new token") {
+      fail()
+    }
+  }
+
+  feature("Token registration") {
+    scenario("Current: If current user does not have matching registeredPush token, register the user with our BE") {
+
+      accountSignal ! AccountData(accountId, None, "", None, None, Some("oldToken"))
+      pushEnabledPref := true
+      googlePlayAvailable ! true
+
+      val token = "token"
+      (google.getPushToken _).expects().anyNumberOfTimes().returning(token)
+
+      lazy val service = initTokenService()
+
+      (sync.registerPush _).expects().anyNumberOfTimes().onCall { () =>
+        Future {
+          service.onTokenRegistered()
+          SyncId()
+        } (Threading.Background)
+      }
+
+      Await.result(service.currentTokenPref.signal.filter(_.contains(token)).head, defaultDuration)
+      Await.result(accountSignal.filter(_.registeredPush.contains(token)).head, defaultDuration)
+    }
+
+    scenario("Changed token should trigger re-registration for current user") {
+      accountSignal ! AccountData(accountId, None, "", None, None, Some("token"))
+      pushEnabledPref := true
+      googlePlayAvailable ! true
+
+      val token = "token"
+      (google.getPushToken _).expects().anyNumberOfTimes().returning(token)
+
+      lazy val service = initTokenService()
+
+      (sync.registerPush _).expects().anyNumberOfTimes().onCall { () =>
+        Future {
+          service.onTokenRegistered()
+          SyncId()
+        } (Threading.Background)
+      }
+
+      Await.ready(service.currentTokenPref.signal.filter(_.contains(token)).head, defaultDuration)
+      Await.ready(accountSignal.filter(_.registeredPush.contains(token)).head, defaultDuration)
+
+      val newToken = "newToken"
+      service.onTokenRefresh ! newToken
+
+      Await.ready(service.currentTokenPref.signal.filter(_.contains(newToken)).head, defaultDuration)
+      Await.ready(accountSignal.filter(_.registeredPush.contains(newToken)).head, defaultDuration)
+
     }
   }
 
@@ -137,20 +196,28 @@ class PushTokenServiceSpec extends FeatureSpec with AndroidFreeSpec with MockFac
                        accountId: AccountId         = accountId,
                        accounts:  AccountsStorage   = accounts,
                        sync:      SyncServiceHandle = sync) = {
-    mockPreference(prefs)
+    import PushTokenService._
+
     (prefs.gcmEnabledKey _).expects().returning(gcmEnabledKey)
     (prefs.uiPreferenceBooleanSignal _).expects(gcmEnabledKey, false).returning(pushEnabledPref)
+    (prefs.preference (_: String, _: Option[String])(_: PrefCodec[Option[String]])).expects(*, *, *).anyNumberOfTimes().onCall { (key, default, _) =>
+      key match {
+        case `pushTokenPrefKey` => pushTokenPref
+        case _ => fail(s"Unexpected call to prefs.preference with key: $key")
+      }
+    }
     (google.isGooglePlayServicesAvailable _).expects().anyNumberOfTimes().returning(googlePlayAvailable)
     (accounts.signal _).expects(*).anyNumberOfTimes().returning(accountSignal)
     (lifecycle.active _).expects().anyNumberOfTimes().returning(lifecycleActive)
+    (accounts.update _).expects(accountId, *).anyNumberOfTimes().onCall { (_, f) =>
+      Future {
+        returning(accountSignal.currentValue("").fold(Option.empty[(AccountData, AccountData)])(p => Some((p, f(p))))) {
+          case Some((_, updated)) => accountSignal ! updated
+          case _ =>
+        }
+      }(Threading.Background)
+    }
 
     new PushTokenService(google, prefs, lifecycle, accountId, accounts, sync)
   }
-
-  def mockPreference[A](mockPrefs: PreferenceService) = {
-    (mockPrefs.preference (_: String, _: A)(_: PrefCodec[A])).expects(*, *, *).anyNumberOfTimes().onCall { (_, default, _) =>
-      Preference.inMemory[A](default)
-    }
-  }
-
 }
