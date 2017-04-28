@@ -72,29 +72,30 @@ class GcmGlobalService(context: Context, val prefs: PreferenceServiceImpl, metad
   }
 
   //removes the current gcm token and generates a new one - ensures that the user shouldn't be left without a GCM token
-  def resetGcm(user: AccountId): Future[Option[GcmRegistration]] = unregister().flatMap { _ =>
+  def resetGcm(user: AccountId): CancellableFuture[Option[GcmRegistration]] = CancellableFuture.lift(unregister()) flatMap { _ =>
     withGcm {
       LoggedTry {deleteInstanceId()} // if localytics registered first with only their sender id, we have to unregister so that our own additional sender id gets registered, too
       try {
         val token = getFcmToken
         Localytics.setPushDisabled(false)
         Localytics.setPushRegistrationId(token)
-        Future.successful(Some(setGcm(token, AccountId(""))))
+        CancellableFuture.successful(Some(setGcm(token, AccountId(""))))
       } catch {
         case NonFatal(ex) =>
           setGcm("", AccountId(""))
           warn(s"registerGcm failed for sender: '$gcmSenderId'", ex)
           HockeyApp.saveException(ex, s"unable to register gcm for sender $gcmSenderId")
-          Future.successful(None)
+          CancellableFuture.successful(None)
       }
     }
   }
 
-  private def setGcm(token: String, user: AccountId): GcmRegistration =
-    returning(GcmRegistration(token, user, appVersion)) { reg =>
-      verbose(s"setGcmRegistration: $reg")
-      editPreferences(reg.save(_))
-    }
+  private def setGcm(token: String, user: AccountId): GcmRegistration = {
+    val reg = GcmRegistration(token, user, appVersion)
+    verbose(s"setGcmRegistration: $reg")
+    editPreferences(reg.save(_))
+    reg
+  }
 
   //used to indicate that the token was registered properly with the BE - no user indicates it's not registered
   def updateRegisteredUser(token: String, user: AccountId) = withPreferences { prefs =>

@@ -34,10 +34,12 @@ import com.waz.sync.client.{AssetClient, VersionBlacklistClient}
 import com.waz.ui.MemoryImageCache
 import com.waz.ui.MemoryImageCache.{Entry, Key}
 import com.waz.utils.Cache
+import com.waz.utils.wrappers.{GoogleApi, GoogleApiImpl}
 import com.waz.znet._
 
 
 class GlobalModule(val context: Context, val backend: BackendConfig) { global =>
+  lazy val googleApi: GoogleApi = new GoogleApiImpl
   lazy val storage: Database = new GlobalDatabase(context)
   lazy val prefs: PreferenceServiceImpl = wire[PreferenceServiceImpl]
   lazy val metadata: MetaDataService = wire[MetaDataService]

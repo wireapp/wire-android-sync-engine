@@ -173,14 +173,19 @@ class GcmService(accountId:         AccountId,
     }
   }
 
-  def resetGcm(): Future[Option[GcmRegistration]] = gcmGlobalService.resetGcm(accountId)
-
-  def onGcmRegistered(reg: GcmRegistration): Future[Unit] = {
-    for {
-      _ <- lastRegistrationTime := Instant.now
-      f <- gcmGlobalService.updateRegisteredUser(reg.token, accountId)
-    } yield f
-  }
+  //Will first unregister the current token before registering a new one
+  def resetGcm(post: GcmRegistration => Future[Boolean]): Future[Option[GcmRegistration]] =
+    gcmGlobalService.resetGcm(accountId).future flatMap {
+      case Some(reg) => post(reg) flatMap {
+        case true =>
+          lastRegistrationTime := Instant.now
+          gcmGlobalService.updateRegisteredUser(reg.token, accountId).future map {
+            Some(_)
+          }
+        case false => Future.successful(Some(reg))
+      }
+      case None => Future.successful(None)
+    }
 
   def addNotificationToProcess(nId: Uid, not: Option[PushNotification] = None): Future[Any] = {
     not.foreach { n =>
