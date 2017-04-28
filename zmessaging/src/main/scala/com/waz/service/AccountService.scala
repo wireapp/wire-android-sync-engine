@@ -75,7 +75,7 @@ class UserModule(val userId: UserId, val account: AccountService) {
       import com.waz.api.ClientRegistrationState._
       clientsSync.registerClient(account.password) map {
         case Right((REGISTERED, Some(cl))) =>
-          Right(account.copy(clientId = Some(cl.id), clientRegState = REGISTERED, activated = true))
+          Right(account.copy(clientId = Some(cl.id), clientRegState = REGISTERED, verified = true))
         case Right((state, _)) =>
           sync.syncSelfClients() // request clients sync, UI will need that
           Right(account.copy(clientRegState = state))
@@ -200,7 +200,7 @@ class AccountService(@volatile var account: AccountData, val global: GlobalModul
 
   accountData.zip(isLoggedIn) {
     case (acc, loggedIn) =>
-      if (loggedIn && acc.activated && (acc.userId.isEmpty || acc.clientId.isEmpty)) {
+      if (loggedIn && acc.verified && (acc.userId.isEmpty || acc.clientId.isEmpty)) {
         verbose(s"account data needs registration: $acc")
         Serialized.future(self) { ensureFullyRegistered() }
       }
@@ -211,7 +211,7 @@ class AccountService(@volatile var account: AccountData, val global: GlobalModul
   private var awaitActivationFuture = CancellableFuture successful Option.empty[AccountData]
 
   private val shouldAwaitActivation = lifecycle.uiActive.zip(accountsStorage.optSignal(id)) map {
-    case (true, Some(acc)) => !acc.activated && acc.password.isDefined
+    case (true, Some(acc)) => !acc.verified && acc.password.isDefined
     case _ => false
   }
 
@@ -239,12 +239,12 @@ class AccountService(@volatile var account: AccountData, val global: GlobalModul
     case None =>
       Serialized.future(this) {
         accountsStorage.get(id) flatMap {
-          case Some(ad @ AccountData(_, _, _, _, _, None, _, _, _, _, _, _, _)) =>
+          case Some(ad @ AccountData(_, _, _, _, _, _, _, None, _, _, _, _, _, _)) =>
             verbose(s"account data has no cookie, user not logged in: $ad")
             Future successful None
           case Some(acc) =>
             ensureFullyRegistered() flatMap {
-              case Right(a @ AccountData(_, _, _, _, _, _, _, _, Some(_), Some(_), _, _, _)) if a.activated =>
+              case Right(a @ AccountData(_, _, _, _, _, _, _, _, _, _, Some(_), Some(_), _, _)) if a.verified =>
                 zmessaging.filter(_.isDefined).head // wait until loaded
               case _ =>
                 zmessaging.head
@@ -313,7 +313,7 @@ class AccountService(@volatile var account: AccountData, val global: GlobalModul
           case None => Future successful Left(ErrorResponse.internalError(s"Missing AccountData for id: $id"))
           case Some(acc) =>
             activate(acc, credentials).future flatMap {
-              case Right(acc1) if acc1.activated =>
+              case Right(acc1) if acc1.verified =>
                 loadSelfUser(acc1) flatMap {
                   case Right(acc2) =>
                     // TODO: check if there is some other AccountData with the same userId already present
@@ -321,7 +321,7 @@ class AccountService(@volatile var account: AccountData, val global: GlobalModul
                     // we should merge those accounts, delete current one, and switch to the previous one
                     userModule.head flatMap { _.ensureClientRegistered(acc2) } flatMap {
                       case Right(acc3) =>
-                        accountsStorage.updateOrCreate(id, _.updated(acc3.userId, acc3.activated, acc3.clientId, acc3.clientRegState), acc3) map { Right(_) }
+                        accountsStorage.updateOrCreate(id, _.updated(acc3.userId, acc3.verified, acc3.clientId, acc3.clientRegState), acc3) map { Right(_) }
                       case Left(err) => Future successful Left(err)
                     }
                   case Left(err) => Future successful Left(err)
@@ -334,18 +334,18 @@ class AccountService(@volatile var account: AccountData, val global: GlobalModul
   }
 
   private def activate(account: AccountData, credentials: Credentials): CancellableFuture[Either[ErrorResponse, AccountData]] =
-    if (account.activated) CancellableFuture successful Right(account)
+    if (account.verified) CancellableFuture successful Right(account)
     else loginClient.login(account.id, credentials) flatMap {
       case Right((token, cookie)) =>
         CancellableFuture lift {
           for {
             _ <- credentialsHandler.cookie := cookie
             _ <- credentialsHandler.accessToken := Some(token)
-            acc <- accountsStorage.updateOrCreate(id, _.copy(activated = true, cookie = cookie, accessToken = Some(token)), account.copy(activated = true, cookie = cookie, accessToken = Some(token)))
+            acc <- accountsStorage.updateOrCreate(id, _.copy(verified = true, cookie = cookie, accessToken = Some(token)), account.copy(verified = true, cookie = cookie, accessToken = Some(token)))
           } yield Right(acc)
         }
       case Left((_, ErrorResponse(Status.Forbidden, _, "pending-activation"))) =>
-        CancellableFuture successful Right(account.copy(activated = false))
+        CancellableFuture successful Right(account.copy(verified = false))
       case Left((_, err)) =>
         verbose(s"activate failed: $err")
         CancellableFuture successful Left(err)
@@ -354,11 +354,11 @@ class AccountService(@volatile var account: AccountData, val global: GlobalModul
   private def awaitActivation(retry: Int = 0): CancellableFuture[Option[AccountData]] =
     CancellableFuture lift accountsStorage.get(id) flatMap {
       case None => CancellableFuture successful None
-      case Some(data) if data.activated => CancellableFuture successful Some(data)
+      case Some(data) if data.verified => CancellableFuture successful Some(data)
       case Some(_) if !lifecycle.isUiActive => CancellableFuture successful None
       case Some(data) =>
         activate(data, credentials) flatMap {
-          case Right(acc) if acc.activated => CancellableFuture successful Some(acc)
+          case Right(acc) if acc.verified => CancellableFuture successful Some(acc)
           case _ =>
             CancellableFuture.delay(ActivationThrottling.delay(retry)) flatMap { _ => awaitActivation(retry + 1) }
         }

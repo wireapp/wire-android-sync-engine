@@ -95,7 +95,7 @@ object OtrClients {
   def incoming(implicit ui: UiModule): OtrClients = new OtrClients({ account =>
 
     account.accountData flatMap {
-      case AccountData(_, _, _, _, _, _, _, _, Some(userId), Some(clientId), _, _, _) =>
+      case AccountData(_, _, _, _, _, _, _, _, _, _, Some(userId), Some(clientId), _, _) =>
         account.storage.otrClientsStorage.incomingClientsSignal(userId, clientId).map { cs =>
           (userId, cs.sorted(IncomingClientOrdering).toVector)
         }
