@@ -17,12 +17,11 @@
  */
 package com.waz.specs
 
-import com.waz.utils.wrappers._
-import com.waz.ZLog
-import com.waz.ZLog.LogLevel
+import com.waz.ZLog.{LogLevel, LogTag}
 import com.waz.threading.{DispatchQueue, Threading}
 import com.waz.utils.isTest
-import com.waz.utils.wrappers.{Intent, JVMIntentUtil, JavaURIUtil, URI}
+import com.waz.utils.wrappers.{Intent, JVMIntentUtil, JavaURIUtil, URI, _}
+import com.waz.{HockeyApp, HockeyAppUtil, ZLog}
 import org.scalatest.{BeforeAndAfterAll, Suite}
 
 trait AndroidFreeSpec extends BeforeAndAfterAll { this: Suite =>
@@ -44,6 +43,16 @@ trait AndroidFreeSpec extends BeforeAndAfterAll { this: Suite =>
     Threading.setUi(new DispatchQueue {
       override def execute(runnable: Runnable) = ???
     })
+
+    Localytics.setUtil(None)
+
+    HockeyApp.setUtil(Some(new HockeyAppUtil {
+      override def saveException(t: Throwable, description: String)(implicit tag: LogTag) = {
+        println("Exception sent to HockeyApp:")
+        println(description)
+        t.printStackTrace()
+      }
+    }))
   }
 
 }

@@ -27,22 +27,32 @@ import scala.util.Try
 
 object HockeyApp {
 
-  def saveException(t: Throwable, description: String)(implicit tag: LogTag): Unit = {
-    error(description, t)
-    if (shouldReport(t)) {
-      ExceptionHandler.saveException(t, new CrashManagerListener {
-        override def shouldAutoUploadCrashes: Boolean = true
-        override def getUserID: String = Try(ZMessaging.context.getSharedPreferences("zprefs", Context.MODE_PRIVATE).getString("com.waz.device.id", "???")).getOrElse("????")
-        override def getDescription: String = s"zmessaging - $tag - $description"
-      })
+  private var util: Option[HockeyAppUtil] = Some(new HockeyAppUtil {
+    override def saveException(t: Throwable, description: String)(implicit tag: LogTag) = {
+      error(description, t)
+      if (shouldReport(t)) {
+        ExceptionHandler.saveException(t, new CrashManagerListener {
+          override def shouldAutoUploadCrashes: Boolean = true
+          override def getUserID: String = Try(ZMessaging.context.getSharedPreferences("zprefs", Context.MODE_PRIVATE).getString("com.waz.device.id", "???")).getOrElse("????")
+          override def getDescription: String = s"zmessaging - $tag - $description"
+        })
+      }
     }
-  }
+
+    def shouldReport(t: Throwable) = t match {
+      case _: NoReporting => false
+      case _: RSRuntimeException => false
+      case _ => true
+    }
+  })
+
+  def setUtil(util: Option[HockeyAppUtil]) = this.util = util
+
+  def saveException(t: Throwable, description: String)(implicit tag: LogTag): Unit = util.foreach(_.saveException(t, description))
 
   trait NoReporting { self: Throwable => }
+}
 
-  def shouldReport(t: Throwable) = t match {
-    case _: NoReporting => false
-    case _: RSRuntimeException => false
-    case _ => true
-  }
+trait HockeyAppUtil {
+  def saveException(t: Throwable, description: String)(implicit tag: LogTag): Unit
 }
