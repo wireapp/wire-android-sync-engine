@@ -18,11 +18,9 @@
 package com.waz.service.push
 
 import com.waz.ZLog
-import com.waz.ZLog.LogLevel
-import com.waz.content.{AccountsStorage, Preference}
 import com.waz.content.Preference.PrefCodec
-import com.waz.model.{AccountData, AccountId, SyncId}
-import com.waz.service.push.PushTokenService.pushTokenPrefKey
+import com.waz.content.{AccountsStorage, Preference}
+import com.waz.model._
 import com.waz.service.{PreferenceService, ZmsLifecycle}
 import com.waz.specs.AndroidFreeSpec
 import com.waz.sync.SyncServiceHandle
@@ -33,8 +31,8 @@ import com.waz.utils.wrappers.GoogleApi
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{BeforeAndAfter, FeatureSpec, Matchers}
 
-import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
+import scala.concurrent.{Await, Future}
 
 class PushTokenServiceSpec extends FeatureSpec with AndroidFreeSpec with MockFactory with Matchers with BeforeAndAfter {
 
@@ -78,21 +76,38 @@ class PushTokenServiceSpec extends FeatureSpec with AndroidFreeSpec with MockFac
       Await.ready(service.currentTokenPref.signal.filter(_.contains(token)).head, defaultDuration)
     }
 
-    scenario("Remove Push Token event should create new token and delete all previous tokens") {
-      fail()
-    }
+    scenario("Current: Remove Push Token event should create new token and delete all previous tokens") {
 
-    scenario("If play services is not available, we should never query for a new token") {
-      fail()
-    }
+      val oldToken = "oldToken"
+      val newToken = "newToken"
+      var calls = 0
+      (google.getPushToken _).expects().anyNumberOfTimes().onCall { () =>
+        calls += 1
+        calls match {
+          case 1 => oldToken
+          case 2 => newToken
+          case _ => fail("Too many calls to getPushToken!")
+        }
+      }
 
-    scenario("InstanceIdService refresh should generate new token") {
-      fail()
+      //This needs to be called
+      (google.deleteAllPushTokens _).expects().once()
+
+      val service = initTokenService()
+
+      pushEnabledPref := true
+      googlePlayAvailable ! true
+      //wait for first token to be set
+      Await.ready(service.currentTokenPref.signal.filter(_.contains(oldToken)).head, defaultDuration)
+      //delete first token in response to BE event
+      service.eventProcessingStage(RConvId(), Vector(GcmTokenRemoveEvent(oldToken, "sender", Some("client"))))
+      //new token should be set
+      Await.ready(service.currentTokenPref.signal.filter(_.contains(newToken)).head, defaultDuration)
     }
   }
 
   feature("Token registration") {
-    scenario("Current: If current user does not have matching registeredPush token, register the user with our BE") {
+    scenario("If current user does not have matching registeredPush token, register the user with our BE") {
 
       accountSignal ! AccountData(accountId, None, "", None, None, Some("oldToken"))
       pushEnabledPref := true
@@ -114,7 +129,7 @@ class PushTokenServiceSpec extends FeatureSpec with AndroidFreeSpec with MockFac
       Await.result(accountSignal.filter(_.registeredPush.contains(token)).head, defaultDuration)
     }
 
-    scenario("Changed token should trigger re-registration for current user") {
+    scenario("Instance Id token registration should trigger re-registration for current user") {
       accountSignal ! AccountData(accountId, None, "", None, None, Some("token"))
       pushEnabledPref := true
       googlePlayAvailable ! true
@@ -135,7 +150,7 @@ class PushTokenServiceSpec extends FeatureSpec with AndroidFreeSpec with MockFac
       Await.ready(accountSignal.filter(_.registeredPush.contains(token)).head, defaultDuration)
 
       val newToken = "newToken"
-      service.onTokenRefresh ! newToken
+      service.onTokenRefresh ! newToken //InstanceIDService triggers new token
 
       Await.ready(service.currentTokenPref.signal.filter(_.contains(newToken)).head, defaultDuration)
       Await.ready(accountSignal.filter(_.registeredPush.contains(newToken)).head, defaultDuration)
@@ -184,7 +199,7 @@ class PushTokenServiceSpec extends FeatureSpec with AndroidFreeSpec with MockFac
 
       Await.ready(service.pushActive.filter(_ == true).head, defaultDuration)
 
-      googlePlayAvailable ! false //maybe the user disables play services??
+      googlePlayAvailable ! false //Set true and then false again to cause the signal to change. Maybe the user disables play services?
       Await.ready(service.pushActive.filter(_ == false).head, defaultDuration)
     }
 

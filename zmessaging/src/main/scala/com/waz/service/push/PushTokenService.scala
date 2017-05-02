@@ -77,12 +77,12 @@ class PushTokenService(googleApi: GoogleApi,
   } yield current.isDefined).
     orElse(Signal.const(false))
 
-  val eventProcessingStage = EventScheduler.Stage[GcmTokenRemoveEvent] { (convId, events) =>
+  val eventProcessingStage = EventScheduler.Stage[GcmTokenRemoveEvent] { (_, events) =>
     currentTokenPref().flatMap {
       case Some(t) if events.exists(_.token == t) =>
         verbose("Clearing all push tokens in response to backend notification")
         googleApi.deleteAllPushTokens()
-        (currentTokenPref := None).flatMap(_ => setNewToken())
+        currentTokenPref := None
       case _ => Future.successful({})
     }
   }
