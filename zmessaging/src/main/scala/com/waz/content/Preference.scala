@@ -20,6 +20,7 @@ package com.waz.content
 import com.waz.ZLog.ImplicitTag._
 import com.waz.ZLog.verbose
 import com.waz.model.Id
+import com.waz.service.push.PushTokenService
 import com.waz.threading.{SerialDispatchQueue, Threading}
 import com.waz.utils.events.{Signal, SourceSignal}
 import com.waz.znet.AuthenticationManager.Token
