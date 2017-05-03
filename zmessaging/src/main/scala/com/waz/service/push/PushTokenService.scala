@@ -28,7 +28,7 @@ import com.waz.threading.SerialDispatchQueue
 import com.waz.utils.events.{EventContext, EventStream, Signal}
 import com.waz.utils.wrappers.{GoogleApi, Localytics}
 import com.waz.utils.{ExponentialBackoff, returning, _}
-import org.threeten.bp.Instant
+import org.threeten.bp.{Clock, Instant}
 
 import scala.concurrent.Future
 import scala.util.control.NonFatal
@@ -41,7 +41,8 @@ class PushTokenService(googleApi: GoogleApi,
                        lifeCycle: ZmsLifecycle,
                        accountId: AccountId,
                        accounts:  AccountsStorage,
-                       sync:      SyncServiceHandle) {
+                       sync:      SyncServiceHandle,
+                       clock:     Clock) {
 
   import PushTokenService._
   implicit val dispatcher = new SerialDispatchQueue(name = "PushTokenDispatchQueue")
@@ -54,12 +55,12 @@ class PushTokenService(googleApi: GoogleApi,
   val currentTokenPref    = preference[Option[String]](pushTokenPrefKey, None)
   val onTokenRefresh      = EventStream[String]()
 
-  val lastReceivedConvEventTime = prefs.preference[Option[Instant]](lastReceivedKey,     None)
-  val lastFetchedConvEventTime  = prefs.preference[Option[Instant]](lastFetchedKey,      None)
-  val lastFetchedLocalTime      = prefs.preference[Option[Instant]](lastFetchedLocalKey, None)
-  val lastRegistrationTime      = prefs.preference[Option[Instant]](lastRegisteredKey,   None)
-  val tokenFailCount            = prefs.preference[Int]            (failCountKey,        0)
-  val lastTokenFail             = prefs.preference[Option[Instant]](failedTimeKey,       None)
+  val lastReceivedConvEventTime = prefs.preference[Instant](lastReceivedKey,     Instant.EPOCH)
+  val lastFetchedConvEventTime  = prefs.preference[Instant](lastFetchedKey,      Instant.EPOCH)
+  val lastFetchedLocalTime      = prefs.preference[Instant](lastFetchedLocalKey, Instant.EPOCH)
+  val lastRegistrationTime      = prefs.preference[Instant](lastRegisteredKey,   Instant.EPOCH)
+  val tokenFailCount            = prefs.preference[Int]    (failCountKey,        0)
+  val lastTokenFail             = prefs.preference[Instant](failedTimeKey,       Instant.EPOCH)
 
   onTokenRefresh { t => setNewToken(Some(t)) }
 
@@ -75,42 +76,48 @@ class PushTokenService(googleApi: GoogleApi,
       .map(_.registeredPush)
       .map(t => currentToken.isDefined && t == currentToken)
       .orElse(Signal.const(false))
-  } yield TokenState(lastReceived, lastFetched, localFetchTime, lastRegistered, failedCount, lastFailed, userRegistered)
+  } yield TokenState(lastReceived, lastFetched, localFetchTime, lastRegistered, failedCount, lastFailed, userRegistered, clock)
 
-  tokenState.map(_.receivingNotifications).on(dispatcher) {
-    case true => tokenFailCount := 0
-    case _ =>
+  (for {
+    lastReceived <- lastReceivedConvEventTime.signal
+    lastFetched  <- lastFetchedConvEventTime.signal
+  } yield (lastReceived, lastFetched)).on(dispatcher) { case (recvd, fetched) =>
+    val receiving = fetched <= recvd
+    verbose(s"Receiving notifications? $receiving, updating fail count")
+    if (receiving) tokenFailCount := 0
+    else {
+      for {
+        _ <- tokenFailCount.mutate(_ + 1)
+        _ <- lastTokenFail := Instant.now(clock)
+      } {}
+    }
   }
 
   private val shouldGenerateNewToken = for {
-    play          <- googleApi.isGooglePlayServicesAvailable
-    current       <- currentTokenPref.signal
-    limitExceeded <- tokenState.map(_.failLimitExceeded)
-  } yield (play && (current.isEmpty || limitExceeded), limitExceeded)
+    play    <- googleApi.isGooglePlayServicesAvailable
+    current <- currentTokenPref.signal
+    state   <- tokenState
+  } yield {
+    returning(play && (current.isEmpty || state.shouldCreateNewToken)) { gen =>
+      verbose(s"Should create new token: $gen")
+    }
+  }
 
   shouldGenerateNewToken.on(dispatcher) {
-    case (true, limitExceeded) =>
-      verbose(s"Should generate new token. Fail limit exceeded?: $limitExceeded")
-      if (limitExceeded)
-        for {
-          _ <- tokenFailCount.mutate(_ + 1)
-          _ <- lastTokenFail := Some(Instant.now)
-          _ <- setNewToken()
-        } yield {}
-      else setNewToken()
+    case true => setNewToken()
     case _ =>
-      verbose("Shouldn't generate new token")
   }
 
   val pushActive = (for {
     push     <- pushEnabled                             if push
     play     <- googleApi.isGooglePlayServicesAvailable if play
     lcActive <- lifeCycle.active                        if !lcActive
-    //token state will be undefined at the start, in which case we SHOULD use the token (hence state.forall)
-    state    <- tokenState                              if state.shouldUseToken
+    state    <- tokenState
     current  <- currentTokenPref.signal
-  } yield current.isDefined).
-    orElse(Signal.const(false))
+  } yield {
+    verbose(s"token state: $state")
+    state.shouldUseToken && current.isDefined
+  }).orElse(Signal.const(false))
 
   val eventProcessingStage = EventScheduler.Stage[GcmTokenRemoveEvent] { (_, events) =>
     currentTokenPref().flatMap {
@@ -156,7 +163,7 @@ class PushTokenService(googleApi: GoogleApi,
     currentTokenPref().flatMap {
       case Some(token) =>
         accounts.update(accountId, _.copy(registeredPush = Some(token)))
-          .flatMap(_ => lastRegistrationTime := Some(Instant.now))
+          .flatMap(_ => lastRegistrationTime := Instant.now(clock))
       case value =>
         warn(s"Couldn't find current token after registration - this shouldn't happen, had value: $value")
         Future.successful({})
@@ -192,41 +199,40 @@ object PushTokenService {
     * We are only comparing timestamps of conversation events, considering events received on native push with those fetched from the notification stream.
     * Events are fetched only when web socket connects (meaning native push was considered active), this means that this state should rarely change.
     */
-  case class TokenState(lastReceivedConvEvent: Option[Instant],
-                        lastFetchedConvEvent:  Option[Instant],
-                        lastFetchedLocalTime:  Option[Instant],
-                        lastRegisteredTime:    Option[Instant],
+  case class TokenState(lastReceivedConvEvent: Instant,
+                        lastFetchedConvEvent:  Instant,
+                        lastFetchedLocalTime:  Instant,
+                        lastRegisteredTime:    Instant,
                         failureCount:          Int,
-                        lastFailed:            Option[Instant],
-                        isUserRegistered:      Boolean) {
+                        lastFailed:            Instant,
+                        isUserRegistered:      Boolean,
+                        clock:                 Clock) {
 
     //we received notifications on native push when websockets/fetching were not active (as expected)
-    val receivingNotifications = (lastFetchedConvEvent, lastReceivedConvEvent) match {
-      case (Some(fetched), Some(received)) => fetched <= received
-      case _ => true
-    }
+    private val receivingNotifications = lastFetchedConvEvent <= lastReceivedConvEvent
 
     //The token was registered with the current user since the last time we fetched from the notifications stream. Give it a chance to work.
-    private val justRegistered = (lastFetchedLocalTime, lastRegisteredTime) match {
-      case (Some(fetch), Some(registered)) => fetch <= registered
-      case _ => false
-    }
+    private val justRegistered = lastFetchedLocalTime <= lastRegisteredTime
 
+
+    private def backOff = RegistrationRetryBackoff.delay(failureCount)
     //If the current token doesn't seem to be working, wait a little while before we try using it again.
-    private def isBackoffExceeded = lastRegisteredTime.forall(RegistrationRetryBackoff.delay(failureCount).elapsedSince(_))
+    private def isBackoffExceeded = backOff.elapsedSince(lastRegisteredTime, clock)
+
+    private val justFailed = lastRegisteredTime <= lastFailed
+
+    /**
+      * The current token has failed too often. The backoff is now passed and we should attempt to register another one.
+      */
+    def shouldCreateNewToken = failureCount >= failLimit && justFailed && isBackoffExceeded
 
     /**
       * If the current user isn't registered or just recently registered, or if it's receiving normally, OR if none of the above are true
       * and the backoff has gone by, we should be using (or trying to use) native push.
       */
-    def shouldUseToken = !isUserRegistered || justRegistered || receivingNotifications || isBackoffExceeded
+    def shouldUseToken = (!isUserRegistered || justRegistered || receivingNotifications || isBackoffExceeded) && ! shouldCreateNewToken
 
-    private val justFailed = (lastFailed, lastRegisteredTime) match {
-      case (Some(failed), Some(registered)) => registered <= failed
-      case _ => false
-    }
-
-    val failLimitExceeded = failureCount >= failLimit && justFailed
+    override def toString = s"PushTokenState: shouldUse?: $shouldUseToken, shouldCreateNew? $shouldCreateNewToken, backoff: ${backOff.toSeconds}, justRegistered: $justRegistered, receivingNotifications: $receivingNotifications, isBackoffExceeded: $isBackoffExceeded"
   }
 
 }

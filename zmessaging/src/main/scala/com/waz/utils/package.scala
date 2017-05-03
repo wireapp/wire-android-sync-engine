@@ -28,7 +28,7 @@ import com.waz.api.UpdateListener
 import com.waz.threading.{CancellableFuture, Threading}
 import com.waz.utils.wrappers.{URI, URIBuilder}
 import org.threeten.bp
-import org.threeten.bp.Instant
+import org.threeten.bp.{Clock, Instant}
 import org.threeten.bp.Instant.now
 import org.threeten.bp.temporal.ChronoUnit
 
@@ -164,6 +164,7 @@ package object utils {
     def fromEpoch = Instant.ofEpochMilli(a.toMillis)
     def asJava = bp.Duration.ofNanos(a.toNanos)
     def elapsedSince(b: bp.Instant): Boolean = b plus a isBefore now
+    def elapsedSince(b: bp.Instant, clock: Clock): Boolean = b plus a isBefore now(clock)
     def untilNow = {
       val n = (nanoNow - a).toNanos.toDouble
       if (abs(n) > 1e9d) s"${n.toDouble / 1e9d} s"

@@ -18,6 +18,7 @@
 package com.waz
 
 import java.security.{Permission, PermissionCollection}
+import java.time.Instant
 import java.util.Date
 
 import android.content.Context
@@ -35,7 +36,7 @@ import com.waz.model.GenericContent.Text
 import com.waz.model.{otr => _, _}
 import com.waz.service.ContactsService
 import com.waz.service.messages.MessageAndLikes
-import com.waz.threading.Threading
+import com.waz.threading.{DispatchQueue, LimitedDispatchQueue, Threading}
 import com.waz.utils.events.{EventContext, FlatMapSignal, Signal, Subscription}
 import com.waz.utils.{CachedStorageImpl, Cleanup, Managed, returning}
 import libcore.net.MimeUtils
@@ -267,6 +268,20 @@ package object testutils {
 
   def textMessageEvent(id: Uid, conv: RConvId, time: Date, from: UserId, text: String) =
     GenericMessageEvent(conv, time, from, GenericMessage(id, Text(text)))
+
+  def waitUntilTasksFinished(dispatcher: LimitedDispatchQueue, timeout: FiniteDuration = 5.seconds): Unit = {
+    val start = System.currentTimeMillis()
+    var lastTime = 0L
+
+    def timeoutExceeded = lastTime - start > timeout.toMillis
+
+    while (dispatcher.hasOutstandingTasks && {
+      lastTime = System.currentTimeMillis()
+      !timeoutExceeded
+    }) {}
+
+    if (timeoutExceeded) throw new Exception(s"Waiting on dispatcher: ${dispatcher.name} timed out")
+  }
 }
 
 object JCE {

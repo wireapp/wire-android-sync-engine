@@ -111,6 +111,7 @@ class ZMessaging(val clientId: ClientId, val userModule: UserModule) {
   lazy val otrClientsSync       = userModule.clientsSync
   lazy val verificationUpdater  = userModule.verificationUpdater
 
+  def clock             = global.clock
   def context           = global.context
   def contextWrapper    = new AndroidContext(context)
   def googleApi         = global.googleApi

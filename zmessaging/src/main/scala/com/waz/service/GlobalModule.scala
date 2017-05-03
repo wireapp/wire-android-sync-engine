@@ -36,9 +36,11 @@ import com.waz.ui.MemoryImageCache.{Entry, Key}
 import com.waz.utils.Cache
 import com.waz.utils.wrappers.{GoogleApi, GoogleApiImpl}
 import com.waz.znet._
+import org.threeten.bp.Clock
 
 
 class GlobalModule(val context: Context, val backend: BackendConfig) { global =>
+  lazy val clock: Clock = Clock.systemUTC()
   lazy val googleApi: GoogleApi = new GoogleApiImpl
   lazy val storage: Database = new GlobalDatabase(context)
   lazy val prefs: PreferenceServiceImpl = wire[PreferenceServiceImpl]

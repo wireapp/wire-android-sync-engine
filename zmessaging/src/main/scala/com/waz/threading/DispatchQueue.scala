@@ -109,6 +109,9 @@ class LimitedDispatchQueue(concurrencyLimit: Int = 1, parent: ExecutionContext =
         dispatchExecutor()
     }
   }
+
+  //for tests
+  def hasOutstandingTasks: Boolean = !Executor.queue.isEmpty && Executor.runningCount.get() == 0
 }
 
 object LimitedDispatchQueue {
