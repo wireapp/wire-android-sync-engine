@@ -25,7 +25,7 @@ import com.waz.model.{AccountId, GcmTokenRemoveEvent}
 import com.waz.service.{EventScheduler, PreferenceService, ZmsLifecycle}
 import com.waz.sync.SyncServiceHandle
 import com.waz.threading.SerialDispatchQueue
-import com.waz.utils.events.{EventContext, EventStream, Signal}
+import com.waz.utils.events.{ClockSignal, EventContext, EventStream, Signal}
 import com.waz.utils.wrappers.{GoogleApi, Localytics}
 import com.waz.utils.{ExponentialBackoff, returning, _}
 import org.threeten.bp.{Clock, Instant}
@@ -64,7 +64,8 @@ class PushTokenService(googleApi: GoogleApi,
 
   onTokenRefresh { t => setNewToken(Some(t)) }
 
-  private val tokenState = for {
+  //exposed for tests
+  private[push] val tokenState = for {
     lastReceived   <- lastReceivedConvEventTime.signal
     lastFetched    <- lastFetchedConvEventTime.signal
     localFetchTime <- lastFetchedLocalTime.signal
@@ -94,11 +95,11 @@ class PushTokenService(googleApi: GoogleApi,
   }
 
   private val shouldGenerateNewToken = for {
-    play    <- googleApi.isGooglePlayServicesAvailable
-    current <- currentTokenPref.signal
-    state   <- tokenState
+    play      <- googleApi.isGooglePlayServicesAvailable
+    current   <- currentTokenPref.signal
+    createNew <- tokenState.flatMap(_.createNewToken)
   } yield {
-    returning(play && (current.isEmpty || state.shouldCreateNewToken)) { gen =>
+    returning(play && (current.isEmpty || createNew)) { gen =>
       verbose(s"Should create new token: $gen")
     }
   }
@@ -114,10 +115,8 @@ class PushTokenService(googleApi: GoogleApi,
     lcActive <- lifeCycle.active                        if !lcActive
     state    <- tokenState
     current  <- currentTokenPref.signal
-  } yield {
-    verbose(s"token state: $state")
-    state.shouldUseToken && current.isDefined
-  }).orElse(Signal.const(false))
+  } yield state.shouldUseToken && current.isDefined).
+    orElse(Signal.const(false))
 
   val eventProcessingStage = EventScheduler.Stage[GcmTokenRemoveEvent] { (_, events) =>
     currentTokenPref().flatMap {
@@ -214,8 +213,11 @@ object PushTokenService {
     //The token was registered with the current user since the last time we fetched from the notifications stream. Give it a chance to work.
     private val justRegistered = lastFetchedLocalTime <= lastRegisteredTime
 
+    private val backOff = RegistrationRetryBackoff.delay(failureCount)
 
-    private def backOff = RegistrationRetryBackoff.delay(failureCount)
+    //exposed for tests
+    private[push] val backOffClock = ClockSignal(RegistrationRetryBackoff.delay(failureCount), clock)
+
     //If the current token doesn't seem to be working, wait a little while before we try using it again.
     private def isBackoffExceeded = backOff.elapsedSince(lastRegisteredTime, clock)
 
@@ -224,15 +226,13 @@ object PushTokenService {
     /**
       * The current token has failed too often. The backoff is now passed and we should attempt to register another one.
       */
-    def shouldCreateNewToken = failureCount >= failLimit && justFailed && isBackoffExceeded
+    val createNewToken = backOffClock.map(_ => failureCount >= failLimit && justFailed && isBackoffExceeded).orElse(Signal.const(false))
 
     /**
-      * If the current user isn't registered or just recently registered, or if it's receiving normally, OR if none of the above are true
-      * and the backoff has gone by, we should be using (or trying to use) native push.
+      * If the current user isn't registered OR just recently registered, OR if it's receiving normally, OR if none of the above are true
+      * and the backoff has gone by, AND we're not currently waiting to create a new token, THEN we should be using (or trying to use) native push.
       */
-    def shouldUseToken = (!isUserRegistered || justRegistered || receivingNotifications || isBackoffExceeded) && ! shouldCreateNewToken
-
-    override def toString = s"PushTokenState: shouldUse?: $shouldUseToken, shouldCreateNew? $shouldCreateNewToken, backoff: ${backOff.toSeconds}, justRegistered: $justRegistered, receivingNotifications: $receivingNotifications, isBackoffExceeded: $isBackoffExceeded"
+    def shouldUseToken = (!isUserRegistered || justRegistered || receivingNotifications || isBackoffExceeded) && ! createNewToken.currentValue.getOrElse(false)
   }
 
 }

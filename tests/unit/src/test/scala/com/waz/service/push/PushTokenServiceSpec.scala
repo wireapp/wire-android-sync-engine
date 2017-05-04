@@ -225,14 +225,10 @@ class PushTokenServiceSpec extends FeatureSpec with AndroidFreeSpec with MockFac
       Await.result(service.currentTokenPref.signal.filter(_.contains(oldToken)).head, defaultDuration)
       Await.result(accountSignal.filter(_.registeredPush.contains(oldToken)).head, defaultDuration)
 
-      clock.advance(RegistrationRetryBackoff.maxDelay) //backoff passes
+      //backoff passes
+      clock.advance(RegistrationRetryBackoff.maxDelay)
+      service.tokenState.currentValue("").get.backOffClock.check()
 
-      //make a change to trigger updating of shouldCreateNewToken (user opens the app, for example)
-      //TODO is there a better way of doing this? What if the app isn't killed for a long time? (i.e., because the websocket is open)
-      googlePlayAvailable ! false
-      Await.result(service.pushActive.filter(_ == false).head, defaultDuration)
-
-      googlePlayAvailable ! true
       Await.result(service.currentTokenPref.signal.filter(_.contains(newToken)).head, defaultDuration)
       Await.result(accountSignal.filter(_.registeredPush.contains(newToken)).head, defaultDuration)
       Await.result(service.pushActive.filter(_ == true).head, defaultDuration)
