@@ -19,7 +19,6 @@ package com.waz.service
 
 import android.content.SharedPreferences.OnSharedPreferenceChangeListener
 import android.content.{Context, SharedPreferences}
-import com.waz.ZLog.ImplicitTag._
 import com.waz.api.ZmsVersion
 import com.waz.content.Preference
 import com.waz.content.Preference.PrefCodec

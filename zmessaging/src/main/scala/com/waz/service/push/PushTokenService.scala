@@ -51,9 +51,9 @@ class PushTokenService(googleApi: GoogleApi,
 
   import prefs._
 
-  private val pushEnabled = uiPreferenceBooleanSignal(gcmEnabledKey).signal
-  val currentTokenPref    = preference[Option[String]](pushTokenPrefKey, None)
-  val onTokenRefresh      = EventStream[String]()
+  val pushEnabledPref   = preference[Boolean](gcmEnabledKey, true, uiPreferences)
+  val currentTokenPref  = preference[Option[String]](pushTokenPrefKey, None)
+  val onTokenRefresh    = EventStream[String]()
 
   val lastReceivedConvEventTime = prefs.preference[Instant](lastReceivedKey,     Instant.EPOCH)
   val lastFetchedConvEventTime  = prefs.preference[Instant](lastFetchedKey,      Instant.EPOCH)
@@ -110,9 +110,9 @@ class PushTokenService(googleApi: GoogleApi,
   }
 
   val pushActive = (for {
-    push     <- pushEnabled                             if push
+    push     <- pushEnabledPref.signal if push
     play     <- googleApi.isGooglePlayServicesAvailable if play
-    lcActive <- lifeCycle.active                        if !lcActive
+    lcActive <- lifeCycle.active if !lcActive
     state    <- tokenState
     current  <- currentTokenPref.signal
   } yield state.shouldUseToken && current.isDefined).
