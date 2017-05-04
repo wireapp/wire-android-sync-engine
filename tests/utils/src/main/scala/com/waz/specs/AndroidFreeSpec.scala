@@ -17,8 +17,10 @@
  */
 package com.waz.specs
 
+import java.util.concurrent.{Executors, ThreadFactory}
+
 import com.waz.ZLog.LogTag
-import com.waz.threading.{DispatchQueue, SerialDispatchQueue, Threading}
+import com.waz.threading.{SerialDispatchQueue, Threading}
 import com.waz.utils.isTest
 import com.waz.utils.wrappers.{Intent, JVMIntentUtil, JavaURIUtil, URI, _}
 import com.waz.{HockeyApp, HockeyAppUtil, ZLog}
@@ -43,7 +45,13 @@ trait AndroidFreeSpec extends BeforeAndAfterAll { this: Suite =>
 
     Intent.setUtil(JVMIntentUtil)
 
-    Threading.setUi(new SerialDispatchQueue(name = "TestUIThread"))
+    Threading.setUi(new SerialDispatchQueue({
+      Threading.executionContext(Executors.newSingleThreadExecutor(new ThreadFactory {
+        override def newThread(r: Runnable) = {
+          new Thread(r, Threading.testUiThreadName)
+        }
+      }))
+    }, Threading.testUiThreadName))
 
     Localytics.setUtil(None)
 

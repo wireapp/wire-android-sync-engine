@@ -98,13 +98,9 @@ object PreferenceService {
 
     override def default: A = load
 
-    override def apply() = {
-      ZLog.verbose(s"apply: $key")
-      Future { ZLog.verbose("actually getting it"); load }
-    }
+    override def apply() = Future(load)
 
     override def update(value: A) = Future {
-      ZLog.verbose(s"updating: $key")
       val editor = prefs.edit()
       save(editor, value)
       editor.commit()

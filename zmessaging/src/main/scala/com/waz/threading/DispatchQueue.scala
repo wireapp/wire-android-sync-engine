@@ -39,6 +39,7 @@ trait DispatchQueue extends ExecutionContext {
 
   //TODO: this implements ExecutionContext.reportFailure, should we use different log here? or maybe do something else
   override def reportFailure(t: Throwable): Unit = error("reportFailure called", t)(logTagFor[DispatchQueue])
+
 }
 
 object DispatchQueue {
