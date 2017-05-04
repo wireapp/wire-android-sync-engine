@@ -158,7 +158,7 @@ class CacheService(context: Context, storage: Database, val cacheStorage: CacheS
 
   def remove(entry: CacheEntry): Future[Unit] = {
     verbose(s"remove($entry)")
-    cacheStorage.remove(entry.data)
+    cacheStorage.remove(entry.data.key)
   }
 
   def deleteExpired(): CancellableFuture[Unit] = {
@@ -168,7 +168,7 @@ class CacheService(context: Context, storage: Database, val cacheStorage: CacheS
       CacheEntryDao.deleteExpired(currentTime)
       entries
     }.map { entries =>
-      entries foreach cacheStorage.remove
+      entries.map(_.key) foreach cacheStorage.remove
       entries
     }.map { _ foreach (entry => entry.path foreach { path => entryFile(path, entry.fileId).delete() }) }
   }
