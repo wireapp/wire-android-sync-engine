@@ -17,7 +17,7 @@
  */
 package com.waz.service.push
 
-import com.waz.{ZLog, testutils}
+import com.waz.ZLog
 import com.waz.content.Preference.PrefCodec
 import com.waz.content.{AccountsStorage, Preference}
 import com.waz.model._
@@ -25,18 +25,17 @@ import com.waz.service.{PreferenceService, ZmsLifecycle}
 import com.waz.specs.AndroidFreeSpec
 import com.waz.sync.SyncServiceHandle
 import com.waz.testutils.TestClock
-import com.waz.threading.{LimitedDispatchQueue, Threading}
+import com.waz.threading.Threading
 import com.waz.utils.events.{Signal, SourceSignal}
 import com.waz.utils.returning
 import com.waz.utils.wrappers.GoogleApi
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{BeforeAndAfter, FeatureSpec, Matchers}
-import org.threeten.bp.{Clock, Instant, ZoneId}
-import com.waz.utils._
+import org.threeten.bp.Instant
 import com.waz.testutils._
 
+import scala.concurrent.Future
 import scala.concurrent.duration._
-import scala.concurrent.{Await, Future}
 
 class PushTokenServiceSpec extends FeatureSpec with AndroidFreeSpec with MockFactory with Matchers with BeforeAndAfter {
 
@@ -93,7 +92,7 @@ class PushTokenServiceSpec extends FeatureSpec with AndroidFreeSpec with MockFac
 
       pushEnabledPref := true
       googlePlayAvailable ! true
-      Await.ready(service.currentTokenPref.signal.filter(_.contains(token)).head, defaultDuration)
+      result(service.currentTokenPref.signal.filter(_.contains(token)).head)
     }
 
     scenario("Remove Push Token event should create new token and delete all previous tokens") {
@@ -118,11 +117,11 @@ class PushTokenServiceSpec extends FeatureSpec with AndroidFreeSpec with MockFac
       pushEnabledPref := true
       googlePlayAvailable ! true
       //wait for first token to be set
-      Await.ready(service.currentTokenPref.signal.filter(_.contains(oldToken)).head, defaultDuration)
+      result(service.currentTokenPref.signal.filter(_.contains(oldToken)).head)
       //delete first token in response to BE event
       service.eventProcessingStage(RConvId(), Vector(GcmTokenRemoveEvent(oldToken, "sender", Some("client"))))
       //new token should be set
-      Await.ready(service.currentTokenPref.signal.filter(_.contains(newToken)).head, defaultDuration)
+      result(service.currentTokenPref.signal.filter(_.contains(newToken)).head)
     }
 
     scenario("If current user does not have matching registeredPush token, register the user with our BE") {
@@ -143,8 +142,8 @@ class PushTokenServiceSpec extends FeatureSpec with AndroidFreeSpec with MockFac
         } (Threading.Background)
       }
 
-      Await.result(service.currentTokenPref.signal.filter(_.contains(token)).head, defaultDuration)
-      Await.result(accountSignal.filter(_.registeredPush.contains(token)).head, defaultDuration)
+      result(service.currentTokenPref.signal.filter(_.contains(token)).head)
+      result(accountSignal.filter(_.registeredPush.contains(token)).head)
     }
 
     scenario("Instance Id token refresh should trigger re-registration for current user") {
@@ -164,14 +163,14 @@ class PushTokenServiceSpec extends FeatureSpec with AndroidFreeSpec with MockFac
         } (Threading.Background)
       }
 
-      Await.ready(service.currentTokenPref.signal.filter(_.contains(token)).head, defaultDuration)
-      Await.ready(accountSignal.filter(_.registeredPush.contains(token)).head, defaultDuration)
+      result(service.currentTokenPref.signal.filter(_.contains(token)).head)
+      result(accountSignal.filter(_.registeredPush.contains(token)).head)
 
       val newToken = "newToken"
       service.onTokenRefresh ! newToken //InstanceIDService triggers new token
 
-      Await.ready(service.currentTokenPref.signal.filter(_.contains(newToken)).head, defaultDuration)
-      Await.ready(accountSignal.filter(_.registeredPush.contains(newToken)).head, defaultDuration)
+      result(service.currentTokenPref.signal.filter(_.contains(newToken)).head)
+      result(accountSignal.filter(_.registeredPush.contains(newToken)).head)
 
     }
 
@@ -204,9 +203,9 @@ class PushTokenServiceSpec extends FeatureSpec with AndroidFreeSpec with MockFac
         } (Threading.Background)
       }
 
-      Await.result(service.currentTokenPref.signal.filter(_.contains(oldToken)).head, defaultDuration)
-      Await.result(accountSignal.filter(_.registeredPush.contains(oldToken)).head, defaultDuration)
-      Await.result(service.pushActive.filter(_ == true).head, defaultDuration)
+      result(service.currentTokenPref.signal.filter(_.contains(oldToken)).head)
+      result(accountSignal.filter(_.registeredPush.contains(oldToken)).head)
+      result(service.pushActive.filter(_ == true).head)
 
       (1 to PushTokenService.failLimit).foreach { i =>
         clock.advance(10.seconds)
@@ -215,23 +214,23 @@ class PushTokenServiceSpec extends FeatureSpec with AndroidFreeSpec with MockFac
         service.lastFetchedLocalTime := Instant.now(clock)
 
         //Wait for failure to update before continuing
-        Await.result(service.tokenFailCount.signal.filter(_ == i).head, defaultDuration)
-        Await.result(service.lastTokenFail.signal.filter(_ == Instant.ofEpochMilli((i * 10).seconds.toMillis)).head, defaultDuration)
+        result(service.tokenFailCount.signal.filter(_ == i).head)
+        result(service.lastTokenFail.signal.filter(_ == Instant.ofEpochMilli((i * 10).seconds.toMillis)).head)
       }
 
       waitUntilTasksFinished(service.dispatcher)
       //Check that token hasn't changed or been re-registered
-      Await.result(service.pushActive.filter(_ == false).head, defaultDuration)
-      Await.result(service.currentTokenPref.signal.filter(_.contains(oldToken)).head, defaultDuration)
-      Await.result(accountSignal.filter(_.registeredPush.contains(oldToken)).head, defaultDuration)
+      result(service.pushActive.filter(_ == false).head)
+      result(service.currentTokenPref.signal.filter(_.contains(oldToken)).head)
+      result(accountSignal.filter(_.registeredPush.contains(oldToken)).head)
 
       //backoff passes
       clock.advance(RegistrationRetryBackoff.maxDelay)
       service.tokenState.currentValue("").get.backOffClock.check()
 
-      Await.result(service.currentTokenPref.signal.filter(_.contains(newToken)).head, defaultDuration)
-      Await.result(accountSignal.filter(_.registeredPush.contains(newToken)).head, defaultDuration)
-      Await.result(service.pushActive.filter(_ == true).head, defaultDuration)
+      result(service.currentTokenPref.signal.filter(_.contains(newToken)).head)
+      result(accountSignal.filter(_.registeredPush.contains(newToken)).head)
+      result(service.pushActive.filter(_ == true).head)
     }
 
     scenario("Non-matching user/global tokens should delete old user token on BE.") {
@@ -249,10 +248,10 @@ class PushTokenServiceSpec extends FeatureSpec with AndroidFreeSpec with MockFac
       pushEnabledPref := true //set active
       googlePlayAvailable ! true
 
-      Await.ready(service.pushActive.filter(_ == true).head, defaultDuration)
+      result(service.pushActive.filter(_ == true).head)
 
       pushEnabledPref := false //set inactive
-      Await.ready(service.pushActive.filter(_ == false).head, defaultDuration)
+      result(service.pushActive.filter(_ == false).head)
     }
 
     scenario("Push should be active if in background and inactive if not") {
@@ -264,10 +263,10 @@ class PushTokenServiceSpec extends FeatureSpec with AndroidFreeSpec with MockFac
       googlePlayAvailable ! true
       lifecycleActive ! true //websocket should be open
 
-      Await.ready(service.pushActive.filter(_ == false).head, defaultDuration)
+      result(service.pushActive.filter(_ == false).head)
 
       lifecycleActive ! false //websocket should be off - use push again
-      Await.ready(service.pushActive.filter(_ == true).head, defaultDuration)
+      result(service.pushActive.filter(_ == true).head)
     }
 
     scenario("Push should be inactive if play services are unavailable") {
@@ -279,7 +278,7 @@ class PushTokenServiceSpec extends FeatureSpec with AndroidFreeSpec with MockFac
       googlePlayAvailable ! false
 
       waitUntilTasksFinished(service.dispatcher)
-      Await.ready(service.pushActive.filter(_ == false).head, defaultDuration)
+      result(service.pushActive.filter(_ == false).head)
     }
 
     scenario("Failed count should increment if we miss notifications while push is active") {
@@ -293,12 +292,12 @@ class PushTokenServiceSpec extends FeatureSpec with AndroidFreeSpec with MockFac
       lifecycleActive ! false
 
       //native push should be active
-      Await.ready(service.pushActive.filter(_ == true).head, defaultDuration)
+      result(service.pushActive.filter(_ == true).head)
 
       service.lastFetchedConvEventTime := Instant.now
       service.lastFetchedLocalTime := Instant.now
 
-      Await.ready(service.tokenFailCount.signal.filter(_ == 1).head, defaultDuration)
+      result(service.tokenFailCount.signal.filter(_ == 1).head)
     }
 
   }
