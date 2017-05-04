@@ -19,7 +19,8 @@ package com.waz.service
 
 import android.content.SharedPreferences.OnSharedPreferenceChangeListener
 import android.content.{Context, SharedPreferences}
-import android.os.Looper
+import com.waz.ZLog
+import com.waz.ZLog.ImplicitTag._
 import com.waz.api.ZmsVersion
 import com.waz.content.Preference
 import com.waz.content.Preference.PrefCodec
@@ -33,88 +34,61 @@ import scala.util.Try
 
 trait PreferenceService {
 
+  protected def dispatcher: SerialDispatchQueue
+
   def preferences: SharedPreferences
 
+  //TODO - try to merge UI preferences with zms preferences - there's not much point in having two.
   def uiPreferences: SharedPreferences
 
-  def withPreferences[A](body: SharedPreferences => A, prefs: => SharedPreferences = preferences): CancellableFuture[A]
+  def withPreferences[A](body: SharedPreferences => A, prefs: => SharedPreferences = preferences): CancellableFuture[A] = dispatcher(body(prefs))
 
-  def editPreferences(body: SharedPreferences.Editor => Unit, prefs: => SharedPreferences = preferences): CancellableFuture[Boolean]
-
-  def preference[A](key: String, defaultValue: A)(implicit codec: PrefCodec[A]): Preference[A] = {
-    val prefs = preferences
-    new Pref[A](prefs, key, Option(prefs.getString(key, null)).fold(defaultValue)(codec.decode), { (prefs, value) => prefs.putString(key, codec.encode(value)) })
+  def editPreferences(body: SharedPreferences.Editor => Unit, prefs: => SharedPreferences = preferences): CancellableFuture[Boolean] = dispatcher {
+    val editor = prefs.edit()
+    body(editor)
+    editor.commit()
   }
 
   def preference[A](key: String, defaultValue: A, prefs: => SharedPreferences = preferences)(implicit codec: PrefCodec[A]): Preference[A] =
     new Pref[A](prefs, key, Option(prefs.getString(key, null)).fold(defaultValue)(codec.decode), { (prefs, value) => prefs.putString(key, codec.encode(value)) })
 
-  def intPreference(key: String, prefs: => SharedPreferences = preferences, defaultValue: Int = 0): Preference[Int] =
-    new Pref[Int](prefs, key, prefs.getInt(key, defaultValue), _.putInt(key, _))
-
-  def longPreference(key: String, prefs: => SharedPreferences = preferences, defaultValue: Long = 0): Preference[Long] =
-    new Pref[Long](prefs, key, prefs.getLong(key, defaultValue), _.putLong(key, _))
-
-  def preferenceStringSignal(key: String, prefs: => SharedPreferences = preferences, defaultValue: String = ""): Preference[String] =
-    new Pref[String](prefs, key, prefs.getString(key, defaultValue), _.putString(key, _))
-
-  def preferenceBooleanSignal(key: String, prefs: => SharedPreferences = preferences, defaultValue: Boolean = false): Preference[Boolean] =
-    new Pref[Boolean](prefs, key, prefs.getBoolean(key, defaultValue), _.putBoolean(key, _))
-
-  def withUiPreferences[A](body: SharedPreferences => A) =
-    withPreferences(body, uiPreferences)
-
   def editUiPreferences(body: SharedPreferences.Editor => Unit) =
     editPreferences(body, uiPreferences)
 
-  def uiPreferenceStringSignal(key: String, defaultValue: String = "") = preferenceStringSignal(key, uiPreferences, defaultValue)
-  def uiPreferenceBooleanSignal(key: String, defaultValue: Boolean = false) = preferenceBooleanSignal(key, uiPreferences, defaultValue)
-
-  def autoAnswerCallPrefKey: String
-  def callingV3Key: String
-  def gcmEnabledKey: String
-  def v31AssetsEnabledKey: String
-  def wsForegroundKey: String
+  def autoAnswerCallPrefKey: String = "PREF_KEY_AUTO_ANSWER_ENABLED"
+  def callingV3Key:          String = "PREF_KEY_CALLING_V3"
+  def gcmEnabledKey:         String = "PREF_KEY_GCM_ENABLED"
+  def v31AssetsEnabledKey:   String = "PREF_V31_ASSETS_ENABLED"
+  def wsForegroundKey:       String = "PREF_KEY_WS_FOREGROUND_SERVICE_ENABLED"
 
 }
 
 class PreferenceServiceImpl(context: Context) extends PreferenceService {
   import com.waz.service.PreferenceService._
 
-  private implicit val dispatcher = preferenceDispatcher
+  override protected implicit val dispatcher = preferenceDispatcher
 
   lazy val analyticsEnabledPrefKey = Try(context.getResources.getString(R.string.zms_analytics_preference_key)).getOrElse("PREF_KEY_AVS_METRICS")
-  lazy val analyticsEnabledPref = uiPreferenceBooleanSignal(analyticsEnabledPrefKey)
+  lazy val analyticsEnabledPref    = preference[Boolean](analyticsEnabledPrefKey, false, uiPreferences)
+  lazy val wsForegroundEnabledPref = preference[Boolean](wsForegroundKey, false, uiPreferences)
 
-  override lazy val autoAnswerCallPrefKey    = Try(context.getResources.getString(R.string.zms_auto_answer_key)).getOrElse("PREF_KEY_AUTO_ANSWER_ENABLED")
-  override lazy val callingV3Key             = Try(context.getResources.getString(R.string.zms_calling_v3)).getOrElse("PREF_KEY_CALLING_V3")
-  override lazy val gcmEnabledKey            = Try(context.getResources.getString(R.string.zms_gcm_enabled)).getOrElse("PREF_KEY_GCM_ENABLED")
-  override lazy val v31AssetsEnabledKey      = Try(context.getResources.getString(R.string.zms_v31_assets_enabled)).getOrElse("PREF_V31_ASSETS_ENABLED")
-  override lazy val wsForegroundKey          = Try(context.getResources.getString(R.string.zms_ws_foreground_service_enabled)).getOrElse("PREF_KEY_WS_FOREGROUND_SERVICE_ENABLED")
-
-  lazy val uiPreferences = uiPreferencesFrom(context)
-
-  lazy val wsForegroundEnabledPref = uiPreferenceBooleanSignal(wsForegroundKey)
+  override lazy val autoAnswerCallPrefKey    = Try(context.getResources.getString(R.string.zms_auto_answer_key))              .getOrElse(super.autoAnswerCallPrefKey)
+  override lazy val callingV3Key             = Try(context.getResources.getString(R.string.zms_calling_v3))                   .getOrElse(super.callingV3Key)
+  override lazy val gcmEnabledKey            = Try(context.getResources.getString(R.string.zms_gcm_enabled))                  .getOrElse(super.gcmEnabledKey)
+  override lazy val v31AssetsEnabledKey      = Try(context.getResources.getString(R.string.zms_v31_assets_enabled))           .getOrElse(super.v31AssetsEnabledKey)
+  override lazy val wsForegroundKey          = Try(context.getResources.getString(R.string.zms_ws_foreground_service_enabled)).getOrElse(super.wsForegroundKey)
 
   def callingV3  = uiPreferences.getString(callingV3Key,         if (ZmsVersion.DEBUG) "2" else "0") //0 (calling v2) by default for production, v3 (2) for debug
   def gcmEnabled = uiPreferences.getBoolean(gcmEnabledKey,       true) //true by default for production
   def v31AssetsEnabled = false
 
-  override lazy val preferences = preferencesFrom(context)
-
-  override def withPreferences[A](body: SharedPreferences => A, prefs: => SharedPreferences = preferences): CancellableFuture[A] = dispatcher(body(prefs))
-
-  override def editPreferences(body: SharedPreferences.Editor => Unit, prefs: => SharedPreferences = preferences): CancellableFuture[Boolean] = dispatcher {
-    val editor = prefs.edit()
-    body(editor)
-    editor.commit()
-  }
+  override lazy val preferences   = preferencesFrom("zmessaging", context)
+  override lazy val uiPreferences = preferencesFrom("com.waz.zclient.user.preferences", context)
 
 }
 
 object PreferenceService {
-  def uiPreferencesFrom(context: Context) = context.getSharedPreferences("com.waz.zclient.user.preferences", Context.MODE_PRIVATE)
-  def preferencesFrom(context: Context) = context.getSharedPreferences("zmessaging", Context.MODE_PRIVATE)
+  def preferencesFrom(name: String, context: Context) = context.getSharedPreferences(name, Context.MODE_PRIVATE)
 
   lazy val preferenceDispatcher = new SerialDispatchQueue()
 
@@ -124,9 +98,13 @@ object PreferenceService {
 
     override def default: A = load
 
-    override def apply() = Future { load }
+    override def apply() = {
+      ZLog.verbose(s"apply: $key")
+      Future { ZLog.verbose("actually getting it"); load }
+    }
 
     override def update(value: A) = Future {
+      ZLog.verbose(s"updating: $key")
       val editor = prefs.edit()
       save(editor, value)
       editor.commit()
@@ -135,14 +113,15 @@ object PreferenceService {
     override lazy val signal: SourceSignal[A] = new SourceSignal[A](Some(load)) {
 
       private val listener = new OnSharedPreferenceChangeListener {
-        override def onSharedPreferenceChanged(sharedPreferences: SharedPreferences, k: String): Unit =
+        override def onSharedPreferenceChanged(sharedPreferences: SharedPreferences, k: String): Unit = {
           if (key == k) {
-            if (Thread.currentThread() == Looper.getMainLooper.getThread) publish(load, Threading.Ui)
+            if (Threading.isUiThread) publish(load, Threading.Ui)
             else publish(load)
           }
+        }
       }
 
-      override def onWire():Unit = {
+      override def onWire(): Unit = {
         value = Some(load)
         Threading.Ui { prefs.registerOnSharedPreferenceChangeListener(listener) } .map { _ =>
           publish(load, Threading.Background) // load value again after registering the listener (it could have been changed in meantime)

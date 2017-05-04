@@ -61,8 +61,8 @@ class DefaultFlowManagerService(context: Context, netClient: ZNetClient, websock
   private lazy val logLevelPrefKey       = Try(context.getResources.getString(R.string.pref_avs_loglevel_key)).getOrElse("PREF_KEY_AVS_LOGLEVEL")
 
   private lazy val metricsEnabledPref = prefs.analyticsEnabledPref
-  private lazy val loggingEnabledPref = prefs.preferenceBooleanSignal(loggingEnabledPrefKey)
-  private lazy val logLevelPref       = prefs.intPreference(logLevelPrefKey)
+  private lazy val loggingEnabledPref = prefs.preference[Boolean](loggingEnabledPrefKey, false)
+  private lazy val logLevelPref       = prefs.preference[Int](logLevelPrefKey, 0)
 
   val onMediaEstablished = new Publisher[RConvId]
   val onFlowManagerError = new Publisher[(RConvId, Int)] // (conv, errorCode)

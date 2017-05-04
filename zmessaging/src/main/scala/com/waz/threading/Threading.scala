@@ -18,10 +18,9 @@
 package com.waz.threading
 
 import java.util.Timer
-
-import android.os.{Handler, HandlerThread, Looper}
 import java.util.concurrent.{Executor, ExecutorService, Executors}
 
+import android.os.{Handler, HandlerThread, Looper}
 import com.waz.ZLog._
 import com.waz.api.ZmsVersion
 import com.waz.utils.returning

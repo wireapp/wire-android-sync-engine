@@ -18,7 +18,7 @@
 package com.waz.specs
 
 import com.waz.ZLog.LogTag
-import com.waz.threading.{DispatchQueue, Threading}
+import com.waz.threading.{DispatchQueue, SerialDispatchQueue, Threading}
 import com.waz.utils.isTest
 import com.waz.utils.wrappers.{Intent, JVMIntentUtil, JavaURIUtil, URI, _}
 import com.waz.{HockeyApp, HockeyAppUtil, ZLog}
@@ -43,9 +43,7 @@ trait AndroidFreeSpec extends BeforeAndAfterAll { this: Suite =>
 
     Intent.setUtil(JVMIntentUtil)
 
-    Threading.setUi(new DispatchQueue {
-      override def execute(runnable: Runnable) = ???
-    })
+    Threading.setUi(new SerialDispatchQueue(name = "TestUIThread"))
 
     Localytics.setUtil(None)
 

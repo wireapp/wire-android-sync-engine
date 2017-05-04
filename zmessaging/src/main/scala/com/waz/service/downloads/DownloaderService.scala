@@ -25,7 +25,7 @@ import com.waz.api.impl.ProgressIndicator
 import com.waz.api.impl.ProgressIndicator.{Callback, ProgressData}
 import com.waz.cache.{CacheEntry, CacheService, Expiration}
 import com.waz.model.CacheKey
-import com.waz.service.{NetworkModeService, PreferenceServiceImpl}
+import com.waz.service.{NetworkModeService, PreferenceService}
 import com.waz.threading.CancellableFuture.CancelException
 import com.waz.threading.{CancellableFuture, SerialDispatchQueue}
 import com.waz.utils._
@@ -48,7 +48,7 @@ import scala.util.{Failure, Success, Try}
  * we could then remove background downloads limit, which is currently used to make sure there is
  * some bandwidth reserved for important requests
  */
-class DownloaderService(context: Context, cache: CacheService, prefs: PreferenceServiceImpl, network: NetworkModeService) {
+class DownloaderService(context: Context, cache: CacheService, prefs: PreferenceService, network: NetworkModeService) {
   import DownloaderService._
   private implicit val dispatcher = new SerialDispatchQueue(name = "DownloaderService")
   private implicit val ev = EventContext.Global
@@ -62,7 +62,7 @@ class DownloaderService(context: Context, cache: CacheService, prefs: Preference
   private lazy val downloadPrefAlways = Try(context.getResources.getString(R.string.zms_image_download_default_value)).getOrElse("always")
   private lazy val downloadPrefKey = Try(context.getResources.getString(R.string.zms_image_download_preference_key)).getOrElse("zms_pref_image_download") // hardcoded value used in tests
 
-  private lazy val downloadPref = prefs.uiPreferenceStringSignal(downloadPrefKey, downloadPrefAlways).signal
+  private lazy val downloadPref = prefs.preference[String](downloadPrefKey, downloadPrefAlways, prefs.uiPreferences).signal
   private lazy val downloadEnabled = Signal.or(downloadPref.map(_ == downloadPrefAlways), network.networkMode.map(_ == NetworkMode.WIFI))
 
   downloadEnabled.disableAutowiring()

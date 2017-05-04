@@ -46,7 +46,7 @@ class Accounts(val global: GlobalModule) {
   val regClient     = global.regClient
   val loginClient   = global.loginClient
 
-  val currentAccountPref = prefs.preferenceStringSignal(CurrentAccountPref)
+  val currentAccountPref = prefs.preference[String](CurrentAccountPref, "")
 
   lazy val currentAccountData = currentAccountPref.signal.flatMap[Option[AccountData]] {
     case "" => Signal.const(Option.empty[AccountData])

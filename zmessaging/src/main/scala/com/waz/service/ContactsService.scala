@@ -137,7 +137,7 @@ class ContactsService(context: Context, accountId: AccountId, accountStorage: Ac
   private[waz] lazy val lastUploadTime = keyValuePref[Option[Instant]]("address_book_last_upload_time", None)
   private[service] lazy val addressBookVersionOfLastUpload = keyValuePref[Option[Int]]("address_book_version_of_last_upload", None)
   private lazy val shareContactsPrefKey = Try(context.getString(R.string.pref_share_contacts_key)).getOrElse(PrefKey) // fallback for testing
-  private[service] lazy val shareContactsPref = prefs.uiPreferenceBooleanSignal(shareContactsPrefKey, defaultValue = true)
+  private[service] lazy val shareContactsPref = prefs.preference[Boolean](shareContactsPrefKey, defaultValue = true, prefs.uiPreferences)
   private lazy val contactsObserver = new ContentObserverSignal(Contacts)(context)
   private lazy val contactsNeedReloading = new AtomicBoolean(true)
 

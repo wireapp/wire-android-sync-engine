@@ -52,7 +52,7 @@ class GcmGlobalService(context: Context, val prefs: PreferenceServiceImpl, metad
       ConnectionResult.DEVELOPER_ERROR
   }
 
-  val gcmEnabled = prefs.uiPreferenceBooleanSignal(prefs.gcmEnabledKey).signal
+  val gcmEnabled = prefs.preference[Boolean](prefs.gcmEnabledKey, false, prefs.uiPreferences).signal
 
   def gcmAvailable = prefs.gcmEnabled && gcmCheckResult == ConnectionResult.SUCCESS
 
