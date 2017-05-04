@@ -39,7 +39,6 @@ import scala.concurrent.{Await, Future, Promise}
 
 class CallingServiceSpec extends FeatureSpec with Matchers with MockFactory with BeforeAndAfterAll with AndroidFreeSpec {
 
-  val defaultDuration = 5.seconds
   implicit val eventContext = EventContext.Implicits.global
   implicit val executionContext = new SerialDispatchQueue(name = "CallingServiceSpec")
 
@@ -59,8 +58,8 @@ class CallingServiceSpec extends FeatureSpec with Matchers with MockFactory with
     scenario("CallingService intialization") {
       val service = initCallingService()
       service.onReady(3)
-      Await.result(service.v3Available.head, defaultDuration) shouldEqual true
-      Await.result(service.requestedCallVersion.head, defaultDuration) shouldEqual 3
+      result(service.v3Available.head) shouldEqual true
+      result(service.requestedCallVersion.head) shouldEqual 3
     }
 
     scenario("Incoming call 1:1 call goes through SELF_JOINING to become SELF_CONNECTED") {
@@ -79,8 +78,8 @@ class CallingServiceSpec extends FeatureSpec with Matchers with MockFactory with
         service.onEstablishedCall(_1t1Conv.remoteId, otherUser)
       }
       service.startCall(_1t1Conv.id)
-      Await.ready(checkpoint1.head, defaultDuration)
-      Await.ready(checkpoint2.head, defaultDuration)
+      result(checkpoint1.head)
+      result(checkpoint2.head)
     }
 
     scenario("Incoming group call goes through SELF_JOINING to become SELF_CONNECTED") {
@@ -102,8 +101,8 @@ class CallingServiceSpec extends FeatureSpec with Matchers with MockFactory with
         service.onGroupChanged(groupConv.remoteId, Set(groupMember1, groupMember2))
       }
       service.startCall(groupConv.id)
-      Await.ready(checkpoint1.head, defaultDuration)
-      Await.ready(checkpoint2.head, defaultDuration)
+      result(checkpoint1.head)
+      result(checkpoint2.head)
     }
 
     scenario("Outgoing 1:1 call goes through SELF_CALLING to SELF_JOINING to SELF_CONNECTED") {
@@ -125,13 +124,13 @@ class CallingServiceSpec extends FeatureSpec with Matchers with MockFactory with
       )))
 
       service.startCall(_1t1Conv.id)
-      Await.ready(checkpoint1.head, defaultDuration)
+      result(checkpoint1.head)
 
       service.onOtherSideAnsweredCall(_1t1Conv.remoteId)
-      Await.ready(checkpoint2.head, defaultDuration)
+      result(checkpoint2.head)
 
       service.onEstablishedCall(_1t1Conv.remoteId, otherUser)
-      Await.ready(checkpoint3.head, defaultDuration)
+      result(checkpoint3.head)
     }
 
     scenario("Outgoing group call goes through SELF_CALLING to SELF_JOINING to SELF_CONNECTED") {
@@ -156,16 +155,16 @@ class CallingServiceSpec extends FeatureSpec with Matchers with MockFactory with
       )))
 
       service.startCall(groupConv.id)
-      Await.ready(checkpoint1.head, defaultDuration)
+      result(checkpoint1.head)
 
       service.onOtherSideAnsweredCall(groupConv.remoteId)
-      Await.ready(checkpoint2.head, defaultDuration)
+      result(checkpoint2.head)
 
       //TODO which user from a group conversation gets passed down here?
       service.onEstablishedCall(groupConv.remoteId, groupMember1)
       service.onGroupChanged(groupConv.remoteId, Set(groupMember1, groupMember2))
 
-      Await.ready(checkpoint3.head, defaultDuration)
+      result(checkpoint3.head)
     }
   }
 
@@ -188,13 +187,13 @@ class CallingServiceSpec extends FeatureSpec with Matchers with MockFactory with
         service.onGroupChanged(groupConv.remoteId, Set(groupMember1, groupMember2))
       }
       service.startCall(groupConv.id)
-      Await.ready(checkpoint1.head, defaultDuration)
+      result(checkpoint1.head)
 
       (avsMock.endCall _).expects(*, *).once().onCall { (rId, isGroup) =>
         service.onClosedCall(StillOngoing, groupConv.remoteId, Instant.now, groupMember1)
       }
       service.endCall(groupConv.id) //avs won't call the ClosedHandler if a group call is still ongoing in the background
-      Await.ready(checkpoint2.head, defaultDuration)
+      result(checkpoint2.head)
     }
 
     scenario("Incoming group call answered on another device") {
@@ -210,10 +209,10 @@ class CallingServiceSpec extends FeatureSpec with Matchers with MockFactory with
       val checkpoint2 = callCheckpoint(service, _.isEmpty, _.isEmpty)
 
       service.onIncomingCall(groupConv.remoteId, groupMember1, videoCall = false, shouldRing = true)
-      Await.ready(checkpoint1.head, defaultDuration)
+      result(checkpoint1.head)
 
       service.onClosedCall(AnsweredElsewhere, groupConv.remoteId, Instant.now, groupMember1)
-      Await.ready(checkpoint2.head, defaultDuration)
+      result(checkpoint2.head)
     }
 
     scenario("Reject incoming 1:1 call should remove it from activeCall, and then also from backgroundCalls after timeout") {
@@ -229,16 +228,16 @@ class CallingServiceSpec extends FeatureSpec with Matchers with MockFactory with
       val checkpoint3 = callCheckpoint(service, _.isEmpty, _.isEmpty)
 
       service.onIncomingCall(_1t1Conv.remoteId, otherUser, videoCall = false, shouldRing = true)
-      Await.ready(checkpoint1.head, defaultDuration)
+      result(checkpoint1.head)
 
       (avsMock.rejectCall _).expects(*, *).once().onCall { (_, _) =>
         service.onClosedCall(StillOngoing, _1t1Conv.remoteId, Instant.now, otherUser)
       }
       service.endCall(_1t1Conv.id)
-      Await.ready(checkpoint2.head, defaultDuration)
+      result(checkpoint2.head)
 
       service.onClosedCall(Normal, _1t1Conv.remoteId, Instant.now, otherUser)
-      Await.ready(checkpoint3.head, defaultDuration)
+      result(checkpoint3.head)
     }
 
     scenario("Current: Cancel outgoing group call should remove it from background and active calls") {
@@ -262,13 +261,13 @@ class CallingServiceSpec extends FeatureSpec with Matchers with MockFactory with
       )))
 
       service.startCall(groupConv.id)
-      Await.ready(checkpoint1.head, defaultDuration)
+      result(checkpoint1.head)
 
       (avsMock.endCall _).expects(groupConv.remoteId, true).once().onCall { (_, _) =>
         service.onClosedCall(Normal, groupConv.remoteId, Instant.now, groupMember1)
       }
       service.endCall(groupConv.id)
-      Await.ready(checkpoint2.head, defaultDuration)
+      result(checkpoint2.head)
     }
   }
 
@@ -302,7 +301,7 @@ class CallingServiceSpec extends FeatureSpec with Matchers with MockFactory with
       service.startCall(ongoingConv.id)
       service.onIncomingCall(incomingConv.remoteId, incomingUserId, videoCall = false, shouldRing = false) //Receive the second call after first is established
 
-      Await.ready(checkpoint.head, defaultDuration)
+      result(checkpoint.head)
     }
 
     scenario("With a background group call, receive a 1:1 call, finish it, and then still join the group call afterwards") {
@@ -342,7 +341,7 @@ class CallingServiceSpec extends FeatureSpec with Matchers with MockFactory with
       }
       service.endCall(groupConv.id) //user rejects the group call
 
-      Await.ready(checkpoint1.head, defaultDuration)
+      result(checkpoint1.head)
 
       //Checkpoint 2: Receive and accept a 1:1 call
       val checkpoint2 = callCheckpoint(service,
@@ -355,7 +354,7 @@ class CallingServiceSpec extends FeatureSpec with Matchers with MockFactory with
       }
       service.startCall(otoConv.id) //user accepts 1:1 call
 
-      Await.ready(checkpoint2.head, defaultDuration)
+      result(checkpoint2.head)
 
       val checkpoint3 = callCheckpoint(service, _.contains(groupConv.id), _.exists(curr => curr.others == Set(groupMember1, groupMember2) && curr.state == VoiceChannelState.SELF_CONNECTED))
       
@@ -370,7 +369,7 @@ class CallingServiceSpec extends FeatureSpec with Matchers with MockFactory with
       }
       service.startCall(groupConv.id)
 
-      Await.ready(checkpoint3.head, defaultDuration)
+      result(checkpoint3.head)
     }
   }
 
@@ -385,7 +384,7 @@ class CallingServiceSpec extends FeatureSpec with Matchers with MockFactory with
   def signalTest[A](signal: Signal[A])(test: A => Boolean)(trigger: => Unit): Unit = {
     signal.disableAutowiring()
     trigger
-    Await.ready(signal.filter(test).head, defaultDuration)
+    result(signal.filter(test).head)
   }
 
   def initCallingService(context:        Context                     = context,
@@ -413,7 +412,7 @@ class CallingServiceSpec extends FeatureSpec with Matchers with MockFactory with
       initPromise.future
     }
     val service = new DefaultCallingService(context, self, avs, convs, members, null, flows, messages, media, null, callLogService, network, null)
-    Await.ready(initPromise.future, defaultDuration)
+    result(initPromise.future)
     service
   }
 }

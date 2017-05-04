@@ -17,12 +17,15 @@
  */
 package com.waz.specs
 
-import com.waz.ZLog.{LogLevel, LogTag}
+import com.waz.ZLog.LogTag
 import com.waz.threading.{DispatchQueue, Threading}
 import com.waz.utils.isTest
 import com.waz.utils.wrappers.{Intent, JVMIntentUtil, JavaURIUtil, URI, _}
 import com.waz.{HockeyApp, HockeyAppUtil, ZLog}
 import org.scalatest.{BeforeAndAfterAll, Suite}
+
+import scala.concurrent.duration._
+import scala.concurrent.{Await, Future}
 
 trait AndroidFreeSpec extends BeforeAndAfterAll { this: Suite =>
 
@@ -54,5 +57,7 @@ trait AndroidFreeSpec extends BeforeAndAfterAll { this: Suite =>
       }
     }))
   }
+
+  def result[A](future: Future[A])(implicit defaultDuration: FiniteDuration = 5.seconds): A = Await.result(future, defaultDuration)
 
 }
