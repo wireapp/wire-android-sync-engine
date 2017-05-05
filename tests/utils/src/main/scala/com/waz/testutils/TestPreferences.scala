@@ -21,10 +21,8 @@ import java.util
 
 import android.content.SharedPreferences
 import android.content.SharedPreferences.{Editor, OnSharedPreferenceChangeListener}
-import com.waz.ZLog
 import com.waz.service.PreferenceService
 import com.waz.threading.SerialDispatchQueue
-import com.waz.utils.returning
 
 import scala.language.existentials
 
