@@ -32,7 +32,7 @@ import scala.collection._
 import scala.collection.immutable.SortedSet
 import scala.concurrent.Future
 
-class ConversationStorage(storage: ZmsDatabase) extends CachedStorage[ConvId, ConversationData](new UnlimitedLruCache(), storage)(ConversationDataDao, "ConversationStorage_Cached") {
+class ConversationStorage(storage: ZmsDatabase) extends CachedStorageImpl[ConvId, ConversationData](new UnlimitedLruCache(), storage)(ConversationDataDao, "ConversationStorage_Cached") {
   import ConversationStorage._
   import EventContext.Implicits.global
   private implicit val dispatcher = new SerialDispatchQueue(name = "ConversationStorage")

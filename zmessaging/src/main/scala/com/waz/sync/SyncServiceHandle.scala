@@ -72,6 +72,7 @@ trait SyncServiceHandle {
   def postReceipt(conv: ConvId, message: MessageId, user: UserId, tpe: ReceiptType): Future[SyncId]
 
   def resetGcm(): Future[SyncId]
+  def registerPush(): Future[SyncId]
   def deleteGcmToken(token: GcmId): Future[SyncId]
 
   def syncSelfClients(): Future[SyncId]
@@ -131,6 +132,7 @@ class AndroidSyncServiceHandle(context: Context, service: => SyncRequestService,
   def postReceipt(conv: ConvId, message: MessageId, user: UserId, tpe: ReceiptType): Future[SyncId] = addRequest(PostReceipt(conv, message, user, tpe), priority = Priority.Optional)
 
   def resetGcm() = addRequest(ResetGcmToken, priority = Priority.Low, forceRetry = true)
+  def registerPush() = addRequest(RegisterPushToken, priority = Priority.High, forceRetry = true)
   def deleteGcmToken(token: GcmId) = addRequest(DeleteGcmToken(token), priority = Priority.Low)
 
   def syncSelfClients() = addRequest(SyncSelfClients, priority = Priority.Critical)
@@ -187,6 +189,7 @@ class AccountSyncHandler(zms: Signal[ZMessaging], otrClients: OtrClientsSyncHand
     case PostAddressBook(ab)                   => zms.addressbookSync.postAddressBook(ab)
     case PostInvitation(i)                     => zms.invitationSync.postInvitation(i)
     case ResetGcmToken                         => zms.gcmSync.resetGcm()
+    case RegisterPushToken                     => zms.gcmSync.registerPushToken()
     case PostLiking(convId, liking)            => zms.reactionsSync.postReaction(convId, liking)
     case PostDeleted(convId, msgId)            => zms.messagesSync.postDeleted(convId, msgId)
     case PostLastRead(convId, time)            => zms.lastReadSync.postLastRead(convId, time)

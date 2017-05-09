@@ -62,7 +62,7 @@ class DownloaderService(context: Context, cache: CacheService, prefs: Preference
   private lazy val downloadPrefAlways = Try(context.getResources.getString(R.string.zms_image_download_default_value)).getOrElse("always")
   private lazy val downloadPrefKey = Try(context.getResources.getString(R.string.zms_image_download_preference_key)).getOrElse("zms_pref_image_download") // hardcoded value used in tests
 
-  private lazy val downloadPref = prefs.uiPreferenceStringSignal(downloadPrefKey, downloadPrefAlways).signal
+  private lazy val downloadPref = prefs.preference[String](downloadPrefKey, downloadPrefAlways, prefs.uiPreferences).signal
   private lazy val downloadEnabled = Signal.or(downloadPref.map(_ == downloadPrefAlways), network.networkMode.map(_ == NetworkMode.WIFI))
 
   downloadEnabled.disableAutowiring()

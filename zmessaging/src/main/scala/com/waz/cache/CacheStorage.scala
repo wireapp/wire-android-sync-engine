@@ -27,26 +27,14 @@ import com.waz.content.Database
 import com.waz.model.{CacheKey, Uid}
 import com.waz.threading.{SerialDispatchQueue, Threading}
 import com.waz.utils.TrimmingLruCache.{Fixed, Relative}
-import com.waz.utils.events.Signal
-import com.waz.utils.{CachedStorage, SerialProcessingQueue, TrimmingLruCache}
+import com.waz.utils.{CachedStorage, CachedStorageImpl, SerialProcessingQueue, TrimmingLruCache}
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
 
-trait CacheStorage {
-  def get(key: CacheKey): Future[Option[CacheEntryData]]
-  def list(): Future[Seq[CacheEntryData]]
-  def insert(entry: CacheEntryData): Future[CacheEntryData]
-  def insert(vs: Traversable[CacheEntryData]): Future[Set[CacheEntryData]]
-  def remove(key: CacheKey): Future[Unit]
-  def remove(key: CacheEntryData): Future[Unit]
-  def remove(keys: Iterable[CacheKey]): Future[Unit]
-  def optSignal(cacheKey: CacheKey): Signal[Option[CacheEntryData]]
-}
+trait CacheStorage extends CachedStorage[CacheKey, CacheEntryData]
 
-class CacheStorageImpl(storage: Database, context: Context)
-  extends CachedStorage[CacheKey, CacheEntryData](new EntryCache(context), storage)(CacheEntryDao, "CacheStorage")
-  with CacheStorage {
+class CacheStorageImpl(storage: Database, context: Context) extends CachedStorageImpl[CacheKey, CacheEntryData](new EntryCache(context), storage)(CacheEntryDao, "CacheStorage") with CacheStorage {
 
   import com.waz.cache.CacheStorage._
   import com.waz.utils.events.EventContext.Implicits.global

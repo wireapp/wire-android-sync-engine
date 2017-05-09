@@ -24,7 +24,7 @@ import android.content.Context
 import com.waz.ZLog._
 import com.waz.api.ZmsVersion
 import com.waz.cache.{CacheService, Expiration}
-import com.waz.content.AccountsStorage
+import com.waz.content.AccountsStorageImpl
 import com.waz.content.WireContentProvider.CacheUri
 import com.waz.model.{AccountId, Mime}
 import com.waz.service.push.GcmGlobalService
@@ -70,7 +70,7 @@ class ZmsReportingService(user: AccountId, global: ReportingService) extends Rep
   global.addStateReporter(generateStateReport)(s"ZMessaging[$user]")
 }
 
-class GlobalReportingService(context: Context, cache: CacheService, metadata: MetaDataService, storage: AccountsStorage, prefs: PreferenceService) extends ReportingService {
+class GlobalReportingService(context: Context, cache: CacheService, metadata: MetaDataService, storage: AccountsStorageImpl, prefs: PreferenceServiceImpl) extends ReportingService {
   import ReportingService._
   import Threading.Implicits.Background
   implicit val tag: LogTag = logTagFor[GlobalReportingService]

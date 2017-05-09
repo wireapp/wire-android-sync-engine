@@ -35,13 +35,23 @@ import com.waz.znet.AuthenticationManager.{Cookie, Token}
 /**
  * Represents a local user account.
  *
- * @param activated - true if user account has been activated
+ * @param verified - true if user account has been activated
  * @param password - will not be stored in db
  */
-case class AccountData(id: AccountId, email: Option[EmailAddress], hash: String, phone: Option[PhoneNumber],
-                       activated: Boolean = false, cookie: Option[Cookie] = None, password: Option[String] = None, accessToken: Option[Token] = None,
-                       userId: Option[UserId] = None, clientId: Option[ClientId] = None, clientRegState: ClientRegistrationState = ClientRegistrationState.UNKNOWN,
-                       handle:Option[Handle], privateMode:Boolean = false) {
+case class AccountData(id:             AccountId,
+                       email:          Option[EmailAddress],
+                       hash:           String,
+                       phone:          Option[PhoneNumber],
+                       handle:         Option[Handle],
+                       registeredPush: Option[String]          = None,
+                       verified:       Boolean                 = false,
+                       cookie:         Option[Cookie]          = None,
+                       password:       Option[String]          = None,
+                       accessToken:    Option[Token]           = None,
+                       userId:         Option[UserId]          = None,
+                       clientId:       Option[ClientId]        = None,
+                       clientRegState: ClientRegistrationState = ClientRegistrationState.UNKNOWN,
+                       privateMode:    Boolean                 = false) {
 
   def authorized(credentials: Credentials) = credentials match {
     case EmailCredentials(e, Some(passwd), _) if email.contains(e) && AccountData.computeHash(id, passwd) == hash =>
@@ -67,12 +77,12 @@ case class AccountData(id: AccountId, email: Option[EmailAddress], hash: String,
   }
 
   def updated(user: UserInfo) =
-    copy(userId = Some(user.id), email = user.email.orElse(email), phone = user.phone.orElse(phone), activated = true, handle = user.handle.orElse(handle), privateMode = user.privateMode.getOrElse(privateMode))
+    copy(userId = Some(user.id), email = user.email.orElse(email), phone = user.phone.orElse(phone), verified = true, handle = user.handle.orElse(handle), privateMode = user.privateMode.getOrElse(privateMode))
 
   def updated(userId: Option[UserId], activated: Boolean, clientId: Option[ClientId], clientRegState: ClientRegistrationState) =
-    copy(userId = userId orElse this.userId, activated = this.activated | activated, clientId = clientId orElse this.clientId, clientRegState = clientRegState)
+    copy(userId = userId orElse this.userId, verified = this.verified | activated, clientId = clientId orElse this.clientId, clientRegState = clientRegState)
 
-  override def toString: String = s"AccountData($id, $handle, $email, $phone, $activated, user: $userId, client: $clientId, cookie: ${cookie.toString}, password: ${password.isDefined})"
+  override def toString: String = s"AccountData($id, $handle, $email, $phone, $verified, user: $userId, client: $clientId, cookie: ${cookie.toString}, password: ${password.isDefined})"
 }
 
 case class PhoneNumber(str: String) extends AnyVal {
@@ -112,20 +122,21 @@ object AccountData {
     val Id = id[AccountId]('_id, "PRIMARY KEY").apply(_.id)
     val Email = opt(emailAddress('email))(_.email)
     val Hash = text('hash)(_.hash)
-    val EmailVerified = bool('verified)(_.activated)
-    val Cookie = opt(text[Cookie]('cookie, _.str, AuthenticationManager.Cookie))(_.cookie)
     val Phone = opt(phoneNumber('phone))(_.phone)
+    val Handle = opt(handle('handle))(_.handle)
+    val PushRegistered = opt(text('push_registered))(_.registeredPush)
+    val EmailVerified = bool('verified)(_.verified)
+    val Cookie = opt(text[Cookie]('cookie, _.str, AuthenticationManager.Cookie))(_.cookie)
     val Token = opt(text[Token]('access_token, JsonEncoder.encodeString[Token], JsonDecoder.decode[Token]))(_.accessToken)
     val UserId = opt(id[UserId]('user_id)).apply(_.userId)
     val ClientId = opt(id[ClientId]('client_id))(_.clientId)
     val ClientRegState = text[ClientRegistrationState]('reg_state, _.name(), ClientRegistrationState.valueOf)(_.clientRegState)
-    val Handle = opt(handle('handle))(_.handle)
     val PrivateMode = bool('private_mode)(_.privateMode)
 
     override val idCol = Id
     override val table = Table("Accounts", Id, Email, Hash, EmailVerified, Cookie, Phone, Token, UserId, ClientId, ClientRegState, Handle, PrivateMode)
 
-    override def apply(implicit cursor: DBCursor): AccountData = AccountData(Id, Email, Hash, Phone, EmailVerified, Cookie, None, Token, UserId, ClientId, ClientRegState, Handle, PrivateMode)
+    override def apply(implicit cursor: DBCursor): AccountData = AccountData(Id, Email, Hash, Phone, Handle, PushRegistered, EmailVerified, Cookie, None, Token, UserId, ClientId, ClientRegState, PrivateMode)
 
     def findByEmail(email: EmailAddress)(implicit db: DB) =
       iterating(db.query(table.name, null, s"${Email.name} = ?", Array(email.str), null, null, null))

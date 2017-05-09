@@ -17,15 +17,15 @@
  */
 package com.waz.service
 
-import com.waz.service.push.GcmGlobalService.GcmSenderId
+import com.waz.service.push.GcmGlobalService.PushSenderId
 
-case class BackendConfig(baseUrl: String, pushUrl: String, gcmSenderId: GcmSenderId, environment: String) {
+case class BackendConfig(baseUrl: String, pushUrl: String, gcmSenderId: PushSenderId, environment: String) {
   import BackendConfig._
   if (gcmSenderId != stagingSenderId && gcmSenderId != prodSenderId) throw new IllegalArgumentException(s"Unknown sender id: $gcmSenderId")
 }
 
 object BackendConfig {
-  val Seq(stagingSenderId, prodSenderId) = Seq("723990470614", "782078216207") map GcmSenderId
+  val Seq(stagingSenderId, prodSenderId) = Seq("723990470614", "782078216207") map PushSenderId
 
   val StagingBackend = BackendConfig("https://staging-nginz-https.zinfra.io", "https://staging-nginz-ssl.zinfra.io/await", stagingSenderId, "staging")
   val ProdBackend = BackendConfig("https://prod-nginz-https.wire.com", "https://prod-nginz-ssl.wire.com/await", prodSenderId, "prod")

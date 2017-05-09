@@ -38,7 +38,7 @@ trait MediaManagerService {
   def mediaManager: Option[MediaManager]
 }
 
-class DefaultMediaManagerService(context: Context, prefs: PreferenceService) extends MediaManagerService {
+class DefaultMediaManagerService(context: Context, prefs: PreferenceServiceImpl) extends MediaManagerService {
   import com.waz.service.MediaManagerService._
 
   private implicit val dispatcher = new SerialDispatchQueue(name = "MediaManagerService")
@@ -70,7 +70,7 @@ class DefaultMediaManagerService(context: Context, prefs: PreferenceService) ext
 
   private lazy val intensityMap = Map(prefAll -> IntensityLevel.FULL, prefSome -> IntensityLevel.SOME, prefNone -> IntensityLevel.NONE)
 
-  private lazy val soundsPref = prefs.uiPreferenceStringSignal(soundsPrefKey)
+  private lazy val soundsPref = prefs.preference[String](soundsPrefKey, "", prefs.uiPreferences)
 
   soundsPref.signal { value =>
     val intensity = intensityMap.getOrElse(value, IntensityLevel.FULL)

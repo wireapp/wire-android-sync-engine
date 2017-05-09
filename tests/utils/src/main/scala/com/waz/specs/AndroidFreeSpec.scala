@@ -17,13 +17,17 @@
  */
 package com.waz.specs
 
-import com.waz.utils.wrappers._
-import com.waz.ZLog
-import com.waz.ZLog.LogLevel
-import com.waz.threading.{DispatchQueue, Threading}
+import java.util.concurrent.{Executors, ThreadFactory}
+
+import com.waz.ZLog.LogTag
+import com.waz.threading.{SerialDispatchQueue, Threading}
 import com.waz.utils.isTest
-import com.waz.utils.wrappers.{Intent, JVMIntentUtil, JavaURIUtil, URI}
+import com.waz.utils.wrappers.{Intent, JVMIntentUtil, JavaURIUtil, URI, _}
+import com.waz.{HockeyApp, HockeyAppUtil, ZLog}
 import org.scalatest.{BeforeAndAfterAll, Suite}
+
+import scala.concurrent.duration._
+import scala.concurrent.{Await, Future}
 
 trait AndroidFreeSpec extends BeforeAndAfterAll { this: Suite =>
 
@@ -37,13 +41,29 @@ trait AndroidFreeSpec extends BeforeAndAfterAll { this: Suite =>
 
     isTest = true
 
-    ZLog.testLogLevel = LogLevel.Verbose
+    ZLog.setTestLogging()
 
     Intent.setUtil(JVMIntentUtil)
 
-    Threading.setUi(new DispatchQueue {
-      override def execute(runnable: Runnable) = ???
-    })
+    Threading.setUi(new SerialDispatchQueue({
+      Threading.executionContext(Executors.newSingleThreadExecutor(new ThreadFactory {
+        override def newThread(r: Runnable) = {
+          new Thread(r, Threading.testUiThreadName)
+        }
+      }))
+    }, Threading.testUiThreadName))
+
+    Localytics.setUtil(None)
+
+    HockeyApp.setUtil(Some(new HockeyAppUtil {
+      override def saveException(t: Throwable, description: String)(implicit tag: LogTag) = {
+        println("Exception sent to HockeyApp:")
+        println(description)
+        t.printStackTrace()
+      }
+    }))
   }
+
+  def result[A](future: Future[A])(implicit defaultDuration: FiniteDuration = 5.seconds): A = Await.result(future, defaultDuration)
 
 }

@@ -111,8 +111,10 @@ class ZMessaging(val clientId: ClientId, val userModule: UserModule) {
   lazy val otrClientsSync       = userModule.clientsSync
   lazy val verificationUpdater  = userModule.verificationUpdater
 
+  def clock             = global.clock
   def context           = global.context
   def contextWrapper    = new AndroidContext(context)
+  def googleApi         = global.googleApi
   def imageCache        = global.imageCache
   def permissions       = global.permissions
   def phoneNumbers      = global.phoneNumbers
@@ -182,6 +184,7 @@ class ZMessaging(val clientId: ClientId, val userModule: UserModule) {
   lazy val assetLoader     = wire[AssetLoaderImpl]
   lazy val imageLoader     = wire[ImageLoader]
 
+  lazy val pushToken                              = wire[PushTokenService]
   lazy val pushSignals                            = wire[PushServiceSignals]
   lazy val push: PushService                      = wire[PushService]
   lazy val gcm: GcmService                        = wire[GcmService]
@@ -199,7 +202,7 @@ class ZMessaging(val clientId: ClientId, val userModule: UserModule) {
   lazy val convEvents: ConversationEventsService  = wire[ConversationEventsService]
   lazy val convsUi                                = wire[ConversationsUiService]
   lazy val convsStats                             = wire[ConversationsListStateService]
-  lazy val messages: DefaultMessagesService              = wire[DefaultMessagesService]
+  lazy val messages: DefaultMessagesService       = wire[DefaultMessagesService]
   lazy val connection: ConnectionService          = wire[ConnectionService]
   lazy val flowmanager: DefaultFlowManagerService = wire[DefaultFlowManagerService]
   lazy val voiceContent                           = wire[VoiceChannelContent]

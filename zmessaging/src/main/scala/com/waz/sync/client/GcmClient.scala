@@ -19,7 +19,7 @@ package com.waz.sync.client
 
 import com.waz.ZLog._
 import com.waz.model.otr.ClientId
-import com.waz.service.push.GcmGlobalService.GcmSenderId
+import com.waz.service.push.GcmGlobalService.PushSenderId
 import com.waz.threading.Threading
 import com.waz.utils.{JsonDecoder, JsonEncoder}
 import com.waz.znet.Response.SuccessHttpStatus
@@ -46,7 +46,7 @@ class GcmClient(netClient: ZNetClient) {
 object GcmClient {
   val PushesPath = "/push/tokens"
 
-  case class GcmToken(token: String, app: GcmSenderId, clientId: ClientId, transport: String = "GCM")
+  case class GcmToken(token: String, app: PushSenderId, clientId: ClientId, transport: String = "GCM")
   object GcmToken {
 
     implicit lazy val Decoder: JsonDecoder[GcmToken] = new JsonDecoder[GcmToken] {

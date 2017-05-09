@@ -24,9 +24,9 @@ import com.waz.model.otr.{Client, ClientId, UserClients}
 import com.waz.model.otr.UserClients.UserClientsDao
 import com.waz.utils.TrimmingLruCache.Fixed
 import com.waz.utils.events.Signal
-import com.waz.utils.{CachedStorage, TrimmingLruCache}
+import com.waz.utils.{CachedStorageImpl, TrimmingLruCache}
 
-class OtrClientsStorage(context: Context, storage: Database) extends CachedStorage[UserId, UserClients](new TrimmingLruCache(context, Fixed(2000)), storage)(UserClientsDao, "OtrClientsStorage") {
+class OtrClientsStorage(context: Context, storage: Database) extends CachedStorageImpl[UserId, UserClients](new TrimmingLruCache(context, Fixed(2000)), storage)(UserClientsDao, "OtrClientsStorage") {
   import com.waz.threading.Threading.Implicits.Background
 
   def incomingClientsSignal(userId: UserId, clientId: ClientId): Signal[Seq[Client]] =

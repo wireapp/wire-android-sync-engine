@@ -17,17 +17,32 @@
  */
 package com.waz.utils.events
 
+import com.waz.ZLog
+import com.waz.ZLog.ImplicitTag._
+import com.waz.threading.CancellableFuture
 import com.waz.threading.CancellableFuture.delayed
 import com.waz.threading.Threading.Background
-import org.threeten.bp.Instant
+import org.threeten.bp.{Clock, Instant}
 import org.threeten.bp.Instant.now
+import com.waz.utils._
 
 import scala.concurrent.duration.FiniteDuration
+import scala.concurrent.duration._
 
-case class ClockSignal(interval: FiniteDuration) extends SourceSignal[Instant](Some(now)) {
+case class ClockSignal(interval: FiniteDuration, clock: Clock = Clock.systemUTC()) extends SourceSignal[Instant](Some(now(clock))) {
+
+  private var delay = CancellableFuture.successful({})
+
   def refresh: Unit = if (wired) {
-    publish(now)
-    delayed(interval)(refresh)(Background)
+    publish(now(clock))
+    delay.cancel()
+    delay = delayed(interval)(refresh)(Background)
+  }
+
+  //To force a refresh in tests when clock is advanced
+  def check() = {
+    val lastRefresh = value.getOrElse(Instant.EPOCH)
+    if (interval <= lastRefresh.until(now(clock)).toMillis.millis) refresh
   }
 
   override def onWire: Unit = refresh

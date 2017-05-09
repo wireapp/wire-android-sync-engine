@@ -30,7 +30,7 @@ import com.waz.utils.events._
 import scala.collection.{breakOut, mutable}
 import scala.concurrent.Future
 
-class UsersStorage(context: Context, storage: ZmsDatabase) extends CachedStorage[UserId, UserData](new TrimmingLruCache(context, Fixed(2000)), storage)(UserDataDao, "UsersStorage_Cached") {
+class UsersStorage(context: Context, storage: ZmsDatabase) extends CachedStorageImpl[UserId, UserData](new TrimmingLruCache(context, Fixed(2000)), storage)(UserDataDao, "UsersStorage_Cached") {
   import com.waz.content.UsersStorage._
   import EventContext.Implicits.global
   private implicit val dispatcher = new SerialDispatchQueue(name = "UsersStorage")

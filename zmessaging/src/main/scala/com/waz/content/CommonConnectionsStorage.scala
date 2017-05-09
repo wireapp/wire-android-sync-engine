@@ -21,6 +21,6 @@ import android.content.Context
 import com.waz.model.CommonConnectionsData.CommonConnectionsDataDao
 import com.waz.model.{CommonConnectionsData, UserId}
 import com.waz.utils.TrimmingLruCache.Fixed
-import com.waz.utils.{CachedStorage, TrimmingLruCache}
+import com.waz.utils.{CachedStorageImpl, TrimmingLruCache}
 
-class CommonConnectionsStorage(context: Context, storage: Database) extends CachedStorage[UserId, CommonConnectionsData](new TrimmingLruCache(context, Fixed(50)), storage)(CommonConnectionsDataDao, "CommonConnectionsStorage")
+class CommonConnectionsStorage(context: Context, storage: Database) extends CachedStorageImpl[UserId, CommonConnectionsData](new TrimmingLruCache(context, Fixed(50)), storage)(CommonConnectionsDataDao, "CommonConnectionsStorage")

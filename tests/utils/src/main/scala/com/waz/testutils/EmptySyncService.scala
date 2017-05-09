@@ -66,6 +66,7 @@ trait EmptySyncServiceTrait extends SyncServiceHandle {
   override def postReceipt(conv: ConvId, message: MessageId, user: UserId, tpe: ReceiptType) = sid
 
   override def resetGcm() = sid
+  override def registerPush() = sid
   override def deleteGcmToken(token: GcmId) = sid
 
   override def syncSelfClients(): Future[SyncId] = sid

@@ -46,7 +46,7 @@ class Accounts(val global: GlobalModule) {
   val regClient     = global.regClient
   val loginClient   = global.loginClient
 
-  val currentAccountPref = prefs.preferenceStringSignal(CurrentAccountPref)
+  val currentAccountPref = prefs.preference[String](CurrentAccountPref, "")
 
   lazy val currentAccountData = currentAccountPref.signal.flatMap[Option[AccountData]] {
     case "" => Signal.const(Option.empty[AccountData])
@@ -137,10 +137,10 @@ class Accounts(val global: GlobalModule) {
     def loginOnBackend() =
       loginClient.login(account.id, normalized).future map {
         case Right((token, c)) =>
-          Right(account.updated(normalized).copy(cookie = c, activated = true, accessToken = Some(token)))
+          Right(account.updated(normalized).copy(cookie = c, verified = true, accessToken = Some(token)))
         case Left((_, error @ ErrorResponse(Status.Forbidden, _, "pending-activation"))) =>
           verbose(s"account pending activation: $normalized, $error")
-          Right(account.updated(normalized).copy(activated = false, cookie = None, accessToken = None))
+          Right(account.updated(normalized).copy(verified = false, cookie = None, accessToken = None))
         case Left((_, error)) =>
           verbose(s"login failed: $error")
           Left(error)
@@ -149,7 +149,7 @@ class Accounts(val global: GlobalModule) {
     loginOnBackend() flatMap {
       case Right(a) =>
         for {
-          acc     <- storage.updateOrCreate(a.id, _.updated(normalized).copy(cookie = a.cookie, activated = true, accessToken = a.accessToken), a)
+          acc     <- storage.updateOrCreate(a.id, _.updated(normalized).copy(cookie = a.cookie, verified = true, accessToken = a.accessToken), a)
           service <- getInstance(acc)
           _       <- setAccount(Some(acc.id))
           res     <- service.login(normalized)
@@ -191,7 +191,7 @@ class Accounts(val global: GlobalModule) {
         case Right((userInfo, cookie)) =>
           verbose(s"register($credentials) done, id: $accountId, user: $userInfo, cookie: $cookie")
           for {
-            acc     <- storage.insert(AccountData(accountId, normalized).copy(cookie = cookie, userId = Some(userInfo.id), activated = normalized.autoLoginOnRegistration))
+            acc     <- storage.insert(AccountData(accountId, normalized).copy(cookie = cookie, userId = Some(userInfo.id), verified = normalized.autoLoginOnRegistration))
             _       = verbose(s"created account: $acc")
             service <- getInstance(acc)
             _       <- setAccount(Some(accountId))

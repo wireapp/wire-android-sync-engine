@@ -23,7 +23,7 @@ import com.waz.model.KeyValueData
 import com.waz.model.KeyValueData.KeyValueDataDao
 import com.waz.threading.Threading
 import com.waz.utils.TrimmingLruCache.Fixed
-import com.waz.utils.{CachedStorage, TrimmingLruCache}
+import com.waz.utils.{CachedStorageImpl, TrimmingLruCache}
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -31,7 +31,7 @@ import scala.concurrent.{ExecutionContext, Future}
   * General preference storage in user db.
   * This can be used similarly to PreferenceService, but it keeps separate data for each logged in user as opposed to PreferenceService which uses single global preferences file.
   */
-class KeyValueStorage(context: Context, storage: ZmsDatabase) extends CachedStorage[String, KeyValueData](new TrimmingLruCache(context, Fixed(128)), storage)(KeyValueDataDao, "KeyValueStorage_Cached") {
+class KeyValueStorage(context: Context, storage: ZmsDatabase) extends CachedStorageImpl[String, KeyValueData](new TrimmingLruCache(context, Fixed(128)), storage)(KeyValueDataDao, "KeyValueStorage_Cached") {
   import KeyValueStorage._
   import Threading.Implicits.Background
 
@@ -56,15 +56,11 @@ object KeyValueStorage {
   val SpotifyRefreshToken = "spotify_refresh_token"
   val ShouldSyncConversations = "should_sync_conversations"
 
-  class KeyValuePref[A](storage: KeyValueStorage, key: String, val default: A)(implicit val trans: PrefCodec[A], implicit val dispatcher: ExecutionContext) extends Preference[A] {
+  class KeyValuePref[A](storage: KeyValueStorage, key: String, val default: A)(implicit val trans: PrefCodec[A], override implicit val dispatcher: ExecutionContext) extends Preference[A] {
     def apply(): Future[A] = storage.decodePref(key, trans.decode).map(_.getOrElse(default))
-
-    def :=(value: A): Future[Unit] = update(value)
 
     def update(value: A): Future[Unit] = {
       storage.setPref(key, trans.encode(value)) .map { _ => signal ! value }
     }
-
-    def mutate(f: A => A): Future[Unit] = apply().flatMap(cur => update(f(cur)))
   }
 }

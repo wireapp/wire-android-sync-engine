@@ -48,7 +48,7 @@ trait FlowManagerService {
   def flowManager: Option[FlowManager]
 }
 
-class DefaultFlowManagerService(context: Context, netClient: ZNetClient, websocket: WebSocketClientService, prefs: PreferenceService, network: DefaultNetworkModeService) extends FlowManagerService {
+class DefaultFlowManagerService(context: Context, netClient: ZNetClient, websocket: WebSocketClientService, prefs: PreferenceServiceImpl, network: DefaultNetworkModeService) extends FlowManagerService {
   import DefaultFlowManagerService._
 
   val MetricsUrlRE = "/conversations/([a-z0-9-]*)/call/metrics/complete".r
@@ -61,8 +61,8 @@ class DefaultFlowManagerService(context: Context, netClient: ZNetClient, websock
   private lazy val logLevelPrefKey       = Try(context.getResources.getString(R.string.pref_avs_loglevel_key)).getOrElse("PREF_KEY_AVS_LOGLEVEL")
 
   private lazy val metricsEnabledPref = prefs.analyticsEnabledPref
-  private lazy val loggingEnabledPref = prefs.preferenceBooleanSignal(loggingEnabledPrefKey)
-  private lazy val logLevelPref       = prefs.intPreference(logLevelPrefKey)
+  private lazy val loggingEnabledPref = prefs.preference[Boolean](loggingEnabledPrefKey, false)
+  private lazy val logLevelPref       = prefs.preference[Int](logLevelPrefKey, 0)
 
   val onMediaEstablished = new Publisher[RConvId]
   val onFlowManagerError = new Publisher[(RConvId, Int)] // (conv, errorCode)

@@ -110,8 +110,8 @@ lazy val zmessaging = project
       "com.koushikdutta.async" % "androidasync" % "2.1.8",
       "com.googlecode.libphonenumber" % "libphonenumber" % "7.1.1", // 7.2.x breaks protobuf
       "com.softwaremill.macwire" %% "macros" % "2.2.2" % Provided,
-      "com.google.android.gms" % "play-services-base" % "7.8.0" % Provided exclude("com.android.support", "support-v4"),
-      "com.google.android.gms" % "play-services-gcm" % "7.8.0" % Provided,
+      "com.google.android.gms" % "play-services-base" % "9.0.0" % Provided exclude("com.android.support", "support-v4"),
+      "com.google.firebase" % "firebase-messaging" % "9.0.0" % Provided,
       Deps.avs % Provided,
       Deps.cryptobox,
       Deps.genericMessage,

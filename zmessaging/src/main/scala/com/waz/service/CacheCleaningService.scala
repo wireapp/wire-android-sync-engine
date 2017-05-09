@@ -26,7 +26,7 @@ import com.waz.utils.events.EventContext
 
 import scala.concurrent.duration._
 
-class CacheCleaningService(cache: CacheService, prefs: PreferenceService) {
+class CacheCleaningService(cache: CacheService, prefs: PreferenceServiceImpl) {
   import CacheCleaningService._
   import Threading.Implicits.Background
   private implicit val tag: LogTag = logTagFor[CacheCleaningService]

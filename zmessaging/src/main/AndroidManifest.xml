@@ -6,13 +6,8 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
 
-    <!-- required for GCM !-->
-    <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="com.google.android.c2dm.permission.RECEIVE" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
-
-    <permission android:name=".permission.C2D_MESSAGE" android:protectionLevel="signature" />
-    <uses-permission android:name=".permission.C2D_MESSAGE" />
 
     <application>
         <service android:name="com.waz.zms.SyncService" />
@@ -21,9 +16,10 @@
         <service android:name="com.waz.zms.CallService" android:exported="true" />
         <service android:name="com.waz.zms.GcmHandlerService" />
 
-        <service android:name="com.waz.zms.GmsInstanceIdListenerService" android:exported="false">
+        <service
+                android:name="com.waz.zms.InstanceIdListenerService">
             <intent-filter>
-                <action android:name="com.google.android.gms.iid.InstanceID"/>
+                <action android:name="com.google.firebase.INSTANCE_ID_EVENT" />
             </intent-filter>
         </service>
 
@@ -34,11 +30,5 @@
             </intent-filter>
         </receiver>
 
-        <receiver android:name="com.waz.zms.GcmBroadcastReceiver" android:permission="com.google.android.c2dm.permission.SEND" >
-            <intent-filter>
-                <action android:name="com.google.android.c2dm.intent.RECEIVE" />
-                <category android:name="com.waz.zms" />
-            </intent-filter>
-        </receiver>
     </application>
 </manifest>

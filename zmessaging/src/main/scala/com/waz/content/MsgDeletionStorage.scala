@@ -33,7 +33,7 @@ import scala.util.Random
   * We need that to discard new versions of previously deleted messages.
   * We don't want to store it permanently, so will drop items older than 2 weeks.
   */
-class MsgDeletionStorage(context: Context, storage: Database) extends CachedStorage[MessageId, MsgDeletion](new TrimmingLruCache(context, Fixed(512)), storage)(MsgDeletionDao, "MsgDeletionStorage_Cached") {
+class MsgDeletionStorage(context: Context, storage: Database) extends CachedStorageImpl[MessageId, MsgDeletion](new TrimmingLruCache(context, Fixed(512)), storage)(MsgDeletionDao, "MsgDeletionStorage_Cached") {
   import MsgDeletionStorage._
   import Threading.Implicits.Background
 

@@ -32,7 +32,7 @@ import scala.collection.{breakOut, mutable}
 import scala.concurrent.duration._
 import scala.concurrent.Future
 
-class ReactionsStorage(context: Context, storage: Database) extends CachedStorage[(MessageId, UserId), Liking](new TrimmingLruCache(context, Fixed(MessagesStorage.cacheSize)), storage)(LikingDao, "LikingStorage") {
+class ReactionsStorage(context: Context, storage: Database) extends CachedStorageImpl[(MessageId, UserId), Liking](new TrimmingLruCache(context, Fixed(MessagesStorage.cacheSize)), storage)(LikingDao, "LikingStorage") {
   import ReactionsStorage._
   import EventContext.Implicits.global
 

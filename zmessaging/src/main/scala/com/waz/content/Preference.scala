@@ -17,19 +17,26 @@
  */
 package com.waz.content
 
+import com.waz.ZLog.ImplicitTag._
+import com.waz.ZLog.verbose
 import com.waz.model.Id
+import com.waz.service.push.PushTokenService
 import com.waz.threading.{SerialDispatchQueue, Threading}
 import com.waz.utils.events.{Signal, SourceSignal}
 import com.waz.znet.AuthenticationManager.Token
 import org.json.JSONObject
 import org.threeten.bp.Instant
 
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 
 trait Preference[A] {
+  protected implicit def dispatcher: ExecutionContext
   def default: A
   def apply(): Future[A]
-  def :=(value: A): Future[Unit]
+  def update(value: A): Future[Unit]
+
+  def :=(value: A): Future[Unit] = update(value)
+  def mutate(f: A => A): Future[Unit] = apply().flatMap(cur => update(f(cur)))
 
   lazy val signal: SourceSignal[A] = {
     val s = Signal[A]()
@@ -40,23 +47,37 @@ trait Preference[A] {
 
 object Preference {
   def empty[A] = new Preference[Option[A]] {
+    override protected implicit val dispatcher = null
     def default = None
     def apply() = Future.successful(None)
-    def :=(value: Option[A]) = Future.successful(())
+    override def update(value: Option[A]) = Future.successful({})
   }
 
-  def inMemory[A](defaultValue: A): Preference[A] = new Preference[A] {
-    private implicit val dispatcher = new SerialDispatchQueue()
+  def inMemory[A](defaultValue: A, key: Option[String] = None): Preference[A] = new Preference[A] {
+    override protected implicit val dispatcher = new SerialDispatchQueue()
+
+    private lazy val hash = s"@${Integer.toHexString(hashCode)}"
+
     private var value = defaultValue
+
     override def default = defaultValue
-    override def :=(v: A) = Future { value = v; signal ! v }
-    override def apply() = Future { value }
+
+    override def update(v: A) = Future {
+      key.foreach(k => verbose(s"updating $k$hash: $value to $v"))
+      value = v
+      signal ! v
+    }
+
+    override def apply() = Future {
+      key.foreach(k => verbose(s"getting $k$hash: $value"))
+      value
+    }
   }
 
   def apply[A](defaultValue: A, load: => Future[A], save: A => Future[Any]): Preference[A] = new Preference[A] {
-    import Threading.Implicits.Background
+    override protected implicit val dispatcher = Threading.Background
     override def default = defaultValue
-    override def :=(v: A) = save(v) map { _ => signal ! v }
+    override def update(v: A) = save(v) map { _ => signal ! v }
     override def apply() = load
   }
 

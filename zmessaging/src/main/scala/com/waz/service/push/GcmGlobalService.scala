@@ -19,23 +19,23 @@ package com.waz.service.push
 
 import android.content.{Context, SharedPreferences}
 import com.google.android.gms.common.{ConnectionResult, GooglePlayServicesUtil}
-import com.google.android.gms.gcm.GoogleCloudMessaging
-import com.google.android.gms.iid.InstanceID
+import com.google.firebase.iid.FirebaseInstanceId
 import com.localytics.android.Localytics
 import com.waz.HockeyApp
 import com.waz.HockeyApp.NoReporting
 import com.waz.ZLog._
 import com.waz.ZLog.ImplicitTag._
 import com.waz.model._
-import com.waz.service.push.GcmGlobalService.{GcmRegistration, GcmSenderId}
-import com.waz.service.{BackendConfig, MetaDataService, PreferenceService}
+import com.waz.service.{BackendConfig, MetaDataService, PreferenceServiceImpl}
+import com.waz.service.push.GcmGlobalService.{GcmRegistration, PushSenderId}
 import com.waz.threading.{CancellableFuture, SerialDispatchQueue}
-import com.waz.utils.LoggedTry
+import com.waz.utils.{LoggedTry, returning}
 import com.waz.utils.events.EventContext
 
+import scala.concurrent.Future
 import scala.util.control.{NoStackTrace, NonFatal}
 
-class GcmGlobalService(context: Context, val prefs: PreferenceService, metadata: MetaDataService, backendConfig: BackendConfig) {
+class GcmGlobalService(context: Context, val prefs: PreferenceServiceImpl, metadata: MetaDataService, backendConfig: BackendConfig) {
 
   implicit val dispatcher = new SerialDispatchQueue(name = "GcmGlobalDispatchQueue")
 
@@ -44,7 +44,7 @@ class GcmGlobalService(context: Context, val prefs: PreferenceService, metadata:
   import metadata._
   import prefs._
 
-  val gcmSenderId: GcmSenderId = backendConfig.gcmSenderId
+  val gcmSenderId: PushSenderId = backendConfig.gcmSenderId
 
   lazy val gcmCheckResult = try GooglePlayServicesUtil.isGooglePlayServicesAvailable(context) catch {
     case ex: Throwable =>
@@ -52,7 +52,7 @@ class GcmGlobalService(context: Context, val prefs: PreferenceService, metadata:
       ConnectionResult.DEVELOPER_ERROR
   }
 
-  val gcmEnabled = prefs.uiPreferenceBooleanSignal(prefs.gcmEnabledKey).signal
+  val gcmEnabled = prefs.preference[Boolean](prefs.gcmEnabledKey, false, prefs.uiPreferences).signal
 
   def gcmAvailable = prefs.gcmEnabled && gcmCheckResult == ConnectionResult.SUCCESS
 
@@ -76,7 +76,7 @@ class GcmGlobalService(context: Context, val prefs: PreferenceService, metadata:
     withGcm {
       LoggedTry {deleteInstanceId()} // if localytics registered first with only their sender id, we have to unregister so that our own additional sender id gets registered, too
       try {
-        val token = getGcmToken(gcmSenderId.str +: metadata.localyticsSenderId.toSeq)
+        val token = getFcmToken
         Localytics.setPushDisabled(false)
         Localytics.setPushRegistrationId(token)
         CancellableFuture.successful(Some(setGcm(token, AccountId(""))))
@@ -113,16 +113,18 @@ class GcmGlobalService(context: Context, val prefs: PreferenceService, metadata:
 
   private def withGcm[A](body: => A): A = if (gcmAvailable) body else throw new GcmGlobalService.GcmNotAvailableException
 
-  private def getGcmToken(senderIds: Seq[String]) =
-     InstanceID.getInstance(context).getToken(senderIds mkString ",", GoogleCloudMessaging.INSTANCE_ID_SCOPE)
+  //TODO do we need the scope here? GoogleCloudMessaging.INSTANCE_ID_SCOPE
+  private def getFcmToken = returning(FirebaseInstanceId.getInstance().getToken()) { t =>
+    if (t == null) throw new Exception("No FCM token was returned from the FirebaseInstanceId")
+  }
 
   //Deleting the instance id also removes any tokens the instance id was using
-  private def deleteInstanceId(): Unit = LoggedTry.local { InstanceID.getInstance(context).deleteInstanceID() }
+  private def deleteInstanceId(): Unit = LoggedTry.local { FirebaseInstanceId.getInstance().deleteInstanceId() }
 }
 
 object GcmGlobalService {
 
-  case class GcmSenderId(str: String) extends AnyVal
+  case class PushSenderId(str: String) extends AnyVal
 
   val RegistrationIdPref = "registration_id"
   val RegistrationUserPref = "registration_user"

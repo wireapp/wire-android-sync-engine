@@ -32,6 +32,9 @@ object ZLog {
   }
 
   var testLogLevel: LogLevel = LogLevel.Error
+  def setTestLogging() = this.testLogLevel = LogLevel.Verbose
+  def testLogging: Boolean = this.testLogLevel == LogLevel.Verbose
+
   @volatile var minimumLogLevel: Int = Log.VERBOSE
 
   def logTagFor[A <: Singleton](a: A): String = macro ZLogMacros.logTagForSingleton[A]

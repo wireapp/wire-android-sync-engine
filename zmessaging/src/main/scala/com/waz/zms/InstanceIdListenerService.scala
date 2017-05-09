@@ -17,22 +17,20 @@
  */
 package com.waz.zms
 
-import com.google.android.gms.iid.InstanceIDListenerService
+import com.google.firebase.iid.FirebaseInstanceIdService
 import com.waz.ZLog._
+import com.waz.ZLog.ImplicitTag._
 import com.waz.service.ZMessaging
 import com.waz.threading.Threading
 
 import scala.concurrent.Future
 
-class GmsInstanceIdListenerService extends InstanceIDListenerService with ZMessagingService {
-  private implicit val logTag: LogTag = logTagFor[GmsInstanceIdListenerService]
+class InstanceIdListenerService extends FirebaseInstanceIdService with ZMessagingService {
   import Threading.Implicits.Background
 
-  // it's possible to test that this works via
-  // adb shell am startservice -a com.google.android.gms.iid.InstanceID --es "CMD" "RST" -n com.waz.zclient.dev/com.waz.zms.GmsInstanceIdListenerService
-  // this requires temporary setting android:exported="true" for the service, though (don't forget to change back afterwards!)
+  //TODO figure out how to test
   override def onTokenRefresh(): Unit = {
-    info("GCM: onTokenRefresh() called")
+    info("FCM: onTokenRefresh() called")
     ZMessaging.currentAccounts.getCurrentZms flatMap {
       case Some(zms) =>
         debug("clearing gcm token and requesting re-registration with gcm")

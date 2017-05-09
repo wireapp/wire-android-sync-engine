@@ -27,7 +27,7 @@ import com.waz.content.ZmsDatabase
 import com.waz.threading.{CancellableFuture, SerialDispatchQueue}
 import com.waz.utils.TrimmingLruCache.Fixed
 import com.waz.utils.events.RefreshingSignal
-import com.waz.utils.{CachedStorage, TrimmingLruCache}
+import com.waz.utils.{CachedStorageImpl, TrimmingLruCache}
 
 import scala.collection.{breakOut, mutable}
 import scala.concurrent.Future
@@ -42,7 +42,7 @@ class ErrorsService(context: Context, storage: ZmsDatabase, lifecycle: ZmsLifecy
 
   private var dismissHandler: PartialFunction[ErrorData, Future[_]] = PartialFunction.empty
 
-  val errorsStorage = new CachedStorage[Uid, ErrorData](new TrimmingLruCache(context, Fixed(128)), storage)(ErrorDataDao, "ErrorStorage")
+  val errorsStorage = new CachedStorageImpl[Uid, ErrorData](new TrimmingLruCache(context, Fixed(128)), storage)(ErrorDataDao, "ErrorStorage")
 
   private val errors = new mutable.HashMap[Uid, ErrorData]()
 

@@ -81,7 +81,7 @@ class AccountsSpec extends FeatureSpec with Matchers with BeforeAndAfter with Ro
         case Right(data) =>
           data.email shouldEqual Some(EmailAddress("email"))
           data.credentials shouldEqual creds
-          data.activated shouldEqual false
+          data.verified shouldEqual false
           data.userId shouldBe empty
         case res =>
           fail(s"login returned: $res")
@@ -105,7 +105,7 @@ class AccountsSpec extends FeatureSpec with Matchers with BeforeAndAfter with Ro
 
       val Right(data) = accounts.login(PhoneCredentials(phone, Some(ConfirmationCode("code")))).await()
       data.phone shouldEqual Some(phone)
-      data.activated shouldEqual true
+      data.verified shouldEqual true
       data.email shouldEqual Some(email)
       accountId = data.id.str
       accounts.currentAccountPref().await() shouldEqual data.id.str
@@ -125,7 +125,7 @@ class AccountsSpec extends FeatureSpec with Matchers with BeforeAndAfter with Ro
       data.id.str shouldEqual accountId
       data.phone shouldEqual Some(phone)
       data.email shouldEqual Some(email)
-      data.activated shouldEqual true
+      data.verified shouldEqual true
       accounts.accountMap should have size accountsSize
       accounts.currentAccountPref().await() shouldEqual data.id.str
     }
@@ -143,7 +143,7 @@ class AccountsSpec extends FeatureSpec with Matchers with BeforeAndAfter with Ro
       data.id.str shouldEqual accountId
       data.phone shouldEqual Some(phone)
       data.email shouldEqual Some(email)
-      data.activated shouldEqual true
+      data.verified shouldEqual true
       accounts.accountMap should have size accountsSize
       accounts.currentAccountPref().await() shouldEqual data.id.str
     }

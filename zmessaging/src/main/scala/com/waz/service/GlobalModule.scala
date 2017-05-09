@@ -24,7 +24,7 @@ import com.waz.api.ZmsVersion
 import com.waz.bitmap.BitmapDecoder
 import com.waz.cache.CacheService
 import com.waz.client.RegistrationClient
-import com.waz.content.{AccountsStorage, Database, GlobalDatabase}
+import com.waz.content.{AccountsStorageImpl, Database, GlobalDatabase}
 import com.waz.service.assets.{AssetLoader, GlobalRecordAndPlayService}
 import com.waz.service.downloads.DownloadRequest.{AssetFromInputStream, UnencodedAudioAsset, VideoAsset}
 import com.waz.service.downloads._
@@ -34,12 +34,16 @@ import com.waz.sync.client.{AssetClient, VersionBlacklistClient}
 import com.waz.ui.MemoryImageCache
 import com.waz.ui.MemoryImageCache.{Entry, Key}
 import com.waz.utils.Cache
+import com.waz.utils.wrappers.{GoogleApi, GoogleApiImpl}
 import com.waz.znet._
+import org.threeten.bp.Clock
 
 
 class GlobalModule(val context: Context, val backend: BackendConfig) { global =>
+  lazy val clock: Clock = Clock.systemUTC()
+  lazy val googleApi: GoogleApi = new GoogleApiImpl
   lazy val storage: Database = new GlobalDatabase(context)
-  lazy val prefs: PreferenceService = wire[PreferenceService]
+  lazy val prefs: PreferenceServiceImpl = wire[PreferenceServiceImpl]
   lazy val metadata: MetaDataService = wire[MetaDataService]
   lazy val cache: CacheService = CacheService(context, storage)
   lazy val gcmGlobal = wire[GcmGlobalService]
@@ -65,7 +69,7 @@ class GlobalModule(val context: Context, val backend: BackendConfig) { global =>
 
   lazy val cacheCleanup = wire[CacheCleaningService]
 
-  lazy val accountsStorage = wire[AccountsStorage]
+  lazy val accountsStorage = wire[AccountsStorageImpl]
   lazy val mediaManager = wire[DefaultMediaManagerService]
   lazy val recordingAndPlayback = wire[GlobalRecordAndPlayService]
   lazy val tempFiles: TempFileService = wire[TempFileService]

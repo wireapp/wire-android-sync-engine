@@ -23,11 +23,11 @@ import com.waz.model.NotificationData.NotificationDataDao
 import com.waz.model.{NotId, NotificationData}
 import com.waz.utils.TrimmingLruCache.Fixed
 import com.waz.utils.events.{AggregatingSignal, EventStream}
-import com.waz.utils.{CachedStorage, TrimmingLruCache}
+import com.waz.utils.{CachedStorageImpl, TrimmingLruCache}
 
 import scala.collection._
 
-class NotificationStorage(context: Context, storage: Database) extends CachedStorage[NotId, NotificationData](new TrimmingLruCache(context, Fixed(128)), storage)(NotificationDataDao, "NotificationStorage") {
+class NotificationStorage(context: Context, storage: Database) extends CachedStorageImpl[NotId, NotificationData](new TrimmingLruCache(context, Fixed(128)), storage)(NotificationDataDao, "NotificationStorage") {
   import com.waz.threading.Threading.Implicits.Background
 
   val changesStream = EventStream.union[Seq[ContentChange[NotId, NotificationData]]](

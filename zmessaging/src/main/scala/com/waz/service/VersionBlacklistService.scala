@@ -27,16 +27,16 @@ import com.waz.utils.events.{EventContext, Signal}
 import scala.concurrent.Future
 import scala.concurrent.duration._
 
-class VersionBlacklistService(metadata: MetaDataService, prefs: PreferenceService, client: VersionBlacklistClient) {
+class VersionBlacklistService(metadata: MetaDataService, prefs: PreferenceServiceImpl, client: VersionBlacklistClient) {
 
   import Threading.Implicits.Background
   private implicit val tag: LogTag = logTagFor[VersionBlacklistService]
   private implicit val ec = EventContext.Global
   import metadata._
 
-  val lastUpToDateSync = prefs.longPreference(LastUpToDateSyncPref)
-  val lastCheckedVersion = prefs.intPreference(LastCheckedVersionPref)
-  val upToDatePref = prefs.preferenceBooleanSignal(UpToDatePref, defaultValue = true)
+  val lastUpToDateSync = prefs.preference[Long](LastUpToDateSyncPref, 0)
+  val lastCheckedVersion = prefs.preference[Int](LastCheckedVersionPref, 0)
+  val upToDatePref = prefs.preference[Boolean](UpToDatePref, defaultValue = true)
 
   val upToDate = Signal(lastCheckedVersion.signal, upToDatePref.signal) map {
     case (lastVersion, isUpToDate) => lastVersion != metadata.appVersion || isUpToDate

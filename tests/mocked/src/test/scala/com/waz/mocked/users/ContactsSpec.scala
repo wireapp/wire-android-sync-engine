@@ -28,7 +28,7 @@ import com.waz.model.Contact
 import com.waz.model.AccountData.AccountDataDao
 import com.waz.model._
 import com.waz.service.ContactsService.PrefKey
-import com.waz.service.PreferenceService.uiPreferencesFrom
+import com.waz.service.PreferenceServiceImpl.uiPreferencesFrom
 import com.waz.service.{SearchKey, Timeouts, ZMessaging}
 import com.waz.sync.client.AddressBookClient.UserAndContactIds
 import com.waz.sync.client.InvitationClient.ConfirmedInvitation

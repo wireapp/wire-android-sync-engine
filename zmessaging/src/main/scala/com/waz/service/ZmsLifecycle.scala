@@ -26,6 +26,7 @@ class ZmsLifecycle extends EventContext {
 
   val lifecycleState = Signal(LifecycleState.Stopped)
   val uiActive = lifecycleState.map(_ == LifecycleState.UiActive)
+  def active = lifecycleState.map(st => st == LifecycleState.UiActive || st == LifecycleState.Active)
 
   val loggedIn = lifecycleState.map(_ != LifecycleState.Stopped)
 

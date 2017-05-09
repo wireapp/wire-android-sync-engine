@@ -23,11 +23,17 @@ import com.waz.api.impl.{Credentials, EmailCredentials, PhoneCredentials}
 import com.waz.model.AccountData.AccountDataDao
 import com.waz.model._
 import com.waz.utils.TrimmingLruCache.Fixed
-import com.waz.utils.{CachedStorage, TrimmingLruCache}
+import com.waz.utils.{CachedStorage, CachedStorageImpl, TrimmingLruCache}
 
 import scala.concurrent.Future
 
-class AccountsStorage(context: Context, storage: Database) extends CachedStorage[AccountId, AccountData](new TrimmingLruCache(context, Fixed(8)), storage)(AccountDataDao) {
+trait AccountsStorage extends CachedStorage[AccountId, AccountData] {
+  def findByEmail(email: EmailAddress): Future[Option[AccountData]]
+  def findByPhone(phone: PhoneNumber): Future[Option[AccountData]]
+  def find(credentials: Credentials): Future[Option[AccountData]]
+}
+
+class AccountsStorageImpl(context: Context, storage: Database) extends CachedStorageImpl[AccountId, AccountData](new TrimmingLruCache(context, Fixed(8)), storage)(AccountDataDao) with AccountsStorage {
   import com.waz.threading.Threading.Implicits.Background
 
   def findByEmail(email: EmailAddress) = find(_.email.contains(email), AccountDataDao.findByEmail(email)(_), identity).map(_.headOption)

@@ -40,7 +40,7 @@ import com.waz.service.assets.GlobalRecordAndPlayService.AssetMediaKey
 import com.waz.service.downloads.DownloadRequest._
 import com.waz.service.downloads._
 import com.waz.service.images.ImageAssetGenerator
-import com.waz.service.{ErrorsService, PreferenceService}
+import com.waz.service.{ErrorsService, PreferenceServiceImpl}
 import com.waz.sync.SyncServiceHandle
 import com.waz.threading.{CancellableFuture, Threading}
 import com.waz.utils._
@@ -58,7 +58,7 @@ class AssetService(val storage: AssetsStorage, generator: ImageAssetGenerator, c
     loader: AssetLoader, messages: MessagesStorage, downloader: DownloaderService, errors: ErrorsService,
     permissions: PermissionsService, streamLoader: Downloader[AssetFromInputStream], assetDownloader: AssetDownloader,
     metaService: MetaDataService, sync: SyncServiceHandle, media: GlobalRecordAndPlayService,
-    prefs: PreferenceService) {
+    prefs: PreferenceServiceImpl) {
 
   import AssetService._
   import com.waz.threading.Threading.Implicits.Background
