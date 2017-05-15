@@ -31,7 +31,7 @@ import org.robolectric.Robolectric
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.{BeforeAndAfter, FeatureSpec, Matchers, RobolectricTests}
 
-import scala.concurrent.Await
+import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
 
 class AuthenticationManagerBackendSpec extends FeatureSpec with Matchers with BeforeAndAfter with ProvisionedSuite with ShadowLogging with RobolectricTests with ScalaFutures with DefaultPatienceConfig { test =>
@@ -40,13 +40,13 @@ class AuthenticationManagerBackendSpec extends FeatureSpec with Matchers with Be
   override protected lazy val logfileBaseDir: File = new File("target/logcat/integration")
 
   lazy val globalModule: GlobalModule = new GlobalModule(Robolectric.application, BackendConfig.StagingBackend) {
-    override lazy val clientWrapper: ClientWrapper = TestClientWrapper
+    override lazy val clientWrapper: Future[ClientWrapper] = TestClientWrapper()
   }
 
   lazy val storage = new ZmsDatabase(AccountId(), Robolectric.application)
   lazy val keyValue = new UserPreferences(Robolectric.application, storage)
 
-  lazy val client = new LoginClient(new AsyncClient(wrapper = TestClientWrapper), BackendConfig.StagingBackend)
+  lazy val client = new LoginClient(new AsyncClient(wrapper = TestClientWrapper()), BackendConfig.StagingBackend)
 
   lazy val email = provisionedEmail("auto1")
   lazy val passwd = "auto1_pass"

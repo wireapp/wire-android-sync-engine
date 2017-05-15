@@ -25,9 +25,8 @@ import com.waz.service.BackendConfig
 import com.waz.sync.client.InvitationClient.ConfirmedInvitation
 import com.waz.threading.CancellableFuture
 import com.waz.utils.wrappers.URI
-import com.waz.znet.ContentEncoder.{ByteArrayRequestContent, RequestContent}
-import com.waz.znet.Request._
-import com.waz.znet.Response.{HttpStatus, ResponseBodyDecoder, Status}
+import com.waz.znet.ContentEncoder.{ByteArrayRequestContent}
+import com.waz.znet.Response.{HttpStatus, Status}
 import com.waz.znet.ZNetClient.{EmptyAsyncClient, EmptyClient}
 import com.waz.znet._
 import org.json.JSONObject
@@ -35,8 +34,6 @@ import org.scalatest._
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.time._
 import org.threeten.bp.Instant
-
-import scala.concurrent.duration.FiniteDuration
 
 class InvitationClientSpec extends FeatureSpec with Matchers with Inside with ScalaFutures with RobolectricTests {
 
@@ -79,17 +76,17 @@ class InvitationClientSpec extends FeatureSpec with Matchers with Inside with Sc
     }
 
     scenario("Request was successful but body was empty") {
-      nextResponse = emptyResponse.copy(headers = Response.Headers("Location" -> "/connections/1508c3bd-4566-4688-906e-93035971c193"))
+      nextResponse = emptyResponse.copy(headers = Response.createHeaders("Location" -> "/connections/1508c3bd-4566-4688-906e-93035971c193"))
       whenReady(inviteBy(Left(EmailAddress("meep@meow.me"))))(inside(_) { case Right(Left(u)) => u shouldEqual UserId("1508c3bd-4566-4688-906e-93035971c193") })
     }
 
     scenario("Request ends in redirect") {
-      nextResponse = Response(HttpStatus(Status.SeeOther), EmptyResponse, Response.Headers("Location" -> "/connections/1508c3bd-4566-4688-906e-93035971c193"))
+      nextResponse = Response(HttpStatus(Status.SeeOther), EmptyResponse, Response.createHeaders("Location" -> "/connections/1508c3bd-4566-4688-906e-93035971c193"))
       whenReady(inviteBy(Left(EmailAddress("meep@meow.me"))))(inside(_) { case Right(Left(u)) => u shouldEqual UserId("1508c3bd-4566-4688-906e-93035971c193") })
     }
 
     scenario("Request ends in redirect with deprecated URI") {
-      nextResponse = Response(HttpStatus(Status.SeeOther), EmptyResponse, Response.Headers("Location" -> "/self/connections/1508c3bd-4566-4688-906e-93035971c193"))
+      nextResponse = Response(HttpStatus(Status.SeeOther), EmptyResponse, Response.createHeaders("Location" -> "/self/connections/1508c3bd-4566-4688-906e-93035971c193"))
       whenReady(inviteBy(Left(EmailAddress("meep@meow.me"))))(inside(_) { case Right(Left(u)) => u shouldEqual UserId("1508c3bd-4566-4688-906e-93035971c193") })
     }
   }
@@ -120,7 +117,7 @@ class InvitationClientSpec extends FeatureSpec with Matchers with Inside with Sc
   )
 
   lazy val registrationClient = new RegistrationClient(new EmptyAsyncClient {
-    override def apply(uri: URI, method: String, body: RequestContent, headers: Map[String, String], followRedirect: Boolean, timeout: FiniteDuration, decoder: Option[ResponseBodyDecoder], downloadProgressCallback: Option[ProgressCallback]): CancellableFuture[Response] =
+    override def apply(uri: URI, request: Request[_]): CancellableFuture[Response] =
       CancellableFuture.successful(nextResponse)
   }, BackendConfig.StagingBackend)
 

@@ -26,8 +26,6 @@ import com.waz.service.{BackendConfig, GlobalModule}
 import com.waz.threading.CancellableFuture.CancelException
 import com.waz.threading.{CancellableFuture, SerialDispatchQueue, Threading}
 import com.waz.utils.wrappers.URI
-import com.waz.znet.ContentEncoder.RequestContent
-import com.waz.znet.Request.ProgressCallback
 import com.waz.znet.Response._
 
 import scala.collection.mutable
@@ -130,10 +128,10 @@ class ZNetClient(credentials: CredentialsHandler,
         val future =
           if (request.requiresAuthentication) {
             CancellableFuture.lift(auth.currentToken()) flatMap {
-              case Right(token) => client(uri, request.httpMethod, request.getBody, request.headers ++ token.headers, request.followRedirect, request.timeout, request.decoder, request.downloadCallback)
+              case Right(token) => client(uri, request.copyWithHeaders(token.headers))
               case Left(status) => CancellableFuture.successful(Response(status))
             }
-          } else client(uri, request.httpMethod, request.getBody, request.headers, request.followRedirect, request.timeout, request.decoder, request.downloadCallback)
+          } else client(uri, request)
 
         handle.httpFuture = Some(future)
 
@@ -228,8 +226,8 @@ object ZNetClient {
   private val handleId = new AtomicInteger(0)
   def nextId = handleId.incrementAndGet()
 
-  class EmptyAsyncClient(wrapper: ClientWrapper = ClientWrapper) extends AsyncClient(wrapper = wrapper) {
-    override def apply(uri: URI, method: String, body: RequestContent, headers: Map[String, String], followRedirect: Boolean, timeout: FiniteDuration, decoder: Option[ResponseBodyDecoder], downloadProgressCallback: Option[ProgressCallback]): CancellableFuture[Response] =
+  class EmptyAsyncClient(client: Future[ClientWrapper] = ClientWrapper()) extends AsyncClient(wrapper = client) {
+    override def apply(uri: URI, request: Request[_]): CancellableFuture[Response] =
       CancellableFuture.failed(new Exception("Empty async client"))
   }
 

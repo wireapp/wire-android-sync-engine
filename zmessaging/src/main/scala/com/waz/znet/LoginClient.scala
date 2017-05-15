@@ -31,7 +31,6 @@ import com.waz.znet.AuthenticationManager._
 import com.waz.znet.ContentEncoder.{EmptyRequestContent, JsonContentEncoder}
 import com.waz.znet.Response.{Status, SuccessHttpStatus}
 import com.waz.utils.wrappers.URI
-
 import org.json.JSONObject
 
 import scala.concurrent.duration._
@@ -86,15 +85,18 @@ class LoginClient(client: AsyncClient, backend: BackendConfig) {
 
   def loginNow(userId: AccountId, credentials: Credentials) = {
     debug(s"trying to login: $credentials")
-    client(loginUri, Request.PostMethod, loginRequestBody(userId, credentials), timeout = RegistrationClient.timeout) map responseHandler
+    val request = Request.Post(loginUri.getPath, loginRequestBody(userId, credentials), timeout = RegistrationClient.timeout)
+    client(loginUri, request) map responseHandler
   }
   def accessNow(cookie: Cookie, token: Option[Token]) = {
     val headers = token.fold(Request.EmptyHeaders)(_.headers) ++ cookie.headers
-    client(accessUri, Request.PostMethod, EmptyRequestContent, headers, timeout = RegistrationClient.timeout) map responseHandler
+    val request = Request.Post[Unit](loginUri.getPath, data = EmptyRequestContent, headers = headers, timeout = RegistrationClient.timeout)
+    client(accessUri, request) map responseHandler
   }
 
   def requestVerificationEmail(email: EmailAddress): CancellableFuture[Either[ErrorResponse, Unit]] = {
-    client(activateSendUri, Request.PostMethod, JsonContentEncoder(JsonEncoder(_.put("email", email.str)))) map {
+    val request = Request.Post(activateSendUri.getPath, JsonContentEncoder(JsonEncoder(_.put("email", email.str))))
+    client(activateSendUri, request) map {
       case Response(SuccessHttpStatus(), resp, _) => Right(())
       case Response(_, ErrorResponse(code, msg, label), _) =>
         info(s"requestVerificationEmail failed with error: ($code, $msg, $label)")

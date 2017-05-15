@@ -40,7 +40,7 @@ class JavaURI(uri: JURI) extends URI {
   override def getPathSegments                = ???
   override def getLastPathSegment             = ???
   override def getQueryParameter(key: String) = ???
-  override def normalizeScheme                = ???
+  override def normalizeScheme                = JavaURIUtil.parse(uri.toString.toLowerCase)
   override def toString                       = uri.toString
 }
 

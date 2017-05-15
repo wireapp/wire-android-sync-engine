@@ -46,7 +46,7 @@ import org.scalatest._
 import org.scalatest.enablers.{Containing, Emptiness, Length}
 import com.waz.ZLog.ImplicitTag._
 
-import scala.concurrent.Await
+import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
 import scala.{PartialFunction => =/>}
 
@@ -81,12 +81,12 @@ trait ApiSpec extends BeforeAndAfterEach with BeforeAndAfterAll with Matchers wi
   private lazy val eventSpies = new AtomicReference(Vector.empty[Event =/> Unit])
 
   def testBackend: BackendConfig = BackendConfig.StagingBackend
-  lazy val testClient = new AsyncClient(wrapper = TestClientWrapper)
+  lazy val testClient = new AsyncClient(wrapper = TestClientWrapper())
 
   lazy val globalModule: GlobalModule = new ApiSpecGlobal
 
   class ApiSpecGlobal extends GlobalModule(context, testBackend) {
-    override lazy val clientWrapper: ClientWrapper = TestClientWrapper
+    override lazy val clientWrapper: Future[ClientWrapper] = TestClientWrapper()
     override lazy val client: AsyncClient = testClient
     override lazy val timeouts: Timeouts = suite.timeouts
 
@@ -108,7 +108,7 @@ trait ApiSpec extends BeforeAndAfterEach with BeforeAndAfterAll with Matchers wi
 
   def netClient = zmessaging.zNetClient
 
-  def znetClientFor(email: String, password: String) = new ZNetClient(email, password, new AsyncClient(wrapper = TestClientWrapper))
+  def znetClientFor(email: String, password: String) = new ZNetClient(email, password, new AsyncClient(wrapper = TestClientWrapper()))
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()

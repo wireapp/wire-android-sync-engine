@@ -118,14 +118,14 @@ class WebSocketClient(context: Context,
       req.setHeader("Accept-Encoding", "identity") // XXX: this is a hack for Backend In The Box problem: 'Accept-Encoding: gzip' header causes 500
       req.setHeader("User-Agent", client.userAgent)
 
-      CancellableFuture.lift(client.client) flatMap { client =>
+      CancellableFuture.lift(client.wrapper) flatMap { client =>
         val f = client.websocket(req, null, new WebSocketConnectCallback {
           override def onCompleted(ex: Exception, socket: WebSocket): Unit = {
             debug(s"WebSocket request finished, ex: $ex, socket: $socket")
             p.tryComplete(if (ex == null) Try(onConnected(socket)) else Failure(ex))
           }
         })
-        returning(new CancellableFuture(p).withTimeout(30.seconds)) { _.onFailure { case _ => f.cancel(true) } }
+        returning(new CancellableFuture(p).withTimeout(30.seconds)) { _.onFailure { case _ => f.cancel() } }
       }
     case Left(status) =>
       CancellableFuture.failed(new Exception(s"Authentication returned error status: $status"))

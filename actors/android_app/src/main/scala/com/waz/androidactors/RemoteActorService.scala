@@ -99,7 +99,7 @@ class RemoteActorService(context: Context) {
       dbs.listFiles() foreach { db =>
         println(s"deleting db: $db, res:" + db.delete())
       }
-      currentActor ! actorSystem.actorOf(RemoteProcessActor.props(context, name, None, backend, TestClientWrapper), name.replaceAll("\\s+", "_"))
+      currentActor ! actorSystem.actorOf(RemoteProcessActor.props(context, name, None, backend, TestClientWrapper()), name.replaceAll("\\s+", "_"))
     }
   }
 
