@@ -101,6 +101,7 @@ class AsyncClientSpec extends AndroidFreeSpec {
     override def pause(): Unit = ()
     override def close(): Unit = ()
     override def resume(): Unit = ()
+<<<<<<< HEAD
   }
 
   private val uriRegex = """/(get|post)/(json|multi)*[_]*(empty|json)(\d+)""".r
@@ -190,6 +191,97 @@ class AsyncClientSpec extends AndroidFreeSpec {
   @volatile private var progress = ProgressIndicator.ProgressData(0L, 0L, State.UNKNOWN)
   @volatile private var progressTickCount: Int = 0
 
+=======
+  }
+
+  private val uriRegex = """/(get|post)/(json|multi)*[_]*(empty|json)(\d+)""".r
+
+  private val jsonRequest = """{"key": "value"}"""
+  private val okJsonResponse = """{"result": "ok"}"""
+  private val penguinData = "some penguin data"
+  private val jsonObject = Json((1 to 25).map(i => s"key_$i" -> Seq.tabulate(i)(identity).mkString(",")).toMap)
+
+  private def toHeaders(tuples: (String, String)*): Headers = {
+    val headers = new Headers()
+    tuples.foreach(t => headers.set(t._1, t._2))
+    headers
+  }
+
+  private def contentLength(data: String): (String, String) = "Content-Length" -> data.length.toString
+  private def contentLength(body: Array[Byte]): (String, String) = "Content-Length" -> body.length.toString
+
+  private def mockResponse(req: HttpRequest): HttpResponse = {
+    val res = mock[AsyncHttpResponse]
+    req.absoluteUri.getOrElse(throw new IllegalArgumentException("No URI found")).getPath match {
+      case uriRegex(method, json, expect, code) if expect == "empty" => new FakeHttpResponse(code.toInt, "", toHeaders(contentLength("")))
+
+      case uriRegex(method, json, expect, code) if expect == "json" =>
+        new FakeHttpResponse(code.toInt, okJsonResponse, toHeaders("Content-Type" -> "application/json", contentLength(okJsonResponse)))
+
+      case "/get/penguin" =>
+        new FakeHttpResponse(200, penguinData, toHeaders("Content-Type" -> "image/png", contentLength(penguinData)))
+
+      case "/get/gzipped" =>
+        val gzipped = IoUtils.gzip(jsonObject.toString.getBytes("utf8"))
+        new FakeHttpResponse(200, jsonObject.toString, toHeaders("Content-Type" -> "application/json", "Content-Encoding" -> "gzip", contentLength(gzipped)))
+
+      case "/post/gzipped" =>
+        val gzipped = IoUtils.gzip(okJsonResponse.getBytes("utf8"))
+        new FakeHttpResponse(200, okJsonResponse, toHeaders("Content-Type" -> "application/json", "Content-Encoding" -> "gzip", contentLength(gzipped)))
+
+      case "/get/delayed" => new FakeHttpResponse(200, okJsonResponse, toHeaders("Content-Type" -> "application/json", contentLength(okJsonResponse)))
+
+      case other => throw new IllegalArgumentException(s"Unrecognized URI: $other")
+    }
+  }
+
+  private val requestWorker = new RequestWorker {
+    override def processRequest(uri: URI, method: String, body: RequestContent, h: Map[String, String], fr: Boolean, t: FiniteDuration): HttpRequest = new HttpRequest {
+      override def absoluteUri: Option[URI] = Some(uri)
+      override def httpMethod: String = method
+      override def getBody: RequestContent = body
+      override def headers: Map[String, String] = h
+      override def followRedirect: Boolean = fr
+      override def timeout: FiniteDuration = t
+    }
+  }
+
+  class FakeClientWrapper(delay: Option[Long] = None) extends ClientWrapper {
+    override def execute(request: HttpRequest, callback: HttpConnectCallback): CancellableFuture[HttpResponse] = {
+      val p = Promise[HttpResponse]
+      Future {
+        delay.map(Thread.sleep)
+        val fakeResponse = mockResponse(request)
+        callback.onConnectCompleted(null, fakeResponse)
+        p.success(fakeResponse)
+      }
+      CancellableFuture.lift(p.future)
+    }
+
+    override def websocket(request: HttpRequest, protocol: String, callback: AsyncHttpClient.WebSocketConnectCallback): CancellableFuture[WebSocket] = ???
+    override def stop(): Unit = ???
+  }
+
+  private def client = new AsyncClient(
+    bodyDecoder = DefaultResponseBodyDecoder,
+    userAgent="test",
+    wrapper = Future { new FakeClientWrapper(Some(100L)) },
+    requestWorker = requestWorker,
+    responseWorker = new KoushiResponseWorker
+  )
+
+  private def clientWithDelay = new AsyncClient(
+    bodyDecoder = DefaultResponseBodyDecoder,
+    userAgent="test",
+    wrapper = Future { new FakeClientWrapper(Some(3000L)) },
+    requestWorker = requestWorker,
+    responseWorker = new KoushiResponseWorker
+  )
+
+  @volatile private var progress = ProgressIndicator.ProgressData(0L, 0L, State.UNKNOWN)
+  @volatile private var progressTickCount: Int = 0
+
+>>>>>>> AsyncClient refactoring and android-free user tests.
   private val callback = (currentProgress: ProgressIndicator.ProgressData) => {
     progressTickCount += 1
     progress = currentProgress
@@ -483,5 +575,5 @@ class AsyncClientSpec extends AndroidFreeSpec {
     }
 
   }
-  
+
 }

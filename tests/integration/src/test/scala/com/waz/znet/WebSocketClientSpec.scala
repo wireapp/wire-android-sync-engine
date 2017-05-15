@@ -79,7 +79,7 @@ class WebSocketClientSpec extends FeatureSpec with Matchers with ProvisionedSuit
       
       val manager = new WebSocketClient(context, asyncClient, Uri.parse(backend.websocketUrl), auth)
       import EventContext.Implicits.global
-
+.
       manager.onMessage {
         case resp @ JsonObjectResponse(js) if js.toString.contains("auto1_updated") =>
           println(s"Received response from websocket: '$resp'")

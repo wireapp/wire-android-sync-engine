@@ -85,7 +85,7 @@ class AsyncClient(bodyDecoder: ResponseBodyDecoder = DefaultResponseBodyDecoder,
             }
           }
         }
-      }
+      })
 
       val httpFuture = client.execute(request, callback)
 
