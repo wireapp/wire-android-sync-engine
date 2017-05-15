@@ -24,6 +24,7 @@ import com.koushikdutta.async.{ByteBufferList, DataEmitter}
 import com.waz.RobolectricUtils
 import com.waz.test.WebSocketEchoServer
 import com.waz.provision.RemoteProcess
+import com.waz.utils.events.EventContext
 import org.robolectric.shadows.ShadowLog
 import org.scalatest._
 
@@ -39,7 +40,7 @@ class WebSocketWebSpec extends FeatureSpecLike with Matchers with BeforeAndAfter
 
   before {
     ShadowLog.stream = System.out
-    client = new AsyncClient(wrapper = TestClientWrapper)
+    client = new AsyncClient(wrapper = TestClientWrapper())
   }
 
   after {
@@ -68,7 +69,8 @@ class WebSocketWebSpec extends FeatureSpecLike with Matchers with BeforeAndAfter
   feature("websocket") {
 
     scenario("Connect to echo server: http//localhost:18084") {
-      cl = Await.result(client.client, 1.second)
+      import scala.concurrent.ExecutionContext.Implicits.global
+      cl = Await.result(client.wrapper.map(ClientWrapper.toKoushi), 1.second)
       @volatile var socket: WebSocket = null
 
       cl.websocket(new AsyncHttpGet("http://localhost:18084"), null, new WebSocketConnectCallback {

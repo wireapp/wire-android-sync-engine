@@ -50,13 +50,15 @@ case class Request[A: ContentEncoder](
       retryPolicy: RetryPolicy = RetryPolicy.NeverRetry,
       followRedirect: Boolean = true,
       timeout: FiniteDuration = AsyncClient.DefaultTimeout
-) {
+) extends HttpRequest {
 
   assert(uploadCallback.isEmpty, "uploadCallback is not supported yet") //TODO
 
   require(resourcePath.isDefined || absoluteUri.isDefined, "Either resourcePath or absoluteUri has to be specified")
 
   def getBody = data.map(implicitly[ContentEncoder[A]].apply).getOrElse(EmptyRequestContent)
+
+  def copyWithHeaders(headers: Map[String, String]) = copy[A](headers = this.headers ++ headers)
 }
 
 object Request {
@@ -79,8 +81,8 @@ object Request {
   def Delete[A: ContentEncoder](path: String, data: Option[A] = None, requiresAuthentication: Boolean = true, headers: Map[String, String] = EmptyHeaders) =
     Request[A](DeleteMethod, Some(path), data = data, requiresAuthentication = requiresAuthentication, headers = headers)
 
-  def Get(path: String, downloadCallback: Option[ProgressCallback] = None, requiresAuthentication: Boolean = true, headers: Map[String, String] = EmptyHeaders) =
-    Request[Unit](GetMethod, Some(path), downloadCallback = downloadCallback, requiresAuthentication = requiresAuthentication, headers = headers)(EmptyContentEncoder)
+  def Get(path: String, downloadCallback: Option[ProgressCallback] = None, requiresAuthentication: Boolean = true, headers: Map[String, String] = EmptyHeaders, timeout: FiniteDuration = AsyncClient.DefaultTimeout) =
+    Request[Unit](GetMethod, Some(path), downloadCallback = downloadCallback, requiresAuthentication = requiresAuthentication, headers = headers, timeout = timeout)(EmptyContentEncoder)
 
   def Head(path: String, downloadCallback: Option[ProgressCallback] = None, requiresAuthentication: Boolean = true, headers: Map[String, String] = EmptyHeaders) =
     Request[Unit](HeadMethod, Some(path), downloadCallback = downloadCallback, requiresAuthentication = requiresAuthentication, headers = headers)(EmptyContentEncoder)
@@ -207,6 +209,10 @@ object ContentEncoder {
 
   implicit object GzippedContentEncoder extends ContentEncoder[GzippedRequestContent] {
     override def apply(data: GzippedRequestContent) = data
+  }
+
+  implicit object StreamedContentEncoder extends ContentEncoder[StreamRequestContent] {
+    override def apply(data: StreamRequestContent) = data
   }
 
   implicit object EmptyContentEncoder extends ContentEncoder[Unit] {

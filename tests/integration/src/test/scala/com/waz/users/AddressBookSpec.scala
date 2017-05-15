@@ -146,7 +146,7 @@ class AddressBookSpec extends FeatureSpec with Matchers with BeforeAndAfter with
   val uuids = (1 to 8) map (_ => randomUUID())
   val emails = uuids map (id => EmailAddress(s"android.test+$id@wire.com"))
 
-  def newClient = new RegistrationClient(new AsyncClient(wrapper = TestClientWrapper), testBackend)
+  def newClient = new RegistrationClient(new AsyncClient(wrapper = TestClientWrapper()), testBackend)
 
   override lazy val zmessagingFactory: ZMessagingFactory = new ZMessagingFactory(globalModule) {
     override def zmessaging(clientId: ClientId, user: UserModule): ZMessaging = new ApiZMessaging(clientId, user) {

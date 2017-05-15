@@ -56,7 +56,7 @@ class RemoteProcess extends RoboProcess {
 
     val backend = BackendConfig.byName(args(3))
 
-    val processActor = actorSystem.actorOf(RemoteProcessActor.props(Robolectric.application, processName, coordinatorActor, backend, TestClientWrapper), processName.replaceAll("\\s+", "_"))
+    val processActor = actorSystem.actorOf(RemoteProcessActor.props(Robolectric.application, processName, coordinatorActor, backend, TestClientWrapper()), processName.replaceAll("\\s+", "_"))
 
     Robolectric.getShadowApplication.grantPermissions(Permission.values.map(_.id):_*)
 

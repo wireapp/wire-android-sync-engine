@@ -17,16 +17,17 @@
  */
 package com.waz.znet
 
+import java.util.Locale
+
 import com.waz.api.impl.ErrorResponse
-import com.waz.znet.ResponseConsumer.{FileConsumer, ByteArrayConsumer, JsonConsumer, StringConsumer}
+import com.waz.znet.ResponseConsumer.{ByteArrayConsumer, FileConsumer, JsonConsumer, StringConsumer}
 import com.waz.cache.CacheService
-import com.koushikdutta.async.http.{Headers => KoushHeaders}
 
 case class Response(
   status: Response.Status,
   body: ResponseContent = EmptyResponse,
   headers: Response.Headers = Response.EmptyHeaders
-)
+) extends HttpResponse
 
 object Response {
 
@@ -91,7 +92,7 @@ object Response {
    * Response status indicating some internal exception happening during request or response processing.
    * This should generally indicate a bug in our code and we don't know if the request was processed by server.
    */
-  case class InternalError(msg: String, cause: Option[Throwable] = None, httpStatus: Option[HttpStatus] = None) extends Status {
+  case class InternalError(msg: String, cause: Option[Throwable] = None, httpStatus: Option[Status] = None) extends Status {
     override val isSuccess: Boolean = false
     override val status: Int = ErrorResponse.InternalErrorCode
   }
@@ -126,12 +127,13 @@ object Response {
     val JsonContent = "application/json.*".r
     val ImageContent = "image/.*".r
 
-    override def apply(contentType: String, contentLength: Long): ResponseConsumer[_ <: ResponseContent] =
+    override def apply(contentType: String, contentLength: Long): ResponseConsumer[_ <: ResponseContent] = {
       contentType match {
         case JsonContent() => new JsonConsumer(contentLength)
         case TextContent() => new StringConsumer(contentLength)
         case _ => new ByteArrayConsumer(contentLength, contentType)
       }
+    }
   }
 
   def CacheResponseBodyDecoder(cache: CacheService) = new ResponseBodyDecoder {
@@ -147,24 +149,21 @@ object Response {
       }
   }
 
-  val EmptyHeaders = new Headers
+  case class Headers(headers: Map[String, String] = Map.empty[String, String]){
+    assert(headers.keys.exists(key => toLower(key) != key) == false)
 
-  class Headers(headers: KoushHeaders = new KoushHeaders()) {
-    import scala.collection.JavaConverters._
-    lazy val map = headers.getMultiMap
+    def apply(key: String) = headers.get(toLower(key))
 
-    def apply(key: String): Option[String] = Option(headers.get(key))
+    def foreach(key: String)(f: String => Unit): Unit = headers.get(toLower(key)).foreach(f)
 
-    def foreach(key: String)(f: String => Unit): Unit = Option(headers.getAll(key)) foreach { _.iterator().asScala foreach f }
-
-    override def toString: String = s"Headers[${map.entrySet().asScala map { e => e.getKey -> e.getValue.asScala }}]"
+    override def toString: String = s"Headers[$headers]"
   }
 
-  object Headers {
-    def apply(entries: (String, String)*) = {
-      val headers = new KoushHeaders()
-      entries foreach { case (key, value) => headers.add(key, value) }
-      new Headers(headers)
-    }
-  }
+  val EmptyHeaders = Headers()
+
+  def createHeaders(headers: Map[String, String]) = Headers(headers.map { case (key, value) => toLower(key) -> value })
+  def createHeaders(entries: (String, String)*) = Headers(entries.map { case (key, value) => toLower(key) -> value }.toMap)
+
+  private def toLower(key: String) = key.toLowerCase(Locale.US)
+
 }

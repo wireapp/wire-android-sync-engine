@@ -41,7 +41,8 @@ class InternalBackendClient(client: AsyncClient, backend: BackendConfig) {
   val (user, password) = InternalCredentials.backend(backend)
 
   def activateEmail(email: EmailAddress): ErrorOrResponse[Unit] = {
-    client(URI.parse(Request.query(backend.baseUrl + "/i/users/activation-code", "email" -> email.str)), headers = basicAuthHeader, timeout = AsyncClient.DefaultTimeout) flatMap {
+    val request = Request.Get("/i/users/activation-code", headers = basicAuthHeader, timeout = AsyncClient.DefaultTimeout)
+    client(URI.parse(Request.query(backend.baseUrl + "/i/users/activation-code", "email" -> email.str)), request) flatMap {
       case Response(SuccessHttpStatus(), CodeExtractor(code), headers) => verifyEmail(email, ConfirmationCode(code))
       case Response(_, ErrorResponse(status, message, label), _) => CancellableFuture.successful(Left(ErrorResponse(status, message, label)))
       case other => CancellableFuture.successful(Left(ErrorResponse(other.status.status, other.toString, "unknown")))
@@ -51,26 +52,32 @@ class InternalBackendClient(client: AsyncClient, backend: BackendConfig) {
   def getPhoneActivationCode(phone: PhoneNumber): ErrorOrResponse[ConfirmationCode] = getPhoneConfirmationCode(phone, "activation")
   def getPhoneLoginCode(phone: PhoneNumber): ErrorOrResponse[ConfirmationCode] = getPhoneConfirmationCode(phone, "login")
 
-  private def verifyEmail(email: EmailAddress, code: ConfirmationCode): ErrorOrResponse[Unit] =
-    client(URI.parse(backend.baseUrl + "/activate"), Request.PostMethod, verifyRequestBody(email, code), timeout = AsyncClient.DefaultTimeout) map {
+  private def verifyEmail(email: EmailAddress, code: ConfirmationCode): ErrorOrResponse[Unit] = {
+    val request = Request.Post("/activate", data = verifyRequestBody(email, code), timeout = AsyncClient.DefaultTimeout)
+    client(URI.parse(backend.baseUrl + "/activate"), request) map {
       case Response(SuccessHttpStatus(), _, _) => Right(())
       case Response(_, ErrorResponse(status, msg, label), _) => Left(ErrorResponse(status, msg, label))
       case other => Left(ErrorResponse(other.status.status, other.toString, "unknown"))
     }
+  }
 
-  private def getPhoneConfirmationCode(phone: PhoneNumber, kindOfCode: String): ErrorOrResponse[ConfirmationCode] =
-    client(URI.parse(Request.query(backend.baseUrl + s"/i/users/$kindOfCode-code", "phone" -> phone.str)), headers = basicAuthHeader, timeout = AsyncClient.DefaultTimeout) map {
+  private def getPhoneConfirmationCode(phone: PhoneNumber, kindOfCode: String): ErrorOrResponse[ConfirmationCode] = {
+    val request = Request.Get(s"/i/users/$kindOfCode-code", headers = basicAuthHeader, timeout = AsyncClient.DefaultTimeout)
+    client(URI.parse(Request.query(backend.baseUrl + s"/i/users/$kindOfCode-code", "phone" -> phone.str)), request) map {
       case Response(SuccessHttpStatus(), CodeExtractor(code), headers) => Right(ConfirmationCode(code))
       case Response(_, ErrorResponse(status, message, label), _) => Left(ErrorResponse(status, message, label))
       case other => Left(ErrorResponse(other.status.status, other.toString, "unknown"))
     }
+  }
 
-  def getInvitationToken(inviter: UserId, invitation: InvitationId): ErrorOrResponse[PersonalInvitationToken] =
-    client(URI.parse(Request.query(s"${backend.baseUrl}/i/users/invitation-code", "inviter" -> inviter.str, "invitation_id" -> invitation.str)), headers = basicAuthHeader, timeout = AsyncClient.DefaultTimeout) map {
+  def getInvitationToken(inviter: UserId, invitation: InvitationId): ErrorOrResponse[PersonalInvitationToken] = {
+    val request = Request.Get("/i/users/invitation-code", headers = basicAuthHeader, timeout = AsyncClient.DefaultTimeout)
+    client(URI.parse(Request.query(s"${backend.baseUrl}/i/users/invitation-code", "inviter" -> inviter.str, "invitation_id" -> invitation.str)), request) map {
       case Response(SuccessHttpStatus(), CodeExtractor(code), headers) => Right(PersonalInvitationToken(code))
       case Response(_, ErrorResponse(status, message, label), _) => Left(ErrorResponse(status, message, label))
       case other => Left(ErrorResponse(other.status.status, other.toString, "unknown"))
     }
+  }
 
   private def basicAuthHeader: String Map String = {
     val auth = user + ":" + password
