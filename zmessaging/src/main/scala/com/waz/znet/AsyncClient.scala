@@ -19,67 +19,62 @@ package com.waz.znet
 
 import java.net.{ConnectException, UnknownHostException}
 import java.util.concurrent.TimeoutException
-import java.util.concurrent.atomic.AtomicLong
 
-import com.koushikdutta.async._
-import com.koushikdutta.async.callback.CompletedCallback.NullCompletedCallback
-import com.koushikdutta.async.callback.DataCallback.NullDataCallback
-import com.koushikdutta.async.callback.{CompletedCallback, DataCallback}
 import com.koushikdutta.async.http._
 import com.koushikdutta.async.http.callback.HttpConnectCallback
 import com.waz.HockeyApp.NoReporting
 import com.waz.ZLog._
-import com.waz.api
-import com.waz.api.impl.ProgressIndicator
+import com.waz.ZLog.ImplicitTag._
 import com.waz.threading.CancellableFuture.CancelException
 import com.waz.threading.{CancellableFuture, SerialDispatchQueue, Threading}
 import com.waz.utils.returning
 import com.waz.utils.wrappers.URI
-import com.waz.znet.ContentEncoder.{MultipartRequestContent, _}
-import com.waz.znet.Request.ProgressCallback
-import com.waz.znet.Response.{DefaultResponseBodyDecoder, Headers, HttpStatus, ResponseBodyDecoder}
-import com.waz.znet.ResponseConsumer.ConsumerState.Done
+import com.waz.znet.ContentEncoder.MultipartRequestContent
+import com.waz.znet.Response.{DefaultResponseBodyDecoder, ResponseBodyDecoder}
 
 import scala.concurrent._
 import scala.concurrent.duration._
 import scala.util.control.NonFatal
-import scala.util.{Failure, Success}
 
-class AsyncClient(bodyDecoder: ResponseBodyDecoder = DefaultResponseBodyDecoder, val userAgent: String = AsyncClient.userAgent(), wrapper: ClientWrapper = ClientWrapper) {
+class AsyncClient(bodyDecoder: ResponseBodyDecoder = DefaultResponseBodyDecoder,
+                  val userAgent: String = AsyncClient.userAgent(),
+                  val wrapper: Future[ClientWrapper] = ClientWrapper(),
+                  requestWorker: RequestWorker = new KoushiRequestWorker,
+                  responseWorker: ResponseWorker = new KoushiResponseWorker
+                 ) {
   import AsyncClient._
 
   protected implicit val dispatcher = new SerialDispatchQueue(Threading.ThreadPool)
 
-  val client = wrapper(new AsyncHttpClient(new AsyncServer))
+  def apply(uri: URI, request: Request[_]): CancellableFuture[Response] = {
+    val body = request.getBody
+    debug(s"Starting request[${request.httpMethod}]($uri) with body: '${if (body.toString.contains("password")) "<body>" else body}', headers: '${request.headers}'")
 
-  def apply(uri: URI, method: String = Request.GetMethod, body: RequestContent = EmptyRequestContent, headers: Map[String, String] = EmptyHeaders, followRedirect: Boolean = true, timeout: FiniteDuration = DefaultTimeout, decoder: Option[ResponseBodyDecoder] = None, downloadProgressCallback: Option[ProgressCallback] = None): CancellableFuture[Response] = {
-    debug(s"Starting request[$method]($uri) with body: '${if (body.toString.contains("password")) "<body>" else body}', headers: '$headers'")
-
-    val requestTimeout = if (method != Request.PostMethod) timeout else body match {
+    val requestTimeout = if (request.httpMethod != Request.PostMethod) request.timeout else body match {
       case _: MultipartRequestContent => MultipartPostTimeout
-      case _ => timeout
+      case _ => request.timeout
     }
 
-    CancellableFuture.lift(client) flatMap { client =>
+    CancellableFuture.lift(wrapper) flatMap { client =>
       val p = Promise[Response]()
       @volatile var cancelled = false
       @volatile var processFuture = None: Option[CancellableFuture[_]]
       @volatile var lastNetworkActivity: Long = System.currentTimeMillis
       @volatile var timeoutForPhase = requestTimeout
-      val interval = 5.seconds min timeout
+      val interval = 5.seconds min request.timeout
 
-      val request = buildHttpRequest(uri, method, body, headers, followRedirect, timeoutForPhase)
+      val requestBuilt = requestWorker.processRequest(uri, request.httpMethod, body, request.headers, request.followRedirect, timeoutForPhase)
 
-      val callback = new HttpConnectCallback {
+      val httpFuture = client.execute(requestBuilt, new HttpConnectCallback {
         override def onConnectCompleted(ex: Exception, response: AsyncHttpResponse): Unit = {
           debug(s"Connect completed for uri: '$uri', ex: '$ex', cancelled: $cancelled")
-          timeoutForPhase = timeout
+          timeoutForPhase = request.timeout
 
           if (ex != null) {
             p.tryFailure(if (cancelled) CancellableFuture.DefaultCancelException else ex)
           } else {
             val networkActivityCallback = () => lastNetworkActivity = System.currentTimeMillis
-            val future = processResponse(uri, response, decoder.getOrElse(bodyDecoder), downloadProgressCallback, networkActivityCallback)
+            val future = responseWorker.processResponse(uri, response, request.decoder.getOrElse(bodyDecoder), request.downloadCallback, networkActivityCallback)
             p.tryCompleteWith(future)
 
             // XXX: order is important here, we first set processFuture and then check cancelled to avoid race condition in cancel callback
@@ -90,7 +85,7 @@ class AsyncClient(bodyDecoder: ResponseBodyDecoder = DefaultResponseBodyDecoder,
             }
           }
         }
-      }
+      })
 
       val httpFuture = client.execute(request, callback)
 
@@ -98,7 +93,7 @@ class AsyncClient(bodyDecoder: ResponseBodyDecoder = DefaultResponseBodyDecoder,
         override def cancel()(implicit tag: LogTag): Boolean = {
           debug(s"cancelling request for $uri")(tag)
           cancelled = true
-          httpFuture.cancel(true)
+          httpFuture.cancel()(tag)
           processFuture.foreach(_.cancel()(tag))
           super.cancel()(tag)
         }
@@ -118,98 +113,12 @@ class AsyncClient(bodyDecoder: ResponseBodyDecoder = DefaultResponseBodyDecoder,
     }
   }
 
-  def close(): Unit = client foreach { _.getServer.stop() }
+  def close(): Unit = wrapper foreach { _.stop() }
 
-  private def buildHttpRequest(uri: URI, method: String, body: RequestContent, headers: Map[String, String], followRedirect: Boolean, timeout: FiniteDuration): AsyncHttpRequest = {
-    val r = new AsyncHttpRequest(URI.unwrap(uri.normalizeScheme), method)
-    r.setTimeout(timeout.toMillis.toInt)
-    r.setFollowRedirect(followRedirect)
-    r.getHeaders.set(UserAgentHeader, userAgent)
-    headers.foreach(p => r.getHeaders.set(p._1, p._2.trim))
-    body(r)
-  }
-
-  //XXX: has to be executed on Http thread (inside onConnectCompleted), since data callbacks have to be set before this callback completes,
-  private def processResponse(uri: URI, response: AsyncHttpResponse, decoder: ResponseBodyDecoder = bodyDecoder, progressCallback: Option[ProgressCallback], networkActivityCallback: () => Unit): CancellableFuture[Response] = {
-    val httpStatus = HttpStatus(response.code(), response.message())
-    val contentLength = HttpUtil.contentLength(response.headers())
-    val contentType = Option(response.headers().get(ContentTypeHeader)).getOrElse("")
-
-    debug(s"got connection response for request: $uri, status: '$httpStatus', length: '$contentLength', type: '$contentType'")
-
-    progressCallback foreach (_(ProgressIndicator.ProgressData(0L, contentLength, api.ProgressIndicator.State.RUNNING)))
-    if (contentLength == 0) {
-      progressCallback foreach { cb => Future(cb(ProgressIndicator.ProgressData(0, 0, api.ProgressIndicator.State.COMPLETED))) }
-      CancellableFuture.successful(Response(httpStatus, headers = new Headers(response.headers())))
-    } else {
-
-      val p = Promise[Response]()
-      val consumer = decoder(contentType, contentLength)
-
-      def onComplete(ex: Exception) = {
-        response.setDataCallback(new NullDataCallback)
-        response.setEndCallback(new NullCompletedCallback)
-        p.tryComplete(
-          if (ex != null) Failure(ex)
-          else consumer.result match {
-            case Success(body) =>
-              progressCallback foreach { cb => Future(cb(ProgressIndicator.ProgressData(contentLength, contentLength, api.ProgressIndicator.State.COMPLETED))) }
-              Success(Response(httpStatus, body, new Headers(response.headers())))
-
-            case Failure(t) =>
-              progressCallback foreach { cb => Future(cb(ProgressIndicator.ProgressData(0, contentLength, api.ProgressIndicator.State.FAILED))) }
-              Success(Response(Response.InternalError(s"Response body consumer failed for request: '$uri'", Some(t), Some(httpStatus))))
-          }
-        )
-      }
-
-      response.setDataCallback(new DataCallback {
-        val bytesSent = new AtomicLong(0L)
-
-        override def onDataAvailable(emitter: DataEmitter, bb: ByteBufferList): Unit = {
-          debug(s"data received for $uri, length: ${bb.remaining}")
-          val numConsumed = bb.remaining
-          val state = consumer.consume(bb)
-
-          networkActivityCallback()
-          progressCallback foreach { cb => Future(cb(ProgressIndicator.ProgressData(bytesSent.addAndGet(numConsumed), contentLength, api.ProgressIndicator.State.RUNNING))) }
-
-          state match {
-            case Done =>
-              // consumer doesn't need any more data, we can stop receiving and report success
-              debug(s"consumer [$consumer] returned Done, finishing response processing for: $uri")
-              onComplete(null)
-              response.close()
-            case _ => // ignore
-          }
-        }
-      })
-
-      response.setEndCallback(new CompletedCallback {
-        override def onCompleted(ex: Exception): Unit = {
-          debug(s"response for $uri ENDED, ex: $ex, p.isCompleted: ${p.isCompleted}")
-          Option(ex) foreach { error(s"response for $uri failed", _) }
-          networkActivityCallback()
-          onComplete(ex)
-        }
-      })
-
-      new CancellableFuture(p) {
-        override def cancel()(implicit tag: LogTag): Boolean = {
-          debug(s"cancelling response processing for: $uri")(tag)
-          response.setDataCallback(new NullDataCallback)
-          response.setEndCallback(new NullCompletedCallback)
-          response.close()
-          progressCallback foreach { cb => Future(cb(ProgressIndicator.ProgressData(0, contentLength, api.ProgressIndicator.State.CANCELLED))) }
-          super.cancel()(tag)
-        }
-      }
-    }
-  }
 }
 
 object AsyncClient {
-  private implicit val logTag: LogTag = logTagFor[AsyncClient]
+
   val MultipartPostTimeout = 15.minutes
   val DefaultTimeout = 30.seconds
   val EmptyHeaders = Map[String, String]()

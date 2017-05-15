@@ -23,6 +23,7 @@ import javax.net.ssl._
 import com.koushikdutta.async.http.AsyncHttpClientMiddleware.GetSocketData
 import com.koushikdutta.async.http.spdy.SpdyMiddleware
 import com.koushikdutta.async.http.{SSLEngineSNIConfigurator, _}
+import com.koushikdutta.async._
 import com.waz.threading.Threading
 import com.waz.utils._
 
@@ -32,10 +33,10 @@ import scala.concurrent.Future
  * Replaces ssl context, trust managers and verifiers for Robolectric testing.
  * Default ssl implementation in AndroidAsync doesn't work correctly when run in RoboTests, so we need to hack it a bit.
   */
-object TestClientWrapper extends ClientWrapper {
+object TestClientWrapper {
   import Threading.Implicits.Background
 
-  def apply(client: AsyncHttpClient): Future[AsyncHttpClient] = Future {
+  def apply(client: AsyncHttpClient): Future[ClientWrapper] = Future {
 
     def prepareSSlMiddleware() = new SpdyMiddleware(client) {
 
@@ -68,7 +69,9 @@ object TestClientWrapper extends ClientWrapper {
     client.insertMiddleware(prepareSSlMiddleware())
     client.insertMiddleware(new HttpTransportMiddleware)
 
-    client
+    new ClientWrapperImpl(client)
   }
+
+  def apply(): Future[ClientWrapper] = apply(new AsyncHttpClient(new AsyncServer))
 }
 

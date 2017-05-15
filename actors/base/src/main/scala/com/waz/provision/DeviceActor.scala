@@ -31,7 +31,7 @@ import com.waz.api._
 import com.waz.api.impl.{AccentColor, DoNothingAndProceed, ZMessagingApi}
 import com.waz.content.GlobalPreferences.CallingV3Key
 import com.waz.content.Preferences.PrefKey
-import com.waz.content.{Database, GlobalDatabase, GlobalPreferences}
+import com.waz.content.{Database, GlobalDatabase}
 import com.waz.model.ConversationData.ConversationType
 import com.waz.model.UserData.ConnectionStatus
 import com.waz.model.VoiceChannelData.ChannelState
@@ -56,14 +56,14 @@ object DeviceActor {
   def props(deviceName: String,
             application: Context,
             backend: BackendConfig = BackendConfig.StagingBackend,
-            wrapper: ClientWrapper) =
+            wrapper: Future[ClientWrapper]) =
   Props(new DeviceActor(deviceName, application, backend, wrapper)).withDispatcher("ui-dispatcher")
 }
 
 class DeviceActor(val deviceName: String,
                   val application: Context,
                   backend: BackendConfig = BackendConfig.StagingBackend,
-                  wrapper: ClientWrapper) extends Actor with ActorLogging {
+                  wrapper: Future[ClientWrapper]) extends Actor with ActorLogging {
 
   import ActorMessage._
 
@@ -78,7 +78,7 @@ class DeviceActor(val deviceName: String,
   lazy val globalModule = new GlobalModule(application, backend) { global =>
     ZMessaging.currentGlobal = this
     override lazy val storage: Database = new GlobalDatabase(application, Random.nextInt().toHexString)
-    override lazy val clientWrapper: ClientWrapper = wrapper
+    override lazy val clientWrapper: Future[ClientWrapper] = wrapper
 
     override lazy val metadata: MetaDataService = new MetaDataService(context) {
       override val cryptoBoxDirName: String = "otr_" + Random.nextInt().toHexString
