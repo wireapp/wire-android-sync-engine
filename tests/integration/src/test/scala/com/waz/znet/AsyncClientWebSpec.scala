@@ -30,7 +30,6 @@ import java.io.{File, FileInputStream}
 import java.util.concurrent.{CountDownLatch, TimeUnit}
 
 import com.waz.testutils.DefaultPatienceConfig
-import com.waz.utils.events.EventContext
 import org.scalatest.concurrent.ScalaFutures
 
 import scala.concurrent.Await

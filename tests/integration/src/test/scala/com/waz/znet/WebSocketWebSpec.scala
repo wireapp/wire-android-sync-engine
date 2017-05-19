@@ -24,7 +24,6 @@ import com.koushikdutta.async.{ByteBufferList, DataEmitter}
 import com.waz.RobolectricUtils
 import com.waz.test.WebSocketEchoServer
 import com.waz.provision.RemoteProcess
-import com.waz.utils.events.EventContext
 import org.robolectric.shadows.ShadowLog
 import org.scalatest._
 

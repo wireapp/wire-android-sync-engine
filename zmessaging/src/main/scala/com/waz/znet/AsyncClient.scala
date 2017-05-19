@@ -87,8 +87,6 @@ class AsyncClient(bodyDecoder: ResponseBodyDecoder = DefaultResponseBodyDecoder,
         }
       })
 
-      val httpFuture = client.execute(request, callback)
-
       returning(new CancellableFuture(p) {
         override def cancel()(implicit tag: LogTag): Boolean = {
           debug(s"cancelling request for $uri")(tag)

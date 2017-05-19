@@ -189,7 +189,7 @@ trait MockedClientSuite extends ApiSpec with MockedClient with MockedWebSocket w
 
   class MockedGlobalModule(context: Context, backend: BackendConfig, testClient: AsyncClient) extends GlobalModule(context, testBackend) {
     override lazy val client: AsyncClient = testClient
-    override lazy val clientWrapper: ClientWrapper = TestClientWrapper
+    override lazy val clientWrapper: Future[ClientWrapper] = TestClientWrapper()
     override lazy val loginClient: LoginClient = new LoginClient(client, backend) {
       override def login(user: AccountId, credentials: Credentials): CancellableFuture[LoginResult] = suite.login(user, credentials)
       override def access(cookie: Cookie, token: Option[Token]): CancellableFuture[LoginResult] = suite.access(cookie, token)
