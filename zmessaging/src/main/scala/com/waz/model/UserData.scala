@@ -31,9 +31,6 @@ import com.waz.utils._
 import com.waz.utils.wrappers.{DB, DBCursor}
 import org.json.JSONObject
 
-import com.waz.ZLog._
-import com.waz.ZLog.ImplicitTag._
-
 case class UserData(
                      id: UserId,
                      name: String,
@@ -65,23 +62,20 @@ case class UserData(
 
   def getDisplayName = if (displayName.isEmpty) name else displayName
 
-  def updated(user: UserInfo): UserData = {
-    debug(s"PP copy picture id with 'updated(UserInfo)', old: $picture, new: ${user.mediumPicture.map(_.id)}")
-    copy(
-      name = user.name.getOrElse(name),
-      email = user.email.orElse(email),
-      phone = user.phone.orElse(phone),
-      accent = user.accentId.getOrElse(accent),
-      trackingId = user.trackingId.orElse(trackingId),
-      searchKey = SearchKey(user.name.getOrElse(name)),
-      picture = user.mediumPicture.map(_.id).orElse(picture),
-      deleted = user.deleted,
-      handle = user.handle match {
-        case Some(h) if !h.toString.isEmpty => Some(h)
-        case _ => handle
-      }
-    )
-  }
+  def updated(user: UserInfo): UserData = copy(
+    name = user.name.getOrElse(name),
+    email = user.email.orElse(email),
+    phone = user.phone.orElse(phone),
+    accent = user.accentId.getOrElse(accent),
+    trackingId = user.trackingId.orElse(trackingId),
+    searchKey = SearchKey(user.name.getOrElse(name)),
+    picture = user.mediumPicture.map(_.id).orElse(picture),
+    deleted = user.deleted,
+    handle = user.handle match {
+      case Some(h) if !h.toString.isEmpty => Some(h)
+      case _ => handle
+    }
+  )
 
   def updated(user: UserSearchEntry): UserData = copy(
     name = user.name,
@@ -101,21 +95,18 @@ case class UserData(
               accent: Option[AccentColor] = None,
               picture: Option[AssetId] = None,
               trackingId: Option[String] = None,
-              handle: Option[Handle] = None): UserData = {
-    debug(s"PP copy picture id with 'updated(..., picture, ...)', old: ${this.picture}, new: $picture")
-    copy(
-      name = name.getOrElse(this.name),
-      email = email.orElse(this.email),
-      phone = phone.orElse(this.phone),
-      accent = accent.fold(this.accent)(_.id),
-      picture = picture.orElse(this.picture),
-      searchKey = SearchKey(name.getOrElse(this.name)),
-      handle = handle match {
-        case Some(h) if !h.toString.isEmpty => Some(h)
-        case _ => this.handle
-      }
-    )
-  }
+              handle: Option[Handle] = None): UserData = copy(
+    name = name.getOrElse(this.name),
+    email = email.orElse(this.email),
+    phone = phone.orElse(this.phone),
+    accent = accent.fold(this.accent)(_.id),
+    picture = picture.orElse(this.picture),
+    searchKey = SearchKey(name.getOrElse(this.name)),
+    handle = handle match {
+      case Some(h) if !h.toString.isEmpty => Some(h)
+      case _ => this.handle
+    }
+  )
 
   def updateConnectionStatus(status: UserData.ConnectionStatus, time: Option[Date] = None, message: Option[String] = None): UserData = {
     if (time.exists(_.before(this.connectionLastUpdated))) this
@@ -179,16 +170,13 @@ object UserData {
 
   implicit lazy val Decoder: JsonDecoder[UserData] = new JsonDecoder[UserData] {
     import JsonDecoder._
-    override def apply(implicit js: JSONObject): UserData = {
-      debug(s"PP decode picture id from json: ${decodeOptAssetId('assetId)}")
-      UserData(
-        id = 'id, name = 'name, email = decodeOptEmailAddress('email), phone = decodeOptPhoneNumber('phone),
-        trackingId = decodeOptId[TrackingId]('trackingId), picture = decodeOptAssetId('assetId), accent = decodeInt('accent), searchKey = SearchKey('name),
-        connection = ConnectionStatus('connection), connectionLastUpdated = new Date(decodeLong('connectionLastUpdated)), connectionMessage = decodeOptString('connectionMessage),
-        conversation = decodeOptRConvId('rconvId), relation = Relation.withId('relation),
-        syncTimestamp = decodeLong('syncTimestamp), 'displayName, Verification.valueOf('verified), deleted = 'deleted,
-        handle = decodeOptHandle('handle))
-    }
+    override def apply(implicit js: JSONObject): UserData = UserData(
+      id = 'id, name = 'name, email = decodeOptEmailAddress('email), phone = decodeOptPhoneNumber('phone),
+      trackingId = decodeOptId[TrackingId]('trackingId), picture = decodeOptAssetId('assetId), accent = decodeInt('accent), searchKey = SearchKey('name),
+      connection = ConnectionStatus('connection), connectionLastUpdated = new Date(decodeLong('connectionLastUpdated)), connectionMessage = decodeOptString('connectionMessage),
+      conversation = decodeOptRConvId('rconvId), relation = Relation.withId('relation),
+      syncTimestamp = decodeLong('syncTimestamp), 'displayName, Verification.valueOf('verified), deleted = 'deleted,
+      handle = decodeOptHandle('handle))
   }
 
   implicit lazy val Encoder: JsonEncoder[UserData] = new JsonEncoder[UserData] {
@@ -198,7 +186,6 @@ object UserData {
       v.email foreach (o.put("email", _))
       v.phone foreach (o.put("phone", _))
       v.trackingId foreach (id => o.put("trackingId", id.str))
-      debug(s"PP encoding picture with json encoder: ${v.picture}")
       v.picture foreach (id => o.put("assetId", id.str))
       o.put("accent", v.accent)
       o.put("connection", v.connection.code)

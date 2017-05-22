@@ -63,7 +63,6 @@ class ImageAssetGenerator(context: Context, cache: CacheService, loader: ImageLo
   //used for creating small previews for user profile assets for the web team, based off of some input asset. It will
   //create a new AssetData representing the preview image
   def generateSmallProfile(asset: AssetData): CancellableFuture[AssetData] = {
-    debug(s"PP generating preview for ${asset.id}")
     loader.loadRawImageData(asset) flatMap {
       case Some(data) =>
         loader.getImageMetadata(data) flatMap { meta => generateAssetData(AssetData.newImageAsset(AssetId(), Preview), Left(data), meta, SmallProfileOptions) }

@@ -59,7 +59,7 @@ class UsersClient(netClient: ZNetClient) {
     }
 
   def updateSelf(info: UserInfo): ErrorOrResponse[Unit] = {
-    debug(s"PP updateSelf: $info, picture: ${info.picture}")
+    debug(s"updateSelf: $info, picture: ${info.picture}")
     netClient.updateWithErrorHandling("updateSelf", Request.Put(SelfPath, info))
   }
 

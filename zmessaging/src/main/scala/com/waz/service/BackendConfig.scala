@@ -39,8 +39,7 @@ object BackendConfig {
 
   //This information can be found in downloadable google-services.json file from the BE console.
   val StagingFirebaseOptions = FirebaseOptions("723990470614", "1:723990470614:android:9a1527f79aa62284", "AIzaSyAGCoJGUtDBLJJiQPLxHQRrdkbyI0wlbo8")
-  //TODO add api and app ids from BE config files
-  val ProdFirebaseOptions    = FirebaseOptions("782078216207", "", "")
+  val ProdFirebaseOptions    = FirebaseOptions("782078216207", "1:782078216207:android:d3db2443512d2055", "AIzaSyBdYVv2f-Y7JJmHVmDNCKgWvX6Isa8rAGA")
 
   val StagingBackend = BackendConfig("https://staging-nginz-https.zinfra.io", "https://staging-nginz-ssl.zinfra.io/await", StagingFirebaseOptions, "staging")
   val ProdBackend    = BackendConfig("https://prod-nginz-https.wire.com",     "https://prod-nginz-ssl.wire.com/await",     ProdFirebaseOptions,    "prod")

@@ -180,7 +180,6 @@ class CachedStorageImpl[K, V](cache: LruCache[K, Option[V]], db: Database)(impli
   def onRemoved(key: K): EventStream[K] = onDeleted.map(_.view.filter(_ == key).lastOption).collect { case Some(k) => k }
 
   def optSignal(key: K): Signal[Option[V]] = {
-
     val changeOrDelete = onChanged(key).map(Option(_)).union(onRemoved(key).map(_ => Option.empty[V]))
     new AggregatingSignal[Option[V], Option[V]](changeOrDelete, get(key), { (_, v) => v })
   }

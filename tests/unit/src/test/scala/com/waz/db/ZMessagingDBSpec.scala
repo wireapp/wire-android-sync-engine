@@ -42,7 +42,7 @@ import org.scalatest.prop.GeneratorDrivenPropertyChecks
 import org.threeten.bp.Instant
 
 class ZMessagingDBSpec extends FeatureSpec with Matchers with Inspectors with GeneratorDrivenPropertyChecks with BeforeAndAfter with RobolectricTests with DbLoader {
-  lazy val dbHelper: DBHelper = new ZMessagingDB(Robolectric.application, "")
+  lazy val dbHelper: DBHelper = new ZMessagingDB(Robolectric.application, "test_db")
 
   after {
     dbHelper.close()

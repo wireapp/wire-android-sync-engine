@@ -161,7 +161,6 @@ object UserInfo {
       info.accentId.foreach(o.put("accent_id", _))
       info.trackingId.foreach(id => o.put("tracking_id", id.str))
       info.picture.foreach(ps => o.put("assets", encodeAsset(ps)))
-      info.picture.foreach(ps => o.put("picture", encodePicture(ps)))
     }
   }
 
@@ -170,7 +169,6 @@ object UserInfo {
       info.name.foreach(o.put("name", _))
       info.accentId.foreach(o.put("accent_id", _))
       info.picture.foreach(ps => o.put("assets", encodeAsset(ps)))
-      info.picture.foreach(ps => o.put("picture", encodePicture(ps)))
     }
   }
 }

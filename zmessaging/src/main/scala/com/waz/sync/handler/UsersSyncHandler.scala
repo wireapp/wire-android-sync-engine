@@ -56,35 +56,32 @@ class UsersSyncHandler(assetSync: AssetSyncHandler, userService: UserServiceImpl
 
   def postSelfPicture(): Future[SyncResult] = userService.getSelfUser flatMap {
     case Some(userData) => userData.picture match {
-      case Some(assetId) => debug(s"postSelfPicture with user id: ${userData.id} and assetId $assetId"); postSelfPicture(userData.id, assetId)
-      case None => debug(s"updatedSelfToSyncResult with user id: ${userData.id}"); updatedSelfToSyncResult(usersClient.updateSelf(UserInfo(userData.id, picture = None)))
+      case Some(assetId)  => postSelfPicture(userData.id, assetId)
+      case None           => updatedSelfToSyncResult(usersClient.updateSelf(UserInfo(userData.id, picture = None)))
     }
     case _ => Future.successful(SyncResult.failed())
   }
 
   private def postSelfPicture(id: UserId, assetId: AssetId): Future[SyncResult] = for {
     Some(asset) <- assets.getAssetData(assetId)
-    preview <- imageGenerator.generateSmallProfile(asset).future
-    _ <- assets.mergeOrCreateAsset(preview) //needs to be in storage for other steps to find it
-    _ <- assetSync.postSelfImageAsset(RConvId(id.str), preview.id).recover { case _ => warn("Failed to upload v2 small picture") } //TODO Dean: stop posting to v2 after transition period
-    _ <- assetSync.postSelfImageAsset(RConvId(id.str), assetId).recover { case _ => warn("Failed to upload v2 medium picture") } //TODO Dean: stop posting to v2 after transition period
-    res <- assetSync.uploadAssetData(preview.id, public = true).future flatMap {
-      case Right(uploadedPreview) =>
-        assetSync.uploadAssetData(assetId, public = true).future flatMap {
-          case Right(uploaded) =>
-            for {
-              asset <- assets.getAssetData(assetId)
-              res <- updatedSelfToSyncResult(usersClient.updateSelf(UserInfo(id, picture = Some(Seq(uploadedPreview, uploaded).flatten))))
-            } yield res
+    preview     <- imageGenerator.generateSmallProfile(asset).future
+    _           <- assets.mergeOrCreateAsset(preview) //needs to be in storage for other steps to find it
+    res         <- assetSync.uploadAssetData(preview.id, public = true).future flatMap {
+                     case Right(uploadedPreview) =>
+                       assetSync.uploadAssetData(assetId, public = true).future flatMap {
+                         case Right(uploaded) => for {
+                           asset <- assets.getAssetData(assetId)
+                           res   <- updatedSelfToSyncResult(usersClient.updateSelf(UserInfo(id, picture = Some(Seq(uploadedPreview, uploaded).flatten))))
+                         } yield res
 
-          case Left(err) =>
-            error(s"self picture upload asset $assetId failed: $err")
-            Future.successful(SyncResult.failed())
-        }
-      case Left(err) =>
-        warn(s"Failed to upload small profile picture: $err")
-        Future.successful(SyncResult.failed())
-    }
+                        case Left(err) =>
+                          error(s"self picture upload asset $assetId failed: $err")
+                          Future.successful(SyncResult.failed())
+                       }
+                     case Left(err) =>
+                       warn(s"Failed to upload small profile picture: $err")
+                       Future.successful(SyncResult.failed())
+                   }
   } yield res
 
   def syncConnectedUsers(): Future[SyncResult] = {
