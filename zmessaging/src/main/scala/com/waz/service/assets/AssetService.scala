@@ -187,9 +187,15 @@ class AssetServiceImpl(storage: AssetsStorage, generator: ImageAssetGenerator, c
       }
     }
 
-  def getAssetData(id: AssetId): Future[Option[AssetData]] = storage.get(id)
+  def getAssetData(id: AssetId): Future[Option[AssetData]] = {
+    debug(s"PP getAssetData($id)")
+    storage.get(id)
+  }
 
-  def mergeOrCreateAsset(assetData: AssetData): Future[Option[AssetData]] = storage.mergeOrCreateAsset(assetData)
+  def mergeOrCreateAsset(assetData: AssetData): Future[Option[AssetData]] = {
+    debug(s"PP mergeOrCreateAsset(${assetData.id}")
+    storage.mergeOrCreateAsset(assetData)
+  }
 
   def removeAssets(ids: Iterable[AssetId]): Future[Unit] = storage.remove(ids)
 

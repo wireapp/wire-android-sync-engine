@@ -48,6 +48,7 @@ class AssetSyncHandler(cache: CacheService, client: AssetClient, assets: AssetSe
         warn(s"asset has already been uploaded, skipping: $asset")
         CancellableFuture.successful(Right(None))
       case (Some(asset), Some(data)) =>
+        debug(s"PP upload asset data for assetId: $assetId")
         otrSync.uploadAssetDataV3(data, if (public) None else Some(AESKey()), asset.mime).flatMap {
           case Right(remoteData) => CancellableFuture.lift(assets.updateAsset(asset.id, _.copyWithRemoteData(remoteData)).map { Right(_) })
           case Left(err) => CancellableFuture successful Left(err)
@@ -65,14 +66,16 @@ class AssetSyncHandler(cache: CacheService, client: AssetClient, assets: AssetSe
   }
 
   //for v2
-  def postSelfImageAsset(convId: RConvId, id: AssetId): Future[SyncResult] =
+  def postSelfImageAsset(convId: RConvId, id: AssetId): Future[SyncResult] = {
+    debug(s"postSelfImageAsset with id $id")
     (for {
       Some(asset) <- assets.getAssetData(id)
-      data        <- cache.getEntry(asset.cacheKey)
+      data <- cache.getEntry(asset.cacheKey)
     } yield (asset, data)) flatMap {
       case (a, Some(d)) => postImageData(convId, a, d, nativePush = false)
       case _ => Future.successful(SyncResult.Failure(None))
     }
+  }
 
   // plain text asset upload should only be used for self image
   private[handler] def postImageData(convId: RConvId, asset: AssetData, data: LocalData, nativePush: Boolean = true): Future[SyncResult] = {
