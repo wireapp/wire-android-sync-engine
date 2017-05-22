@@ -21,6 +21,8 @@ import android.content.Context
 import com.google.firebase.FirebaseApp
 import com.waz.service.BackendConfig.FirebaseOptions
 
+import scala.util.Try
+
 case class BackendConfig(baseUrl: String, websocketUrl: String, firebaseOptions: FirebaseOptions, environment: String) {
   val pushSenderId = firebaseOptions.pushSenderId
 }
@@ -29,12 +31,13 @@ object BackendConfig {
 
   case class FirebaseOptions(pushSenderId: String, appId: String, apiKey: String) {
 
-    def apply(context: Context) =
+    def apply(context: Context) = Try {
       FirebaseApp.initializeApp(context, new com.google.firebase.FirebaseOptions.Builder()
         .setApplicationId(appId)
         .setApiKey(apiKey)
         .setGcmSenderId(pushSenderId)
         .build())
+    }.toOption
   }
 
   //This information can be found in downloadable google-services.json file from the BE console.

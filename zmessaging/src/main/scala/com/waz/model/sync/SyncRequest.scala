@@ -17,6 +17,8 @@
  */
 package com.waz.model.sync
 
+import com.waz.HockeyApp
+import com.waz.ZLog.error
 import com.waz.api.EphemeralExpiration
 import com.waz.model.AddressBook.AddressBookDecoder
 import com.waz.model.UserData.ConnectionStatus
@@ -29,6 +31,7 @@ import org.json.JSONObject
 import org.threeten.bp.Instant
 
 import scala.reflect.ClassTag
+import scala.util.control.NonFatal
 
 sealed abstract class SyncRequest {
   val cmd: SyncCommand
@@ -290,49 +293,57 @@ object SyncRequest {
       def userId = decodeId[UserId]('user)
       def messageId = decodeId[MessageId]('message)
       def users = decodeUserIdSeq('users).toSet
+      val cmd = js.getString("cmd")
 
-      SyncCommand.fromName(js.getString("cmd")) match {
-        case Cmd.SyncUser              => SyncUser(users)
-        case Cmd.SyncConversation      => SyncConversation(decodeConvIdSeq('convs).toSet)
-        case Cmd.SyncSearchQuery       => SyncSearchQuery(SearchQuery.fromCacheKey(decodeString('queryCacheKey)))
-        case Cmd.SyncCallState         => SyncCallState(convId, fromFreshNotification = false)
-        case Cmd.PostConv              => PostConv(convId, decodeStringSeq('users).map(UserId(_)), 'name)
-        case Cmd.PostConvName          => PostConvName(convId, 'name)
-        case Cmd.PostConvState         => PostConvState(convId, JsonDecoder[ConversationState]('state))
-        case Cmd.PostLastRead          => PostLastRead(convId, 'time)
-        case Cmd.PostCleared           => PostCleared(convId, 'time)
-        case Cmd.PostTypingState       => PostTypingState(convId, 'typing)
-        case Cmd.PostConnectionStatus  => PostConnectionStatus(userId, opt('status, js => ConnectionStatus(js.getString("status"))))
-        case Cmd.PostSelfPicture       => PostSelfPicture(decodeOptAssetId('asset))
-        case Cmd.PostMessage           => PostMessage(convId, messageId, 'time)
-        case Cmd.PostDeleted           => PostDeleted(convId, messageId)
-        case Cmd.PostRecalled          => PostRecalled(convId, messageId, decodeId[MessageId]('recalled))
-        case Cmd.PostAssetStatus       => PostAssetStatus(convId, messageId, EphemeralExpiration.getForMillis('ephemeral), JsonDecoder[AssetStatus.Syncable]('status))
-        case Cmd.PostConvJoin          => PostConvJoin(convId, users)
-        case Cmd.PostConvLeave         => PostConvLeave(convId, userId)
-        case Cmd.PostConnection        => PostConnection(userId, 'name, 'message)
-        case Cmd.DeletePushToken       => DeletePushToken(decodeId[PushToken]('token))
-        case Cmd.SyncRichMedia         => SyncRichMedia(messageId)
-        case Cmd.SyncSelf              => SyncSelf
-        case Cmd.DeleteAccount         => DeleteAccount
-        case Cmd.SyncConversations     => SyncConversations
-        case Cmd.SyncConnectedUsers    => SyncConnectedUsers
-        case Cmd.SyncConnections       => SyncConnections
-        case Cmd.RegisterPushToken     => RegisterPushToken(decodeId[PushToken]('token))
-        case Cmd.PostSelf              => PostSelf(JsonDecoder[UserInfo]('user))
-        case Cmd.PostAddressBook       => PostAddressBook(JsonDecoder.opt[AddressBook]('addressBook).getOrElse(AddressBook.Empty))
-        case Cmd.PostInvitation        => PostInvitation(JsonDecoder[Invitation]('invitation))
-        case Cmd.SyncSelfClients       => SyncSelfClients
-        case Cmd.SyncClients           => SyncClients(userId)
-        case Cmd.SyncClientLocation    => SyncClientsLocation
-        case Cmd.SyncPreKeys           => SyncPreKeys(userId, decodeClientIdSeq('clients).toSet)
-        case Cmd.PostClientLabel       => PostClientLabel(decodeId[ClientId]('client), 'label)
-        case Cmd.PostLiking            => PostLiking(convId, JsonDecoder[Liking]('liking))
-        case Cmd.PostSessionReset      => PostSessionReset(convId, userId, decodeId[ClientId]('client))
-        case Cmd.PostOpenGraphMeta     => PostOpenGraphMeta(convId, messageId, 'time)
-        case Cmd.PostReceipt           => PostReceipt(convId, messageId, userId, ReceiptType.fromName('type))
-        case Cmd.ValidateHandles       => ValidateHandles('handles)
-        case Cmd.Unknown               => Unknown
+      try {
+        SyncCommand.fromName(cmd) match {
+          case Cmd.SyncUser              => SyncUser(users)
+          case Cmd.SyncConversation      => SyncConversation(decodeConvIdSeq('convs).toSet)
+          case Cmd.SyncSearchQuery       => SyncSearchQuery(SearchQuery.fromCacheKey(decodeString('queryCacheKey)))
+          case Cmd.SyncCallState         => SyncCallState(convId, fromFreshNotification = false)
+          case Cmd.PostConv              => PostConv(convId, decodeStringSeq('users).map(UserId(_)), 'name)
+          case Cmd.PostConvName          => PostConvName(convId, 'name)
+          case Cmd.PostConvState         => PostConvState(convId, JsonDecoder[ConversationState]('state))
+          case Cmd.PostLastRead          => PostLastRead(convId, 'time)
+          case Cmd.PostCleared           => PostCleared(convId, 'time)
+          case Cmd.PostTypingState       => PostTypingState(convId, 'typing)
+          case Cmd.PostConnectionStatus  => PostConnectionStatus(userId, opt('status, js => ConnectionStatus(js.getString("status"))))
+          case Cmd.PostSelfPicture       => PostSelfPicture(decodeOptAssetId('asset))
+          case Cmd.PostMessage           => PostMessage(convId, messageId, 'time)
+          case Cmd.PostDeleted           => PostDeleted(convId, messageId)
+          case Cmd.PostRecalled          => PostRecalled(convId, messageId, decodeId[MessageId]('recalled))
+          case Cmd.PostAssetStatus       => PostAssetStatus(convId, messageId, EphemeralExpiration.getForMillis('ephemeral), JsonDecoder[AssetStatus.Syncable]('status))
+          case Cmd.PostConvJoin          => PostConvJoin(convId, users)
+          case Cmd.PostConvLeave         => PostConvLeave(convId, userId)
+          case Cmd.PostConnection        => PostConnection(userId, 'name, 'message)
+          case Cmd.DeletePushToken       => DeletePushToken(decodeId[PushToken]('token))
+          case Cmd.SyncRichMedia         => SyncRichMedia(messageId)
+          case Cmd.SyncSelf              => SyncSelf
+          case Cmd.DeleteAccount         => DeleteAccount
+          case Cmd.SyncConversations     => SyncConversations
+          case Cmd.SyncConnectedUsers    => SyncConnectedUsers
+          case Cmd.SyncConnections       => SyncConnections
+          case Cmd.RegisterPushToken     => RegisterPushToken(decodeId[PushToken]('token))
+          case Cmd.PostSelf              => PostSelf(JsonDecoder[UserInfo]('user))
+          case Cmd.PostAddressBook       => PostAddressBook(JsonDecoder.opt[AddressBook]('addressBook).getOrElse(AddressBook.Empty))
+          case Cmd.PostInvitation        => PostInvitation(JsonDecoder[Invitation]('invitation))
+          case Cmd.SyncSelfClients       => SyncSelfClients
+          case Cmd.SyncClients           => SyncClients(userId)
+          case Cmd.SyncClientLocation    => SyncClientsLocation
+          case Cmd.SyncPreKeys           => SyncPreKeys(userId, decodeClientIdSeq('clients).toSet)
+          case Cmd.PostClientLabel       => PostClientLabel(decodeId[ClientId]('client), 'label)
+          case Cmd.PostLiking            => PostLiking(convId, JsonDecoder[Liking]('liking))
+          case Cmd.PostSessionReset      => PostSessionReset(convId, userId, decodeId[ClientId]('client))
+          case Cmd.PostOpenGraphMeta     => PostOpenGraphMeta(convId, messageId, 'time)
+          case Cmd.PostReceipt           => PostReceipt(convId, messageId, userId, ReceiptType.fromName('type))
+          case Cmd.ValidateHandles       => ValidateHandles('handles)
+          case Cmd.Unknown               => Unknown
+        }
+      } catch {
+        case NonFatal(e) =>
+          error(s"Error reading SyncCommand: $cmd", e)
+          HockeyApp.saveException(e, s"Error reading SyncCommand: $cmd")
+          Unknown
       }
     }
   }

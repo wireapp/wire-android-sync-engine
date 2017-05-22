@@ -19,7 +19,6 @@ package com.waz.utils.wrappers
 
 import android.app.Activity
 import com.google.android.gms.common.{ConnectionResult, GoogleApiAvailability}
-import com.google.firebase.{FirebaseApp, FirebaseOptions}
 import com.google.firebase.iid.FirebaseInstanceId
 import com.waz.ZLog.ImplicitTag._
 import com.waz.ZLog.warn
@@ -28,6 +27,8 @@ import com.waz.service.BackendConfig
 import com.waz.utils.LoggedTry
 import com.waz.utils.events.Signal
 import com.waz.utils.wrappers.GoogleApi.RequestGooglePlayServices
+
+import scala.util.Try
 
 trait GoogleApi {
   def isGooglePlayServicesAvailable: Signal[Boolean]
@@ -43,7 +44,7 @@ class GoogleApiImpl(context: Context, beConfig: BackendConfig) extends GoogleApi
 
   private val firebaseApp = beConfig.firebaseOptions(context)
 
-  override val isGooglePlayServicesAvailable = Signal[Boolean](api.isGooglePlayServicesAvailable(context) == ConnectionResult.SUCCESS)
+  override val isGooglePlayServicesAvailable = Signal[Boolean](Try(api.isGooglePlayServicesAvailable(context) == ConnectionResult.SUCCESS).toOption.contains(true))
 
   override def checkGooglePlayServicesAvailable(activity: Activity) = api.isGooglePlayServicesAvailable(activity) match {
     case ConnectionResult.SUCCESS => isGooglePlayServicesAvailable ! true
@@ -65,10 +66,10 @@ class GoogleApiImpl(context: Context, beConfig: BackendConfig) extends GoogleApi
   }
 
   override def getPushToken =
-    LoggedTry(FirebaseInstanceId.getInstance(firebaseApp).getToken(beConfig.pushSenderId, "FCM")).toOption.map(PushToken(_))
+    firebaseApp.flatMap(app => LoggedTry(FirebaseInstanceId.getInstance(app).getToken(beConfig.pushSenderId, "FCM")).toOption.map(PushToken(_)))
 
   override def deleteAllPushTokens(): Unit =
-    LoggedTry(FirebaseInstanceId.getInstance(firebaseApp).deleteInstanceId())
+    firebaseApp.foreach(app => LoggedTry(FirebaseInstanceId.getInstance(app).deleteInstanceId()))
 }
 
 object GoogleApi {

@@ -54,7 +54,7 @@ class ZMessagingDB(context: Context, dbName: String) extends DaoDB(context.getAp
 }
 
 object ZMessagingDB {
-  val DbVersion = 85
+  val DbVersion = 86
 
   lazy val daos = Seq (
     UserDataDao, SearchQueryCacheDao, AssetDataDao, ConversationDataDao,
@@ -132,9 +132,12 @@ object ZMessagingDB {
       db.execSQL("INSERT INTO KeyValues (key, value) VALUES ('should_sync_conversations', 'true')")
     },
     Migration(84, 85){ db =>
-      //TODO TEST!!
-      db.execSQL("UPDATE SyncJobs SET data = replace(data, 'delete-gcm-token', 'delete-push-token') WHERE data LIKE '%delete-gcm-token%'")
-      db.execSQL("UPDATE SyncJobs SET data = replace(data, 'register-gcm-token', 'register-push-token') WHERE data LIKE '%register-gcm-token%'")
+      // bug in this migration - skip this version
+    },
+    Migration(85, 86) { db =>
+      // new users won't have any push ti- fix for broken internal users due to last migration
+      db.execSQL("DELETE FROM SyncJobs WHERE data LIKE '%push-token%'")
+      db.execSQL("DELETE FROM SyncJobs WHERE data LIKE '%gcm-token%'")
     }
   )
 }

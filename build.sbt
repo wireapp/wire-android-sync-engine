@@ -8,7 +8,7 @@ import sbtassembly.MappingSet
 import SharedSettings._
 
 val MajorVersion = "99"
-val MinorVersion = "1" // hotfix release
+val MinorVersion = "2" // hotfix release
 
 version in ThisBuild := {
   val jobName = sys.env.get("JOB_NAME")
@@ -110,8 +110,8 @@ lazy val zmessaging = project
       "com.koushikdutta.async" % "androidasync" % "2.1.8",
       "com.googlecode.libphonenumber" % "libphonenumber" % "7.1.1", // 7.2.x breaks protobuf
       "com.softwaremill.macwire" %% "macros" % "2.2.2" % Provided,
-      "com.google.android.gms" % "play-services-base" % "9.0.0" % Provided exclude("com.android.support", "support-v4"),
-      "com.google.firebase" % "firebase-messaging" % "9.0.0" % Provided,
+      "com.google.android.gms" % "play-services-base" % "10.0.1" % Provided exclude("com.android.support", "support-v4"),
+      "com.google.firebase" % "firebase-messaging" % "10.0.1" % Provided,
       Deps.avs % Provided,
       Deps.cryptobox,
       Deps.genericMessage,
