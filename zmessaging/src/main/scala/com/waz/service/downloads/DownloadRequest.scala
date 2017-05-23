@@ -54,7 +54,7 @@ object DownloadRequest {
   case class UnencodedAudioAsset(cacheKey: CacheKey, name: Option[String]) extends DownloadRequest
 
   case class External(cacheKey: CacheKey, uri: URI) extends ExternalAssetRequest {
-    override def request: Request[Unit] = Request[Unit](absoluteUri = Some(uri), requiresAuthentication = false)
+    override def request: Request[Unit] = Request[Unit](baseUri = Some(uri), requiresAuthentication = false)
   }
 
   // external asset downloaded from wire proxy, path is relative to our proxy endpoint

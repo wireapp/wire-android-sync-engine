@@ -121,17 +121,15 @@ class ZNetClient(credentials: CredentialsHandler,
         handle.startTime = System.currentTimeMillis()
         ongoing += handle.id -> handle
 
-        val request: Request[_] = handle.request
-
-        val uri = request.resourcePath.map(path => baseUri.buildUpon.encodedPath(path).build).orElse(request.absoluteUri).get
+        val request = handle.request.withBaseUriIfNone(baseUri)
 
         val future =
           if (request.requiresAuthentication) {
             CancellableFuture.lift(auth.currentToken()) flatMap {
-              case Right(token) => client(uri, request.copyWithHeaders(token.headers))
+              case Right(token) => client(request.withHeaders(token.headers))
               case Left(status) => CancellableFuture.successful(Response(status))
             }
-          } else client(uri, request)
+          } else client(request)
 
         handle.httpFuture = Some(future)
 
@@ -227,7 +225,7 @@ object ZNetClient {
   def nextId = handleId.incrementAndGet()
 
   class EmptyAsyncClient(client: Future[ClientWrapper] = ClientWrapper()) extends AsyncClient(wrapper = client) {
-    override def apply(uri: URI, request: Request[_]): CancellableFuture[Response] =
+    override def apply(request: Request[_]): CancellableFuture[Response] =
       CancellableFuture.failed(new Exception("Empty async client"))
   }
 

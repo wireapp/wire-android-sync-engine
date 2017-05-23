@@ -97,7 +97,7 @@ object SpotifyClient {
 
   private def withMarket(u: URI, authenticated: Boolean): URI = if (authenticated) uri(u)(_ :? ("market", "from_token")) else u
 
-  private def get(url: URI, headers: Map[String, String]) = Request[Unit](httpMethod = Request.GetMethod, absoluteUri = Option(url), requiresAuthentication = false, headers = headers)
+  private def get(url: URI, headers: Map[String, String]) = Request[Unit](httpMethod = Request.GetMethod, baseUri = Option(url), requiresAuthentication = false, headers = headers)
 
   object IsPremiumResponse extends SpotifyJsonObjectResponse[Boolean] {
     override def fromJson(implicit js: JSONObject): Option[Boolean] = Some(js.has("product") && js.getString("product") == "premium")

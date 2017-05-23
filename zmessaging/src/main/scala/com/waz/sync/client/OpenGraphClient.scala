@@ -42,7 +42,7 @@ class OpenGraphClient(netClient: ZNetClient) {
         "Cookie" -> cookie.map { case (k, v) => s"$k=$v" } .mkString("; ")
       )
 
-      val req = Request[Unit](Request.HeadMethod, absoluteUri = Some(uri), decoder = Some(ResponseDecoder), requiresAuthentication = false, headers = headers, followRedirect = false)
+      val req = Request[Unit](Request.HeadMethod, baseUri = Some(uri), decoder = Some(ResponseDecoder), requiresAuthentication = false, headers = headers, followRedirect = false)
       netClient(req) flatMap {
         case (Response(SuccessStatus(), StringResponse(_), _) | Response(SuccessStatus(), EmptyResponse, _)) => // this means that ResponseDecoder accepted the content type, we can proceed with GET
           netClient.withErrorHandling("loadOpenGraph", req.copy(httpMethod = Request.GetMethod)) {

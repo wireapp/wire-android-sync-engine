@@ -85,18 +85,18 @@ class LoginClient(client: AsyncClient, backend: BackendConfig) {
 
   def loginNow(userId: AccountId, credentials: Credentials) = {
     debug(s"trying to login: $credentials")
-    val request = Request.Post(loginUri.getPath, loginRequestBody(userId, credentials), timeout = RegistrationClient.timeout)
-    client(loginUri, request) map responseHandler
+    val request = Request.Post(loginUri.getPath, loginRequestBody(userId, credentials), baseUri = Some(URI.parse(backend.baseUrl)), timeout = RegistrationClient.timeout)
+    client(request) map responseHandler
   }
   def accessNow(cookie: Cookie, token: Option[Token]) = {
     val headers = token.fold(Request.EmptyHeaders)(_.headers) ++ cookie.headers
-    val request = Request.Post[Unit](loginUri.getPath, data = EmptyRequestContent, headers = headers, timeout = RegistrationClient.timeout)
-    client(accessUri, request) map responseHandler
+    val request = Request.Post[Unit](AccessPath, data = EmptyRequestContent, baseUri = Some(URI.parse(backend.baseUrl)), headers = headers, timeout = RegistrationClient.timeout)
+    client(request) map responseHandler
   }
 
   def requestVerificationEmail(email: EmailAddress): CancellableFuture[Either[ErrorResponse, Unit]] = {
-    val request = Request.Post(activateSendUri.getPath, JsonContentEncoder(JsonEncoder(_.put("email", email.str))))
-    client(activateSendUri, request) map {
+    val request = Request.Post(ActivateSendPath, JsonContentEncoder(JsonEncoder(_.put("email", email.str))), baseUri = Some(URI.parse(backend.baseUrl)))
+    client(request) map {
       case Response(SuccessHttpStatus(), resp, _) => Right(())
       case Response(_, ErrorResponse(code, msg, label), _) =>
         info(s"requestVerificationEmail failed with error: ($code, $msg, $label)")
@@ -117,9 +117,6 @@ class LoginClient(client: AsyncClient, backend: BackendConfig) {
     case r @ Response(status, _, headers) => Left((headers(RequestId), ErrorResponse(status.status, s"unexpected login response: $r", "")))
   }
 
-  private val loginUri = URI.parse(backend.baseUrl).buildUpon.encodedPath(LoginPath).appendQueryParameter("persist", "true").build
-  private val accessUri = URI.parse(backend.baseUrl).buildUpon.encodedPath(AccessPath).build
-  private val activateSendUri = URI.parse(backend.baseUrl).buildUpon.encodedPath(ActivateSendPath).build
 }
 
 object LoginClient {
@@ -132,6 +129,7 @@ object LoginClient {
   val LoginPath = "/login"
   val AccessPath = "/access"
   val ActivateSendPath = "/activate/send"
+  val loginUri = URI.parse(LoginPath).buildUpon.appendQueryParameter("persist", "true").build
 
   //TODO remove once logout issue is fixed: https://wearezeta.atlassian.net/browse/AN-4816
   val RequestId = "Request-Id"

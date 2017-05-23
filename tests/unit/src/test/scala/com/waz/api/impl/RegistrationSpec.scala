@@ -70,8 +70,9 @@ class RegistrationSpec extends FeatureSpec with Matchers with OptionValues with 
   class MockGlobal extends MockGlobalModule {
 
     override lazy val client: AsyncClient = new AsyncClient(wrapper = TestClientWrapper()) {
-      override def apply(uri: URI, req: Request[_]): CancellableFuture[Response] = {
+      override def apply(req: Request[_]): CancellableFuture[Response] = {
         val body = req.getBody
+        val uri = req.absoluteUri.get
         println(s"uri: $uri, body: $body")
         request = Some((uri, body))
         CancellableFuture.successful(response(request.value))

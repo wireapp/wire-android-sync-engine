@@ -18,7 +18,6 @@
 package com.waz.testutils
 
 import com.waz.threading.CancellableFuture
-import com.waz.utils.wrappers.URI
 import com.waz.znet.{AsyncClient, Request, Response, TestClientWrapper}
 
 import scala.concurrent.duration._
@@ -28,14 +27,14 @@ class UnreliableAsyncClient extends AsyncClient(wrapper = TestClientWrapper()) {
   @volatile var delayInMillis: Long = 200L
   @volatile var failFor: Option[(Regex, String)] = None
 
-  override def apply(uri: URI, request: Request[_]): CancellableFuture[Response] = {
+  override def apply(request: Request[_]): CancellableFuture[Response] = {
     CancellableFuture.delay(delayInMillis.millis) flatMap { _ =>
       val fail = failFor exists { failFor =>
         val (uriRegex, failingMethod) = failFor
-        failingMethod == request.httpMethod && uriRegex.pattern.matcher(uri.toString).matches
+        failingMethod == request.httpMethod && uriRegex.pattern.matcher(request.absoluteUri.toString).matches
       }
       if (fail) CancellableFuture.successful(Response(Response.HttpStatus(500)))
-      else super.apply(uri, request)
+      else super.apply(request)
     }
   }
 }

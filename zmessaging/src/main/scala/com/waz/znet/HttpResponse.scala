@@ -49,7 +49,7 @@ trait HttpResponse {
   def close(): Unit = {}
 }
 
-class KoushiHttpResponse(val res: AsyncHttpResponse) extends HttpResponse {
+class HttpResponseImpl(val res: AsyncHttpResponse) extends HttpResponse {
   override val status: Response.Status = HttpStatus(res.code(), res.message())
   override val body: ResponseContent = EmptyResponse // TODO
   override val headers: Response.Headers = {
@@ -65,30 +65,30 @@ class KoushiHttpResponse(val res: AsyncHttpResponse) extends HttpResponse {
 }
 
 object HttpResponse {
-  def apply(response: AsyncHttpResponse): HttpResponse = new KoushiHttpResponse(response)
+  def apply(response: AsyncHttpResponse): HttpResponse = new HttpResponseImpl(response)
 
   import scala.language.implicitConversions
 
-  implicit def fromKoushi(res: AsyncHttpResponse): HttpResponse = apply(res)
-  implicit def toKoushi(res: HttpResponse): AsyncHttpResponse = res match {
-    case wrapper: KoushiHttpResponse => wrapper.res
+  implicit def wrap(res: AsyncHttpResponse): HttpResponse = apply(res)
+  implicit def unwrap(res: HttpResponse): AsyncHttpResponse = res match {
+    case wrapper: HttpResponseImpl => wrapper.res
     case _ => throw new IllegalArgumentException(s"Expected Koushikdutta's AsyncHttpResponse, but tried to unwrap: $res")
   }
 }
 
 trait ResponseWorker {
-  def processResponse(uri: URI,
+  def processResponse(requestUri: Option[URI],
                       response: HttpResponse,
                       decoder: ResponseBodyDecoder,
                       progressCallback: Option[ProgressCallback],
                       networkActivityCallback: () => Unit): CancellableFuture[Response]
 }
 
-class KoushiResponseWorker extends ResponseWorker {
+class ResponseImplWorker extends ResponseWorker {
   protected implicit val dispatcher = new SerialDispatchQueue(Threading.ThreadPool)
 
   //XXX: has to be executed on Http thread (inside onConnectCompleted), since data callbacks have to be set before this callback completes,
-  override def processResponse(uri: URI,
+  override def processResponse(requestUri: Option[URI],
                                response: HttpResponse,
                                decoder: ResponseBodyDecoder,
                                progressCallback: Option[ProgressCallback],
@@ -97,7 +97,7 @@ class KoushiResponseWorker extends ResponseWorker {
     val contentLength = response.headers("Content-Length").map(_.toInt).getOrElse(-1)
     val contentType = response.headers("Content-Type").getOrElse("")
 
-    debug(s"got connection response for request: $uri, status: '$httpStatus', length: '$contentLength', type: '$contentType'")
+    debug(s"got connection response for $requestUri, status: '$httpStatus', length: '$contentLength', type: '$contentType'")
 
     progressCallback foreach (_(ProgressIndicator.ProgressData(0L, contentLength, api.ProgressIndicator.State.RUNNING)))
     if (contentLength == 0) {
@@ -118,7 +118,7 @@ class KoushiResponseWorker extends ResponseWorker {
               Success(Response(httpStatus, body, response.headers))
             case Failure(t) =>
               progressCallback foreach { cb => Future(cb(ProgressIndicator.ProgressData(0, contentLength, api.ProgressIndicator.State.FAILED))) }
-              Success(Response(Response.InternalError(s"Response body consumer failed for request: '$uri'", Some(t), Some(httpStatus))))
+              Success(Response(Response.InternalError(s"Response body consumer failed for request: '$requestUri'", Some(t), Some(httpStatus))))
           }
         )
       }
@@ -136,7 +136,7 @@ class KoushiResponseWorker extends ResponseWorker {
           state match {
             case Done =>
               // consumer doesn't need any more data, we can stop receiving and report success
-              debug(s"consumer [$consumer] returned Done, finishing response processing for: $uri")
+              debug(s"consumer [$consumer] returned Done, finishing response processing for: $requestUri")
               onComplete(null)
               response.close()
             case _ => // ignore
@@ -146,8 +146,8 @@ class KoushiResponseWorker extends ResponseWorker {
 
       response.setEndCallback(new CompletedCallback {
         override def onCompleted(ex: Exception): Unit = {
-          debug(s"response for $uri ENDED, ex: $ex, p.isCompleted: ${p.isCompleted}")
-          Option(ex) foreach { error(s"response for $uri failed", _) }
+          debug(s"response for $requestUri ENDED, ex: $ex, p.isCompleted: ${p.isCompleted}")
+          Option(ex) foreach { error(s"response for $requestUri failed", _) }
           networkActivityCallback()
           onComplete(ex)
         }
@@ -155,7 +155,7 @@ class KoushiResponseWorker extends ResponseWorker {
 
       new CancellableFuture(p) {
         override def cancel()(implicit tag: LogTag): Boolean = {
-          debug(s"cancelling response processing for: $uri")(tag)
+          debug(s"cancelling response processing for: $requestUri")(tag)
           response.setDataCallback(new NullDataCallback)
           response.setEndCallback(new NullCompletedCallback)
           response.close()

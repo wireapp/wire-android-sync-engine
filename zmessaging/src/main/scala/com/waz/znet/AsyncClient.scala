@@ -28,7 +28,6 @@ import com.waz.ZLog.ImplicitTag._
 import com.waz.threading.CancellableFuture.CancelException
 import com.waz.threading.{CancellableFuture, SerialDispatchQueue, Threading}
 import com.waz.utils.returning
-import com.waz.utils.wrappers.URI
 import com.waz.znet.ContentEncoder.MultipartRequestContent
 import com.waz.znet.Response.{DefaultResponseBodyDecoder, ResponseBodyDecoder}
 
@@ -39,16 +38,16 @@ import scala.util.control.NonFatal
 class AsyncClient(bodyDecoder: ResponseBodyDecoder = DefaultResponseBodyDecoder,
                   val userAgent: String = AsyncClient.userAgent(),
                   val wrapper: Future[ClientWrapper] = ClientWrapper(),
-                  requestWorker: RequestWorker = new KoushiRequestWorker,
-                  responseWorker: ResponseWorker = new KoushiResponseWorker
+                  requestWorker: RequestWorker = new HttpRequestImplWorker,
+                  responseWorker: ResponseWorker = new ResponseImplWorker
                  ) {
   import AsyncClient._
 
   protected implicit val dispatcher = new SerialDispatchQueue(Threading.ThreadPool)
 
-  def apply(uri: URI, request: Request[_]): CancellableFuture[Response] = {
+  def apply(request: Request[_]): CancellableFuture[Response] = {
     val body = request.getBody
-    debug(s"Starting request[${request.httpMethod}]($uri) with body: '${if (body.toString.contains("password")) "<body>" else body}', headers: '${request.headers}'")
+    debug(s"Starting request[${request.httpMethod}](${request.absoluteUri}) with body: '${if (body.toString.contains("password")) "<body>" else body}', headers: '${request.headers}'")
 
     val requestTimeout = if (request.httpMethod != Request.PostMethod) request.timeout else body match {
       case _: MultipartRequestContent => MultipartPostTimeout
@@ -63,18 +62,19 @@ class AsyncClient(bodyDecoder: ResponseBodyDecoder = DefaultResponseBodyDecoder,
       @volatile var timeoutForPhase = requestTimeout
       val interval = 5.seconds min request.timeout
 
-      val requestBuilt = requestWorker.processRequest(uri, request.httpMethod, body, request.headers, request.followRedirect, timeoutForPhase)
+      val requestBuilt = requestWorker.processRequest(request.withTimeout(timeoutForPhase))
 
       val httpFuture = client.execute(requestBuilt, new HttpConnectCallback {
         override def onConnectCompleted(ex: Exception, response: AsyncHttpResponse): Unit = {
-          debug(s"Connect completed for uri: '$uri', ex: '$ex', cancelled: $cancelled")
+          debug(s"Connect completed for uri: '${request.absoluteUri}', ex: '$ex', cancelled: $cancelled")
           timeoutForPhase = request.timeout
 
           if (ex != null) {
             p.tryFailure(if (cancelled) CancellableFuture.DefaultCancelException else ex)
           } else {
             val networkActivityCallback = () => lastNetworkActivity = System.currentTimeMillis
-            val future = responseWorker.processResponse(uri, response, request.decoder.getOrElse(bodyDecoder), request.downloadCallback, networkActivityCallback)
+            debug(s"got connection response for request: ${request.absoluteUri}")
+            val future = responseWorker.processResponse(request.absoluteUri, response, request.decoder.getOrElse(bodyDecoder), request.downloadCallback, networkActivityCallback)
             p.tryCompleteWith(future)
 
             // XXX: order is important here, we first set processFuture and then check cancelled to avoid race condition in cancel callback
@@ -87,11 +87,9 @@ class AsyncClient(bodyDecoder: ResponseBodyDecoder = DefaultResponseBodyDecoder,
         }
       })
 
-      val httpFuture = client.execute(request, callback)
-
       returning(new CancellableFuture(p) {
         override def cancel()(implicit tag: LogTag): Boolean = {
-          debug(s"cancelling request for $uri")(tag)
+          debug(s"cancelling request for ${request.absoluteUri}")(tag)
           cancelled = true
           httpFuture.cancel()(tag)
           processFuture.foreach(_.cancel()(tag))

@@ -33,7 +33,7 @@ trait HttpRequest {
   def timeout: FiniteDuration
 }
 
-class KoushiHttpRequest(val req: AsyncHttpRequest) extends HttpRequest {
+class HttpRequestImpl(val req: AsyncHttpRequest) extends HttpRequest {
   override val absoluteUri: Option[URI] = Some(new AndroidURI(req.getUri()))
   override val httpMethod: String = req.getMethod()
   override val getBody: RequestContent = EmptyRequestContent // TODO
@@ -48,30 +48,26 @@ class KoushiHttpRequest(val req: AsyncHttpRequest) extends HttpRequest {
 object HttpRequest {
   import scala.language.implicitConversions
 
-  def apply(req: AsyncHttpRequest): HttpRequest = new KoushiHttpRequest(req)
+  def apply(req: AsyncHttpRequest): HttpRequest = new HttpRequestImpl(req)
 
-  implicit def fromKoushi(req: AsyncHttpRequest): HttpRequest = apply(req)
-  implicit def toKoushi(req: HttpRequest): AsyncHttpRequest = req match {
-    case wrapper: KoushiHttpRequest => wrapper.req
-    case _ => throw new IllegalArgumentException(s"Expected Koushikdutta's AsyncHttpRequest, but tried to unwrap: $req")
+  implicit def wrap(req: AsyncHttpRequest): HttpRequest = apply(req)
+  implicit def unwrap(req: HttpRequest): AsyncHttpRequest = req match {
+    case wrapper: HttpRequestImpl => wrapper.req
+    case _ => throw new IllegalArgumentException(s"Expected AsyncHttpRequest, but tried to unwrap: $req")
   }
 }
 
 trait RequestWorker {
-  def processRequest(uri: URI, method: String, body: RequestContent, headers: Map[String, String], followRedirect: Boolean, timeout: FiniteDuration): HttpRequest
-
-  def processRequest(uri: URI, req: HttpRequest): HttpRequest = processRequest(uri, req.httpMethod, req.getBody, req.headers, req.followRedirect, req.timeout)
-  def processRequest(req: HttpRequest): HttpRequest =
-    processRequest(req.absoluteUri.getOrElse(throw new IllegalArgumentException("URI not specified")), req)
+  def processRequest(request: HttpRequest): HttpRequest
 }
 
-class KoushiRequestWorker extends RequestWorker {
-  override def processRequest(uri: URI, method: String, body: RequestContent, headers: Map[String, String], followRedirect: Boolean, timeout: FiniteDuration): HttpRequest = {
-    val r = new AsyncHttpRequest(URI.unwrap(uri.normalizeScheme), method)
-    r.setTimeout(timeout.toMillis.toInt)
-    r.setFollowRedirect(followRedirect)
+class HttpRequestImplWorker extends RequestWorker {
+  override def processRequest(request: HttpRequest): HttpRequest = {
+    val r = new AsyncHttpRequest(URI.unwrap(request.absoluteUri.getOrElse(throw new IllegalArgumentException("URI not provided")).normalizeScheme), request.httpMethod)
+    r.setTimeout(request.timeout.toMillis.toInt)
+    r.setFollowRedirect(request.followRedirect)
     r.getHeaders.set(AsyncClient.UserAgentHeader, AsyncClient.userAgent())
-    headers.foreach(p => r.getHeaders.set(p._1, p._2.trim))
-    new KoushiHttpRequest(body(r))
+    request.headers.foreach(p => r.getHeaders.set(p._1, p._2.trim))
+    new HttpRequestImpl(request.getBody.apply(r))
   }
 }

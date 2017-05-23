@@ -26,7 +26,7 @@ class JavaURIBuilder(uriBuilder: JURIBuilder) extends URIBuilder {
   //TODO figure out which methods map best to java.net.URI
   override def appendPath(path: String)                         = new JavaURIBuilder(uriBuilder.setPath(path))
   override def encodedPath(path: String)                        = ???
-  override def appendEncodedPath(path: String)                  = ???
+  override def appendEncodedPath(path: String)                  = new JavaURIBuilder(uriBuilder.setPath(path))
   override def appendQueryParameter(key: String, value: String) = new JavaURIBuilder(uriBuilder.setParameter(key, value))
   override def build                                            = new JavaURI(uriBuilder.build())
 }
