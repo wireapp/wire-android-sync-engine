@@ -173,7 +173,7 @@ class AccountSyncHandler(zms: Signal[ZMessaging], otrClients: OtrClientsSyncHand
     case SyncUser(u)                           => zms.usersSync.syncUsers(u.toSeq: _*)
     case SyncSearchQuery(query)                => zms.usersearchSync.syncSearchQuery(query)
     case SyncRichMedia(messageId)              => zms.richmediaSync.syncRichMedia(messageId)
-    case DeletePushToken(token)                => zms.gcmSync.deleteGcmToken(token)
+    case DeletePushToken(token)                 => zms.gcmSync.deleteGcmToken(token)
     case PostConnection(userId, name, message) => zms.connectionsSync.postConnection(userId, name, message)
     case PostConnectionStatus(userId, status)  => zms.connectionsSync.postConnectionStatus(userId, status)
     case SyncCallState(convId, fresh)          => zms.voicechannelSync.syncCallState(convId, fresh)
