@@ -36,7 +36,6 @@ import org.json.JSONObject
 import scala.collection.JavaConverters._
 import scala.collection.breakOut
 import scala.concurrent.Future
-import scala.util.Try
 
 /**
   * For more information, see: https://firebase.google.com/docs/cloud-messaging/android/receive
@@ -86,27 +85,26 @@ object FCMHandlerService {
     private implicit val dispatcher = new SerialDispatchQueue(name = "FCMHandler")
 
     def handleMessage(data: Map[String, String]): Future[Unit] = {
-
-      data.get(UserKey).map(UserId) match {
-        case Some(intended) if intended != self =>
-          warn(s"received notification for wrong user, ignoring"); Future.successful(())
-        case _ => //If the 'UserKey' field is empty, we need to do a fetch to check if the notification was for us
-          data match {
-            case EncryptedContent(content, mac) =>
-              decryptNotification(content, mac) flatMap {
-                case Some(notification) => addNotificationToProcess(notification.id, Some(notification))
-                case None => Future.successful(())
-              }
-
-            case UnencryptedNotification(notification) =>
+      data match {
+        case CipherNotification(content, mac) =>
+          decryptNotification(content, mac) flatMap {
+            case Some(notification) =>
               addNotificationToProcess(notification.id, Some(notification))
-
-            case LargeNotification(nId) =>
-              warn("Received large notification - need to trigger fetch")
-              addNotificationToProcess(nId)
-
-            case _ => warn(s"Unexpected notification"); Future.successful({})
+            case None =>
+              Future.successful(())
           }
+
+        case PlainNotification(userId, notification) if userId == self =>
+          addNotificationToProcess(notification.id, Some(notification))
+
+        case PlainNotification(_, _) =>
+          warn(s"Received notification for wrong user")
+          Future.successful({})
+
+        case NoticeNotification(nId) =>
+          addNotificationToProcess(nId)
+
+        case _ => warn(s"Unexpected notification"); Future.successful({})
       }
     }
 
@@ -150,29 +148,31 @@ object FCMHandlerService {
   val TypeKey = "type"
   val MacKey = "mac"
 
-  object EncryptedContent {
+  object CipherNotification {
     def unapply(data: Map[String, String]): Option[(Array[Byte], Array[Byte])] =
-      (data.get(UserKey), data.get(TypeKey), data.get(DataKey), data.get(MacKey)) match {
-        case (Some(userId), Some("otr" | "cipher"), Some(content), Some(mac)) =>
-          LoggedTry.local { (Base64.decode(content, Base64.NO_WRAP | Base64.NO_CLOSE), Base64.decode(mac, Base64.NO_WRAP | Base64.NO_CLOSE)) } .toOption
+      (data.get(TypeKey), data.get(DataKey), data.get(MacKey)) match {
+        case (Some("otr" | "cipher"), Some(content), Some(mac)) =>
+          LoggedTry((Base64.decode(content, Base64.NO_WRAP | Base64.NO_CLOSE), Base64.decode(mac, Base64.NO_WRAP | Base64.NO_CLOSE))).toOption
         case _ => None
       }
   }
 
-  object UnencryptedNotification {
-    def unapply(data: Map[String, String]): Option[PushNotification] =
+  object PlainNotification {
+    def unapply(data: Map[String, String]): Option[(UserId, PushNotification)] =
       (data.get(UserKey), data.get(DataKey)) match {
-        case (Some(user), Some(content)) =>
-          LoggedTry.local(PushNotification.NotificationDecoder(new JSONObject(content))).toOption
+        case (Some(userId), Some(content)) => LoggedTry((UserId(userId), PushNotification.NotificationDecoder(new JSONObject(content)))).toOption
         case _ => None
       }
   }
 
-  object LargeNotification {
-    def unapply(data: Map[String, String]): Option[Uid] = data.get(DataKey).flatMap(s => Try(JsonDecoder.decodeUid('id)(new json.JSONObject(s))).toOption)
+  object NoticeNotification {
+    def unapply(data: Map[String, String]): Option[Uid] =
+      (data.get(TypeKey), data.get(DataKey)) match {
+        case (Some("notice"), Some(content)) => LoggedTry(JsonDecoder.decodeUid('id)(new json.JSONObject(content))).toOption
+    }
   }
 
   object DecryptedNotification {
-    def unapply(js: JSONObject): Option[PushNotification] = LoggedTry.local { PushNotification.NotificationDecoder(js.getJSONObject("data")) }.toOption
+    def unapply(js: JSONObject): Option[PushNotification] = LoggedTry(PushNotification.NotificationDecoder(js.getJSONObject("data"))).toOption
   }
 }

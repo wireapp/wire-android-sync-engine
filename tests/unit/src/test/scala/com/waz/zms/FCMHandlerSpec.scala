@@ -26,8 +26,13 @@ import com.waz.service.push.PushService
 import com.waz.specs.AndroidFreeSpec
 import com.waz.sync.SyncServiceHandle
 import com.waz.utils.events.Signal
+import com.waz.utils.returning
 import com.waz.zms.FCMHandlerService.FCMHandler
+import org.json
+import org.json.JSONObject
 import org.threeten.bp.Instant
+
+import scala.concurrent.Future
 
 class FCMHandlerSpec extends AndroidFreeSpec {
 
@@ -50,7 +55,7 @@ class FCMHandlerSpec extends AndroidFreeSpec {
 
     scenario("Handle regular, non encrypted FCM message when app is in background") {
       val notId = Uid()
-      val fcm = fcmPayload(id = notId)
+      val fcm = plainPayload(id = notId)
 
       val handler = initHandler
       handler.handleMessage(fcm)
@@ -58,7 +63,7 @@ class FCMHandlerSpec extends AndroidFreeSpec {
     }
 
     scenario("Ignore notifications with different intended user id") {
-      val fcm = fcmPayload(intended = UserId())
+      val fcm = plainPayload(intended = UserId())
 
       val handler = initHandler
       handler.handleMessage(fcm)
@@ -66,45 +71,65 @@ class FCMHandlerSpec extends AndroidFreeSpec {
       awaitAllTasks
       result(cloudNotsToHandle.filter(_.isEmpty).head)
     }
+
+
+    scenario("Decrypt cipher notification") {
+
+      val notId = Uid()
+      val fcm = cipherPayload()
+
+      val decryptedValue = returning(new json.JSONObject())(o => o.put("data", new json.JSONObject(payload(id = notId))))
+
+      (otrService.decryptGcm _).expects(*, *).once().returning(Future.successful(Some(decryptedValue)))
+
+      val handler = initHandler
+      handler.handleMessage(fcm)
+      result(cloudNotsToHandle.filter(_.contains(notId)).head)
+
+    }
   }
 
-  def fcmPayload(sender:    ClientId = ClientId(),
-                 recipient: ClientId = ClientId(),
-                 text:      String   = "",
-                 from:      UserId   = UserId(),
-                 time:      Instant  = Instant.now(),
-                 conv:      ConvId   = ConvId(),
-                 id:        Uid      = Uid(),
-                //TODO would be nice to have event names encoded in Event subclasses themselves
-                 eventTpe:  String   = "conversation.otr-message-add",
-                 tpe:       FCMType  = Plain,
-                 intended:  UserId   = self) =
+  def plainPayload(intended: UserId = self, id: Uid = Uid()) =
     Map(
-      "type" -> tpe.str,
+      "type" -> "plain",
       "user" -> intended.str,
-      "data" -> s"""
-                   |{
-                   |  "payload":
-                   |    [{"data": {
-                   |        "sender":"${sender.str}",
-                   |        "recipient":"$recipient.str}",
-                   |        "text":"$text"
-                   |    },
-                   |    "from":"${from.str}",
-                   |    "time":"${time.toString}",
-                   |    "type":"$eventTpe",
-                   |    "conversation":"${conv.str}"
-                   |  }],
-                   |  "transient":false,
-                   |  "id":"${id.str}"
-                   |}
-      """.stripMargin
-  )
+      "data" -> payload(id = id)
+    )
 
-  trait FCMType {
-    val str: String
-  }
-  object Plain extends FCMType { val str = "plain" }
+  def payload(sender:    ClientId = ClientId(),
+              recipient: ClientId = ClientId(),
+              text:      String   = "",
+              from:      UserId   = UserId(),
+              time:      Instant  = Instant.now(),
+              conv:      ConvId   = ConvId(),
+              id:        Uid      = Uid(),
+              //TODO would be nice to have event names encoded in Event subclasses themselves
+              eventTpe:  String   = "conversation.otr-message-add") =
+    s"""
+       |{
+       |  "payload":
+       |    [{"data": {
+       |        "sender":"${sender.str}",
+       |        "recipient":"$recipient.str}",
+       |        "text":"$text"
+       |    },
+       |    "from":"${from.str}",
+       |    "time":"${time.toString}",
+       |    "type":"$eventTpe",
+       |    "conversation":"${conv.str}"
+       |  }],
+       |  "transient":false,
+       |  "id":"${id.str}"
+       |}
+      """.stripMargin
+
+
+  def cipherPayload() =
+    Map(
+      "type" -> "cipher",
+      "mac"  -> "abcd",
+      "data" -> "abcd"
+    )
 
 
   def initHandler = {
