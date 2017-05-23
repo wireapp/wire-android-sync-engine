@@ -102,38 +102,7 @@ object UserInfo {
       UserInfo(id, 'name, accentId, 'email, 'phone, Some(pic), decodeOptString('tracking_id) map (TrackingId(_)), deleted = 'deleted, handle = 'handle, privateMode = privateMode)
     }
   }
-
-  def encodePicture(assets: Seq[AssetData]): JSONArray = {
-
-    val medium = assets.collectFirst { case a@AssetData.IsImageWithTag(Medium) => a }
-    val arr = new json.JSONArray()
-      assets.collect {
-        case a@AssetData.IsImage() =>
-          val tag = a.tag match {
-            case Preview => "smallProfile"
-            case Medium => "medium"
-            case _ => ""
-          }
-          JsonEncoder { o =>
-            o.put("id", a.v2ProfileId.map(_.str).getOrElse(""))
-            o.put("content_type", a.mime.str)
-            o.put("content_length", a.size)
-            o.put("info", JsonEncoder { info =>
-              info.put("tag", tag)
-              info.put("width", a.width)
-              info.put("height", a.height)
-              info.put("original_width", medium.map(_.width).getOrElse(a.width))
-              info.put("original_height", medium.map(_.height).getOrElse(a.height))
-              info.put("correlation_id", medium.map(_.id.str).getOrElse(a.id.str))
-              info.put("nonce", a.id.str)
-              info.put("public", true)
-            })
-          }
-      }.foreach(arr.put)
-    arr
-  }
-
-
+  
   def encodeAsset(assets: Seq[AssetData]): JSONArray = {
     val arr = new json.JSONArray()
     assets.collect {
@@ -161,7 +130,6 @@ object UserInfo {
       info.accentId.foreach(o.put("accent_id", _))
       info.trackingId.foreach(id => o.put("tracking_id", id.str))
       info.picture.foreach(ps => o.put("assets", encodeAsset(ps)))
-      info.picture.foreach(ps => o.put("picture", encodePicture(ps)))
     }
   }
 
@@ -170,7 +138,6 @@ object UserInfo {
       info.name.foreach(o.put("name", _))
       info.accentId.foreach(o.put("accent_id", _))
       info.picture.foreach(ps => o.put("assets", encodeAsset(ps)))
-      info.picture.foreach(ps => o.put("picture", encodePicture(ps)))
     }
   }
 }

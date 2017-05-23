@@ -89,19 +89,24 @@ case class UserData(
     }
   )
 
-  def updated(name: Option[String] = None, email: Option[EmailAddress] = None, phone: Option[PhoneNumber] = None, accent: Option[AccentColor] = None, picture: Option[AssetId] = None, trackingId: Option[String] = None, handle: Option[Handle] = None): UserData =
-    copy(
-      name = name.getOrElse(this.name),
-      email = email.orElse(this.email),
-      phone = phone.orElse(this.phone),
-      accent = accent.fold(this.accent)(_.id),
-      picture = picture.orElse(this.picture),
-      searchKey = SearchKey(name.getOrElse(this.name)),
-      handle = handle match {
-        case Some(h) if !h.toString.isEmpty => Some(h)
-        case _ => this.handle
-      }
-    )
+  def updated(name: Option[String] = None,
+              email: Option[EmailAddress] = None,
+              phone: Option[PhoneNumber] = None,
+              accent: Option[AccentColor] = None,
+              picture: Option[AssetId] = None,
+              trackingId: Option[String] = None,
+              handle: Option[Handle] = None): UserData = copy(
+    name = name.getOrElse(this.name),
+    email = email.orElse(this.email),
+    phone = phone.orElse(this.phone),
+    accent = accent.fold(this.accent)(_.id),
+    picture = picture.orElse(this.picture),
+    searchKey = SearchKey(name.getOrElse(this.name)),
+    handle = handle match {
+      case Some(h) if !h.toString.isEmpty => Some(h)
+      case _ => this.handle
+    }
+  )
 
   def updateConnectionStatus(status: UserData.ConnectionStatus, time: Option[Date] = None, message: Option[String] = None): UserData = {
     if (time.exists(_.before(this.connectionLastUpdated))) this
