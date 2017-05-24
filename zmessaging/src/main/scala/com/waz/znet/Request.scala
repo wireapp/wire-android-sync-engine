@@ -67,6 +67,7 @@ case class Request[A: ContentEncoder](
     case Some(uri) => Some(resourcePath.map(path => uri.buildUpon.appendEncodedPath(path).build).getOrElse(uri))
     case None => None
   }
+
 }
 
 object Request {

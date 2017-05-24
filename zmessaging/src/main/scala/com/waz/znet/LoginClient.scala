@@ -85,6 +85,7 @@ class LoginClient(client: AsyncClient, backend: BackendConfig) {
 
   def loginNow(userId: AccountId, credentials: Credentials) = {
     debug(s"trying to login: $credentials")
+
     val request = Request.Post(loginUri.getPath, loginRequestBody(userId, credentials), baseUri = Some(URI.parse(backend.baseUrl)), timeout = RegistrationClient.timeout)
     client(request) map responseHandler
   }

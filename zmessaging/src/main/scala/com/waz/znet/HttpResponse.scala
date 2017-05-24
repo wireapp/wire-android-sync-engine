@@ -98,7 +98,6 @@ class ResponseImplWorker extends ResponseWorker {
     val contentType = response.headers("Content-Type").getOrElse("")
 
     debug(s"got connection response for $requestUri, status: '$httpStatus', length: '$contentLength', type: '$contentType'")
-
     progressCallback foreach (_(ProgressIndicator.ProgressData(0L, contentLength, api.ProgressIndicator.State.RUNNING)))
     if (contentLength == 0) {
       progressCallback foreach { cb => Future(cb(ProgressIndicator.ProgressData(0, 0, api.ProgressIndicator.State.COMPLETED))) }

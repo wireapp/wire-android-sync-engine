@@ -34,6 +34,7 @@ import com.waz.specs.AndroidFreeSpec
 import com.waz.threading.{CancellableFuture, SerialDispatchQueue}
 import com.waz.utils.{IoUtils, Json}
 import com.waz.utils.wrappers.URI
+
 import com.waz.znet.ContentEncoder.{GzippedRequestContent, JsonContentEncoder, MultipartRequestContent, StreamRequestContent}
 import com.waz.znet.Response.{DefaultResponseBodyDecoder, HttpStatus, SuccessHttpStatus}
 import org.json.JSONObject
@@ -43,6 +44,7 @@ import com.waz.threading.CancellableFuture.CancelException
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future, Promise, TimeoutException}
 import scala.util.Random
+import org.scalatest._
 
 class AsyncClientSpec extends AndroidFreeSpec {
   implicit lazy val dispatcher = new SerialDispatchQueue
@@ -102,7 +104,6 @@ class AsyncClientSpec extends AndroidFreeSpec {
   }
 
   private val uriRegex = """.*(get|post)/(json|multi)*[_]*(empty|json)(\d+)""".r
-
   private val jsonRequest = """{"key": "value"}"""
   private val okJsonResponse = """{"result": "ok"}"""
   private val penguinData = "some penguin data"
@@ -367,7 +368,6 @@ class AsyncClientSpec extends AndroidFreeSpec {
 
     scenario("Send gzipped json request") {
       val obj = Json((1 to 100).map(i => s"key_$i" -> Seq.tabulate(i)(identity).mkString(",")).toMap)
-
       val path = "/post/gzipped"
       val future = client(Request.Post(path, GzippedRequestContent(obj.toString.getBytes("utf8"), "application/json"), baseUri = Some(URI.parse("http://localhost")), timeout = AsyncClient.DefaultTimeout))
       Await.result(future, AsyncClient.DefaultTimeout) match {
@@ -379,7 +379,6 @@ class AsyncClientSpec extends AndroidFreeSpec {
   }
 
   feature("Network inactivity timeout") {
-
     val baseUri = Some(URI.parse("http://meep.me"))
     lazy val mockedResponse = new FakeHttpResponse(200, "", completeOnSet = false)
 
@@ -473,7 +472,6 @@ class AsyncClientSpec extends AndroidFreeSpec {
     scenario("JSON POST, connect (incl. sending of request) is very slow") {
       a[TimeoutException] should be thrownBy doPost("/post/json_json200", jsonObject, false, 2.seconds, 10.seconds, client = clientWithDelay)
     }
-
   }
 
 }

@@ -76,7 +76,6 @@ class WebSocketClientSpec extends FeatureSpec with Matchers with ProvisionedSuit
 
     scenario("Receive name change update") {
       val latch = new CountDownLatch(1)
-      
       val manager = new WebSocketClient(context, asyncClient, Uri.parse(backend.websocketUrl), auth)
       import EventContext.Implicits.global
       manager.onMessage {
