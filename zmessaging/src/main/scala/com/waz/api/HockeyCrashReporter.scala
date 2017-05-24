@@ -34,9 +34,11 @@ object HockeyCrashReporter {
   import Threading.Implicits.Background
 
   def uploadCrashReport(hockeyId: String, dump: File, log: File) = {
-    val url = s"https://rink.hockeyapp.net/api/2/apps/$hockeyId/crashes/upload"
+    val baseUri = URI.parse("https://rink.hockeyapp.net")
+    val path = s"/api/2/apps/$hockeyId/crashes/upload"
 
-    ZMessaging.currentGlobal.client(URI.parse(url), Request.PostMethod, MultipartRequestContent(Seq("attachment0" -> dump, "log" -> log)), timeout = 1.minute) map {
+    val request = Request.Post(path, MultipartRequestContent(Seq("attachment0" -> dump, "log" -> log)), baseUri = Some(baseUri), timeout = 1.minute)
+    ZMessaging.currentGlobal.client(request) map {
       case Response(SuccessHttpStatus(), _, _) => verbose("crash report successfully sent")
       case resp => error(s"Unexpected response from hockey crash report request: $resp")
     } map { _ =>

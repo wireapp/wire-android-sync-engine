@@ -31,7 +31,6 @@ import com.waz.znet.AuthenticationManager._
 import com.waz.znet.ContentEncoder.{EmptyRequestContent, JsonContentEncoder}
 import com.waz.znet.Response.{Status, SuccessHttpStatus}
 import com.waz.utils.wrappers.URI
-
 import org.json.JSONObject
 
 import scala.concurrent.duration._
@@ -86,15 +85,19 @@ class LoginClient(client: AsyncClient, backend: BackendConfig) {
 
   def loginNow(userId: AccountId, credentials: Credentials) = {
     debug(s"trying to login: $credentials")
-    client(loginUri, Request.PostMethod, loginRequestBody(userId, credentials), timeout = RegistrationClient.timeout) map responseHandler
+
+    val request = Request.Post(loginUri.getPath, loginRequestBody(userId, credentials), baseUri = Some(URI.parse(backend.baseUrl)), timeout = RegistrationClient.timeout)
+    client(request) map responseHandler
   }
   def accessNow(cookie: Cookie, token: Option[Token]) = {
     val headers = token.fold(Request.EmptyHeaders)(_.headers) ++ cookie.headers
-    client(accessUri, Request.PostMethod, EmptyRequestContent, headers, timeout = RegistrationClient.timeout) map responseHandler
+    val request = Request.Post[Unit](AccessPath, data = EmptyRequestContent, baseUri = Some(URI.parse(backend.baseUrl)), headers = headers, timeout = RegistrationClient.timeout)
+    client(request) map responseHandler
   }
 
   def requestVerificationEmail(email: EmailAddress): CancellableFuture[Either[ErrorResponse, Unit]] = {
-    client(activateSendUri, Request.PostMethod, JsonContentEncoder(JsonEncoder(_.put("email", email.str)))) map {
+    val request = Request.Post(ActivateSendPath, JsonContentEncoder(JsonEncoder(_.put("email", email.str))), baseUri = Some(URI.parse(backend.baseUrl)))
+    client(request) map {
       case Response(SuccessHttpStatus(), resp, _) => Right(())
       case Response(_, ErrorResponse(code, msg, label), _) =>
         info(s"requestVerificationEmail failed with error: ($code, $msg, $label)")
@@ -115,9 +118,6 @@ class LoginClient(client: AsyncClient, backend: BackendConfig) {
     case r @ Response(status, _, headers) => Left((headers(RequestId), ErrorResponse(status.status, s"unexpected login response: $r", "")))
   }
 
-  private val loginUri = URI.parse(backend.baseUrl).buildUpon.encodedPath(LoginPath).appendQueryParameter("persist", "true").build
-  private val accessUri = URI.parse(backend.baseUrl).buildUpon.encodedPath(AccessPath).build
-  private val activateSendUri = URI.parse(backend.baseUrl).buildUpon.encodedPath(ActivateSendPath).build
 }
 
 object LoginClient {
@@ -130,6 +130,7 @@ object LoginClient {
   val LoginPath = "/login"
   val AccessPath = "/access"
   val ActivateSendPath = "/activate/send"
+  val loginUri = URI.parse(LoginPath).buildUpon.appendQueryParameter("persist", "true").build
 
   //TODO remove once logout issue is fixed: https://wearezeta.atlassian.net/browse/AN-4816
   val RequestId = "Request-Id"

@@ -40,7 +40,7 @@ import scala.concurrent.duration._
 case class Request[A: ContentEncoder](
       httpMethod: String = Request.GetMethod,
       resourcePath: Option[String] = None,
-      absoluteUri: Option[URI] = None,
+      baseUri: Option[URI] = None,
       data: Option[A] = None,
       decoder: Option[ResponseBodyDecoder] = None,
       uploadCallback: Option[ProgressCallback] = None,
@@ -50,13 +50,24 @@ case class Request[A: ContentEncoder](
       retryPolicy: RetryPolicy = RetryPolicy.NeverRetry,
       followRedirect: Boolean = true,
       timeout: FiniteDuration = AsyncClient.DefaultTimeout
-) {
+) extends HttpRequest {
 
   assert(uploadCallback.isEmpty, "uploadCallback is not supported yet") //TODO
 
-  require(resourcePath.isDefined || absoluteUri.isDefined, "Either resourcePath or absoluteUri has to be specified")
+  require(resourcePath.isDefined || baseUri.isDefined, "Either resourcePath or baseUri has to be specified")
 
   def getBody = data.map(implicitly[ContentEncoder[A]].apply).getOrElse(EmptyRequestContent)
+
+  def withHeaders(headers: Map[String, String]) = copy[A](headers = this.headers ++ headers)
+  def withTimeout(timeout: FiniteDuration) = copy[A](timeout = timeout)
+  def withBaseUri(uri: URI) = copy[A](baseUri = Option(uri))
+  def withBaseUriIfNone(uri: URI) = baseUri.map(_ => this).getOrElse(withBaseUri(uri))
+
+  override lazy val absoluteUri: Option[URI] = baseUri match {
+    case Some(uri) => Some(resourcePath.map(path => uri.buildUpon.appendEncodedPath(path).build).getOrElse(uri))
+    case None => None
+  }
+
 }
 
 object Request {
@@ -70,20 +81,50 @@ object Request {
 
   val EmptyHeaders = Map[String, String]()
 
-  def Post[A: ContentEncoder](path: String, data: A, uploadCallback: Option[ProgressCallback] = None, requiresAuthentication: Boolean = true, headers: Map[String, String] = EmptyHeaders, timeout: FiniteDuration = AsyncClient.DefaultTimeout) =
-    Request[A](PostMethod, Some(path), data = Some(data), uploadCallback = uploadCallback, requiresAuthentication = requiresAuthentication, headers = headers, timeout = timeout)
+  def Post[A: ContentEncoder](path: String,
+                              data: A,
+                              baseUri: Option[URI] = None,
+                              uploadCallback: Option[ProgressCallback] = None,
+                              requiresAuthentication: Boolean = true,
+                              headers: Map[String, String] = EmptyHeaders,
+                              timeout: FiniteDuration = AsyncClient.DefaultTimeout) =
+    Request[A](PostMethod, resourcePath = Some(path), baseUri = baseUri, data = Some(data),
+               uploadCallback = uploadCallback, requiresAuthentication = requiresAuthentication,
+               headers = headers, timeout = timeout)
 
-  def Put[A: ContentEncoder](path: String, data: A, uploadCallback: Option[ProgressCallback] = None, requiresAuthentication: Boolean = true, headers: Map[String, String] = EmptyHeaders) =
-    Request[A](PutMethod, Some(path), data = Some(data), uploadCallback = uploadCallback, requiresAuthentication = requiresAuthentication, headers = headers)
+  def Put[A: ContentEncoder](path: String,
+                             data: A,
+                             baseUri: Option[URI] = None,
+                             uploadCallback: Option[ProgressCallback] = None,
+                             requiresAuthentication: Boolean = true,
+                             headers: Map[String, String] = EmptyHeaders) =
+    Request[A](PutMethod, resourcePath = Some(path), baseUri = baseUri, data = Some(data),
+               uploadCallback = uploadCallback, requiresAuthentication = requiresAuthentication,
+               headers = headers)
 
-  def Delete[A: ContentEncoder](path: String, data: Option[A] = None, requiresAuthentication: Boolean = true, headers: Map[String, String] = EmptyHeaders) =
-    Request[A](DeleteMethod, Some(path), data = data, requiresAuthentication = requiresAuthentication, headers = headers)
+  def Delete[A: ContentEncoder](path: String,
+                                data: Option[A] = None,
+                                baseUri: Option[URI] = None,
+                                requiresAuthentication: Boolean = true,
+                                headers: Map[String, String] = EmptyHeaders) =
+    Request[A](DeleteMethod, resourcePath = Some(path), baseUri = baseUri, data = data, requiresAuthentication = requiresAuthentication, headers = headers)
 
-  def Get(path: String, downloadCallback: Option[ProgressCallback] = None, requiresAuthentication: Boolean = true, headers: Map[String, String] = EmptyHeaders) =
-    Request[Unit](GetMethod, Some(path), downloadCallback = downloadCallback, requiresAuthentication = requiresAuthentication, headers = headers)(EmptyContentEncoder)
+  def Get(path: String,
+          baseUri: Option[URI] = None,
+          downloadCallback: Option[ProgressCallback] = None,
+          requiresAuthentication: Boolean = true,
+          headers: Map[String, String] = EmptyHeaders,
+          timeout: FiniteDuration = AsyncClient.DefaultTimeout) =
+    Request[Unit](GetMethod, resourcePath = Some(path), baseUri = baseUri, downloadCallback = downloadCallback,
+                  requiresAuthentication = requiresAuthentication, headers = headers, timeout = timeout)(EmptyContentEncoder)
 
-  def Head(path: String, downloadCallback: Option[ProgressCallback] = None, requiresAuthentication: Boolean = true, headers: Map[String, String] = EmptyHeaders) =
-    Request[Unit](HeadMethod, Some(path), downloadCallback = downloadCallback, requiresAuthentication = requiresAuthentication, headers = headers)(EmptyContentEncoder)
+  def Head(path: String,
+           baseUri: Option[URI] = None,
+           downloadCallback: Option[ProgressCallback] = None,
+           requiresAuthentication: Boolean = true,
+           headers: Map[String, String] = EmptyHeaders) =
+    Request[Unit](HeadMethod, resourcePath = Some(path), baseUri = baseUri, downloadCallback = downloadCallback,
+                  requiresAuthentication = requiresAuthentication, headers = headers)(EmptyContentEncoder)
 
   def query(path: String, args: (String, Any)*): String = {
     args map {
@@ -207,6 +248,10 @@ object ContentEncoder {
 
   implicit object GzippedContentEncoder extends ContentEncoder[GzippedRequestContent] {
     override def apply(data: GzippedRequestContent) = data
+  }
+
+  implicit object StreamedContentEncoder extends ContentEncoder[StreamRequestContent] {
+    override def apply(data: StreamRequestContent) = data
   }
 
   implicit object EmptyContentEncoder extends ContentEncoder[Unit] {

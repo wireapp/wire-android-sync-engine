@@ -22,7 +22,6 @@ import com.koushikdutta.async.callback.DataCallback
 import com.koushikdutta.async.http._
 import com.koushikdutta.async.http.AsyncHttpClient.{StringCallback, WebSocketConnectCallback}
 import com.waz.utils.{IoUtils, returning}
-import com.waz.utils.wrappers.URI
 import com.waz.znet.ContentEncoder.{BinaryRequestContent, StreamRequestContent}
 import com.waz.znet.Response.HttpStatus
 import org.scalatest.{BeforeAndAfter, FeatureSpecLike, Matchers, RobolectricTests}
@@ -30,6 +29,8 @@ import java.io.{File, FileInputStream}
 import java.util.concurrent.{CountDownLatch, TimeUnit}
 
 import com.waz.testutils.DefaultPatienceConfig
+import com.waz.utils.events.EventContext
+import com.waz.utils.wrappers.URI
 import org.scalatest.concurrent.ScalaFutures
 
 import scala.concurrent.Await
@@ -41,7 +42,7 @@ class AsyncClientWebSpec extends FeatureSpecLike with Matchers with BeforeAndAft
   var cl: AsyncHttpClient = _
 
   before {
-    client = new AsyncClient(wrapper = TestClientWrapper)
+    client = new AsyncClient(wrapper = TestClientWrapper())
   }
 
   after {
@@ -52,11 +53,15 @@ class AsyncClientWebSpec extends FeatureSpecLike with Matchers with BeforeAndAft
   val NullStringCallback = new StringCallback {
     override def onCompleted(p1: Exception, p2: AsyncHttpResponse, p3: String): Unit = {}
   }
-  
+
+  private def uriOpt(url: String) = Option(URI.parse(url))
+  private def externalRequest(url: String) = Request.Get("").withBaseUri(URI.parse(url))
+
   feature("Get") {
 
     scenario("AsyncHttpClient get https://www.wire.com") {
-      cl = TestClientWrapper(new AsyncHttpClient(new AsyncServer)).futureValue
+      import scala.concurrent.ExecutionContext.Implicits.global
+      cl = TestClientWrapper(new AsyncHttpClient(new AsyncServer)).map(ClientWrapper.toKoushi).futureValue
       val r = new AsyncHttpGet("https://www.wire.com")
       val ret = cl.executeString(r, NullStringCallback)
       println("First request returned: " + ret.get(15, TimeUnit.SECONDS).substring(0, 256))
@@ -67,7 +72,8 @@ class AsyncClientWebSpec extends FeatureSpecLike with Matchers with BeforeAndAft
     }
 
     scenario("AsyncHttpClient https get") {
-      cl = TestClientWrapper(new AsyncHttpClient(new AsyncServer)).futureValue
+      import scala.concurrent.ExecutionContext.Implicits.global
+      cl = TestClientWrapper(new AsyncHttpClient(new AsyncServer)).map(ClientWrapper.toKoushi).futureValue
       @volatile var ex: Exception = null
       val ret = cl.executeString(new AsyncHttpGet("https://www.wire.com/"), new StringCallback() {
         override def onCompleted(e: Exception, source: AsyncHttpResponse, result: String): Unit = {
@@ -79,25 +85,26 @@ class AsyncClientWebSpec extends FeatureSpecLike with Matchers with BeforeAndAft
     }
 
     scenario("GET https from https://wire.com") {
-      Await.result(client(URI.parse("https://www.wire.com"), timeout = AsyncClient.DefaultTimeout), 5.second) match {
+      Await.result(client(externalRequest("https://www.wire.com")), 5.second) match {
         case Response(HttpStatus(200, _), _, _) => //expected
         case res => fail(s"got unexpected response: $res")
       }
 
-      Await.result(client(URI.parse("https://www.wire.com"), timeout = AsyncClient.DefaultTimeout), 5.second) match {
+      Await.result(client(externalRequest("https://www.wire.com")), 5.second) match {
         case Response(HttpStatus(200, _), _, _) => //expected
         case res => fail(s"got unexpected response: $res")
       }
     }
 
     scenario("Get gzipped content from www.gradle.com") {
-      Await.result(client(URI.parse("http://www.gradle.com"), timeout = AsyncClient.DefaultTimeout), 5.second) match {
+      Await.result(client(externalRequest("http://www.gradle.com")), 5.second) match {
         case Response(HttpStatus(200, _), _, _) => //expected
         case res => fail(s"got unexpected response: $res")
       }
     }
+
     scenario("Get gzipped chunked content from www.clockworkmod.com") {
-      Await.result(client(URI.parse("http://www.clockworkmod.com"), timeout = AsyncClient.DefaultTimeout), 5.second) match {
+      Await.result(client(externalRequest("http://www.clockworkmod.com")), 5.second) match {
         case Response(HttpStatus(200, _), _, _) => //expected
         case res => fail(s"got unexpected response: $res")
       }
@@ -109,7 +116,7 @@ class AsyncClientWebSpec extends FeatureSpecLike with Matchers with BeforeAndAft
     scenario("post data") {
       val data = (0 to 100).map("test_" + _).mkString(", ").getBytes("utf8")
 
-      Await.result(client(URI.parse("http://posttestserver.com/post.php"), "POST", new BinaryRequestContent(data, "text/plain"), timeout = AsyncClient.DefaultTimeout), 45.seconds) match {
+      Await.result(client(Request.Post("/post.php", new BinaryRequestContent(data, "text/plain"), baseUri = uriOpt("http://posttestserver.com/post.php"))), 45.seconds) match {
         case Response(HttpStatus(200, _), _, _) => //expected
         case res => fail(s"got unexpected response: $res")
       }
@@ -118,7 +125,7 @@ class AsyncClientWebSpec extends FeatureSpecLike with Matchers with BeforeAndAft
     scenario("post file with len") {
       val file = returning(File.createTempFile("meep", "png"))(_.deleteOnExit())
       IoUtils.copy(getClass.getResourceAsStream("/images/penguin.png"), file)
-      Await.result(client(URI.parse("http://posttestserver.com/post.php"), "POST", new StreamRequestContent(new FileInputStream(file), "image/png", file.length.toInt), timeout = AsyncClient.DefaultTimeout), 45.seconds) match {
+      Await.result(client(Request.Post("/post.php", new StreamRequestContent(new FileInputStream(file), "image/png", file.length.toInt), baseUri = uriOpt("http://posttestserver.com/post.php"))), 45.seconds) match {
         case Response(HttpStatus(200, _), _, _) => //expected
         case res => fail(s"got unexpected response: $res")
       }
@@ -128,7 +135,8 @@ class AsyncClientWebSpec extends FeatureSpecLike with Matchers with BeforeAndAft
   feature("websocket") {
     scenario("Connect to echo server: ws://echo.websocket.org/") {
       val latch = new CountDownLatch(1)
-      cl = Await.result(client.client, 1.second)
+      import scala.concurrent.ExecutionContext.Implicits.global
+      cl = Await.result(client.wrapper.map(ClientWrapper.toKoushi), 1.second)
       cl.websocket(new AsyncHttpGet("https://echo.websocket.org/"), null, new WebSocketConnectCallback {
         override def onCompleted(ex: Exception, ws: WebSocket): Unit = {
           println(s"connected $ex, $ws")

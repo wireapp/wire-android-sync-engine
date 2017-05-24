@@ -36,8 +36,7 @@ import com.waz.utils.events.EventContext
 import com.waz.utils.{IoUtils, Json}
 import com.waz.znet.AuthenticationManager.{Cookie, Token}
 import com.waz.znet.ContentEncoder.{BinaryRequestContent, EmptyRequestContent, RequestContent}
-import com.waz.znet.Request._
-import com.waz.znet.Response.{Headers, HttpStatus, ResponseBodyDecoder}
+import com.waz.znet.Response.{HttpStatus}
 import com.waz.znet._
 import com.waz.{RobolectricUtils, service}
 import org.json.JSONObject
@@ -45,7 +44,6 @@ import org.robolectric.shadows.ShadowLog
 import org.scalatest._
 import org.scalatest.concurrent.ScalaFutures
 import com.waz.ZLog.ImplicitTag._
-import com.waz.content.GlobalPreferences
 import com.waz.content.GlobalPreferences.CurrentAccountPref
 import com.waz.utils.wrappers.URI
 import com.waz.znet.LoginClient.LoginResult
@@ -71,8 +69,10 @@ class RegistrationSpec extends FeatureSpec with Matchers with OptionValues with 
 
   class MockGlobal extends MockGlobalModule {
 
-    override lazy val client: AsyncClient = new AsyncClient(wrapper = TestClientWrapper) {
-      override def apply(uri: URI, method: String, body: RequestContent, headers: Map[String, String], followRedirect: Boolean, timeout: FiniteDuration, decoder: Option[ResponseBodyDecoder], downloadProgressCallback: Option[ProgressCallback] = None): CancellableFuture[Response] = {
+    override lazy val client: AsyncClient = new AsyncClient(wrapper = TestClientWrapper()) {
+      override def apply(req: Request[_]): CancellableFuture[Response] = {
+        val body = req.getBody
+        val uri = req.absoluteUri.get
         println(s"uri: $uri, body: $body")
         request = Some((uri, body))
         CancellableFuture.successful(response(request.value))
@@ -283,7 +283,7 @@ class RegistrationSpec extends FeatureSpec with Matchers with OptionValues with 
         case (ClientsUri(), _) =>
           Response(HttpStatus(200), JsonObjectResponse(Json("id" -> clientId.str)))
         case req @ (uri, BinaryRequestContent(content, "application/json")) if uri.getLastPathSegment == "login" && new JSONObject(new String(content)).getString("password") == "passwd" =>
-          Response(HttpStatus(200), JsonObjectResponse(Json("access_token" -> "token", "expires_in" -> 36000, "token_type" -> "Bearer")), Headers(LoginClient.SetCookie -> "sd-zuid=asd;asd"))
+          Response(HttpStatus(200), JsonObjectResponse(Json("access_token" -> "token", "expires_in" -> 36000, "token_type" -> "Bearer")), Response.createHeaders(LoginClient.SetCookie -> "sd-zuid=asd;asd"))
         case req =>
           Response(HttpStatus(403), JsonObjectResponse(Json("code" -> 403, "message" -> "invalid credentials", "label" -> "")))
       }

@@ -69,8 +69,7 @@ class AssetDownloader(client: AssetClient, cache: CacheService) extends Download
       val headers = wa.remoteData.token.fold(Map.empty[String, String])(t => Map("Asset-Token" -> t.str))
       val decoder = new AssetBodyDecoder(cache, wa.remoteData.otrKey.filter(_ != AESKey.Empty), wa.remoteData.sha256.filter(_ != Sha256.Empty))
       Some(new Request[Unit](Request.GetMethod, path, downloadCallback = Some(callback), decoder = Some(decoder), headers = headers))
-    case req: ExternalAssetRequest =>
-      Some(req.request.copy(downloadCallback = Some(callback), decoder = Some(new AssetBodyDecoder(cache))))
+    case req: ExternalAssetRequest => Some(req.request.copy(downloadCallback = Some(callback), decoder = Some(new AssetBodyDecoder(cache))))
     case LocalAssetRequest(_, _, _, _) => None
     case CachedAssetRequest(_, _, _) => None
   }

@@ -17,72 +17,183 @@
  */
 package com.waz.znet
 
+
 import java.io.{File, PipedInputStream, PipedOutputStream}
 
-import android.os.Build._
-import com.github.tomakehurst.wiremock.WireMockServer
-import com.github.tomakehurst.wiremock.client.WireMock._
-import com.github.tomakehurst.wiremock.core.WireMockConfiguration
 import com.koushikdutta.async.callback.CompletedCallback.NullCompletedCallback
 import com.koushikdutta.async.callback.DataCallback.NullDataCallback
-import com.koushikdutta.async.callback.{CompletedCallback, DataCallback}
-import com.koushikdutta.async.future.{Future, SimpleFuture}
-import com.koushikdutta.async.http.callback.HttpConnectCallback
-import com.koushikdutta.async.http.{AsyncHttpClient, AsyncHttpRequest, AsyncHttpResponse, Headers}
-import com.koushikdutta.async.{AsyncServer, AsyncSocket, ByteBufferList}
-import com.waz.ZLog.LogTag
+import com.koushikdutta.async.callback._
+import com.koushikdutta.async.http._
+import com.koushikdutta.async.http.callback._
+import com.koushikdutta.async._
+import com.waz.ZLog._
+import com.waz.ZLog.ImplicitTag._
 import com.waz.api.ProgressIndicator.State
 import com.waz.api.impl.ProgressIndicator
-import com.waz.testutils.Matchers._
-import com.waz.testutils.Slow
-import com.waz.threading.CancellableFuture.CancelException
-import com.waz.threading.SerialDispatchQueue
-import com.waz.utils.wrappers.URI
+import com.waz.specs.AndroidFreeSpec
+import com.waz.threading.{CancellableFuture, SerialDispatchQueue}
 import com.waz.utils.{IoUtils, Json}
-import com.waz.znet.ContentEncoder.{EmptyRequestContent, GzippedRequestContent, JsonContentEncoder, MultipartRequestContent, StreamRequestContent}
+import com.waz.utils.wrappers.URI
+
+import com.waz.znet.ContentEncoder.{GzippedRequestContent, JsonContentEncoder, MultipartRequestContent, StreamRequestContent}
 import com.waz.znet.Response.{DefaultResponseBodyDecoder, HttpStatus, SuccessHttpStatus}
 import org.json.JSONObject
+import com.waz.testutils.Slow
+import com.waz.threading.CancellableFuture.CancelException
+
+import scala.concurrent.duration._
+import scala.concurrent.{Await, Future, Promise, TimeoutException}
+import scala.util.Random
 import org.scalatest._
 
-import scala.concurrent.Future.successful
-import scala.concurrent.duration._
-import scala.concurrent.{Await, TimeoutException}
-import scala.util.Random
-
-class AsyncClientSpec extends FeatureSpecLike with Matchers with BeforeAndAfter with RobolectricTests {
-  implicit val tag: LogTag = "AsyncClientSpec"
-  
-  val wireMockPort = 9000 + Random.nextInt(3000)
-  lazy val wireMockServer = new WireMockServer(WireMockConfiguration.wireMockConfig()
-    .port(wireMockPort)
-    .httpsPort(4433)
-    .withRootDirectory(getClass.getResource("/ZNetClientSpec").getPath)
-  )
-
+class AsyncClientSpec extends AndroidFreeSpec {
   implicit lazy val dispatcher = new SerialDispatchQueue
 
-  before {
-    wireMockServer.start()
-    configureFor("localhost", wireMockPort)
+  class FakeHttpResponse(c: Int = 200, m: String = "meep", h: Headers = new Headers(), body: Option[Array[Byte]] = None, completeOnSet: Boolean = true) extends AsyncHttpResponse {
+    @volatile var dataCallback: DataCallback = new NullDataCallback
+    @volatile var endCallback: CompletedCallback = new NullCompletedCallback
+
+    @volatile var alreadyConsumed = false
+
+    private def consume() = synchronized {
+      dataCallback match {
+        case c: NullDataCallback => // do nothing
+        case c: DataCallback if m.nonEmpty && !alreadyConsumed =>
+          val bb = new ByteBufferList(body.getOrElse(m.toCharArray.map(_.toByte)))
+          c.onDataAvailable(null, bb)
+          alreadyConsumed = true
+        case _ =>
+      }
+    }
+
+    private def complete() = synchronized {
+      endCallback match {
+        case c: NullCompletedCallback => // do nothing
+        case c: CompletedCallback => consume(); c.onCompleted(null)
+        case _ =>
+      }
+    }
+
+    override def setEndCallback(callback: CompletedCallback): Unit = {
+      endCallback = callback
+      if(completeOnSet) Future { complete() }
+    }
+
+    def getEndCallback: CompletedCallback = endCallback
+
+    override def setDataCallback(callback: DataCallback): Unit = {
+      dataCallback = callback
+      if(completeOnSet) Future { consume() }
+    }
+
+    def getDataCallback: DataCallback = dataCallback
+
+    override def getRequest: AsyncHttpRequest = null
+    override def message(): String = m
+    override def code(): Int = c
+    override def protocol(): String = "http"
+    override def headers(): Headers = h
+    override def detachSocket(): AsyncSocket = null
+    override def isPaused: Boolean = false
+    override def getServer: AsyncServer = null
+    override def isChunked: Boolean = false
+    override def charset(): String = "UTF-8"
+    override def pause(): Unit = ()
+    override def close(): Unit = ()
+    override def resume(): Unit = ()
   }
 
-  after {
-    wireMockServer.stop()
+  private val uriRegex = """.*(get|post)/(json|multi)*[_]*(empty|json)(\d+)""".r
+  private val jsonRequest = """{"key": "value"}"""
+  private val okJsonResponse = """{"result": "ok"}"""
+  private val penguinData = "some penguin data"
+  private val jsonObject = Json((1 to 25).map(i => s"key_$i" -> Seq.tabulate(i)(identity).mkString(",")).toMap)
+
+  private def toHeaders(tuples: (String, String)*): Headers = {
+    val headers = new Headers()
+    tuples.foreach(t => headers.set(t._1, t._2))
+    headers
   }
 
-  def client = new AsyncClient(wrapper = TestClientWrapper)
+  private def contentLength(data: String): (String, String) = "Content-Length" -> data.length.toString
+  private def contentLength(body: Array[Byte]): (String, String) = "Content-Length" -> body.length.toString
 
-  @volatile var progress = ProgressIndicator.ProgressData(0L, 0L, State.UNKNOWN)
-  @volatile var progressTickCount: Int = 0
+  private def mockResponse(req: HttpRequest): HttpResponse =
+    req.absoluteUri.getOrElse(throw new IllegalArgumentException("No URI found")).getPath match {
+      case uriRegex(method, json, expect, code) if expect == "empty" => new FakeHttpResponse(code.toInt, "", toHeaders(contentLength("")))
 
-  def doGet(path: String, auth: Boolean = false) = Await.result(client(URI.parse(s"http://localhost:$wireMockPort$path"), "GET", EmptyRequestContent, timeout = AsyncClient.DefaultTimeout, decoder = Some(DefaultResponseBodyDecoder), downloadProgressCallback = Some({
-    case currentProgress =>
-      progressTickCount += 1
-      progress = currentProgress
-  })), 500.millis)
+      case uriRegex(method, json, expect, code) if expect == "json" =>
+        new FakeHttpResponse(code.toInt, okJsonResponse, toHeaders("Content-Type" -> "application/json", contentLength(okJsonResponse)))
 
-  def doPost[A: ContentEncoder](path: String, data: A, auth: Boolean = false, timeout: FiniteDuration = AsyncClient.DefaultTimeout, waitTime: FiniteDuration = 500.millis) =
-    Await.result(client(URI.parse(s"http://localhost:$wireMockPort$path"), "POST", implicitly[ContentEncoder[A]].apply(data), timeout = timeout), waitTime)
+      case str: String if str.endsWith("/get/penguin") =>
+        new FakeHttpResponse(200, penguinData, toHeaders("Content-Type" -> "image/png", contentLength(penguinData)))
+
+      case str: String if str.endsWith("/get/gzipped") =>
+        val gzipped = IoUtils.gzip(jsonObject.toString.getBytes("utf8"))
+        new FakeHttpResponse(200, jsonObject.toString, toHeaders("Content-Type" -> "application/json", "Content-Encoding" -> "gzip", contentLength(gzipped)))
+
+      case str: String if str.endsWith("/post/gzipped") =>
+        val gzipped = IoUtils.gzip(okJsonResponse.getBytes("utf8"))
+        new FakeHttpResponse(200, okJsonResponse, toHeaders("Content-Type" -> "application/json", "Content-Encoding" -> "gzip", contentLength(gzipped)))
+
+      case str: String if str.endsWith("/get/delayed") => new FakeHttpResponse(200, okJsonResponse, toHeaders("Content-Type" -> "application/json", contentLength(okJsonResponse)))
+
+      case other => throw new IllegalArgumentException(s"Unrecognized URI: $other")
+    }
+
+  private val requestWorker = new RequestWorker {
+    override def processRequest(req: HttpRequest): HttpRequest = req
+  }
+
+  class FakeClientWrapper(delay: Option[Long] = None) extends ClientWrapper {
+    override def execute(request: HttpRequest, callback: HttpConnectCallback): CancellableFuture[HttpResponse] = {
+      val p = Promise[HttpResponse]
+      Future {
+        delay.map(Thread.sleep)
+        val fakeResponse = mockResponse(request)
+        callback.onConnectCompleted(null, fakeResponse)
+        p.success(fakeResponse)
+      }
+      CancellableFuture.lift(p.future)
+    }
+
+    override def websocket(request: HttpRequest, protocol: String, callback: AsyncHttpClient.WebSocketConnectCallback): CancellableFuture[WebSocket] = ???
+    override def stop(): Unit = ???
+  }
+
+  private def client = new AsyncClient(
+    bodyDecoder = DefaultResponseBodyDecoder,
+    userAgent="test",
+    wrapper = Future { new FakeClientWrapper(Some(100L)) },
+    requestWorker = requestWorker,
+    responseWorker = new ResponseImplWorker
+  )
+
+  private def clientWithDelay = new AsyncClient(
+    bodyDecoder = DefaultResponseBodyDecoder,
+    userAgent="test",
+    wrapper = Future { new FakeClientWrapper(Some(3000L)) },
+    requestWorker = requestWorker,
+    responseWorker = new ResponseImplWorker
+  )
+
+  @volatile private var progress = ProgressIndicator.ProgressData(0L, 0L, State.UNKNOWN)
+  @volatile private var progressTickCount: Int = 0
+
+  private val callback = (currentProgress: ProgressIndicator.ProgressData) => {
+    progressTickCount += 1
+    progress = currentProgress
+  }
+
+  private def doGet(path: String, auth: Boolean = false, waitTime: FiniteDuration = 500.millis) = {
+    val request = Request.Get(path, baseUri = Some(URI.parse("http://localhost")), downloadCallback = Some(callback), requiresAuthentication = auth)
+    Await.result(client(request), waitTime)
+  }
+
+  private def doPost[A: ContentEncoder](path: String, data: A, auth: Boolean = false, timeout: FiniteDuration = AsyncClient.DefaultTimeout, waitTime: FiniteDuration = 500.millis, client: AsyncClient = client) = {
+    val request = Request.Post(path, implicitly[ContentEncoder[A]].apply(data), baseUri = Some(URI.parse("http://localhost")), requiresAuthentication = auth, timeout = timeout)
+    Await.result(client(request), waitTime)
+  }
 
   feature("GET request") {
 
@@ -101,10 +212,10 @@ class AsyncClientSpec extends FeatureSpecLike with Matchers with BeforeAndAfter 
     }
 
     scenario("Perform json GET request") {
-      val json = """{"result": "ok"}"""
+
       doGet("/get/json200") match {
-        case Response(HttpStatus(200, _), JsonObjectResponse(js), headers) if js.toString == new JSONObject(json).toString && headers("Content-Type").contains("application/json") => info(s"got json response with headers: $headers") //fine
-        case r => fail(s"got: $r instead of Response(HttpStatus(200), JsonBody($json))")
+        case Response(HttpStatus(200, _), JsonObjectResponse(js), headers) if js.toString == new JSONObject(okJsonResponse).toString && headers("Content-Type").contains("application/json") => info(s"got json response with headers: $headers") //fine
+        case r => fail(s"got: $r instead of Response(HttpStatus(200), JsonBody($okJsonResponse))")
       }
     }
 
@@ -120,6 +231,7 @@ class AsyncClientSpec extends FeatureSpecLike with Matchers with BeforeAndAfter 
       progress.state shouldEqual State.COMPLETED
     }
 
+    // I'm not sure if this test actually does what it says it does...
     scenario("Get gzipped json") {
       import scala.collection.JavaConverters._
 
@@ -129,14 +241,6 @@ class AsyncClientSpec extends FeatureSpecLike with Matchers with BeforeAndAfter 
       val obj = Json((1 to 25).map(i => s"key_$i" -> Seq.tabulate(i)(identity).mkString(",")).toMap)
 
       val gzipped = IoUtils.gzip(obj.toString.getBytes("utf8"))
-
-      stubFor(get(urlEqualTo("/get/gzipped"))
-        .willReturn(aResponse()
-        .withStatus(200)
-        .withHeader("Content-Type", "application/json")
-        .withHeader("Content-Encoding", "gzip")
-        .withBody(gzipped)
-        ))
 
       doGet("/get/gzipped") match {
         case Response(HttpStatus(200, _), JsonObjectResponse(js), headers) => toMap(js) shouldEqual toMap(obj)
@@ -155,38 +259,40 @@ class AsyncClientSpec extends FeatureSpecLike with Matchers with BeforeAndAfter 
     }
 
     scenario("Post json, receive empty 200") {
-      doPost("/post/json_empty200", new JSONObject("""{ "key": "value"}""")) match {
+      doPost("/post/json_empty200", new JSONObject(jsonRequest)) match {
         case Response(HttpStatus(200, _), EmptyResponse, _) => // expected
         case resp => fail(s"got: $resp when expected Response(HttpStatus(200))")
       }
     }
 
-    scenario("Post json, receive json 200") {
-      val json = """{"result": "ok"}"""
-      doPost("/post/json_json200", new JSONObject("""{ "key": "value"}""")) match {
-        case Response(HttpStatus(200, _), JsonObjectResponse(js), _) if js.toString == new JSONObject(json).toString => //fine
-        case r => fail(s"got: $r instead of Response(HttpStatus(200), JsonBody($json))")
+   scenario("Post json, receive json 200") {
+      doPost("/post/json_json200", new JSONObject(jsonRequest)) match {
+        case Response(HttpStatus(200, _), JsonObjectResponse(js), _) if js.toString == new JSONObject(okJsonResponse).toString => //fine
+        case r => fail(s"got: $r instead of Response(HttpStatus(200), JsonBody($okJsonResponse))")
       }
     }
   }
 
   feature("Cancelling") {
 
+    val baseUri = Some(URI.parse("http://localhost"))
+
     scenario("Cancel once completed") {
-      val future = client(URI.parse(s"http://localhost:$wireMockPort/get/empty200"), "GET", EmptyRequestContent, timeout = AsyncClient.DefaultTimeout)
-      Thread.sleep(100)
+      val path = "/get/empty200"
+      val future = client(Request.Get(path, baseUri = baseUri))
+      Thread.sleep(200L)
       future.cancel()
 
-      Await.result(future, 100.millis) match {
+      Await.result(future, 200.millis) match {
         case Response(HttpStatus(200, _), EmptyResponse, _) => //expected
         case resp => fail(s"got: $resp while expecting Response(HttpStatus(200))")
       }
     }
 
     scenario("Cancel right away", Slow) {
-      val c = client
       (0 to 100) map { _ =>
-        val future = c(URI.parse(s"http://localhost:$wireMockPort/get/json200"), "GET", EmptyRequestContent, timeout = AsyncClient.DefaultTimeout)
+        val path = "/get/json200"
+        val future = client(Request.Get(path, baseUri = baseUri))
         future.cancel()
         future
       } foreach { future =>
@@ -197,9 +303,9 @@ class AsyncClientSpec extends FeatureSpecLike with Matchers with BeforeAndAfter 
     }
 
     scenario("Cancel randomly", Slow) {
-      val c = client
       (0 to 255) foreach { _ =>
-        val future = c(URI.parse(s"http://localhost:$wireMockPort/get/json200"), "GET", EmptyRequestContent, timeout = AsyncClient.DefaultTimeout)
+        val path = "/get/json200"
+        val future = client(Request.Get(path, baseUri = baseUri))
         Thread.sleep(Random.nextInt(50))
         future.cancel()
         try {
@@ -214,10 +320,10 @@ class AsyncClientSpec extends FeatureSpecLike with Matchers with BeforeAndAfter 
     }
 
     scenario("Cancel randomly on post", Slow) {
-      val c = client
-      val data = JsonContentEncoder(new JSONObject("""{ "key": "value"}"""))
+      val data = JsonContentEncoder(new JSONObject(jsonRequest))
       (0 to 255) foreach { _ =>
-        val future = c(URI.parse(s"http://localhost:$wireMockPort/post/json_json200"), "POST", data, timeout = AsyncClient.DefaultTimeout)
+        val path = "/post/json_json200"
+        val future = client(Request.Post(path, data, baseUri = baseUri, timeout = AsyncClient.DefaultTimeout))
         Thread.sleep(Random.nextInt(50))
         future.cancel()
         try {
@@ -232,15 +338,8 @@ class AsyncClientSpec extends FeatureSpecLike with Matchers with BeforeAndAfter 
     }
 
     scenario("Cancel long get") {
-      stubFor(get(urlEqualTo("/get/delayed"))
-        .willReturn(aResponse()
-        .withStatus(200)
-        .withHeader("Content-Type", "application/json")
-        .withBody("""{"result":"ok"}""")
-        .withFixedDelay(500)
-        ))
-
-      val future = client(URI.parse(s"http://localhost:$wireMockPort/get/delayed"), "GET", EmptyRequestContent, timeout = AsyncClient.DefaultTimeout)
+      val path = "/get/delayed"
+      val future = clientWithDelay(Request.Get(path, baseUri = baseUri))
       Thread.sleep(100)
 
       future.cancel()
@@ -250,11 +349,11 @@ class AsyncClientSpec extends FeatureSpecLike with Matchers with BeforeAndAfter 
       }
     }
 
-
     scenario("Cancel while streaming POST") {
       val os = new PipedOutputStream()
       val is = new PipedInputStream(os)
-      val future = client(URI.parse(s"http://localhost:$wireMockPort/post/json_json200"), "POST", new StreamRequestContent(is, "application/json", -1), timeout = AsyncClient.DefaultTimeout)
+      val path = "/post/json_json200"
+      val future = client(Request.Post(path, StreamRequestContent(is, "application/json", -1), baseUri = baseUri, timeout = AsyncClient.DefaultTimeout))
       os.write("""{"key":"""".getBytes("utf8"))
       future.cancel()
       os.write("""value"}""".getBytes("utf8"))
@@ -268,96 +367,66 @@ class AsyncClientSpec extends FeatureSpecLike with Matchers with BeforeAndAfter 
   feature("Gzip POST encoding") {
 
     scenario("Send gzipped json request") {
-      stubFor(post(urlEqualTo("/post/gzipped"))
-        .willReturn(aResponse()
-        .withStatus(200)
-        .withHeader("Content-Type", "application/json")
-        .withBody("""{"result":"ok"}""")
-        ))
-
       val obj = Json((1 to 100).map(i => s"key_$i" -> Seq.tabulate(i)(identity).mkString(",")).toMap)
+      val path = "/post/gzipped"
+      val future = client(Request.Post(path, GzippedRequestContent(obj.toString.getBytes("utf8"), "application/json"), baseUri = Some(URI.parse("http://localhost")), timeout = AsyncClient.DefaultTimeout))
+      Await.result(future, AsyncClient.DefaultTimeout) match {
+        case Response(SuccessHttpStatus(), JsonObjectResponse(json), headers) if json.getString("result") == "ok" && headers("Content-Encoding") == Some("gzip") => // fine
+        case other => fail(s"Wrong response: $other")
+      }
 
-      client(URI.parse(s"http://localhost:$wireMockPort/post/gzipped"), "POST", GzippedRequestContent(obj.toString.getBytes("utf8"), "application/json"), timeout = AsyncClient.DefaultTimeout) should eventually(beMatching {
-        case Response(SuccessHttpStatus(), JsonObjectResponse(json), _) if json.getString("result") == "ok" => // fine
-      })
-
-      verify(postRequestedFor(urlEqualTo("/post/gzipped")).withHeader("Content-Encoding", equalTo("gzip")))
-    }
-  }
-
-  feature("User-Agent") {
-
-    scenario("Send user agent with requests") {
-      val agent = s"Wire/* (zms *; Android ${VERSION.RELEASE}; $MANUFACTURER $MODEL)"
-
-      verify(getRequestedFor(urlEqualTo("/get/empty200")).withHeader("User-Agent", equalTo(agent)))
-      verify(postRequestedFor(urlEqualTo("/post/empty200")).withHeader("User-Agent", equalTo(agent)))
-      verify(getRequestedFor(urlEqualTo("/get/delayed")).withHeader("User-Agent", equalTo(agent)))
     }
   }
 
   feature("Network inactivity timeout") {
-    import scala.language.reflectiveCalls
+    val baseUri = Some(URI.parse("http://meep.me"))
+    lazy val mockedResponse = new FakeHttpResponse(200, "", completeOnSet = false)
 
-    lazy val mockedResponse = new AsyncHttpResponse {
-      @volatile var dataCallback: DataCallback = new NullDataCallback
-      @volatile var endCallback: CompletedCallback = new NullCompletedCallback
+    @volatile var onConnect: Option[HttpConnectCallback] = None
 
-      override def getRequest: AsyncHttpRequest = null
-      override def message(): String = "meep"
-      override def code(): Int = 200
-      override def protocol(): String = "http"
-      override def headers(): Headers = new Headers()
-      override def detachSocket(): AsyncSocket = null
-      override def getEndCallback: CompletedCallback = endCallback
-      override def isPaused: Boolean = false
-      override def setDataCallback(callback: DataCallback): Unit = dataCallback = callback
-      override def getDataCallback: DataCallback = dataCallback
-      override def getServer: AsyncServer = null
-      override def isChunked: Boolean = false
-      override def charset(): String = "UTF-8"
-      override def setEndCallback(callback: CompletedCallback): Unit = endCallback = callback
-      override def pause(): Unit = ()
-      override def close(): Unit = ()
-      override def resume(): Unit = ()
+    lazy val clientWrapper = new ClientWrapper {
+      override def execute(req: HttpRequest, callback: HttpConnectCallback): CancellableFuture[HttpResponse] = {
+        onConnect = Option(callback)
+        CancellableFuture(mockedResponse)
+      }
+
+      def websocket(request: HttpRequest, protocol: String, callback: AsyncHttpClient.WebSocketConnectCallback): CancellableFuture[WebSocket] = ???
+      def stop(): Unit = {}
     }
 
-    lazy val mockedClient = new AsyncClient {
-      @volatile var onConnect: Option[HttpConnectCallback] = None
-
-      override val client = successful(new AsyncHttpClient(new AsyncServer) {
-        override def execute(req: AsyncHttpRequest, callback: HttpConnectCallback): Future[AsyncHttpResponse] = {
-          onConnect = Option(callback)
-          new SimpleFuture[AsyncHttpResponse](mockedResponse)
-        }
-      })
-    }
+    lazy val mockedClient = new AsyncClient(
+      bodyDecoder = DefaultResponseBodyDecoder,
+      userAgent="test",
+      wrapper = Future { clientWrapper },
+      requestWorker = requestWorker,
+      responseWorker = new ResponseImplWorker
+    )
 
     scenario("connect doesn't complete") {
-      val resp = mockedClient(URI.parse("http://meep.me"), timeout = 1.second)
+      val resp = mockedClient(Request.Get("", baseUri = baseUri, timeout = 1.second))
       a[TimeoutException] should be thrownBy Await.result(resp, 2.seconds)
     }
 
     scenario("connect completes, no response is sent") {
-      val resp = mockedClient(URI.parse("http://meep.me"), timeout = 1.second)
+      val resp = mockedClient(Request.Get("", baseUri = baseUri, timeout = 1.second))
       Thread.sleep(100L)
-      mockedClient.onConnect.foreach { _.onConnectCompleted(null, mockedResponse) }
+      onConnect.foreach { _.onConnectCompleted(null, mockedResponse) }
       a[TimeoutException] should be thrownBy Await.result(resp, 2.seconds)
     }
 
     scenario("connect completes, response is sent, but no completion") {
-      val resp = mockedClient(URI.parse("http://meep.me"), timeout = 1.second)
+      val resp = mockedClient(Request.Get("", baseUri = baseUri, timeout = 1.second))
       Thread.sleep(100L)
-      mockedClient.onConnect.foreach { _.onConnectCompleted(null, mockedResponse) }
+      onConnect.foreach { _.onConnectCompleted(null, mockedResponse) }
       Thread.sleep(100L)
       mockedResponse.dataCallback.onDataAvailable(null, new ByteBufferList)
       a[TimeoutException] should be thrownBy Await.result(resp, 2.seconds)
     }
 
     scenario("connect completes, response is sent, in time completion") {
-      val resp = mockedClient(URI.parse("http://meep.me"), timeout = 1.second)
+      val resp = mockedClient(Request.Get("", baseUri = baseUri, timeout = 1.second))
       Thread.sleep(100L)
-      mockedClient.onConnect.foreach { _.onConnectCompleted(null, mockedResponse) }
+      onConnect.foreach { _.onConnectCompleted(null, mockedResponse) }
       Thread.sleep(100L)
       mockedResponse.dataCallback.onDataAvailable(null, new ByteBufferList)
       Thread.sleep(100L)
@@ -366,9 +435,9 @@ class AsyncClientSpec extends FeatureSpecLike with Matchers with BeforeAndAfter 
     }
 
     scenario("connect completes, response is sent slowly, in time completion") {
-      val resp = mockedClient(URI.parse("http://meep.me"), timeout = 1.second)
+      val resp = mockedClient(Request.Get("", baseUri = baseUri, timeout = 1.second))
       Thread.sleep(100L)
-      mockedClient.onConnect.foreach { _.onConnectCompleted(null, mockedResponse) }
+      onConnect.foreach { _.onConnectCompleted(null, mockedResponse) }
       for (i <- 1 to 3) {
         Thread.sleep(500L)
         mockedResponse.dataCallback.onDataAvailable(null, new ByteBufferList)
@@ -379,9 +448,9 @@ class AsyncClientSpec extends FeatureSpecLike with Matchers with BeforeAndAfter 
     }
 
     scenario("connect completes, response is sent slowly, then takes too long") {
-      val resp = mockedClient(URI.parse("http://meep.me"), timeout = 1.second)
+      val resp = mockedClient(Request.Get("", baseUri = baseUri, timeout = 1.second))
       Thread.sleep(100L)
-      mockedClient.onConnect.foreach { _.onConnectCompleted(null, mockedResponse) }
+      onConnect.foreach { _.onConnectCompleted(null, mockedResponse) }
       for (i <- 1 to 2) {
         Thread.sleep(500L)
         mockedResponse.dataCallback.onDataAvailable(null, new ByteBufferList)
@@ -394,74 +463,15 @@ class AsyncClientSpec extends FeatureSpecLike with Matchers with BeforeAndAfter 
     }
 
     scenario("multipart POST, connect (incl. sending of request) is very slow") {
-      wireMockServer.addRequestProcessingDelay(3000)
-      doPost("/post/multi_empty200", MultipartRequestContent(Seq("meep" -> new File(getClass.getResource("/emojis.txt").getPath))), false, 2.seconds, 10.seconds) match {
+      doPost("/post/multi_empty200", MultipartRequestContent(Seq("meep" -> new File(getClass.getResource("/emojis.txt").getPath))), false, 2.seconds, 10.seconds, client = clientWithDelay) match {
         case Response(HttpStatus(200, _), _, _) => // expected
         case resp => fail(s"got: $resp when expected Response(HttpStatus(200))")
       }
     }
 
     scenario("JSON POST, connect (incl. sending of request) is very slow") {
-      wireMockServer.addRequestProcessingDelay(3000)
-      a[TimeoutException] should be thrownBy doPost("/post/json_json200", new JSONObject("""{ "key": "value"}"""), false, 2.seconds, 10.seconds)
+      a[TimeoutException] should be thrownBy doPost("/post/json_json200", jsonObject, false, 2.seconds, 10.seconds, client = clientWithDelay)
     }
   }
 
-  /*
-  TODO: Maciek Gorywoda: We need a way to mock the AsyncClient in a more complex way - for example, simulating low
-  bandwidth connection, but only for downloading assets and for a given time, so after the time passes the connection
-  gets well again and the user is able to download the asset). For that, we need to wrap koushikdutta's AsyncHttpClient.
-  I leave here the code I used in AsyncClientto simulate that situation.
-
-  import com.koushikdutta.async.future.SimpleFuture
-
-  class AsyncClient ... {
-    ...
-    private def mockExecute(callback: () => Boolean): SimpleFuture[AsyncHttpResponse] = {
-    debug(s"CE mocked execute started")
-    new SimpleFuture[AsyncHttpResponse] {
-      val c = CancellableFuture {
-        debug(s"the mocked future started")
-        Thread.sleep(DefaultTimeout.toMillis)
-        callback()
-      }
-
-      override def cancel(): Boolean = {
-        debug(s"mocked future cancel")
-        c.cancel()
-      }
-    }
-  }
-
-  def execute(client: AsyncHttpClient, request: AsyncHttpRequest, callback: HttpConnectCallback, mockCallback: Option[() => Boolean] = None): KFuture[AsyncHttpResponse] = {
-    val uri = request.getUri().toString
-    if (request.getMethod() == "GET" && uri.contains("https://staging-nginz-https.zinfra.io/assets/v3") && mockCallback.isDefined) {
-      AsyncClient.addIfMissing(uri)
-      if(AsyncClient.mockDuration(uri) > 4*DefaultTimeout.toMillis + 1L) {
-        debug(s"the mock execute finished for $uri, calling the standard execute")
-        client.execute(request, callback)
-      } else {
-        mockExecute(mockCallback.get)
-      }
-    }
-    else {
-      debug(s"the standard execute for method ${request.getMethod()} and uri ${request.getUri()}")
-      client.execute(request, callback)
-    }
-  }
-  ...
-    val mockedCallback = () => p.tryFailure(new TimeoutException("mocked timeout"))
-    val httpFuture = execute(client, request, callback, Some(mockedCallback))  // instead of: val httpFuture = client.execute(request, callback)
-  ...
-  }
-
-  object AsyncClient {
-    ...
-    import scala.collection.mutable
-    val mockTime = mutable.HashMap[String, Long]()
-    def addIfMissing(uri: String) = mockTime.getOrElseUpdate(uri, System.currentTimeMillis())
-    def mockDuration(uri: String) = mockTime.get(uri).map(System.currentTimeMillis() - _).getOrElse(0L)
-    ...
-  }
-   */
 }

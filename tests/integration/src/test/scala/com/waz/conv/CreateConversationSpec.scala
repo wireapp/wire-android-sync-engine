@@ -55,7 +55,7 @@ class CreateConversationSpec extends FeatureSpec with Matchers with OptionValues
 
   lazy val allUserIds = Seq("auto1", "auto2", "auto3", "auto4", "auto5", "auto6") map provisionedUserId
 
-  lazy val auto6 = new ConnectionsClient(new ZNetClient(provisionedEmail("auto6"), "auto6_pass", new AsyncClient(wrapper = TestClientWrapper)))
+  lazy val auto6 = new ConnectionsClient(new ZNetClient(provisionedEmail("auto6"), "auto6_pass", new AsyncClient(wrapper = TestClientWrapper())))
 
   lazy val auto4Id = Await.result(auto4.zmessaging.currentValue.flatten.get.users.getSelfUser, 15.seconds).get.id
 

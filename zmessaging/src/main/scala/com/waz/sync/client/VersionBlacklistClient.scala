@@ -36,7 +36,7 @@ class VersionBlacklistClient(netClient: ZNetClient, backendConfig: BackendConfig
   private implicit val tag: LogTag = logTagFor[VersionBlacklistClient]
 
   def loadVersionBlacklist(): ErrorOrResponse[VersionBlacklist] = {
-    netClient.withErrorHandling("loadVersionBlacklist", Request(absoluteUri = Some(blacklistsUrl(backendConfig.environment)), requiresAuthentication = false, decoder = Some(decoder))(EmptyContentEncoder)) {
+    netClient.withErrorHandling("loadVersionBlacklist", Request(baseUri = Some(blacklistsUrl(backendConfig.environment)), requiresAuthentication = false, decoder = Some(decoder))(EmptyContentEncoder)) {
       case Response(SuccessHttpStatus(), VersionBlacklistExtractor(blacklist), _) => blacklist
     }
   }

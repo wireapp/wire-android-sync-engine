@@ -28,18 +28,17 @@ import com.waz.provision.ProvisionedSuite
 import com.waz.service.{BackendConfig, GlobalModule}
 import com.waz.utils.Json
 import com.waz.utils.events.EventContext
+import com.waz.znet.ClientWrapper.toKoushi
 import com.waz.znet.Request._
 import com.waz.znet.Response.SuccessHttpStatus
 import com.waz.{RobolectricUtils, ShadowLogging}
 import org.robolectric.Robolectric
 import org.scalatest._
 
-import scala.concurrent.Await
+import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
 
 class WebSocketClientSpec extends FeatureSpec with Matchers with ProvisionedSuite with ShadowLogging with RobolectricTests with RobolectricUtils {
-  import EventContext.Implicits.global
-
   override val provisionFile = "/one_user.json"
 
   override protected lazy val logfileBaseDir: File = new File("target/logcat/integration")
@@ -47,7 +46,7 @@ class WebSocketClientSpec extends FeatureSpec with Matchers with ProvisionedSuit
   val backend = BackendConfig.StagingBackend
 
   lazy val globalModule: GlobalModule = new GlobalModule(Robolectric.application, backend) {
-    override lazy val clientWrapper: ClientWrapper = TestClientWrapper
+    override lazy val clientWrapper: Future[ClientWrapper] = TestClientWrapper()
   }
   lazy val asyncClient = globalModule.client
   lazy val loginClient = new LoginClient(asyncClient, backend)
@@ -61,8 +60,8 @@ class WebSocketClientSpec extends FeatureSpec with Matchers with ProvisionedSuit
 
       val req = token.right.get.prepare(new AsyncHttpGet(backend.websocketUrl))
       req.setHeader("Accept-Encoding", "identity")
-
-      Await.result(asyncClient.client, 1.second).websocket(req, null, new WebSocketConnectCallback {
+      import scala.concurrent.ExecutionContext.Implicits.global
+      Await.result(asyncClient.wrapper.map(toKoushi), 1.second).websocket(req, null, new WebSocketConnectCallback {
         override def onCompleted(ex: Exception, socket: WebSocket): Unit = {
           println(s"WebSocket request finished, ex: $ex, socket: $socket")
           webSocket = Option(socket)
@@ -77,9 +76,8 @@ class WebSocketClientSpec extends FeatureSpec with Matchers with ProvisionedSuit
 
     scenario("Receive name change update") {
       val latch = new CountDownLatch(1)
-
       val manager = new WebSocketClient(context, asyncClient, Uri.parse(backend.websocketUrl), auth)
-
+      import EventContext.Implicits.global
       manager.onMessage {
         case resp @ JsonObjectResponse(js) if js.toString.contains("auto1_updated") =>
           println(s"Received response from websocket: '$resp'")

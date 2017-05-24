@@ -54,7 +54,8 @@ class AssetClientImpl(netClient: ZNetClient) extends AssetClient {
   import Threading.Implicits.Background
   import com.waz.sync.client.AssetClient._
 
-  override def loadAsset(req: Request[Unit]): ErrorOrResponse[CacheEntry] =
+  override def loadAsset(req: Request[Unit]): ErrorOrResponse[CacheEntry] = {
+    debug(s"AC loadAsset($req)")
     netClient.withErrorHandling("loadAsset", req) {
       case Response(SuccessHttpStatus(), resp: BinaryResponse, _) => resp
       case Response(SuccessHttpStatus(), resp: FileResponse, _) => resp
@@ -63,6 +64,7 @@ class AssetClientImpl(netClient: ZNetClient) extends AssetClient {
       case Right(resp) => CancellableFuture successful Left(ErrorResponse.internalError(s"unexpected response: $resp"))
       case Left(err) => CancellableFuture successful Left(err)
     }
+  }
 
   override def postImageAssetData(asset: AssetData, data: LocalData, nativePush: Boolean = true, convId: RConvId): ErrorOrResponse[RAssetId] = {
     asset match {

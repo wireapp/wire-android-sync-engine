@@ -26,7 +26,7 @@ import org.json.JSONObject
 import org.robolectric.Robolectric
 import org.scalatest._
 
-import scala.concurrent.Await
+import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
 
 class ZNetClientBackendSpec extends FeatureSpec with Matchers with ProvisionedSuite with RobolectricTests {
@@ -35,11 +35,11 @@ class ZNetClientBackendSpec extends FeatureSpec with Matchers with ProvisionedSu
   override val provisionFile = "/three_users.json"
 
   lazy val Seq(client1, client2, client3) = 1 to 3 map { i =>
-    new ZNetClient(provisionedEmail(s"auto$i"), s"auto${i}_pass", new AsyncClient(wrapper = TestClientWrapper))
+    new ZNetClient(provisionedEmail(s"auto$i"), s"auto${i}_pass", new AsyncClient(wrapper = TestClientWrapper()))
   }
 
   lazy val globalModule = new GlobalModule(Robolectric.application, BackendConfig.StagingBackend) {
-    override lazy val clientWrapper: ClientWrapper = TestClientWrapper
+    override lazy val clientWrapper: Future[ClientWrapper] = TestClientWrapper()
   }
 
   feature("Login user") {

@@ -51,7 +51,8 @@ class RegistrationClient(client: AsyncClient, backend: BackendConfig) {
       o.put("locale", bcp47.languageTagOf(currentLocale))
     }
 
-    client(absoluteUri(RegisterPath), Request.PostMethod, JsonContentEncoder(json), timeout = timeout) map {
+    val request = Request.Post(RegisterPath, JsonContentEncoder(json), baseUri = Some(URI.parse(backend.baseUrl)), timeout = timeout)
+    client(request) map {
       case resp @ Response(SuccessHttpStatus(), UserResponseExtractor(user), headers) =>
         debug(s"registration succeeded: $resp")
         Right((user, if (credentials.autoLoginOnRegistration) LoginClient.getCookieFromHeaders(headers) else None))
@@ -84,12 +85,13 @@ class RegistrationClient(client: AsyncClient, backend: BackendConfig) {
     }
 
   private def postActivateSend(kindOfAccess: KindOfAccess)(params: JSONObject): CancellableFuture[ActivateResult] = {
-    val uri = absoluteUri(kindOfAccess match {
+    val uri = kindOfAccess match {
       case KindOfAccess.LOGIN_IF_NO_PASSWD | KindOfAccess.LOGIN => LoginSendPath
       case KindOfAccess.REGISTRATION => ActivateSendPath
-    })
+    }
 
-    client(uri, Request.PostMethod, JsonContentEncoder(params), timeout = timeout) map {
+    val request = Request.Post(uri, JsonContentEncoder(params), baseUri = Some(URI.parse(backend.baseUrl)), timeout = timeout)
+    client(request) map {
       case resp @ Response(SuccessHttpStatus(), _, _) =>
         debug(s"confirmation code requested: $resp")
         ActivateResult.Success
@@ -105,7 +107,8 @@ class RegistrationClient(client: AsyncClient, backend: BackendConfig) {
   }
 
   def verifyPhoneNumber(credentials: PhoneCredentials, kindOfVerification: KindOfVerification): ErrorOrResponse[Unit] = {
-    client(absoluteUri(ActivatePath), Request.PostMethod, activateRequestBody(credentials, kindOfVerification), timeout = timeout) map {
+    val request = Request.Post(ActivatePath, activateRequestBody(credentials, kindOfVerification), baseUri = Some(URI.parse(backend.baseUrl)), timeout = timeout)
+    client(request) map {
       case resp @ Response(SuccessHttpStatus(), _, _) =>
         debug(s"phone number verified: $resp")
         Right(())
@@ -117,24 +120,24 @@ class RegistrationClient(client: AsyncClient, backend: BackendConfig) {
         Left(ErrorResponse(other.status.status, other.toString, "unknown"))
     }
   }
-
-  private def absoluteUri(path: String): URI = URI.parse(backend.baseUrl).buildUpon.encodedPath(path).build
-
   import com.waz.sync.client.InvitationClient._
 
-  def getInvitationDetails(token: PersonalInvitationToken): ErrorOrResponse[ConfirmedInvitation] =
-    client(infoPath(token), Request.GetMethod, timeout = timeout) map {
+  def getInvitationDetails(token: PersonalInvitationToken): ErrorOrResponse[ConfirmedInvitation] = {
+    val uri = infoPath(token)
+    val request = Request.Get(uri.getPath, baseUri = Some(URI.parse(backend.baseUrl)))
+    client(request) map {
       case Response(HttpStatus(Success, _), ConfirmedInvitation(inv), _) =>
         debug(s"received invitation details for $token: $inv")
         Right(inv)
       case Response(HttpStatus(BadRequest, "invalid-invitation-code"), EmptyResponse, headers) =>
         warn(s"invitation token not found: $token")
-        Left(ErrorResponse(NotFound, "no such invitation code" , "invalid-invitation-code"))
+        Left(ErrorResponse(NotFound, "no such invitation code", "invalid-invitation-code"))
       case other =>
         ZNetClient.errorHandling("getInvitationInfo")(tag)(other)
     }
+  }
 
-  private def infoPath(token: PersonalInvitationToken): URI = URI.parse(backend.baseUrl).buildUpon.encodedPath(InvitationPath).appendPath("info").appendQueryParameter("code", token.code).build
+  private def infoPath(token: PersonalInvitationToken): URI = URI.parse(InvitationPath).buildUpon.appendPath("info").appendQueryParameter("code", token.code).build
 }
 
 object RegistrationClient {

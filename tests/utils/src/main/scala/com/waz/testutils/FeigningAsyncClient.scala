@@ -18,18 +18,13 @@
 package com.waz.testutils
 
 import com.waz.threading.CancellableFuture
-import com.waz.utils.wrappers.URI
-import com.waz.znet.ContentEncoder.{EmptyRequestContent, RequestContent}
-import com.waz.znet.Request._
-import com.waz.znet.Response.ResponseBodyDecoder
-import com.waz.znet.{AsyncClient, Response, TestClientWrapper}
+import com.waz.znet.{AsyncClient, Request, Response, TestClientWrapper}
 
-import scala.concurrent.duration._
-
-class FeigningAsyncClient extends AsyncClient(wrapper = TestClientWrapper) {
+class FeigningAsyncClient extends AsyncClient(wrapper = TestClientWrapper()) {
   @volatile var simulateNetworkFailure = false
 
-  override def apply(uri: URI, method: String = "GET", body: RequestContent = EmptyRequestContent, headers: Map[String, String] = AsyncClient.EmptyHeaders, followRedirect: Boolean = false, timeout: FiniteDuration = 30.seconds, decoder: Option[ResponseBodyDecoder] = None, downloadProgressCallback: Option[ProgressCallback] = None): CancellableFuture[Response] =
+  override def apply(request: Request[_]): CancellableFuture[Response] =
     if (simulateNetworkFailure) CancellableFuture.successful(Response(Response.ConnectionError("somebody set up us the bomb")))
-    else super.apply(uri, method, body, headers, followRedirect, timeout, decoder, downloadProgressCallback)
+    else super.apply(request)
+
 }

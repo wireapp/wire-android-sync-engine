@@ -41,7 +41,7 @@ class OpenGraphClientSpec extends FeatureSpec with Matchers with ProvisionedApiS
   scenario("Fetch header of large website, should stop download early") {
     lazy val LargeWebsiteLink = URI.parse("http://unicode.org/emoji/charts/full-emoji-list.html")
 
-    val resp = zmessaging.zNetClient(new Request[Unit](absoluteUri = Some(LargeWebsiteLink), requiresAuthentication = false, decoder = Some(OpenGraphClient.ResponseDecoder))).await()
+    val resp = zmessaging.zNetClient(new Request[Unit](baseUri = Some(LargeWebsiteLink), requiresAuthentication = false, decoder = Some(OpenGraphClient.ResponseDecoder))).await()
 
     resp should beMatching({
       case Response(SuccessStatus(), StringResponse(html), _) if html.length < 10 * 1024 => info(s"response size: ${html.length}")
