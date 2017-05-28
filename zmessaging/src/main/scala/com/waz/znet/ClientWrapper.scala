@@ -86,7 +86,7 @@ object ClientWrapper {
 
   def apply(): Future[ClientWrapper] = apply(new AsyncHttpClient(new AsyncServer))
 
-  val domains @ Seq(zinfra, wire, cloudfront) = Seq("zinfra.io", "wire.com", "cloudfront.net")
+  val domains @ Seq(zinfra, wire) = Seq("zinfra.io", "wire.com")
   val protocol = "TLSv1.2"
   val cipherSuite = "TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384"
 
@@ -107,12 +107,7 @@ object ClientWrapper {
             val tm = if (isCertForDomain(zinfra, cert) || isCertForDomain(wire, cert)) {
               verbose("using backend trust manager")
               ServerTrust.backendTrustManager
-            }
-            else if (isCertForDomain(cloudfront, cert)) {
-              verbose("using cdn trust manager")
-              ServerTrust.cdnTrustManager
-            }
-            else {
+            } else {
               verbose("using system trust manager")
               ServerTrust.systemTrustManager
             }
