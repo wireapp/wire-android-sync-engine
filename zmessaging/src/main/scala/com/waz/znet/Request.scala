@@ -20,7 +20,6 @@ package com.waz.znet
 import java.io.{File, InputStream}
 import java.net.URLEncoder
 
-import android.net.http.AndroidHttpClient
 import com.google.protobuf.nano.MessageNano
 import com.koushikdutta.async.callback.CompletedCallback
 import com.koushikdutta.async.http.AsyncHttpRequest
@@ -142,6 +141,7 @@ trait ContentEncoder[A] { self =>
 }
 
 object ContentEncoder {
+  val MinGzipBytesLength = 250  // minimum content size when gzip should be enabled, no point compressing smaller content
 
   sealed trait RequestContent {
     protected def asyncHttpBody: Option[AsyncHttpRequestBody[_]] = None
@@ -187,7 +187,7 @@ object ContentEncoder {
     override def sourceData: Array[Byte] = bytes
 
     override lazy val data = {
-      if (bytes.length <= AndroidHttpClient.DEFAULT_SYNC_MIN_GZIP_BYTES) bytes
+      if (bytes.length <= MinGzipBytesLength) bytes
       else {
         val zip = IoUtils.gzip(bytes)
         if (zip.length >= bytes.length) bytes

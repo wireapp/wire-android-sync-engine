@@ -19,7 +19,7 @@ object SharedSettings {
   val avsVersion = "2.8.61"
   val audioVersion = "1.195.0"
   val RobolectricVersion = "5.0.0_r2-robolectric-1"
-  val supportLibVersion = "23.1.1"
+  val supportLibVersion = "24.2.0"
   val cryptoboxVersion = "1.0.0"
 
   object Deps {
@@ -77,7 +77,7 @@ object SharedSettings {
   lazy val testSettings = nativeLibsSettings ++ Seq(
     fork := true,
     crossPaths := false,
-    platformTarget in Android := "android-23",
+    platformTarget in Android := "android-24",
 
     javaOptions ++= Seq("-Xmx3072M", "-XX:MaxPermSize=3072M", "-XX:+CMSClassUnloadingEnabled", "-Djava.net.preferIPv4Stack=true"),
     testGrouping in Test := { groupByPackage( (definedTests in Test).value, (javaOptions in Test).value ) },
