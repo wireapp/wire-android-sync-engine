@@ -17,9 +17,12 @@
  */
 package com.waz.db
 
+import java.io.{File, FileInputStream, FileOutputStream}
+
 import android.database.sqlite.SQLiteDatabase
 import com.waz.HockeyApp
 import com.waz.ZLog._
+import com.waz.api.ZmsVersion
 import com.waz.utils.wrappers.DB
 
 import scala.util.control.NonFatal
@@ -78,7 +81,9 @@ class Migrations(migrations: Migration*) {
 
   /**
     * Migrates database using provided migrations.
-    * Falls back to dropping all data if migration fails.
+    * Signals the app on failure, so that we can disable use of this version - this should prevent us from accidentally
+    * dropping internal-user history in case of a migration error. We still drop the tables anyway with the current db
+    * after creating the backup, this should allow the user to continue using the app with lost history.
     *
     * Note, SQLiteOpenHelper#onUpgrade is already called from within an exclusive transaction when the system realises
     * that a database you are trying to access needs to be upgraded. So we can just execute all sql commands directly
@@ -89,6 +94,13 @@ class Migrations(migrations: Migration*) {
   @throws[IllegalStateException]("If no migration plan can be found for given versions")
   def migrate(storage: DaoDB, fromVersion: Int, toVersion: Int)(implicit db: SQLiteDatabase): Unit = {
     if (fromVersion != toVersion) {
+
+      //If there is an existing backup, replace the current db with it so that we apply migrations to the backed up data.
+      if (ZmsVersion.DEBUG) {
+        if (storage.backupFile.exists()) copy(storage.backupFile, new File(db.getPath))
+        else copy(new File(db.getPath), storage.backupFile)
+      }
+
       plan(fromVersion, toVersion) match {
         case Nil => throw new IllegalStateException(s"No migration plan from: $fromVersion to: $toVersion")
         case ms =>
@@ -98,15 +110,22 @@ class Migrations(migrations: Migration*) {
               m(db)
               db.execSQL(s"PRAGMA user_version = ${m.toVersion}")
             }
+            if (ZmsVersion.DEBUG) clearBackup(storage)
           } catch {
             case NonFatal(e) =>
               error(s"Migration failed for $storage, from: $fromVersion to: $toVersion", e)
               HockeyApp.saveException(e, s"Migration failed for $storage, from: $fromVersion to: $toVersion")
+              storage.backupFailed ! true
               fallback(storage, db)
           }
       }
     }
   }
+
+  def copy(src: File, dst: File) =
+    new FileOutputStream(dst).getChannel.transferFrom(new FileInputStream(src).getChannel, 0, Int.MaxValue)
+
+  def clearBackup(storage: DaoDB) = storage.backupFile.delete()
 
   def fallback(storage: DaoDB, db: SQLiteDatabase): Unit = {
     warn(s"Dropping all data for $storage.")
