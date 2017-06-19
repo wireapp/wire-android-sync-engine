@@ -84,8 +84,8 @@ class LoginClient(client: AsyncClient, backend: BackendConfig) {
   }.flatten
 
   def loginNow(userId: AccountId, credentials: Credentials) = {
-    debug(s"trying to login: $credentials")
-    val request = Request.Post(loginUri.getPath, loginRequestBody(userId, credentials), baseUri = Some(URI.parse(backend.baseUrl)), timeout = RegistrationClient.timeout)
+    debug(s"trying to login. Credentials: $credentials, uriStr: $loginUriStr")
+    val request = Request.Post(loginUriStr, loginRequestBody(userId, credentials), baseUri = Some(URI.parse(backend.baseUrl)), timeout = RegistrationClient.timeout)
     client(request) map responseHandler
   }
   def accessNow(cookie: Cookie, token: Option[Token]) = {
@@ -129,7 +129,7 @@ object LoginClient {
   val LoginPath = "/login"
   val AccessPath = "/access"
   val ActivateSendPath = "/activate/send"
-  val loginUri = URI.parse(LoginPath).buildUpon.appendQueryParameter("persist", "true").build
+  val loginUriStr = Request.query(LoginPath, ("persist", true))
 
   //TODO remove once logout issue is fixed: https://wearezeta.atlassian.net/browse/AN-4816
   val RequestId = "Request-Id"
