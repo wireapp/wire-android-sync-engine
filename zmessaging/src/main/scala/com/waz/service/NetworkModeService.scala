@@ -33,7 +33,7 @@ trait NetworkModeService {
   def isOnlineMode: Boolean
 }
 
-class DefaultNetworkModeService(context: Context, zmsLifecycle: ZmsLifecycle) extends NetworkModeService {
+class DefaultNetworkModeService(context: Context, zmsLifeCycle: ZmsLifeCycle) extends NetworkModeService {
   import NetworkModeService._
 
   private implicit val ev = EventContext.Global
@@ -43,7 +43,10 @@ class DefaultNetworkModeService(context: Context, zmsLifecycle: ZmsLifecycle) ex
 
   override val networkMode = returning(Signal[NetworkMode](NetworkMode.UNKNOWN)) { _.disableAutowiring() }
 
-  zmsLifecycle.lifecycleState { state => if (state == LifecycleState.UiActive) updateNetworkMode() }
+  zmsLifeCycle.uiActive {
+    case true => updateNetworkMode()
+    case _    => //
+  }
 
   val receiver = new BroadcastReceiver {
     override def onReceive(context: Context, intent: Intent): Unit = updateNetworkMode()

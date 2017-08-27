@@ -25,7 +25,7 @@ import com.waz.api.SyncState
 import com.waz.api.impl.SyncIndicator
 import com.waz.model.sync._
 import com.waz.model.{AccountId, ConvId, SyncId}
-import com.waz.service.{NetworkModeService, ReportingService, ZmsLifecycle}
+import com.waz.service.{NetworkModeService, ReportingService, ZmsLifeCycle}
 import com.waz.sync.SyncRequestServiceImpl.SyncMatcher
 import com.waz.sync.queue.{SyncContentUpdater, SyncScheduler, SyncSchedulerImpl}
 import com.waz.threading.SerialDispatchQueue
@@ -46,7 +46,7 @@ class SyncRequestServiceImpl(context:   Context,
                              network:   NetworkModeService,
                              sync: =>   SyncHandler,
                              reporting: ReportingService,
-                             lifecycle: ZmsLifecycle) extends SyncRequestService {
+                             lifecycle: ZmsLifeCycle) extends SyncRequestService {
 
   private implicit val tag = logTagFor[SyncRequestServiceImpl]
   private implicit val dispatcher = new SerialDispatchQueue(name = "SyncDispatcher")

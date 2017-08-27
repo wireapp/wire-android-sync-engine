@@ -53,7 +53,7 @@ import scala.concurrent.duration._
 import scala.util.Success
 import scala.util.control.NoStackTrace
 
-class ContactsService(context: Context, accountId: AccountId, teamId: Option[TeamId], accountStorage: AccountsStorage, lifecycle: ZmsLifecycle,
+class ContactsService(context: Context, accountId: AccountId, teamId: Option[TeamId], accountStorage: AccountsStorage, lifecycle: ZmsLifeCycle,
                       userPrefs: UserPreferences, users: UserServiceImpl, usersStorage: UsersStorageImpl,
                       timeouts: Timeouts, phoneNumbers: PhoneNumberService, storage: ZmsDatabase, sync: SyncServiceHandle,
                       convs: ConversationStorageImpl, permissions: PermissionsService) {
@@ -61,12 +61,11 @@ class ContactsService(context: Context, accountId: AccountId, teamId: Option[Tea
   import ContactsService._
   import EventContext.Implicits.global
   import Threading.Implicits.Background
-  import lifecycle._
   import timeouts.contacts._
 
-  lifecycleState.on(Background) {
-    case LifecycleState.UiActive => requestUploadIfNeeded()
-    case state =>
+  lifecycle.accInForeground(accountId).on(Background) {
+    case true => requestUploadIfNeeded()
+    case _ =>
   }(lifecycle)
 
   contactsObserver.onChanged.on(Background) { _ =>

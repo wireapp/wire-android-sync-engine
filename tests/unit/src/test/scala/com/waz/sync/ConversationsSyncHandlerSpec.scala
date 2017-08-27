@@ -137,7 +137,7 @@ import scala.concurrent.{Await, Future}
   feature("Error reporting") {
 
     scenario("create group conversation with unconnected user") {
-      service.lifecycle.setLoggedIn(true)
+//      service.lifecycle.setLoggedIn(true)
       val conv = insertConv(ConversationData(ConvId(), RConvId(), None, UserId(), ConversationType.Group))
       val user1 = UserId()
       val user2 = UserId()

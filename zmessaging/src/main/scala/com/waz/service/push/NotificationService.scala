@@ -40,7 +40,7 @@ import org.threeten.bp.Instant
 import scala.collection.breakOut
 import scala.concurrent.Future
 
-class NotificationService(context: Context, selfUserId: UserId, messages: MessagesStorageImpl, lifecycle: ZmsLifecycle,
+class NotificationService(context: Context, accountId: AccountId, selfUserId: UserId, messages: MessagesStorageImpl, lifeCycle: ZmsLifeCycle,
                           storage: NotificationStorage, usersStorage: UsersStorageImpl, convs: ConversationStorageImpl, reactionStorage: ReactionsStorage,
                           userPrefs: UserPreferences, timeouts: Timeouts, pushService: PushServiceImpl) {
 
@@ -58,7 +58,7 @@ class NotificationService(context: Context, selfUserId: UserId, messages: Messag
   //For UI to decide if it should make sounds or not
   val otherDeviceActiveTime = Signal(Instant.EPOCH)
 
-  val notifications = lifecycle.lifecycleState.zip(for {
+  val notifications = lifeCycle.accInForeground(accountId).zip(for {
     data <- storage.notifications.map(_.values.toIndexedSeq.sorted)
     uiVisibleTime <- lastUiVisibleTime.signal
   } yield {
@@ -66,7 +66,7 @@ class NotificationService(context: Context, selfUserId: UserId, messages: Messag
     if (data.forall(_.time.isBefore(uiVisibleTime))) Seq.empty[NotificationData] // no new messages, don't show anything
     else data
   }).flatMap {
-    case (LifecycleState.UiActive, _) => Signal.const(Seq.empty[NotificationInfo])
+    case (true, _) => Signal.const(Seq.empty[NotificationInfo])
     case (_, data) => Signal.future(createNotifications(data))
   }
 
@@ -83,13 +83,13 @@ class NotificationService(context: Context, selfUserId: UserId, messages: Messag
   def markAsDisplayed(ns: Seq[NotId]) = storage.updateAll2(ns, n => n.copy(hasBeenDisplayed = true))
 
   (for {
-    state <- lifecycle.lifecycleState
+    inForeground <- lifeCycle.accInForeground(accountId)
     drift <- pushService.beDrift //TODO BE do NOT want us to rely on this time, we should find a better way, but for now, it's better than using local time
-  } yield (state, drift)) { case (state, drift) =>
-    uiActive = returning(state == LifecycleState.UiActive) { active =>
-      if (active || uiActive) {
+  } yield (inForeground, drift)) { case (inForeground, drift) =>
+    uiActive = returning(inForeground) { inForeGround =>
+      if (inForeGround || uiActive) {
         val inst = Instant.now()
-        verbose(s"UI last active at $inst with BE drift: $drift")
+        verbose(s"Account last active at $inst with BE drift: $drift")
         lastUiVisibleTime := inst + drift
       }
     }

@@ -289,7 +289,7 @@ class AccountsServiceSpec extends AndroidFreeSpec {
     (globalModule.prefs _).expects().anyNumberOfTimes.returning(prefs)
     (globalModule.factory _).expects().anyNumberOfTimes.returning(new ZMessagingFactory(globalModule))
     (globalModule.context _).expects().anyNumberOfTimes().returning(null)
-    (globalModule.lifecycle _).expects().anyNumberOfTimes().returning(new ZmsLifecycleImpl)
+    (globalModule.lifecycle _).expects().anyNumberOfTimes().returning(new ZmsLifeCycleImpl)
 
     (phoneNumbers.normalize _).expects(*).anyNumberOfTimes().onCall { p: PhoneNumber => Future.successful(Some(p)) }
 

@@ -135,18 +135,18 @@ import scala.util.control.NoStackTrace
 
   after {
     ShadowLog.stream = null
-    if (api.account.exists(_.global.lifecycle.isUiActive)) {
-      api.onPause()
-      api.account foreach { acc =>
-        Thread.sleep(1000)
-        Await.result(acc.getZMessaging, 5.seconds) foreach { zms =>
-          val dbName = zms.db.dbHelper.getDatabaseName
-          Await.result(zms.db.close().flatMap(_ => zms.global.storage.close()), 5.seconds)
-          context.getDatabasePath(dbName).getParentFile.listFiles.foreach(_.delete())
-        }
-      }
-      api.onDestroy()
-    }
+//    if (api.account.exists(_.global.lifecycle.isUiActive)) {
+//      api.onPause()
+//      api.account foreach { acc =>
+//        Thread.sleep(1000)
+//        Await.result(acc.getZMessaging, 5.seconds) foreach { zms =>
+//          val dbName = zms.db.dbHelper.getDatabaseName
+//          Await.result(zms.db.close().flatMap(_ => zms.global.storage.close()), 5.seconds)
+//          context.getDatabasePath(dbName).getParentFile.listFiles.foreach(_.delete())
+//        }
+//      }
+//      api.onDestroy()
+//    }
 
     (ui.accounts.activeAccountPref := None).futureValue
   }

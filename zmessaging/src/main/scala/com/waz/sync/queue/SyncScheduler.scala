@@ -27,7 +27,7 @@ import com.waz.ZLog.ImplicitTag._
 import com.waz.api.NetworkMode
 import com.waz.model.sync.SyncJob
 import com.waz.model.{AccountId, ConvId, SyncId}
-import com.waz.service.{LifecycleState, NetworkModeService, ZmsLifecycle}
+import com.waz.service.{NetworkModeService, ZmsLifeCycle}
 import com.waz.sync.{SyncHandler, SyncRequestServiceImpl, SyncResult}
 import com.waz.threading.CancellableFuture.CancelException
 import com.waz.threading.{CancellableFuture, SerialDispatchQueue}
@@ -56,15 +56,15 @@ trait SyncScheduler {
   def reportString: Future[String]
 }
 
-class SyncSchedulerImpl(context: Context, userId: AccountId, val content: SyncContentUpdater, val network: NetworkModeService, service: SyncRequestServiceImpl, handler: => SyncHandler, lifecycle: ZmsLifecycle) extends SyncScheduler {
+class SyncSchedulerImpl(context: Context, accountId: AccountId, val content: SyncContentUpdater, val network: NetworkModeService, service: SyncRequestServiceImpl, handler: => SyncHandler, lifecycle: ZmsLifeCycle) extends SyncScheduler {
 
   import EventContext.Implicits.global
 
   private implicit val dispatcher = new SerialDispatchQueue(name = "SyncSchedulerQueue")
 
-  private[sync] lazy val alarmSyncIntent = Option(Context.unwrap(context)).map(PendingIntent.getService(_, SyncScheduler.AlarmRequestCode, SyncService.intent(context, userId), PendingIntent.FLAG_UPDATE_CURRENT))
+  private[sync] lazy val alarmSyncIntent = Option(Context.unwrap(context)).map(PendingIntent.getService(_, SyncScheduler.AlarmRequestCode, SyncService.intent(context, accountId), PendingIntent.FLAG_UPDATE_CURRENT))
   private[sync] lazy val alarmManager    = Option(Context.unwrap(context)).map(_.getSystemService(ALARM_SERVICE).asInstanceOf[AlarmManager])
-  private[sync] lazy val syncIntent      = Option(Context.unwrap(context)).map(SyncService.intent(_, userId))
+  private[sync] lazy val syncIntent      = Option(Context.unwrap(context)).map(SyncService.intent(_, accountId))
 
   override val queue                = new SyncSerializer
   private[sync] val executor        = new SyncExecutor(this, content, network, handler)
@@ -101,7 +101,7 @@ class SyncSchedulerImpl(context: Context, userId: AccountId, val content: SyncCo
       }
   }
 
-  lifecycle.lifecycleState.map(_ != LifecycleState.Stopped).on(dispatcher) {
+  lifecycle.accLoggedIn(accountId).on(dispatcher) {
     case true => waitEntries.foreach(_._2.onRestart())
     case false =>
   }

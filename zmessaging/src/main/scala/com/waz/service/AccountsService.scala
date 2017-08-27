@@ -77,7 +77,8 @@ class AccountsService(val global: GlobalModule) {
   // XXX Temporary stuff to handle team account in signup/signin - start
   private var _loggedInAccounts = Seq.empty[AccountData]
 
-  loggedInAccounts { accs =>
+  loggedInAccounts.onUi { accs =>
+    global.lifecycle.setLoggedIn(accs.map(_.id).toSet)
     verbose(s"Logged in accounts: ${accs.map(_.id)}")
     _loggedInAccounts = accs
   }
@@ -93,7 +94,10 @@ class AccountsService(val global: GlobalModule) {
   // XXX Temporary stuff to handle team account in signup/signin - end
 
   val activeAccountPref = prefs.preference(CurrentAccountPref)
-  activeAccountPref.signal(ac => verbose(s"Active account: $ac"))
+  activeAccountPref.signal.onUi { ac =>
+    verbose(s"Active account: $ac")
+    global.lifecycle.setActiveAccount(ac)
+  }
 
   lazy val activeAccount = activeAccountPref.signal.flatMap[Option[AccountData]] {
     case None     => Signal.const(None)

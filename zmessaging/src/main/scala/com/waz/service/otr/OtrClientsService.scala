@@ -36,14 +36,14 @@ import scala.collection.breakOut
 import scala.concurrent.Future
 import scala.concurrent.duration._
 
-class OtrClientsService(userId: UserId, clientId: Signal[Option[ClientId]], netClient: OtrClient, userPrefs: UserPreferences, storage: OtrClientsStorage, sync: SyncServiceHandle, lifecycle: ZmsLifecycle, updater: VerificationStateUpdater) {
+class OtrClientsService(userId: UserId, clientId: Signal[Option[ClientId]], netClient: OtrClient, userPrefs: UserPreferences, storage: OtrClientsStorage, sync: SyncServiceHandle, lifecycle: ZmsLifeCycle, updater: VerificationStateUpdater) {
 
   import com.waz.threading.Threading.Implicits.Background
   import com.waz.utils.events.EventContext.Implicits.global
 
   private lazy val lastSelfClientsSyncPref = userPrefs.preference(LastSelfClientsSyncRequestedTime)
 
-  lifecycle.lifecycleState.map(_ != LifecycleState.Stopped) {
+  lifecycle.loggedIn {
     case true => requestSyncIfNeeded()
     case false =>
   }

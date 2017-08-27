@@ -197,16 +197,9 @@ class AccountManager(val id: AccountId, val global: GlobalModule, accounts: Acco
     _zmessaging
   }).orElse(Signal const Option.empty[ZMessaging])
 
-  val isLoggedIn = for {
-    active   <- accounts.activeAccountPref.signal.map(_.contains(id))
-    loggedIn <- accounts.loggedInAccounts.map(_.map(_.id).contains(id))
-  } yield active || loggedIn
-
-  isLoggedIn.onUi { lifecycle.setLoggedIn }
-
   for {
     acc      <- accountData if acc.verified
-    loggedIn <- isLoggedIn  if loggedIn
+    loggedIn <- global.lifecycle.accLoggedIn(id)
     client   <- otrCurrentClient
     _        <- otrClients.map(_.size)
   } {
@@ -228,7 +221,7 @@ class AccountManager(val id: AccountId, val global: GlobalModule, accounts: Acco
 
   private var awaitActivationFuture = CancellableFuture successful Option.empty[AccountData]
 
-  private val shouldAwaitActivation = lifecycle.uiActive.zip(accountsStorage.optSignal(id)) map {
+  private val shouldAwaitActivation = lifecycle.accInForeground(id).zip(accountsStorage.optSignal(id)) map {
     case (true, Some(acc)) => !acc.verified && acc.password.isDefined && (acc.pendingPhone.isDefined || acc.pendingEmail.isDefined)
     case _ => false
   }
@@ -237,8 +230,6 @@ class AccountManager(val id: AccountId, val global: GlobalModule, accounts: Acco
     case true   => awaitActivationFuture = awaitActivationFuture.recover { case _: Throwable => () } flatMap { _ => awaitActivation(0) }
     case false  => awaitActivationFuture.cancel()("stop_await_activate")
   }
-
-  lifecycle.lifecycleState { state => verbose(s"lifecycle state: $state") }
 
   def logout(flushCredentials: Boolean): Future[Unit] = {
     verbose(s"logout($id, flushCredentials: $flushCredentials)")
@@ -428,12 +419,14 @@ class AccountManager(val id: AccountId, val global: GlobalModule, accounts: Acco
     CancellableFuture lift accountsStorage.get(id) flatMap {
       case None => CancellableFuture successful None
       case Some(data) if data.verified => CancellableFuture successful Some(data)
-      case Some(_) if !lifecycle.isUiActive => CancellableFuture successful None
       case Some(data) =>
-        CancellableFuture.lift(activate(data.id)) flatMap {
-          case Right(acc) if acc.verified => CancellableFuture successful Some(acc)
-          case _ =>
-            CancellableFuture.delay(ActivationThrottling.delay(retry)) flatMap { _ => awaitActivation(retry + 1) }
+        CancellableFuture.lift(lifecycle.accInForeground(id).head).flatMap {
+          case true => CancellableFuture.lift(activate(data.id)).flatMap {
+            case Right(acc) if acc.verified => CancellableFuture successful Some(acc)
+            case _ =>
+              CancellableFuture.delay(ActivationThrottling.delay(retry)) flatMap { _ => awaitActivation(retry + 1) }
+          }
+          case false => CancellableFuture.successful(None)
         }
     }
 

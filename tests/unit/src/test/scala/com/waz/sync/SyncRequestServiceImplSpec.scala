@@ -26,7 +26,6 @@ import com.waz.model._
 import com.waz.model.sync.SyncJob.Priority
 import com.waz.model.sync.SyncRequest._
 import com.waz.model.sync.{SyncCommand => Cmd, _}
-import com.waz.service.LifecycleState
 import com.waz.sync.queue.ConvLock
 import com.waz.testutils.Matchers._
 import com.waz.testutils.{MockUserModule, MockZMessaging}

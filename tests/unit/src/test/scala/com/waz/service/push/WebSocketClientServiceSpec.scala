@@ -43,7 +43,7 @@ import scala.concurrent.duration._
     }
   }
 
-  lazy val lifecycle: ZmsLifecycle = new ZmsLifecycleImpl
+  lazy val lifecycle: ZmsLifeCycle = new ZmsLifeCycleImpl
   lazy val network = new DefaultNetworkModeService(context, lifecycle)
   lazy val prefs = GlobalPreferences(context)
   lazy val meta = new MetaDataService(context)

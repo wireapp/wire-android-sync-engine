@@ -18,8 +18,8 @@
 package com.waz.zms
 
 import com.waz.model.otr.ClientId
-import com.waz.model.{ConvId, Uid, UserId}
-import com.waz.service.ZmsLifecycle
+import com.waz.model.{AccountId, ConvId, Uid, UserId}
+import com.waz.service.ZmsLifeCycle
 import com.waz.service.conversation.ConversationsContentUpdater
 import com.waz.service.otr.OtrService
 import com.waz.service.push.PushService
@@ -34,18 +34,19 @@ import scala.concurrent.Future
 
 class FCMHandlerSpec extends AndroidFreeSpec {
 
+  val accountId = AccountId()
   val otrService = mock[OtrService]
-  val lifecycle = mock[ZmsLifecycle]
+  val lifecycle = mock[ZmsLifeCycle]
   val push = mock[PushService]
   val self = UserId()
   val convsContent = mock[ConversationsContentUpdater]
 
-  var lifecycleActive = Signal(false)
+  var accInForeground = Signal(false)
   var cloudNotsToHandle = Signal(Set.empty[Uid])
 
   override protected def afterEach() = {
     super.afterEach()
-    lifecycleActive = Signal(false)
+    accInForeground = Signal(false)
     cloudNotsToHandle = Signal(Set.empty[Uid])
   }
 
@@ -120,8 +121,8 @@ class FCMHandlerSpec extends AndroidFreeSpec {
 
 
   def initHandler = {
-    (lifecycle.active _).expects().anyNumberOfTimes().returning(lifecycleActive)
+    (lifecycle.accInForeground _).expects(accountId).anyNumberOfTimes().returning(accInForeground)
     (push.cloudPushNotificationsToProcess _).expects().anyNumberOfTimes().returning(cloudNotsToHandle)
-    new FCMHandler(otrService, lifecycle, push, self, convsContent)
+    new FCMHandler(accountId, otrService, lifecycle, push, self, convsContent)
   }
 }

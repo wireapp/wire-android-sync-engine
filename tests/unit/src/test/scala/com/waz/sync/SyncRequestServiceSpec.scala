@@ -44,9 +44,9 @@ class SyncRequestServiceSpec extends AndroidFreeSpec {
   val network   = mock[NetworkModeService]
   val sync      = mock[SyncHandler]
   val reporting = mock[ReportingService]
-  val lifecycle = mock[ZmsLifecycle]
+  val lifecycle = mock[ZmsLifeCycle]
 
-  val lifeCycleState = Signal(LifecycleState.Active)
+  val lifeCycleActive = Signal(true)
 
   val timeouts = new Timeouts
 
@@ -79,7 +79,7 @@ class SyncRequestServiceSpec extends AndroidFreeSpec {
     (network.networkMode _).expects().anyNumberOfTimes().returning(networkMode)
     (network.isOnlineMode _).expects().anyNumberOfTimes().returning(false)
     (reporting.addStateReporter(_: (PrintWriter) => Future[Unit])(_: LogTag)).expects(*, *)
-    (lifecycle.lifecycleState _).expects().once().returning(lifeCycleState)
+    (lifecycle.loggedIn _).expects().once().returning(lifeCycleActive)
 
     val content = new SyncContentUpdaterImpl(db)
     val service = new SyncRequestServiceImpl(context, accountId, content, network, sync, reporting, lifecycle)

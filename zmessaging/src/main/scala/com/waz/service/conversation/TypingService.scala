@@ -32,7 +32,7 @@ import com.waz.utils.events.{AggregatingSignal, EventContext, EventStream}
 import scala.concurrent.Future
 import scala.concurrent.duration._
 
-class TypingService(conversations: ConversationStorageImpl, timeouts: Timeouts, lifecycle: ZmsLifecycle, sync: SyncServiceHandle) {
+class TypingService(accountId: AccountId, conversations: ConversationStorageImpl, timeouts: Timeouts, lifecycle: ZmsLifeCycle, sync: SyncServiceHandle) {
   import timeouts.typing._
 
   private implicit val ev = EventContext.Global
@@ -49,8 +49,8 @@ class TypingService(conversations: ConversationStorageImpl, timeouts: Timeouts, 
 
   val typingEventStage = EventScheduler.Stage[TypingEvent]((c, es) => processSequential(es filter isRecent)(handleTypingEvent))
 
-  lifecycle.lifecycleState.on(dispatcher) {
-    case LifecycleState.UiActive => // fine
+  lifecycle.accInForeground(accountId).on(dispatcher) {
+    case true => // fine
     case _ => stopTyping()
   }
 

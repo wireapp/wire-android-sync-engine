@@ -22,6 +22,7 @@ import com.waz.ZLog.ImplicitTag._
 import com.waz.api
 import com.waz.api.MessageContent.Asset.ErrorHandler
 import com.waz.api.MessageContent.Text
+import com.waz.api.NetworkMode.{OFFLINE, WIFI}
 import com.waz.api.impl._
 import com.waz.api.{EphemeralExpiration, ImageAssetFactory, Message, NetworkMode}
 import com.waz.content._
@@ -86,21 +87,22 @@ trait ConversationsUiService {
   def assetUploadFailed    : EventStream[ErrorResponse]
 }
 
-class ConversationsUiServiceImpl( self:            UserId,
-                                  assets:          AssetService,
-                                  users:           UserService,
-                                  usersStorage:    UsersStorage,
-                                  messages:        MessagesService,
-                                  messagesContent: MessagesContentUpdater,
-                                  members:         MembersStorage,
-                                  assetStorage:    AssetsStorage,
-                                  convsContent:    ConversationsContentUpdater,
-                                  convStorage:     ConversationStorage,
-                                  network:         NetworkModeService,
-                                  convs:           ConversationsService,
-                                  sync:            SyncServiceHandle,
-                                  lifecycle:       ZmsLifecycle,
-                                  errors:          ErrorsService) extends ConversationsUiService {
+class ConversationsUiServiceImpl(accountId:       AccountId,
+                                 self:            UserId,
+                                 assets:          AssetService,
+                                 users:           UserService,
+                                 usersStorage:    UsersStorage,
+                                 messages:        MessagesService,
+                                 messagesContent: MessagesContentUpdater,
+                                 members:         MembersStorage,
+                                 assetStorage:    AssetsStorage,
+                                 convsContent:    ConversationsContentUpdater,
+                                 convStorage:     ConversationStorage,
+                                 network:         NetworkModeService,
+                                 convs:           ConversationsService,
+                                 sync:            SyncServiceHandle,
+                                 lifecycle:       ZmsLifeCycle,
+                                 errors:          ErrorsService) extends ConversationsUiService {
   import ConversationsUiService._
   import Threading.Implicits.Background
 
@@ -437,10 +439,15 @@ class ConversationsUiServiceImpl( self:            UserId,
 
   private def shouldWarnAboutFileSize(size: Long) =
     if (size < LargeAssetWarningThresholdInBytes) Future successful None
-    else network.networkMode.head map {
-      case api.NetworkMode.OFFLINE | api.NetworkMode.WIFI => None
-      case net if lifecycle.isUiActive => Some(net)
-      case _ => None
+    else for {
+      mode         <- network.networkMode.head
+      inForeground <- lifecycle.accInForeground(accountId).head
+    } yield {
+      (mode, inForeground) match {
+        case (OFFLINE | WIFI, _) => None
+        case (net, true) => Some(net)
+        case _ => None
+      }
     }
 
   private def showLargeFileWarning(convId: ConvId, size: Long, mime: Mime, net: NetworkMode, message: MessageData, handler: ErrorHandler) = {

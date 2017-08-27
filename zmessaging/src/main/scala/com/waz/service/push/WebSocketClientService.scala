@@ -23,7 +23,6 @@ import com.waz.ZLog.ImplicitTag._
 import com.waz.ZLog._
 import com.waz.api.NetworkMode
 import com.waz.model.otr.ClientId
-import com.waz.service.LifecycleState._
 import com.waz.service._
 import com.waz.threading.{CancellableFuture, SerialDispatchQueue}
 import com.waz.utils.events.{EventContext, EventStream, Signal}
@@ -35,7 +34,7 @@ import scala.concurrent.Future
 import scala.concurrent.duration._
 
 class WebSocketClientService(context:     Context,
-                             lifecycle:   ZmsLifecycle,
+                             lifecycle:   ZmsLifeCycle,
                              netClient:   ZNetClient,
                              auth:        AuthenticationManager,
                              val network: DefaultNetworkModeService,
@@ -55,8 +54,8 @@ class WebSocketClientService(context:     Context,
   // true if web socket should be active,
   val wsActive = network.networkMode.flatMap {
     case NetworkMode.OFFLINE => Signal const false
-    case _ => lifecycle.lifecycleState.flatMap {
-      case Stopped => Signal const false
+    case _ => lifecycle.loggedIn.flatMap {
+      case false => Signal const false
       case _ => useWebSocketFallback
     }.flatMap {
       case true => Signal.const(true)
@@ -67,14 +66,14 @@ class WebSocketClientService(context:     Context,
     }
   }
 
-  val client = wsActive.zip(lifecycle.lifecycleState) map {
-    case (true, state) =>
+  val client = wsActive.zip(lifecycle.idle) map {
+    case (true, idle) =>
       debug(s"Active, client: $clientId")
 
       if (prevClient.isEmpty)
         prevClient = Some(createWebSocketClient(clientId))
 
-      if (state == Idle) {
+      if (idle) {
         // start android service to keep the app running while we need to be connected.
         com.waz.zms.WebSocketService(context)
       }

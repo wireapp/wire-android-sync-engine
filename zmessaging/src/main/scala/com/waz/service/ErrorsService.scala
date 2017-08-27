@@ -34,9 +34,8 @@ import scala.collection.{breakOut, mutable}
 import scala.concurrent.Future
 import com.waz.utils._
 
-class ErrorsService(context: Context, storage: ZmsDatabase, lifecycle: ZmsLifecycle, messages: MessagesStorageImpl) {
+class ErrorsService(accountId: AccountId, context: Context, storage: ZmsDatabase, lifeCycle: ZmsLifeCycle, messages: MessagesStorageImpl) {
   import com.waz.utils.events.EventContext.Implicits.global
-  import lifecycle._
 
   private implicit val dispatcher = new SerialDispatchQueue(name = "ErrorsService")
 
@@ -89,8 +88,10 @@ class ErrorsService(context: Context, storage: ZmsDatabase, lifecycle: ZmsLifecy
   }
 
   def addErrorWhenActive(error: ErrorData) =
-    if (isUiActive) errorsStorage.insert(error)
-    else dismissed(error)
+    lifeCycle.accInForeground(accountId).head.flatMap {
+      case true => errorsStorage.insert(error)
+      case false => dismissed(error)
+    }
 
   def addError(error: ErrorData) = errorsStorage.insert(error)
 

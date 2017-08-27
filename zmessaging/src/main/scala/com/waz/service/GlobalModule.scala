@@ -80,7 +80,7 @@ trait GlobalModule {
   def blacklistClient: VersionBlacklistClient
   def blacklist: VersionBlacklistService
   def factory: ZMessagingFactory
-  def lifecycle: ZmsLifecycle
+  def lifecycle: ZmsLifeCycle
 }
 
 class GlobalModuleImpl(val context: AContext, val backend: BackendConfig) extends GlobalModule { global =>
@@ -138,6 +138,6 @@ class GlobalModuleImpl(val context: AContext, val backend: BackendConfig) extend
 
   lazy val factory                                               = new ZMessagingFactory(this)
 
-  val lifecycle: ZmsLifecycle = new ZmsLifecycleImpl()
+  val lifecycle: ZmsLifeCycle = new ZmsLifeCycleImpl()
 }
 

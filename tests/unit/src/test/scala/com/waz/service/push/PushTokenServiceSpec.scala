@@ -20,7 +20,7 @@ package com.waz.service.push
 import com.waz.content.GlobalPreferences.PushEnabledKey
 import com.waz.content.{AccountsStorage, GlobalPreferences}
 import com.waz.model._
-import com.waz.service.ZmsLifecycle
+import com.waz.service.ZmsLifeCycle
 import com.waz.specs.AndroidFreeSpec
 import com.waz.sync.SyncServiceHandle
 import com.waz.testutils.TestGlobalPreferences
@@ -34,7 +34,7 @@ import scala.concurrent.Future
 class PushTokenServiceSpec extends AndroidFreeSpec {
 
   val google      = mock[GoogleApi]
-  val lifecycle   = mock[ZmsLifecycle]
+  val lifecycle   = mock[ZmsLifeCycle]
   val accStorage  = mock[AccountsStorage]
   val prefs       = new TestGlobalPreferences()
 
@@ -45,7 +45,8 @@ class PushTokenServiceSpec extends AndroidFreeSpec {
   val currentToken        = prefs.preference(GlobalPreferences.PushToken)
 
   val googlePlayAvailable = Signal(false)
-  val lifecycleActive     = Signal(false)
+  val accInForeground     = Signal(false)
+  val accountSignal       = Signal[AccountData]()
 
   val loggedInAccounts    = Signal(Set.empty[AccountData])
 
@@ -195,14 +196,14 @@ class PushTokenServiceSpec extends AndroidFreeSpec {
       loggedInAccounts ! Set(accountData(accountId, token))
       pushEnabled := true
       googlePlayAvailable ! true
-      lifecycleActive ! true //websocket should be open
+      accInForeground ! true //websocket should be open
       currentToken := Some(token)
 
       val service = initTokenService()
 
       result(service.pushActive.filter(_ == false).head)
 
-      lifecycleActive ! false //websocket should be off - use push again
+      accInForeground ! false //websocket should be off - use push again
       result(service.pushActive.filter(_ == true).head)
     }
 
@@ -301,7 +302,7 @@ class PushTokenServiceSpec extends AndroidFreeSpec {
     (accStorage.signal _).expects(*).anyNumberOfTimes().onCall { id: AccountId =>
       loggedInAccounts.map(_.find(_.id == id)).collect { case Some(acc) => acc }
     }
-    (lifecycle.active _).expects().anyNumberOfTimes().returning(lifecycleActive)
+    (lifecycle.accInForeground _).expects(accountId).anyNumberOfTimes().returning(accInForeground)
     (accStorage.update _).expects(*, *).anyNumberOfTimes().onCall { (id, f) =>
       Future.successful {
         val account = loggedInAccounts.currentValue("").flatMap(_.find(_.id == id))

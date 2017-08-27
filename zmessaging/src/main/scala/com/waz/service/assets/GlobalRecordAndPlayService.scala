@@ -33,7 +33,7 @@ import com.waz.cache.{CacheEntry, CacheService, Expiration}
 import com.waz.model._
 import com.waz.service.assets.AudioLevels.peakLoudness
 import com.waz.service.media.SpotifyMediaService.Authentication
-import com.waz.service.{ErrorsService, ZmsLifecycle}
+import com.waz.service.{ErrorsService, ZmsLifeCycle}
 import com.waz.threading.Threading
 import com.waz.utils._
 import com.waz.utils.events.{ClockSignal, EventContext, EventStream, Signal}
@@ -47,7 +47,7 @@ import scala.concurrent.{Future, Promise}
 import scala.util.Failure
 import scala.util.control.{NoStackTrace, NonFatal}
 
-class RecordAndPlayService(globalService: GlobalRecordAndPlayService, errors: ErrorsService, lifecycle: ZmsLifecycle) {
+class RecordAndPlayService(accountId: AccountId, globalService: GlobalRecordAndPlayService, errors: ErrorsService, lifecycle: ZmsLifeCycle) {
   import EventContext.Implicits.global
   import Threading.Implicits.Background
 
@@ -55,7 +55,7 @@ class RecordAndPlayService(globalService: GlobalRecordAndPlayService, errors: Er
     err.tpe.foreach { tpe => errors.addErrorWhenActive(ErrorData(Uid(), tpe, responseMessage = err.message)) }
   }
 
-  lifecycle.uiActive.onChanged.on(Background) {
+  lifecycle.accInForeground(accountId).onChanged.on(Background) {
     case false => globalService.AudioFocusListener.onAudioFocusChange(AudioManager.AUDIOFOCUS_LOSS)
     case true =>
   }(EventContext.Global)

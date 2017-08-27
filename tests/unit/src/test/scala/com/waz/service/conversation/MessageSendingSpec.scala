@@ -52,25 +52,26 @@ import scala.collection.mutable
 class MessageSendingSpec extends AndroidFreeSpec { test =>
   implicit lazy val dispatcher = Threading.Background
 
+  val accountId = AccountId()
   lazy val selfUser = UserData("self user")
   lazy val conv = ConversationData(ConvId(), RConvId(), Some("convName"), selfUser.id, ConversationType.Group)
   
   private def stubService(
-    assets:          AssetService                 = stub[AssetService],
-    users:           UserService                  = stub[UserService],
-    usersStorage:    UsersStorage                 = stub[UsersStorage],
-    messages:        MessagesService              = stub[MessagesService],
-    messagesContent: MessagesContentUpdater       = null, //stub[MessagesContentUpdater],
-    members:         MembersStorage               = stub[MembersStorage],
-    assetStorage:    AssetsStorage                = null, //stub[AssetsStorage],
-    convsContent:    ConversationsContentUpdater  = stub[ConversationsContentUpdater],
-    convStorage:     ConversationStorage          = stub[ConversationStorage],
-    network:         NetworkModeService           = stub[NetworkModeService],
-    convs:           ConversationsService         = null, //stub[ConversationsService],
-    sync:            SyncServiceHandle            = stub[SyncServiceHandle],
-    lifecycle:       ZmsLifecycle                 = stub[ZmsLifecycle],
-    errors:          ErrorsService                = null //stub[ErrorsService]
-  ) = new ConversationsUiServiceImpl(
+                           assets:          AssetService                 = stub[AssetService],
+                           users:           UserService                  = stub[UserService],
+                           usersStorage:    UsersStorage                 = stub[UsersStorage],
+                           messages:        MessagesService              = stub[MessagesService],
+                           messagesContent: MessagesContentUpdater       = null, //stub[MessagesContentUpdater],
+                           members:         MembersStorage               = stub[MembersStorage],
+                           assetStorage:    AssetsStorage                = null, //stub[AssetsStorage],
+                           convsContent:    ConversationsContentUpdater  = stub[ConversationsContentUpdater],
+                           convStorage:     ConversationStorage          = stub[ConversationStorage],
+                           network:         NetworkModeService           = stub[NetworkModeService],
+                           convs:           ConversationsService         = null, //stub[ConversationsService],
+                           sync:            SyncServiceHandle            = stub[SyncServiceHandle],
+                           lifecycle:       ZmsLifeCycle                 = stub[ZmsLifeCycle],
+                           errors:          ErrorsService                = null //stub[ErrorsService]
+  ) = new ConversationsUiServiceImpl(accountId,
     UserId(), assets, users, usersStorage, messages, messagesContent, members,
     assetStorage, convsContent, convStorage, network, convs, sync, lifecycle, errors
   )

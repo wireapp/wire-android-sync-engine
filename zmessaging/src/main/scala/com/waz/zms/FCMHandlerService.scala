@@ -26,7 +26,7 @@ import com.waz.model._
 import com.waz.service.conversation.ConversationsContentUpdater
 import com.waz.service.otr.OtrService
 import com.waz.service.push.PushService
-import com.waz.service.{ZMessaging, ZmsLifecycle}
+import com.waz.service.{ZMessaging, ZmsLifeCycle}
 import com.waz.sync.client.PushNotification
 import com.waz.threading.SerialDispatchQueue
 import com.waz.utils.{JsonDecoder, LoggedTry}
@@ -104,8 +104,9 @@ object FCMHandlerService {
 
   val UserKeyMissingMsg = "Notification did not contain user key - discarding"
 
-  class FCMHandler(otrService:   OtrService,
-                   lifecycle:    ZmsLifecycle,
+  class FCMHandler(accountId:    AccountId,
+                   otrService:   OtrService,
+                   lifecycle:    ZmsLifeCycle,
                    push:         PushService,
                    self:         UserId,
                    convsContent: ConversationsContentUpdater) {
@@ -140,7 +141,7 @@ object FCMHandlerService {
       }
 
     private def addNotificationToProcess(nId: Uid): Future[Unit] = {
-      lifecycle.active.head flatMap {
+      lifecycle.accInForeground(accountId).head flatMap {
         case true => Future.successful(()) // no need to process GCM when ui is active
         case _ =>
           verbose(s"addNotification: $nId")
@@ -151,7 +152,7 @@ object FCMHandlerService {
 
   object FCMHandler {
     def apply(zms: ZMessaging, data: Map[String, String]): Future[Unit] =
-      new FCMHandler(zms.otrService, zms.lifecycle, zms.push, zms.selfUserId, zms.convsContent).handleMessage(data)
+      new FCMHandler(zms.accountId, zms.otrService, zms.lifecycle, zms.push, zms.selfUserId, zms.convsContent).handleMessage(data)
   }
 
   val DataKey = "data"

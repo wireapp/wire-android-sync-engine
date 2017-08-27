@@ -23,7 +23,7 @@ import com.waz.ZLog.{verbose, warn}
 import com.waz.content.GlobalPreferences.{CurrentAccountPref, PushEnabledKey}
 import com.waz.content.{AccountsStorage, GlobalPreferences}
 import com.waz.model.{AccountId, PushToken, PushTokenRemoveEvent}
-import com.waz.service.{EventScheduler, ZmsLifecycle}
+import com.waz.service.{EventScheduler, ZmsLifeCycle}
 import com.waz.sync.SyncServiceHandle
 import com.waz.threading.SerialDispatchQueue
 import com.waz.utils.events.{EventContext, Signal}
@@ -39,7 +39,7 @@ import scala.util.control.NonFatal
 class PushTokenService(googleApi:    GoogleApi,
                        globalToken:  GlobalTokenService,
                        prefs:        GlobalPreferences,
-                       lifeCycle:    ZmsLifecycle,
+                       lifeCycle:    ZmsLifeCycle,
                        accountId:    AccountId,
                        loggedInAccs: Signal[Set[AccountId]],
                        accStorage:   AccountsStorage,
@@ -60,7 +60,7 @@ class PushTokenService(googleApi:    GoogleApi,
   val pushActive = (for {
     push           <- pushEnabled.signal                      if push
     play           <- googleApi.isGooglePlayServicesAvailable if play
-    lcActive       <- lifeCycle.active                        if !lcActive
+    inForeground   <- lifeCycle.accInForeground(accountId)    if !inForeground
     current        <- currentToken.signal                     if current.isDefined
     userRegistered <- userToken.map(_ == current)
   } yield userRegistered)
