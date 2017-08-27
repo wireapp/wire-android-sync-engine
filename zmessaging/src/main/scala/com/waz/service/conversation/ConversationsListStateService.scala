@@ -71,7 +71,7 @@ class ConversationsListStateService(convs: ConversationStorageImpl, userPrefs: U
   private def addToCounts(c: ConversationData, sign: Int): Unit = listStats mutate { stats =>
     val sgn = math.signum(sign)
     stats.copy(
-      unreadCount = stats.unreadCount + sgn * c.unreadCount,
+      unreadCount = stats.unreadCount + sgn * c.unreadCount.messages,
       unsentCount = stats.unsentCount + sgn * c.failedCount,
       pendingCount = stats.pendingCount + (if (c.convType == ConversationType.WaitForConnection) sgn else 0)
     )

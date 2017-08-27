@@ -20,7 +20,7 @@ package com.waz.model
 import com.waz.api.{EphemeralExpiration, IConversation, Verification}
 import com.waz.db.Col._
 import com.waz.db.{Dao, Dao2}
-import com.waz.model.ConversationData.ConversationType
+import com.waz.model.ConversationData.{ConversationType, UnreadCount}
 import com.waz.service.SearchKey
 import com.waz.utils.wrappers.{DB, DBCursor}
 import com.waz.utils.{JsonDecoder, JsonEncoder, _}
@@ -44,7 +44,7 @@ case class ConversationData(id:                   ConvId,
                             cleared:              Instant             = Instant.EPOCH,
                             generatedName:        String              = "",
                             searchKey:            Option[SearchKey]   = None,
-                            unreadCount:          Int                 = 0,
+                            unreadCount:          UnreadCount         = UnreadCount(0, 0, 0),
                             failedCount:          Int                 = 0,
                             missedCallMessage:    Option[MessageId]   = None,
                             incomingKnockMessage: Option[MessageId]   = None,
@@ -95,6 +95,11 @@ object ConversationData {
 
   val Empty = ConversationData(ConvId(), RConvId(), None, UserId(), IConversation.Type.UNKNOWN)
 
+  case class UnreadCount(normal: Int, call: Int, ping: Int) {
+    def total = normal + call + ping
+    def messages = normal + ping
+  }
+
   // total (!) ordering for use in ordered sets; handwritten (instead of e.g. derived from tuples) to avoid allocations
   implicit val ConversationDataOrdering: Ordering[ConversationData] = new Ordering[ConversationData] {
     override def compare(b: ConversationData, a: ConversationData): Int =
@@ -142,7 +147,7 @@ object ConversationData {
       cleared              = decodeInstant('cleared),
       generatedName        = 'generatedName,
       searchKey            = decodeOptString('name) map SearchKey,
-      unreadCount          = 'unreadCount,
+      unreadCount          = UnreadCount('unreadCount, 'unreadCallCount, 'unreadPingCount),
       failedCount          = 'failedCount,
       missedCallMessage    = decodeOptMessageId('missedCallMessage),
       incomingKnockMessage = decodeOptMessageId('incomingKnockMessage),
@@ -170,7 +175,9 @@ object ConversationData {
       o.put("archiveTime", c.archiveTime.toEpochMilli)
       o.put("cleared", c.cleared.toEpochMilli)
       o.put("generatedName", c.generatedName)
-      o.put("unreadCount", c.unreadCount)
+      o.put("unreadCount", c.unreadCount.normal)
+      o.put("unreadCallCount", c.unreadCount.call)
+      o.put("unreadPingCount", c.unreadCount.ping)
       o.put("failedCount", c.failedCount)
       c.missedCallMessage foreach (id => o.put("missedCallMessage", id.str))
       c.incomingKnockMessage foreach (id => o.put("incomingKnockMessage", id.str))
@@ -198,7 +205,9 @@ object ConversationData {
     val Cleared       = timestamp('cleared)(_.cleared)
     val GeneratedName = text('generated_name)(_.generatedName)
     val SKey          = opt(text[SearchKey]('search_key, _.asciiRepresentation, SearchKey.unsafeRestore))(_.searchKey)
-    val UnreadCount   = int('unread_count)(_.unreadCount)
+    val UnreadCount   = int('unread_count)(_.unreadCount.normal)
+    val UnreadCallCount  = int('unread_call_count)(_.unreadCount.call)
+    val UnreadPingCount  = int('unread_ping_count)(_.unreadCount.ping)
     val FailedCount   = int('unsent_count)(_.failedCount)
     val Hidden        = bool('hidden)(_.hidden)
     val MissedCall    = opt(id[MessageId]('missed_call))(_.missedCallMessage)
@@ -207,9 +216,9 @@ object ConversationData {
     val Ephemeral     = long[EphemeralExpiration]('ephemeral, _.milliseconds, EphemeralExpiration.getForMillis)(_.ephemeral)
 
     override val idCol = Id
-    override val table = Table("Conversations", Id, RemoteId, Name, Creator, ConvType, Team, IsManaged, LastEventTime, IsActive, LastRead, Muted, MutedTime, Archived, ArchivedTime, Cleared, GeneratedName, SKey, UnreadCount, FailedCount, Hidden, MissedCall, IncomingKnock, Verified, Ephemeral)
+    override val table = Table("Conversations", Id, RemoteId, Name, Creator, ConvType, Team, IsManaged, LastEventTime, IsActive, LastRead, Muted, MutedTime, Archived, ArchivedTime, Cleared, GeneratedName, SKey, UnreadCount, FailedCount, Hidden, MissedCall, IncomingKnock, Verified, Ephemeral, UnreadCallCount, UnreadPingCount)
 
-    override def apply(implicit cursor: DBCursor): ConversationData = ConversationData(Id, RemoteId, Name, Creator, ConvType, Team, IsManaged, LastEventTime, IsActive, LastRead, Muted, MutedTime, Archived, ArchivedTime, Cleared, GeneratedName, SKey, UnreadCount, FailedCount, MissedCall, IncomingKnock, Hidden, Verified, Ephemeral)
+    override def apply(implicit cursor: DBCursor): ConversationData = ConversationData(Id, RemoteId, Name, Creator, ConvType, Team, IsManaged, LastEventTime, IsActive, LastRead, Muted, MutedTime, Archived, ArchivedTime, Cleared, GeneratedName, SKey, ConversationData.UnreadCount(UnreadCount, UnreadCallCount, UnreadPingCount), FailedCount, MissedCall, IncomingKnock, Hidden, Verified, Ephemeral)
 
     import com.waz.model.ConversationData.ConversationType._
 

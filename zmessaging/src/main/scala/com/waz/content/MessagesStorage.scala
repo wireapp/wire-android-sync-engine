@@ -23,6 +23,7 @@ import android.content.Context
 import com.waz.ZLog.ImplicitTag._
 import com.waz.ZLog._
 import com.waz.api.{ErrorResponse, Message, MessageFilter}
+import com.waz.model.ConversationData.UnreadCount
 import com.waz.model.MessageData.{MessageDataDao, MessageEntry}
 import com.waz.model._
 import com.waz.service.Timeouts
@@ -137,10 +138,15 @@ class MessagesStorageImpl(context: Context, storage: ZmsDatabase, userId: UserId
 
   override def addMessage(msg: MessageData) = put(msg.id, msg)
 
-  def countUnread(conv: ConvId, lastReadTime: Instant): Future[Int] = {
+  def countUnread(conv: ConvId, lastReadTime: Instant): Future[UnreadCount] = {
     storage { MessageDataDao.findMessagesFrom(conv, lastReadTime)(_) }.future.map { msgs =>
-      msgs.acquire { _.count { m =>
-        !m.isLocal && m.convId == conv && m.time.isAfter(lastReadTime) && !m.isDeleted && !m.isSystemMessage }
+      msgs.acquire { msgs =>
+        val unread = msgs filter { m => !m.isLocal && m.convId == conv && m.time.isAfter(lastReadTime) && !m.isDeleted }
+        UnreadCount(
+          unread.count(m => !m.isSystemMessage && m.msgType != Message.Type.KNOCK),
+          unread.count(_.msgType == Message.Type.MISSED_CALL),
+          unread.count(_.msgType == Message.Type.KNOCK)
+        )
       }
     }
   }
@@ -165,7 +171,7 @@ class MessagesStorageImpl(context: Context, storage: ZmsDatabase, userId: UserId
 
   def getLastSentMessage(conv: ConvId) = msgsIndex(conv).flatMap(_.getLastSentMessage)
 
-  def unreadCount(conv: ConvId): Signal[Int] = Signal.future(msgsIndex(conv)).flatMap(_.signals.unreadCount)
+  def unreadCount(conv: ConvId): Signal[Int] = Signal.future(msgsIndex(conv)).flatMap(_.signals.unreadCount).map(_.messages)
 
   def lastRead(conv: ConvId) = Signal.future(msgsIndex(conv)).flatMap(_.signals.lastReadTime)
 

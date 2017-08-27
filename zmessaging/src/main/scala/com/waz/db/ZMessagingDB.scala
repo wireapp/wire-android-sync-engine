@@ -19,7 +19,6 @@ package com.waz.db
 
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
-import com.waz.api.ZmsVersion
 import com.waz.db.ZMessagingDB.{DbVersion, daos, migrations}
 import com.waz.db.migrate._
 import com.waz.model.AddressBook.ContactHashesDao
@@ -53,7 +52,7 @@ class ZMessagingDB(context: Context, dbName: String) extends DaoDB(context.getAp
 }
 
 object ZMessagingDB {
-  val DbVersion = 94
+  val DbVersion = 95
 
   lazy val daos = Seq (
     UserDataDao, SearchQueryCacheDao, AssetDataDao, ConversationDataDao,
@@ -166,6 +165,10 @@ object ZMessagingDB {
     },
     Migration(93, 94) { db =>
       db.execSQL("UPDATE KeyValues SET value = 'true' WHERE key = 'should_sync_teams'")
+    },
+    Migration(94, 95) { db =>
+      db.execSQL("ALTER TABLE Conversations ADD COLUMN unread_call_count INTEGER DEFAULT 0")
+      db.execSQL("ALTER TABLE Conversations ADD COLUMN unread_ping_count INTEGER DEFAULT 0")
     }
   )
 }

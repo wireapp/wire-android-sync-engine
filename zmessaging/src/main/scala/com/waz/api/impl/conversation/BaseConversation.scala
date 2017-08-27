@@ -95,7 +95,7 @@ abstract class BaseConversation(implicit ui: UiModule) extends IConversation wit
 
   override def hasMissedCall: Boolean = data.missedCallMessage.isDefined
 
-  override def getUnreadCount: Int = data.unreadCount
+  override def getUnreadCount: Int = data.unreadCount.messages
 
   override def getFailedCount: Int = data.failedCount
 
