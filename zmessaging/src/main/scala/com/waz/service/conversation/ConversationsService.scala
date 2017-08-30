@@ -72,7 +72,9 @@ class ConversationsService(context:         Context,
     verbose(s"onSlowSyncNeeded($req)")
     for {
       _ <- if (req.lostHistory) onHistoryLost() else successful(())
-      _ <- sync.syncConversations()
+      processing <- push.processing.head
+      if !processing
+        _ <- sync.syncConversations()
       _ <- sync.syncTeam()
     } yield ()
   }

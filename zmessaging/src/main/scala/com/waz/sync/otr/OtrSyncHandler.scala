@@ -33,6 +33,7 @@ import com.waz.service.assets.AssetService
 import com.waz.service.conversation.ConversationsService
 import com.waz.service.messages.MessagesServiceImpl
 import com.waz.service.otr.OtrServiceImpl
+import com.waz.service.push.PushServiceSignals
 import com.waz.service.{ErrorsService, UserServiceImpl}
 import com.waz.sync.SyncResult
 import com.waz.sync.client.AssetClient.UploadResponse
@@ -55,7 +56,7 @@ trait OtrSyncHandler {
 
 class OtrSyncHandlerImpl(client: OtrClient, msgClient: MessagesClient, assetClient: AssetClient, service: OtrServiceImpl, assets: AssetService,
                          convs: ConversationsService, convStorage: ConversationStorageImpl, users: UserServiceImpl, messages: MessagesServiceImpl,
-                         errors: ErrorsService, clientsSyncHandler: OtrClientsSyncHandler, cache: CacheService) extends OtrSyncHandler {
+                         errors: ErrorsService, clientsSyncHandler: OtrClientsSyncHandler, cache: CacheService, push: PushServiceSignals) extends OtrSyncHandler {
 
   import OtrSyncHandler._
   import com.waz.threading.Threading.Implicits.Background
@@ -63,7 +64,7 @@ class OtrSyncHandlerImpl(client: OtrClient, msgClient: MessagesClient, assetClie
   def postOtrMessage(conv: ConversationData, message: GenericMessage): Future[Either[ErrorResponse, Date]] =
     postOtrMessage(conv.id, conv.remoteId, message)
 
-  def postOtrMessage(convId: ConvId, remoteId: RConvId, message: GenericMessage, recipients: Option[Set[UserId]] = None, nativePush: Boolean = true): Future[Either[ErrorResponse, Date]] =
+  def postOtrMessage(convId: ConvId, remoteId: RConvId, message: GenericMessage, recipients: Option[Set[UserId]] = None, nativePush: Boolean = true): Future[Either[ErrorResponse, Date]] = push.afterProcessing {
     service.clients.getSelfClient flatMap {
       case Some(otrClient) =>
         postEncryptedMessage(convId, message, recipients = recipients) {
@@ -76,6 +77,7 @@ class OtrSyncHandlerImpl(client: OtrClient, msgClient: MessagesClient, assetClie
       case None =>
         successful(Left(internalError("Client is not registered")))
     }
+  }
 
   // will retry 3 times, at first we try to send message in normal way,
   // when it fails we will try sending empty messages to contacts for which we can not encrypt the message
@@ -195,6 +197,6 @@ object OtrSyncHandler {
 
   def apply(client: OtrClient, msgClient: MessagesClient, assetClient: AssetClient, service: OtrServiceImpl, assets: AssetService,
             convs: ConversationsService, convStorage: ConversationStorageImpl, users: UserServiceImpl, messages: MessagesServiceImpl,
-            errors: ErrorsService, clientsSyncHandler: OtrClientsSyncHandler, cache: CacheService): OtrSyncHandler =
-    new OtrSyncHandlerImpl(client, msgClient, assetClient, service, assets, convs, convStorage, users, messages, errors, clientsSyncHandler, cache)
+            errors: ErrorsService, clientsSyncHandler: OtrClientsSyncHandler, cache: CacheService, push: PushServiceSignals): OtrSyncHandler =
+    new OtrSyncHandlerImpl(client, msgClient, assetClient, service, assets, convs, convStorage, users, messages, errors, clientsSyncHandler, cache, push)
 }

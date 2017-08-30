@@ -61,7 +61,7 @@ class OtrServiceImpl(selfUserId: UserId, clientId: ClientId, val clients: OtrCli
   import OtrService._
   import Threading.Implicits.Background
 
-  push.onSlowSyncNeeded { _ => sync.syncSelfClients() }
+  push.onSlowSyncNeeded { _ => push.afterProcessing { sync.syncSelfClients() } }
 
   lazy val sessions = returning(cryptoBox.sessions) { sessions =>
     // request self clients sync to update prekeys on backend

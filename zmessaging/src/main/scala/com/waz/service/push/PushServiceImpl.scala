@@ -35,7 +35,7 @@ import com.waz.utils._
 import com.waz.utils.events._
 import org.threeten.bp.{Duration, Instant}
 
-import scala.concurrent.{Future, Promise}
+import scala.concurrent.{ExecutionContext, Future, Promise}
 
 trait PushService {
 
@@ -56,7 +56,7 @@ class PushServiceImpl(context: Context, keyValue: UserPreferences, client: Event
 
   var connectedPushPromise = Promise[PushServiceImpl]()
 
-  val processing = Signal(false)
+  lazy val processing = signals.processing
   override val cloudPushNotificationsToProcess = Signal(Set[Uid]())
 
   /**
@@ -147,7 +147,7 @@ class PushServiceImpl(context: Context, keyValue: UserPreferences, client: Event
   }
 
   private def processNotifications(notifications: Seq[PushNotification]) = wakeLock.async {
-    processing ! true
+    signals.processing ! true
     pipeline {
       returning(notifications.flatMap(_.eventsForClient(clientId))) {
         _.foreach { ev =>
@@ -158,7 +158,7 @@ class PushServiceImpl(context: Context, keyValue: UserPreferences, client: Event
     }.map {
       _ => cloudPushNotificationsToProcess mutate (_ -- notifications.map(_.id).toSet)
     }.andThen {
-      case _ => processing ! false
+      case _ => signals.processing ! false
     }
   }
 
@@ -195,6 +195,9 @@ object PushService {
 class PushServiceSignals {
   val onSlowSyncNeeded = new SourceSignal[SlowSyncRequest] with BgEventSource
   val pushConnected = Signal[Boolean]()
+  val processing = Signal(false)
+
+  def afterProcessing[T](f : => Future[T])(implicit ec: ExecutionContext): Future[T] = processing.filter(_ == false).head.flatMap(_ => f)
 }
 
 /**
