@@ -349,10 +349,10 @@ class AccountsService(val global: GlobalModule) {
     regClient.register(accountData, name, None).future.flatMap {
       case Right((userInfo, Some(cookie))) =>
         verbose(s"register($accountData) done, id: ${accountData.id}, user: $userInfo, cookie: $cookie")
-        storage.update(accountData.id, _.updated(userInfo).copy(cookie = Some(cookie), regWaiting = false, name = Some(name), code = None)).map(_ => Right(()))
+        storage.update(accountData.id, _.updated(userInfo).copy(cookie = Some(cookie), regWaiting = false, name = Some(name), code = None, firstLogin = false)).map(_ => Right(()))
       case Right((userInfo, None)) =>
         verbose(s"register($accountData) done, id: ${accountData.id}, user: $userInfo")
-        storage.update(accountData.id, _.updated(userInfo).copy(cookie = None, regWaiting = false,  name = Some(name), code = None)).map(_ => Right(()))
+        storage.update(accountData.id, _.updated(userInfo).copy(cookie = None, regWaiting = false,  name = Some(name), code = None, firstLogin = false)).map(_ => Right(()))
       case Left(error) =>
         info(s"register($accountData, $name) failed: $error")
         Future successful Left(error)
