@@ -115,7 +115,7 @@ trait ApiSpec extends BeforeAndAfterEach with BeforeAndAfterAll with Matchers wi
   }, 5.seconds)
 
   def getUnreadCount(conv: ConvId) = Await.result(api.zmessaging.flatMap {
-    case Some(zms) => zms.convsStorage.get(conv).map(_.fold(0)(_.unreadCount))
+    case Some(zms) => zms.convsStorage.get(conv).map(_.fold(0)(_.unreadCount.messages))
     case None => Future.successful(0)
   }, 5.seconds)
 
