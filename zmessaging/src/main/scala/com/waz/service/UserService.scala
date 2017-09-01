@@ -91,8 +91,9 @@ class UserServiceImpl(override val selfUserId: UserId,
   push.onSlowSyncNeeded { case SlowSyncRequest(time, _) =>
     verbose(s"onSlowSyncNeeded, updating timestamp to: $time")
     lastSlowSyncTimestamp := Some(time)
-
-    sync.syncSelfUser().map(dependency => sync.syncConnections(Some(dependency)))
+    push.afterProcessing {
+      sync.syncSelfUser().map(dependency => sync.syncConnections(Some(dependency)))
+    }
   }
 
   override lazy val acceptedOrBlockedUsers: Signal[Map[UserId, UserData]] =

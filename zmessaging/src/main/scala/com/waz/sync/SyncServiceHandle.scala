@@ -17,9 +17,6 @@
  */
 package com.waz.sync
 
-import android.content.Context
-import com.waz.ZLog._
-import com.waz.ZLog.ImplicitTag._
 import com.waz.api.EphemeralExpiration
 import com.waz.model.UserData.ConnectionStatus
 import com.waz.model._

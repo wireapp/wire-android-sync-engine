@@ -669,7 +669,7 @@ class AssetMessageSpec extends FeatureSpec with BeforeAndAfter with Matchers wit
     override def zmessaging(teamId: Option[TeamId], clientId: ClientId, userModule: UserModule): ZMessaging =
       new ApiZMessaging(teamId, clientId, userModule) {
 
-        override lazy val otrSync = new OtrSyncHandlerImpl(otrClient, messagesClient, assetClient, otrService, assets, conversations, convsStorage, users, messages, errors, otrClientsSync, cache) {
+        override lazy val otrSync = new OtrSyncHandlerImpl(otrClient, messagesClient, assetClient, otrService, assets, conversations, convsStorage, users, messages, errors, otrClientsSync, cache, pushSignals) {
           override def postOtrMessage(convId: ConvId, remoteId: RConvId, message: GenericMessage, recipients: Option[Set[UserId]], nativePush: Boolean = true): Future[Either[ErrorResponse, Date]] =
             super.postOtrMessage(convId, remoteId, message).andThen { case Success(r) if r.isRight => otrMessageSyncs :+=(remoteId, message, r) }(Threading.Background)
         }
