@@ -221,9 +221,9 @@ class AccountsService(val global: GlobalModule) {
 
     def requestCode(shouldCall: Boolean): Future[Either[ErrorResponse, Unit]] = {
       (if (shouldCall)
-        requestPhoneConfirmationCall(number, KindOfAccess.LOGIN_IF_NO_PASSWD)
+        requestPhoneConfirmationCall(number, KindOfAccess.LOGIN)
       else
-        requestPhoneConfirmationCode(number, KindOfAccess.LOGIN_IF_NO_PASSWD))
+        requestPhoneConfirmationCode(number, KindOfAccess.LOGIN))
         .future.map {
         case Failure(error) => Left(error)
         case PasswordExists => Left(ErrorResponse.PasswordExists)
