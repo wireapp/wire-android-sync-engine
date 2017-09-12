@@ -119,7 +119,7 @@ lazy val zmessaging = project
       Deps.backendApi,
       "com.wire" % "icu4j-shrunk" % "57.1",
       Deps.spotifyPlayer,
-      "org.threeten" % "threetenbp" % "1.3" % Provided,
+      "org.threeten" % "threetenbp" % "1.3.+" % Provided,
       "com.googlecode.mp4parser" % "isoparser" % "1.1.7",
       Deps.hockeyApp % Provided,
       Deps.localytics,
