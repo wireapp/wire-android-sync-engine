@@ -21,7 +21,7 @@ import com.waz.ZLog.ImplicitTag._
 import com.waz.ZLog._
 import com.waz.api.Invitations._
 import com.waz.api.impl._
-import com.waz.api.{KindOfAccess, KindOfVerification}
+import com.waz.api.{ClientRegistrationState, KindOfAccess, KindOfVerification}
 import com.waz.client.RegistrationClientImpl.ActivateResult
 import com.waz.client.RegistrationClientImpl.ActivateResult.{Failure, PasswordExists}
 import com.waz.content.GlobalPreferences.{CurrentAccountPref, FirstTimeWithTeams}
@@ -137,11 +137,21 @@ class AccountsService(val global: GlobalModule) {
   def logout(account: AccountId, flushCredentials: Boolean) = {
     activeAccountPref() flatMap { id =>
         for {
-          otherAccounts <- loggedInAccounts.map(_.map(_.id).filter(!id.contains(_))).head
+          otherAccounts <- loggedInAccounts.map(_.filter(acc => !id.contains(acc.id) && acc.clientRegState == ClientRegistrationState.REGISTERED).map(_.id)).head
           _ <- if (flushCredentials) storage.update(account, _.copy(accessToken = None, cookie = None, password = None, registeredPush = None, pendingEmail = None, pendingPhone = None)) else Future.successful({})
           _ <- if (id.contains(account)) setAccount(if (flushCredentials) otherAccounts.headOption else None) else Future.successful(())
         } yield {}
     }
+  }
+
+  def removeCurrentAccount(): Future[Unit] = activeAccountManager.head flatMap {
+    case Some(account) =>
+      for {
+        _ <- storage.update(account.id, _.copy(accessToken = None, cookie = None, password = None, registeredPush = None, pendingEmail = None, pendingPhone = None, clientRegState = ClientRegistrationState.UNKNOWN, code = None))
+        _ <- setAccount(None)
+      } yield {}
+    case None =>
+      Future.successful(())
   }
 
   private def setAccount(acc: Option[AccountId]) = {
