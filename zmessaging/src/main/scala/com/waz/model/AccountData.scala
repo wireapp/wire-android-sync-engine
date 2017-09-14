@@ -136,7 +136,7 @@ case class AccountData(id:              AccountId                       = Accoun
         o.put("email", e.str)
         password foreach (o.put("password", _))
 
-      case (_, Some(h), _) =>
+      case (_, Some(h), _) if password.isDefined =>
         o.put("handle", h.string)
         password foreach (o.put("password", _))
 
