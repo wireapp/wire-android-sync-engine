@@ -22,9 +22,6 @@
             </intent-filter>
         </activity>
 
-        <activity android:name="com.spotify.sdk.android.authentication.LoginActivity" android:theme="@android:style/Theme.Translucent.NoTitleBar" />
-        <activity android:name="com.waz.testapp.SpotifyActivity" />
-
         <provider android:authorities="com.waz.test" android:exported="true" android:name="com.waz.testapp.TestAssetProvider" />
     </application>
 </manifest>
