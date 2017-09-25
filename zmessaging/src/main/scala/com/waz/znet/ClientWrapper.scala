@@ -28,6 +28,7 @@ import com.koushikdutta.async._
 import com.koushikdutta.async.future.{FutureCallback, Future => AFuture}
 import com.koushikdutta.async.http._
 import com.koushikdutta.async.http.callback._
+import com.waz.HockeyApp
 import com.waz.ZLog._
 import com.waz.ZLog.ImplicitTag._
 import com.waz.service.ZMessaging
@@ -206,13 +207,25 @@ object SNIConfigurator {
     class EngineHolder(engineClass: Class[_]) {
       val peerHost = returning(engineClass.getSuperclass.getDeclaredField("peerHost")) { _.setAccessible(true) }
       val peerPort = returning(engineClass.getSuperclass.getDeclaredField("peerPort")) { _.setAccessible(true) }
-      val sslParameters = engineClass.getDeclaredFields.find { field => Try(field.getType.getDeclaredField("useSni")).isSuccess }.get
-      val useSni = returning(sslParameters.getType.getDeclaredField("useSni")) { _.setAccessible(true) }
+      val sslParameters = returning(engineClass.getDeclaredFields.find { field => Try(field.getType.getDeclaredField("useSni")).isSuccess }) { _ foreach(_.setAccessible(true)) }
+      val useSni = sslParameters.map(sslParams => returning(sslParams.getType.getDeclaredField("useSni")) { _.setAccessible(true) })
+
+      if (sslParameters.isEmpty) {
+        // FIXME: this reflection hack still doesn't work on some devices,
+        // we should check if assets work there and find better solution for them
+        // logging to hockey to have statistics about unsupported devices
+        HockeyApp.saveException(new Exception("ReflectionConfigurator - sslParameters not found"), "ClientWrapper could not configure SNI extension using reflection")
+      }
 
       def apply(engine: SSLEngine, host: String, port: Int) = {
         peerHost.set(engine, host)
         peerPort.set(engine, port)
-        useSni.set(sslParameters.get(engine), true)
+        for {
+          sslParams <- sslParameters
+          sni <- useSni
+        } {
+          sni.set(sslParams.get(engine), true)
+        }
       }
     }
 
