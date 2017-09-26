@@ -312,7 +312,7 @@ class CallingService(val selfUserId:      UserId,
               callProfile.mutate(_.copy(activeId = Some(call.convId), availableCalls = profile.availableCalls + (convId -> active)))
             case None =>
               verbose("No active call, starting new call")
-              setAudioConstantBitRateEnabled(0) //TODO reuse vbr setting when avs is fixed (if(vbr) 0 else 1)
+              setAudioConstantBitRateEnabled(!vbr)
               avs.startCall(w, conv.remoteId, isVideo, isGroup).map {
                 case 0 =>
                   //Assume that when a video call starts, sendingVideo will be true. From here on, we can then listen to state handler
@@ -403,7 +403,7 @@ class CallingService(val selfUserId:      UserId,
     }
   }
 
-  def setAudioConstantBitRateEnabled(enabled: Int): Unit =
+  def setAudioConstantBitRateEnabled(enabled: Boolean): Unit =
     wCall.map { w =>
       verbose(s"setting the audio cbr to $enabled")
       avs.enableAudioCbr(w, enabled)
