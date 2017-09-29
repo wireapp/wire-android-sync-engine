@@ -426,6 +426,7 @@ class ConversationsUiServiceImpl(accountId:       AccountId,
       mime <- in.mimeType
       asset <- assets.addAsset(in, conv.remoteId)
       message <- messages.addAssetMessage(conv.id, asset)
+      _ <- updateLastRead(message)
       size <- in.sizeInBytes
       _ <- Future.successful(assetUploadStarted ! asset)
       shouldSend <- checkSize(conv.id, size, mime, message, handler)
