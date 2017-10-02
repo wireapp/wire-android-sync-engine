@@ -44,7 +44,7 @@ trait Avs {
   def rejectCall(wCall: WCall, convId: RConvId): Unit
   def setVideoSendActive(wCall: WCall, convId: RConvId, active: Boolean): Unit
   //cbr = constant bit rate
-  def enableAudioCbr(wCall: WCall, enabled: Int): Unit
+  def enableAudioCbr(wCall: WCall, enabled: Boolean): Unit
 }
 
 /**
@@ -168,7 +168,7 @@ class AvsImpl() extends Avs {
 
   override def setVideoSendActive(wCall: WCall, convId: RConvId, active: Boolean) = withAvs(wcall_set_video_send_active(wCall, convId.str, active))
 
-  override def enableAudioCbr(wCall: WCall, enabled: Int) = withAvs(wcall_enable_audio_cbr(wCall, enabled))
+  override def enableAudioCbr(wCall: WCall, enabled: Boolean) = withAvs(wcall_enable_audio_cbr(wCall, if (enabled) 1 else 0))
 
 }
 
