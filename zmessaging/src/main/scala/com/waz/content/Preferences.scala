@@ -356,10 +356,10 @@ object UserPreferences {
   lazy val ShouldSyncConversations = PrefKey[Boolean]             ("should_sync_conversations", customDefault = true)
   lazy val ShouldSyncInitial       = PrefKey[Boolean]             ("should_sync_teams", customDefault = true) // TODO: try to change the name to should_sync_initial
 
-  lazy val LastAccountVisibleTime = PrefKey[Instant]    ("last_ui_visible_time")
-  lazy val OtrLastPrekey          = PrefKey[Int]        ("otr_last_prekey_id")
-  lazy val ClientRegVersion       = PrefKey[Int]        ("otr_client_reg_version")
-  lazy val LastStableNotification = PrefKey[Option[Uid]]("last_notification_id")
+  lazy val LastNotificationClearTime = PrefKey[Instant]    ("last_ui_visible_time")
+  lazy val OtrLastPrekey             = PrefKey[Int]        ("otr_last_prekey_id")
+  lazy val ClientRegVersion          = PrefKey[Int]        ("otr_client_reg_version")
+  lazy val LastStableNotification    = PrefKey[Option[Uid]]("last_notification_id")
 
   lazy val LastSelfClientsSyncRequestedTime = PrefKey[Long]("last_self_clients_sync_requested")
 

@@ -24,7 +24,7 @@ import com.waz.ZLog._
 import com.waz.api.Message
 import com.waz.api.NotificationsHandler.NotificationType
 import com.waz.api.NotificationsHandler.NotificationType._
-import com.waz.content.UserPreferences.LastAccountVisibleTime
+import com.waz.content.UserPreferences.LastNotificationClearTime
 import com.waz.content._
 import com.waz.model.ConversationData.ConversationType
 import com.waz.model.GenericContent.LastRead
@@ -50,11 +50,16 @@ class GlobalNotificationsService(context: Context, lifeCycle: ZmsLifeCycle) {
   import ZLog.ImplicitTag.implicitLogTag
   import com.waz.threading.Threading.Implicits.Background
 
-  lazy val groupedNotifications: Signal[Map[AccountId, Signal[(Boolean, Seq[NotificationInfo])]]] = //Boolean = shouldBeSilent
+  //To be set by the UI
+  val messageStreamVisible = Signal(false)
+  val conversationListVisible = Signal(false)
+
+  lazy val groupedNotifications: Signal[Map[AccountId, (Boolean, Seq[NotificationInfo])]] = //Boolean = shouldBeSilent
     Option(ZMessaging.currentAccounts) match {
       case Some(accountsService) =>
-        accountsService.zmsInstances.map { zs =>
-          zs.map { z =>
+        accountsService.zmsInstances.flatMap { zs =>
+          verbose(s"zmsInstances count: ${zs.size}")
+          val seq = zs.map { z =>
             val service = z.notifications
             val notifications = service.notifications
             val shouldBeSilent = service.otherDeviceActiveTime.map { t =>
@@ -63,13 +68,16 @@ class GlobalNotificationsService(context: Context, lifeCycle: ZmsLifeCycle) {
               timeDiff < NotificationsAndroidService.checkNotificationsTimeout.toMillis
             }
 
-            z.accountId -> (for {
-              silent <- shouldBeSilent
+            for {
+              silent <- shouldBeSilent.orElse(Signal.const(false))
               nots <- notifications
             } yield {
-              (silent, nots)
-            })
-          }.toMap
+              verbose(s"groupedNotifications for account: ${z.accountId} -> (silent: $silent, notsCount: ${nots.size})")
+              z.accountId -> (silent, nots)
+            }
+          }.toSeq
+
+          Signal.sequence(seq: _*).map(_.toMap)
         }
       case None =>
         error("No AccountsService available")
@@ -88,6 +96,12 @@ class GlobalNotificationsService(context: Context, lifeCycle: ZmsLifeCycle) {
         Future.successful({})
     }
   }
+
+  def clearNotifications(accountId: AccountId): Unit = {
+    ZMessaging.accountsService.flatMap{ _.getZMessaging(accountId) }.flatMap {
+      case Some(zms) => zms.notifications.clearNotifications()
+    }
+  }
 }
 
 class NotificationService(context:         Context,
@@ -102,7 +116,8 @@ class NotificationService(context:         Context,
                           reactionStorage: ReactionsStorage,
                           userPrefs:       UserPreferences,
                           pushService:     PushService,
-                          convsStats:      ConversationsListStateService) {
+                          convsStats:      ConversationsListStateService,
+                          globalNots:      GlobalNotificationsService) {
 
   import NotificationService._
   import com.waz.utils.events.EventContext.Implicits.global
@@ -110,9 +125,7 @@ class NotificationService(context:         Context,
   private implicit val dispatcher = new SerialDispatchQueue(name = "NotificationService")
   implicit lazy val logTag: LogTag = s"${logTagFor[NotificationService]}#${accountId.str.take(8)}"
 
-  @volatile private var accountActive = false
-
-  private val lastAccountVisibleTime = userPrefs.preference(LastAccountVisibleTime)
+  private val lastNotificationClearTime = userPrefs.preference(LastNotificationClearTime)
 
   val alarmService = Option(context) match {
     case Some(c) => Some(c.getSystemService(Context.ALARM_SERVICE).asInstanceOf[AlarmManager])
@@ -124,22 +137,25 @@ class NotificationService(context:         Context,
   //For UI to decide if it should make sounds or not
   val otherDeviceActiveTime = Signal(Instant.EPOCH)
 
-  private val accInForeground = lifeCycle.accInForeground(accountId)
-
   val notifications = {
     (for {
-      inForeground <- accInForeground.throttle(ClearUiThrottling)
-      lastVisible  <- lastAccountVisibleTime.signal
-      _ = verbose(s"last visible: $lastVisible")
-      _            <- Signal.future(removeNotificationsAfterUiActive(lastVisible))
+      lastClear  <- lastNotificationClearTime.signal
+      _ = verbose(s"last clear: $lastClear")
+      _            <- Signal.future(removeNotificationsAfter(lastClear))
       _ = verbose("old notifications removed")
       data         <- storage.notifications.map(_.values.toIndexedSeq.sorted)
     } yield {
-      verbose(s"Retrieved from notifications storage: ${data.size}, lastAccountVisibleTime: $lastVisible, toShow: ${data.filterNot(_.time.isBefore(lastVisible)).size}")
-      if (data.forall(_.time.isBefore(lastVisible))) Seq.empty[NotificationData] // no new messages, don't show anything
+      verbose(s"Retrieved from notifications storage: ${data.size}, lastNotificationClearTime: $lastClear, toShow: ${data.filterNot(_.time.isBefore(lastClear)).size}")
+      if (data.forall(_.time.isBefore(lastClear))) Seq.empty[NotificationData] // no new messages, don't show anything
       else data
-    }).orElse(Signal.const(Seq.empty[NotificationData]))
-      .flatMap(d => Signal.future(createNotifications(d)))
+    }).flatMap { d =>
+        Signal.future(returning(createNotifications(d)) {
+          _.map { ns =>
+            verbose(s"Created $ns")
+          }
+        })
+      }
+
   }
 
   val lastReadProcessingStage = EventScheduler.Stage[GenericMessageEvent] { (convId, events) =>
@@ -152,20 +168,15 @@ class NotificationService(context:         Context,
     Future.successful(())
   }
 
-  def markAsDisplayed(ns: Seq[NotId]) = storage.updateAll2(ns, n => n.copy(hasBeenDisplayed = true))
-
   (for {
-    inForeground <- accInForeground
-    drift        <- pushService.beDrift //TODO BE do NOT want us to rely on this time, we should find a better way, but for now, it's better than using local time
-  } yield (inForeground, drift)) { case (inForeground, drift) =>
-    accountActive = returning(inForeground) { inForeGround =>
-      if (inForeGround || accountActive) {
-        val inst = clock.instant
-        verbose(s"Account last active at $inst with BE drift: $drift")
-        lastAccountVisibleTime := inst + drift
-      }
-    }
+    inForeground <- lifeCycle.accInForeground(accountId)
+    conversationListVisible <- globalNots.conversationListVisible
+  } yield inForeground && conversationListVisible) {
+    case true => globalNots.clearNotifications(accountId)
+    case _ =>
   }
+
+  def markAsDisplayed(ns: Seq[NotId]) = storage.updateAll2(ns, n => n.copy(hasBeenDisplayed = true))
 
   val notificationEventsStage = EventScheduler.Stage[Event]({ (c, events) =>
     add(events collect {
@@ -177,7 +188,7 @@ class NotificationService(context:         Context,
         verbose("ContactJoinEvent")
         NotificationData(NotId(CONTACT_JOIN, userId), "", ConvId(userId.str), userId, CONTACT_JOIN)
     })
-  }, _ => ! accountActive)
+  })
 
   /**
     * Map containing lastRead time for every conversation.
@@ -200,8 +211,9 @@ class NotificationService(context:         Context,
     new AggregatingSignal(timeUpdates, loadAll(), update)
   }
 
+  //TODO: remove notifications of later likes
   // remove notifications read by other devices
-  lastReadMap.throttle(ClearUiThrottling) { lrMap =>
+  lastReadMap.throttle(ClearThrottling) { lrMap =>
     removeNotifications { n =>
       val lastRead = lrMap.getOrElse(n.conv, Instant.EPOCH)
       val removeIf = !lastRead.isBefore(n.time)
@@ -217,7 +229,7 @@ class NotificationService(context:         Context,
     val failedMsgs = updates collect {
       case (prev, msg) if prev.state != msg.state && msg.state == Message.Status.FAILED => msg
     }
-    if (!accountActive && failedMsgs.nonEmpty) {
+    if (failedMsgs.nonEmpty) {
       storage.insertAll(failedMsgs map { msg => NotificationData(NotId(msg.id), msg.contentString, msg.convId, msg.userId, MESSAGE_SENDING_FAILED) })
     }
 
@@ -245,10 +257,7 @@ class NotificationService(context:         Context,
       }
 
       storage.removeAll(toRemove.map(NotId(_))).flatMap { _ =>
-        if (! accountActive)
-          add(toAdd.valuesIterator.map(r => NotificationData(NotId(r.id), "", convsByMsg.getOrElse(r.message, ConvId(r.user.str)), r.user, LIKE, referencedMessage = Some(r.message))).toVector)
-        else
-          Future.successful(Nil)
+        add(toAdd.valuesIterator.map(r => NotificationData(NotId(r.id), "", convsByMsg.getOrElse(r.message, ConvId(r.user.str)), r.user, LIKE, referencedMessage = Some(r.message))).toVector)
       }
     }.logFailure(reportHockey = true)
   }
@@ -260,18 +269,18 @@ class NotificationService(context:         Context,
   def clearNotifications(): Future[Unit] = {
     val time = clock.instant
     for {
-      _     <- lastAccountVisibleTime := time
+      drift <- pushService.beDrift.head
+      _     <- lastNotificationClearTime := time + drift
       // will execute removeNotifications as part of this call,
       // this ensures that it's actually done while wakeLock is acquired by caller
-      res   <- removeNotificationsAfterUiActive(time)
+      res   <- removeNotificationsAfter(time)
     } yield {}
   }
 
-  private def removeNotificationsAfterUiActive(uiLastVisible: Instant) = {
-    //will effectively remove all
+  def removeNotificationsAfter(time: Instant) = {
     removeNotifications { n =>
-      returning (uiLastVisible.isAfter(n.time)) { v =>
-        verbose(s"Removing notif(${n.id}) if uiLastVisible: $uiLastVisible is after n.time: ${n.time}: $v")
+      returning (time.isAfter(n.time)) { v =>
+        verbose(s"Removing notif(${n.id}) if time: $time is after n.time: ${n.time}: $v")
       }
     }
   }
@@ -288,13 +297,19 @@ class NotificationService(context:         Context,
   private def add(notifications: Seq[NotificationData]) =
     for {
       lrMap <- lastReadMap.head
+      inForeground <- lifeCycle.accInForeground(accountId).head
+      messageStreamVisible <- globalNots.messageStreamVisible.head
+      conversationListVisible <- globalNots.conversationListVisible.head
       selectedConv <- convsStats.selectedConversationId.head
       res <- storage.insertAll(notifications filter { n =>
         //Filter notifications for those coming from other users, and that have come after the last-read time for their respective conversations.
         //Note that for muted conversations, the last-read time is set to Instant.MAX, so they can never come after.
         val lastRead = lrMap.get(n.conv)
-        val filter = n.user != selfUserId && lastRead.forall(_.isBefore(n.time)) && (!accountActive || selectedConv.isEmpty || selectedConv.get != n.conv)
+        val lookingAtConversation = selectedConv.contains(n.conv) && messageStreamVisible && inForeground
+        val lookingAtConvList = conversationListVisible && inForeground
+        val filter = n.user != selfUserId && lastRead.forall(_.isBefore(n.time)) && !lookingAtConversation && !lookingAtConvList
         verbose(s"Inserting notif(${n.id}) if conv lastRead: $lastRead isBefore ${n.time}?: $filter")
+
         filter
       })
       _ = if (res.nonEmpty) verbose(s"inserted: ${res.size} notifications")
@@ -332,9 +347,9 @@ class NotificationService(context:         Context,
 }
 
 object NotificationService {
-  
+
   //var for tests
-  var ClearUiThrottling = 3.seconds
+  var ClearThrottling = 3.seconds
 
   case class NotificationInfo(id: NotId,
                               tpe: NotificationType,

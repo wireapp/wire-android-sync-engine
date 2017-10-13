@@ -144,6 +144,7 @@ class ZMessaging(val teamId: Option[TeamId], val clientId: ClientId, val userMod
   def loadService       = global.loaderService
   def flowmanager       = global.flowmanager
   def mediamanager      = global.mediaManager
+  def gNotifcations     = global.notifications
 
   def db                = storage.db
   def userPrefs         = storage.userPrefs
