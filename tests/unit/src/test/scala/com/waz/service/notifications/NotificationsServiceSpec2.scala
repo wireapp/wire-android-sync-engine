@@ -18,13 +18,13 @@
 package com.waz.service.notifications
 
 import com.waz.api.Message
-import com.waz.content.UserPreferences.LastAccountVisibleTime
+import com.waz.content.UserPreferences.LastNotificationClearTime
 import com.waz.content._
 import com.waz.model.ConversationData.ConversationType
 import com.waz.model._
 import com.waz.service.ZmsLifeCycle
 import com.waz.service.conversation.ConversationsListStateService
-import com.waz.service.push.{NotificationService, PushService}
+import com.waz.service.push.{GlobalNotificationsService, NotificationService, PushService}
 import com.waz.specs.AndroidFreeSpec
 import com.waz.testutils.TestUserPreferences
 import com.waz.utils.events.{EventStream, Signal}
@@ -50,10 +50,12 @@ class NotificationsServiceSpec2 extends AndroidFreeSpec {
   val push      = mock[PushService]
   val convsStats = mock[ConversationsListStateService]
   val members   = mock[MembersStorage]
+  val globalNots = new GlobalNotificationsService
 
 
   val inForeground = Signal(false)
   val beDrift      = Signal(Duration.ZERO)
+  val currentConv  = Signal(Option.empty[ConvId])
   val convsAdded   = EventStream[Seq[ConversationData]]()
   val convsUpdated = EventStream[Seq[(ConversationData, ConversationData)]]()
   val allConvs     = Signal[IndexedSeq[ConversationData]]()
@@ -67,19 +69,20 @@ class NotificationsServiceSpec2 extends AndroidFreeSpec {
   val reactionsChanged = EventStream[Seq[Liking]]()
   val reactionsDeleted = EventStream[Seq[(MessageId, UserId)]]()
 
-  val lastAccountVisiblePref = userPrefs.preference(LastAccountVisibleTime)
+  val lastNotificationClearTime = userPrefs.preference(LastNotificationClearTime)
 
-  NotificationService.ClearUiThrottling = duration.Duration.Zero
+  NotificationService.ClearThrottling = duration.Duration.Zero
 
   feature ("Background behaviour") {
 
     scenario("Display notifications that arrive after account becomes inactive that have not been read elsewhere") {
       val user = UserData(UserId("user"), "testUser1")
       val conv = ConversationData(ConvId("conv"), RConvId(), Some("conv"), user.id, ConversationType.OneToOne, lastRead = Instant.EPOCH)
+      fillMembers(conv, Seq(user.id))
       allConvs ! IndexedSeq(conv)
 
       inForeground ! false
-      lastAccountVisiblePref := clock.instant
+      lastNotificationClearTime := clock.instant
       clock + 10.seconds //messages arrive some time after the account was last visible
 
       val msg1 = MessageData(MessageId("msg1"), conv.id, Message.Type.TEXT, user.id)
@@ -95,13 +98,14 @@ class NotificationsServiceSpec2 extends AndroidFreeSpec {
       result(service.notifications.filter(_.size == 2).head)
     }
 
-    scenario("Bringing ui to foreground should clear notifications") {
+    scenario("Showing the conversation list should clear the current account notifications") {
       val user = UserData(UserId("user"), "testUser1")
       val conv = ConversationData(ConvId("conv"), RConvId(), Some("conv"), user.id, ConversationType.OneToOne, lastRead = Instant.EPOCH)
+      fillMembers(conv, Seq(user.id))
       allConvs ! IndexedSeq(conv)
 
       inForeground ! false
-      lastAccountVisiblePref := clock.instant
+      await(lastNotificationClearTime := clock.instant)
       clock + 10.seconds //messages arrive some time after the account was last visible
 
       val msg1 = MessageData(MessageId("msg1"), conv.id, Message.Type.TEXT, user.id)
@@ -116,7 +120,9 @@ class NotificationsServiceSpec2 extends AndroidFreeSpec {
 
       result(service.notifications.filter(_.size == 2).head)
 
+      clock + 10.seconds
       inForeground ! true
+      globalNots.conversationListVisible ! true
 
       result(service.notifications.filter(_.isEmpty).head)
     }
@@ -125,6 +131,7 @@ class NotificationsServiceSpec2 extends AndroidFreeSpec {
 
       val user = UserData(UserId("user"), "testUser1")
       val conv = ConversationData(ConvId("conv"), RConvId(), Some("conv"), user.id, ConversationType.OneToOne, lastRead = Instant.EPOCH)
+      fillMembers(conv, Seq(user.id))
       allConvs ! IndexedSeq(conv)
 
       clock + 15.seconds
@@ -150,10 +157,41 @@ class NotificationsServiceSpec2 extends AndroidFreeSpec {
     }
   }
 
+  scenario("Notifications for the current displaying conversation shouldn't be created") {
+    val user = UserData(UserId("user"), "testUser1")
+    val conv = ConversationData(ConvId("conv"), RConvId(), Some("conv"), user.id, ConversationType.OneToOne, lastRead = Instant.EPOCH)
+    val conv2 = ConversationData(ConvId("conv2"), RConvId(), Some("conv2"), user.id, ConversationType.OneToOne, lastRead = Instant.EPOCH)
+    fillMembers(conv, Seq(user.id))
+    fillMembers(conv2, Seq(user.id))
+    allConvs ! IndexedSeq(conv)
+
+    inForeground ! true
+    currentConv ! Some(conv2.id)
+    globalNots.messageStreamVisible ! true
+    lastNotificationClearTime := clock.instant
+    clock + 10.seconds //messages arrive some time after the account was last visible
+
+    val msg1 = MessageData(MessageId("msg1"), conv.id, Message.Type.TEXT, user.id)
+    val msg2 = MessageData(MessageId("msg2"), conv2.id, Message.Type.TEXT, user.id)
+
+    (users.get _).expects(user.id).once.returning(Future.successful(Some(user)))
+    (convs.get _).expects(conv.id).once.returning(Future.successful(Some(conv)))
+
+    val service = getService
+
+    msgsAdded ! Seq(msg1, msg2)
+
+    result(service.notifications.filter(nots => nots.size == 1 && nots.exists(_.convId == conv.id)).head)
+  }
+
+
+  def fillMembers(conv: ConversationData, users: Seq[UserId]) = {
+    (members.getByConv _).expects(conv.id).anyNumberOfTimes().returning(Future.successful((users :+ self).map(uid => ConversationMemberData(uid, conv.id)).toIndexedSeq))
+  }
 
   def getService = {
 
-    (lifeCycle.accInForeground _).expects(account).returning(inForeground)
+    (lifeCycle.accInForeground _).expects(account).anyNumberOfTimes().returning(inForeground)
     (push.beDrift _).expects().anyNumberOfTimes().returning(beDrift)
 
     (storage.notifications _).expects().anyNumberOfTimes().returning(notifications)
@@ -176,7 +214,9 @@ class NotificationsServiceSpec2 extends AndroidFreeSpec {
     (reactions.onChanged _).expects().returning(reactionsChanged)
     (reactions.onDeleted _).expects().returning(reactionsDeleted)
 
-    new NotificationService(null, account, self, messages, lifeCycle, storage, users, convs, members, reactions, userPrefs, push, convsStats)
+    (convsStats.selectedConversationId _).expects().returning(currentConv)
+
+    new NotificationService(null, account, self, messages, lifeCycle, storage, users, convs, members, reactions, userPrefs, push, convsStats, globalNots)
   }
 
 }

@@ -45,7 +45,7 @@ import scala.collection.breakOut
 import scala.concurrent.Future
 import scala.concurrent.duration._
 
-class GlobalNotificationsService(context: Context, lifeCycle: ZmsLifeCycle) {
+class GlobalNotificationsService {
 
   import ZLog.ImplicitTag.implicitLogTag
   import com.waz.threading.Threading.Implicits.Background
@@ -94,12 +94,6 @@ class GlobalNotificationsService(context: Context, lifeCycle: ZmsLifeCycle) {
       case None =>
         error("No AccountsService available")
         Future.successful({})
-    }
-  }
-
-  def clearNotifications(accountId: AccountId): Unit = {
-    ZMessaging.accountsService.flatMap{ _.getZMessaging(accountId) }.flatMap {
-      case Some(zms) => zms.notifications.clearNotifications()
     }
   }
 }
@@ -172,7 +166,7 @@ class NotificationService(context:         Context,
     inForeground <- lifeCycle.accInForeground(accountId)
     conversationListVisible <- globalNots.conversationListVisible
   } yield inForeground && conversationListVisible) {
-    case true => globalNots.clearNotifications(accountId)
+    case true => clearNotifications()
     case _ =>
   }
 
