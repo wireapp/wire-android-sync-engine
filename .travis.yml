@@ -18,6 +18,7 @@ dist: precise
 sudo: false
 
 cache:
+  - build.log
   directories:
     - $HOME/.ivy2/cache
     - $HOME/.sbt/boot
@@ -30,4 +31,4 @@ before_install:
   - wget https://repo.typesafe.com/typesafe/ivy-releases/org.scala-sbt/sbt-launch/0.13.12/sbt-launch.jar
   - export SBT_OPTS="-Xms512M -Xmx1536M -Xss1M -XX:+CMSClassUnloadingEnabled"
 
-script: ./travis_large.sh
+script: java $SBT_OPTS -jar sbt-launch.jar test:compile unit/test > $HOME/build.log || tail -n 200 $HOME/build.log
