@@ -18,7 +18,6 @@ dist: precise
 sudo: false
 
 cache:
-  - build.log
   directories:
     - $HOME/.ivy2/cache
     - $HOME/.sbt/boot
