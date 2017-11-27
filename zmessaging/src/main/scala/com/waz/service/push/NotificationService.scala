@@ -127,7 +127,12 @@ class NotificationService(context:         Context,
   //For UI to decide if it should make sounds or not
   val otherDeviceActiveTime = Signal(Instant.EPOCH)
 
-  val notifications = storage.notifications.map(_.values.toIndexedSeq.sorted).flatMap { d => Signal.future(createNotifications(d)) }
+  private var lastNots = Set.empty[NotId] // prevents from creating the same notifications twice
+  val notifications = storage.notifications.filter(_.keys.toSet != lastNots).flatMap { nots =>
+    lastNots = nots.keys.toSet
+    val d = nots.values.toIndexedSeq.sorted
+    Signal.future(createNotifications(d))
+  }
 
   val lastReadProcessingStage = EventScheduler.Stage[GenericMessageEvent] { (convId, events) =>
     events.foreach {
