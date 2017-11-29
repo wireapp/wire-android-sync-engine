@@ -77,8 +77,6 @@ class Self()(implicit ui: UiModule) extends com.waz.api.Self with UiObservable w
 
   def userId = data.flatMap(_.userId)
 
-  override def getClientRegistrationState = data.map(_.clientRegState).getOrElse(ClientRegistrationState.UNKNOWN)
-
   override def getOtherOtrClients = userId.fold[CoreList[OtrClient]](OtrClients.Empty) { OtrClients(_, skipSelf = true) }
 
   override def getIncomingOtrClients = OtrClients.incoming

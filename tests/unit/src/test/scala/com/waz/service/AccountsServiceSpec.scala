@@ -47,6 +47,7 @@ class AccountsServiceSpec extends AndroidFreeSpec with Inside {
     super.beforeEach()
     //prevent migration - can fail tests
     await(prefs.preference(GlobalPreferences.FirstTimeWithTeams) := false)
+    await(prefs.preference(GlobalPreferences.DatabasesRenamed) := true)
   }
 
   feature("Phone registration") {
@@ -474,7 +475,7 @@ class AccountsServiceSpec extends AndroidFreeSpec with Inside {
     (globalModule.loginClient _).expects().anyNumberOfTimes.returning(loginClient)
     (globalModule.prefs _).expects().anyNumberOfTimes.returning(prefs)
     (globalModule.factory _).expects().anyNumberOfTimes.returning(new ZMessagingFactory(globalModule) {
-      override def baseStorage(accountId: AccountId) = new StorageModule(null, accountId, "", prefs) {
+      override def baseStorage(userId: UserId) = new StorageModule(null, userId, "", prefs) {
         override lazy val userPrefs = new TestUserPreferences
       }
     })

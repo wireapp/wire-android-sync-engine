@@ -36,8 +36,6 @@ public interface Self extends UiObservable {
 
     ImageAsset getPicture();
 
-    ClientRegistrationState getClientRegistrationState();
-
     /**
      * Returns current otr client.
      */

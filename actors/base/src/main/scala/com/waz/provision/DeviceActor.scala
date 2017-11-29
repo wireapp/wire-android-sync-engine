@@ -25,9 +25,8 @@ import akka.actor._
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import com.waz.api.OtrClient.DeleteCallback
-import com.waz.api.ZMessagingApi.RegistrationListener
 import com.waz.api._
-import com.waz.api.impl.{AccentColor, DoNothingAndProceed, ErrorResponse, ZMessagingApi}
+import com.waz.api.impl.{DoNothingAndProceed, ErrorResponse, ZMessagingApi}
 import com.waz.content.Preferences.PrefKey
 import com.waz.content.{Database, GlobalDatabase}
 import com.waz.model.ConversationData.ConversationType
@@ -35,6 +34,7 @@ import com.waz.model.UserData.ConnectionStatus
 import com.waz.model.otr.ClientId
 import com.waz.model.{ConvId, ConversationData, Liking, RConvId, MessageContent => _, _}
 import com.waz.service._
+import com.waz.service.otr.CryptoBoxService
 import com.waz.testutils.Implicits.{CoreListAsScala, _}
 import com.waz.threading.{CancellableFuture, DispatchQueueStats, Threading}
 import com.waz.ui.UiModule
@@ -83,8 +83,8 @@ class DeviceActor(val deviceName: String,
     }
 
     override lazy val factory: ZMessagingFactory = new ZMessagingFactory(this) {
-      override def zmessaging(teamId: Option[TeamId], clientId: ClientId, user: UserModule): ZMessaging =
-        new ZMessaging(teamId, clientId, user) {
+      override def zmessaging(teamId: Option[TeamId], clientId: ClientId, user: UserModule, st: StorageModule, cb: CryptoBoxService): ZMessaging =
+        new ZMessaging(teamId, clientId, user, st, cb) {
 
         }
     }
@@ -110,7 +110,7 @@ class DeviceActor(val deviceName: String,
   implicit val defaultTimeout = 5.minutes
   implicit val execContext = context.dispatcher.prepare()
 
-  implicit def zmsDb: SQLiteDatabase = api.account.get.storage.db.dbHelper.getWritableDatabase
+  implicit def zmsDb: SQLiteDatabase = api.account.get.storage.currentValue("actors").get.db.dbHelper.getWritableDatabase
 
   val maxConnectionAttempts = 10
 

@@ -43,7 +43,7 @@ import scala.concurrent.duration._
 
   lazy val conv = ConversationData(ConvId(), RConvId(), Some("convName"), selfUser.id, ConversationType.Group)
 
-  lazy val storage = new StorageModule(context, AccountId(), "", null) {
+  lazy val storage = new StorageModule(context, UserId(), "", null) {
     convsStorage.insert(conv)
   }
 

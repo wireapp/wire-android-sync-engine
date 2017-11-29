@@ -112,14 +112,14 @@ class CallingService(val selfUserId:      UserId,
 
   Option(ZMessaging.currentAccounts).foreach( _.loggedInAccounts.map(_.map(_.id)).map(_.contains(account)) {
     case false =>
-      verbose(s"Account $account logged out, unregistering from AVS")
+      verbose(s"Account $selfUserId logged out, unregistering from AVS")
       wCall.map(avs.unregisterAccount)
     case true =>
   })
 
   callProfile.onChanged { p =>
     verbose(s"Call profile changed. active call: ${p.activeCall}, non active calls: ${p.nonActiveCalls}")
-    p.activeCall.foreach(i => if (i.state == SelfCalling) CallWakeService(context, account, i.convId))
+    p.activeCall.foreach(i => if (i.state == SelfCalling) CallWakeService(context, selfUserId, i.convId))
   }
 
   def onSend(ctx: Pointer, convId: RConvId, userId: UserId, clientId: ClientId, msg: String) = {

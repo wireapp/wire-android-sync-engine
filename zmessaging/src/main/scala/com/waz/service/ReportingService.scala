@@ -105,7 +105,7 @@ class GlobalReportingService(context: Context, cache: CacheService, metadata: Me
   })
 
   val ZUsersReporter = Reporter("ZUsers", { writer =>
-    writer.println(s"current: ${ZMessaging.currentAccounts.activeAccount.currentValue}")
+    writer.println(s"current: ${ZMessaging.currentAccounts.activeAccountPref.signal.currentValue}")
     storage.list() map { all =>
       all foreach { u => writer.println(u.toString) }
     }

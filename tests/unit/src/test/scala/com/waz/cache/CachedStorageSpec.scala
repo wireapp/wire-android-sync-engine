@@ -22,17 +22,17 @@ import com.waz.ZLog.LogTag
 import com.waz.cache.CachedStorageSpec.{Item, ItemDao}
 import com.waz.content.ZmsDatabase
 import com.waz.db.Dao
-import com.waz.model.AccountId
+import com.waz.model.UserId
 import com.waz.testutils.Matchers._
 import com.waz.threading.SerialDispatchQueue
 import com.waz.utils.TrimmingLruCache.Fixed
 import com.waz.utils.wrappers.{DB, DBCursor}
 import com.waz.utils.{CachedStorageImpl, RichFuture, TrimmingLruCache}
+import org.scalatest._
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.prop.TableDrivenPropertyChecks._
 import org.scalatest.prop.Tables
 import org.scalatest.time.{Millis, Seconds, Span}
-import org.scalatest._
 
 import scala.collection.breakOut
 import scala.concurrent.duration._
@@ -47,7 +47,7 @@ import scala.concurrent.{Await, Future}
   implicit val timout: Timeout = 5.seconds
   implicit val tag: LogTag = "DbCacheSpec"
 
-  lazy val db = new ZmsDatabase(AccountId(), context)
+  lazy val db = new ZmsDatabase(UserId(), context)
 
   val testItems = Seq(Item("meep", "meepValue"), Item("mewp", "mewpValue"), Item("foo", "fooValue"), Item("bar", "barValue"), Item("count", "0"))
   val testData = testItems .map { i => i.k -> i } .toMap

@@ -37,7 +37,7 @@ import scala.concurrent.Future
 
 @Ignore class RequestMergerSpec extends FeatureSpec with Matchers with GeneratorDrivenPropertyChecks with RobolectricTests {
 
-  lazy val storage = new ZmsDatabase(AccountId(), Robolectric.application)
+  lazy val storage = new ZmsDatabase(UserId(), Robolectric.application)
 
   feature("Merge keys") {
     scenario("Refs should not be set for requests without ref") {

@@ -20,7 +20,7 @@ package com.waz.content
 import com.waz.RobolectricUtils
 import com.waz.api.User.ConnectionStatus
 import com.waz.model.UserData.UserDataDao
-import com.waz.model.{AccountId, UserData, UserId}
+import com.waz.model.{UserData, UserId}
 import com.waz.testutils.Matchers._
 import com.waz.threading.Threading
 import com.waz.utils.events.EventContext.Implicits.global
@@ -47,7 +47,7 @@ import scala.concurrent.duration._
   var storage: ZmsDatabase = _
 
   before {
-    storage = new ZmsDatabase(AccountId(), Robolectric.application)
+    storage = new ZmsDatabase(UserId(), Robolectric.application)
     implicit def db: DB = storage.dbHelper.getWritableDatabase
 
     UserDataDao.deleteAll
@@ -203,7 +203,6 @@ import scala.concurrent.duration._
     }
 
     scenario("fire signal when user is modified") {
-      import com.waz.utils.events.EventContext.Implicits.global
 
       @volatile var user = Option.empty[UserData]
       val signal = users.signal(testUsers.head.id)

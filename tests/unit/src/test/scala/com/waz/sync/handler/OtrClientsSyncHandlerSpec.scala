@@ -74,7 +74,7 @@ import scala.concurrent.Future
       } map (_.get))
     }
 
-    account.storage.usersStorage.addOrOverwrite(selfUser).futureValue
+    account.storage.currentValue("").get.usersStorage.addOrOverwrite(selfUser).futureValue
   }
 
   lazy val service = new MockZMessaging(userModule, None, clientId)

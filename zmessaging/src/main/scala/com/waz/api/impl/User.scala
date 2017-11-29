@@ -42,7 +42,7 @@ class User(val id: UserId, var data: UserData)(implicit ui: UiModule) extends co
   // this is needed for Self.getUser to work, UI accesses it before zms is fully logged in
   accountLoader { acc =>
     acc.zmessaging flatMap {
-      case None => acc.storage.usersStorage.signal(id)
+      case None => acc.storage.flatMap(_.usersStorage.signal(id))
       case Some(zms) => zms.users.userSignal(id)
     }
   } { set }

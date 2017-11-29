@@ -20,6 +20,7 @@ package com.waz.content
 import android.content.Context
 import com.waz.api.impl.{Credentials, EmailCredentials, PhoneCredentials}
 import com.waz.model.AccountData.AccountDataDao
+import com.waz.model.AccountDataNew.AccountDataNewDao
 import com.waz.model._
 import com.waz.utils.TrimmingLruCache.Fixed
 import com.waz.utils.{CachedStorage, CachedStorageImpl, TrimmingLruCache}
@@ -51,3 +52,7 @@ class AccountsStorageImpl(context: Context, storage: Database) extends CachedSto
 
   def findByPendingTeamName(name: String) = find(ac => ac.pendingTeamName.contains(name), AccountDataDao.findByPendingTeamName(name)(_), identity).map(_.headOption)
 }
+
+trait AccountsStorageNew extends CachedStorage[UserId, AccountDataNew]
+
+class AccountsStorageNewImpl(context: Context, storage: Database) extends CachedStorageImpl[UserId, AccountDataNew](new TrimmingLruCache(context, Fixed(8)), storage)(AccountDataNewDao) with AccountsStorageNew

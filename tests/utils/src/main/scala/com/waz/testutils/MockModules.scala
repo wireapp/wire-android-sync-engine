@@ -26,6 +26,7 @@ import com.waz.model.UserData.ConnectionStatus
 import com.waz.model._
 import com.waz.model.otr.{Client, ClientId}
 import com.waz.service._
+import com.waz.service.otr.CryptoBoxService
 import com.waz.service.push.{WebSocketClientService, WebSocketClientServiceImpl}
 import com.waz.sync.SyncServiceHandle
 import com.waz.sync.client.OtrClient
@@ -55,13 +56,12 @@ class MockGlobalModule(dbSuffix: String = Random.nextInt().toHexString) extends 
   override lazy val factory = new MockZMessagingFactory(this)
 
   override lazy val loginClient: LoginClient = new LoginClientImpl(client, backend) {
-    override def login(account: AccountData) = CancellableFuture.successful(Right((Token("", "", Int.MaxValue), Some(Cookie("")))))
     override def access(cookie: Cookie, token: Option[Token]) = CancellableFuture.successful(Right((Token("", "", Int.MaxValue), Some(Cookie("")))))
   }
 }
 
 class MockZMessagingFactory(global: MockGlobalModule) extends ZMessagingFactory(global) {
-  override def zmessaging(teamId: Option[TeamId], clientId: ClientId, user: UserModule): ZMessaging = super.zmessaging(teamId, clientId, user)
+  override def zmessaging(teamId: Option[TeamId], clientId: ClientId, user: UserModule, st: StorageModule, cb: CryptoBoxService): ZMessaging = super.zmessaging(teamId, clientId, user, st, cb)
 }
 
 class MockAccountsService(global: GlobalModuleImpl = new MockGlobalModule) extends AccountsServiceImpl(global) {
@@ -88,7 +88,7 @@ class MockAccountManager(override val accounts: AccountsServiceImpl = new MockAc
 
 class MockUserModule(val mockAccount: MockAccountManager = new MockAccountManager(), userId: UserId = UserId()) extends UserModule(userId, mockAccount)
 
-class MockZMessaging(val mockUser: MockUserModule = new MockUserModule(), teamId: Option[TeamId] = None, clientId: ClientId = ClientId()) extends ZMessaging(teamId, clientId, mockUser) { zms =>
+class MockZMessaging(val mockUser: MockUserModule = new MockUserModule(), teamId: Option[TeamId] = None, clientId: ClientId = ClientId()) extends ZMessaging(teamId, clientId, mockUser, null, null) { zms =>
   def this(selfUserId: UserId) = this(new MockUserModule(userId = selfUserId), None, ClientId())
   def this(selfUserId: UserId, clientId: ClientId) = this(new MockUserModule(userId = selfUserId), None, clientId)
   def this(selfUserId: UserId, teamId: TeamId, clientId: ClientId) = this(new MockUserModule(userId = selfUserId), Some(teamId), clientId)

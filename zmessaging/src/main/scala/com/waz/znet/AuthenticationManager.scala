@@ -21,15 +21,13 @@ import com.koushikdutta.async.http.AsyncHttpRequest
 import com.waz.HockeyApp
 import com.waz.ZLog._
 import com.waz.api.impl.ErrorResponse
-import com.waz.content.AccountsStorage
-import com.waz.model.{AccountData, AccountId}
-import com.waz.service.ZMessaging
+import com.waz.content.AccountsStorageNew
+import com.waz.model._
 import com.waz.service.ZMessaging.accountTag
 import com.waz.threading.{CancellableFuture, SerialDispatchQueue}
-import com.waz.utils.events.EventStream
 import com.waz.utils.{JsonDecoder, JsonEncoder}
 import com.waz.znet.AuthenticationManager.Token
-import com.waz.znet.LoginClient.{InsufficientCredentials, LoginResult}
+import com.waz.znet.LoginClient.LoginResult
 import com.waz.znet.Response._
 import org.json.JSONObject
 import org.threeten.bp.Instant
@@ -44,7 +42,7 @@ trait AccessTokenProvider {
  * Manages authentication token, and dispatches login requests when needed.
  * Will retry login request if unsuccessful.
  */
-class AuthenticationManager(id: AccountId, accStorage: AccountsStorage, client: LoginClient) extends AccessTokenProvider {
+class AuthenticationManager(id: UserId, accStorage: AccountsStorageNew, client: LoginClient) extends AccessTokenProvider {
 
   lazy implicit val logTag: LogTag = accountTag[AuthenticationManager](id)
 
@@ -54,32 +52,37 @@ class AuthenticationManager(id: AccountId, accStorage: AccountsStorage, client: 
 
   private var closed = false
 
-  val onInvalidCredentials = EventStream[Unit]()
-
   private def token  = withAccount(_.accessToken)
   private def cookie = withAccount(_.cookie)
 
   private def account = withAccount(identity)
 
-  private def withAccount[A](f: (AccountData) => A): Future[A] = accStorage.get(id).map {
+  private def withAccount[A](f: (AccountDataNew) => A): Future[A] = accStorage.get(id).map {
     case Some(acc) => f(acc)
     case _         => throw new IllegalStateException(s"Could not find matching account for: $id")
   }
 
   //Only performs safe update - never wipes either the cookie or the token.
-  private def updateCredentials(token: Option[Token] = None, cookie: Option[Cookie] = None) =
-    accStorage.update(id, acc => acc.copy(accessToken = if (token.isDefined) token else acc.accessToken, cookie = if (cookie.isDefined) cookie else acc.cookie))
+  private def updateCredentials(token: Option[Token] = None, cookie: Option[Cookie] = None) = {
+    def copy(acc: AccountDataNew): AccountDataNew =
+      (token, cookie) match {
+        case (Some(t), Some(c)) => acc.copy(accessToken = t, cookie = c)
+        case (Some(t), None)    => acc.copy(accessToken = t)
+        case (None, Some(c))    => acc.copy(cookie = c)
+        case _                  => acc
+      }
+    accStorage.update(id, copy)
+  }
 
-
-  private def wipeCredentials() =
-    accStorage.update(id, _.copy(accessToken = None, cookie = None))
+  //TODO - proper logout, de-register push token, inform backend, etc.
+  private def wipeCredentials() = accStorage.remove(id)
 
   /**
    * Last login request result. Used to make sure we never send several concurrent login requests.
    */
-  private var loginFuture: CancellableFuture[Either[Status, Token]] = CancellableFuture.lift(token.map { _.fold[Either[Status, Token]](Left(Cancelled))(Right(_)) })
+  private var loginFuture: CancellableFuture[Either[Status, Token]] = CancellableFuture.lift(token.map { Right(_) })
 
-  def invalidateToken() = token.map(_.foreach(t => updateCredentials(Some(t.copy(expiresAt = 0)))))
+  def invalidateToken() = token.map(t => updateCredentials(Some(t.copy(expiresAt = 0))))
 
   def isExpired(token: Token) = token.expiresAt - ExpireThreshold < System.currentTimeMillis()
 
@@ -89,7 +92,7 @@ class AuthenticationManager(id: AccountId, accStorage: AccountsStorage, client: 
   }
 
   /**
-   * Returns current token if not expired or performs login request
+   * Returns current token if not expired or logs the user out
    */
   def currentToken(): Future[Either[Status, Token]] = {
     loginFuture = loginFuture.recover {
@@ -98,42 +101,27 @@ class AuthenticationManager(id: AccountId, accStorage: AccountsStorage, client: 
         Left(Cancelled)
     } flatMap { _ =>
       CancellableFuture.lift(token) flatMap {
-        case Some(token) if !isExpired(token) =>
+        case token if !isExpired(token) =>
           verbose(s"Non expired token: $token")
           CancellableFuture.successful(Right(token))
         case token =>
           CancellableFuture.lift(cookie).flatMap { cookie =>
             debug(s"Non existent or expired token: $token, will attempt to refresh with cookie: $cookie")
-            cookie match {
-              case Some(c) =>
-                dispatchRequest(client.access(c, token)) {
-                  case Left((requestId, resp @ ErrorResponse(Status.Forbidden | Status.Unauthorized, message, label))) =>
-                    verbose(s"access request failed (label: $label, message: $message), will try login request. token: $token, cookie: $cookie, access resp: $resp")
+            dispatchRequest(client.access(cookie, Some(token))) {
+              case Left((requestId, resp @ ErrorResponse(Status.Forbidden | Status.Unauthorized, message, label))) =>
+                verbose(s"access request failed (label: $label, message: $message), will try login request. token: $token, cookie: $cookie, access resp: $resp")
 
-                    HockeyApp.saveException(new RuntimeException(s"Access request: $requestId failed: msg: $message, label: $label, cookie expired at: ${cookie.map(_.expiry)} (is valid: ${cookie.exists(_.isValid)}), token expired at: ${token.map(_.expiresAt)} (is valid: ${token.exists(_.isValid)})"), null)
-                    for {
-                      _ <- CancellableFuture.lift(wipeCredentials())
-                      res <- dispatchLoginRequest()
-                    } yield res
+                HockeyApp.saveException(new RuntimeException(s"Access request: $requestId failed: msg: $message, label: $label, cookie expired at: ${cookie.expiry} (is valid: ${cookie.isValid}), token expired at: ${token.expiresAt} (is valid: ${token.isValid})"), null)
+
+                CancellableFuture.lift(wipeCredentials()).map { _ =>
+                  Left(HttpStatus(resp.code, resp.message))
                 }
-              case None =>
-                dispatchLoginRequest()
             }
           }
       }
     }
     loginFuture.future
   }
-
-  private def dispatchLoginRequest(): CancellableFuture[Either[Status, Token]] =
-    CancellableFuture.lift(account).flatMap { acc =>
-      dispatchRequest(client.login(acc)) {
-        case Left((_, resp)) if resp.code == Status.Forbidden || resp.message == InsufficientCredentials =>
-          debug(s"login request failed with: $resp")
-          onInvalidCredentials ! {}
-          CancellableFuture.successful(Left(HttpStatus(resp.code, resp.message)))
-      }
-    }
 
   private def dispatchRequest(request: => CancellableFuture[LoginResult], retryCount: Int = 0)(handler: ResponseHandler): CancellableFuture[Either[Status, Token]] =
     request flatMap handler.orElse {

@@ -27,14 +27,10 @@ import scala.concurrent.Future
 
 class SyncService extends FutureService with ZMessagingService {
 
-  import com.waz.threading.Threading.Implicits.Background
-
   override protected def onIntent(intent: Intent, id: Int): Future[Any] =
     onAccountIntent(intent) { acc =>
       debug(s"onIntent $intent")
-      acc.userModule.head flatMap {
-        _.syncRequests.scheduler.awaitRunning
-      }
+      acc.userModule.syncRequests.scheduler.awaitRunning
     }
 }
 

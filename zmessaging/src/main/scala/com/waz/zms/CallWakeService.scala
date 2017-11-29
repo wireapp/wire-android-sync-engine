@@ -20,7 +20,7 @@ package com.waz.zms
 import android.content.{Intent => AIntent}
 import com.waz.ZLog.ImplicitTag._
 import com.waz.ZLog._
-import com.waz.model.{AccountId, ConvId}
+import com.waz.model.{ConvId, UserId}
 import com.waz.service.ZMessaging
 import com.waz.service.call.CallInfo.CallState._
 import com.waz.threading.{CancellableFuture, Threading}
@@ -97,13 +97,13 @@ object CallWakeService {
 
   lazy val isConnectingStates = Set(SelfCalling, SelfJoining, OtherCalling)
 
-  def apply(context: Context, user: AccountId, conv: ConvId) = {
+  def apply(context: Context, user: UserId, conv: ConvId) = {
     if (!context.startService(trackIntent(context, user, conv))) {
       error(s"could not start CallService, make sure it's added to AndroidManifest")
     }
   }
 
-  def intent(context: Context, user: AccountId, conv: ConvId, action: String = ActionTrack) = {
+  def intent(context: Context, user: UserId, conv: ConvId, action: String = ActionTrack) = {
     returning(Intent(context, classOf[CallWakeService])) { i =>
       i.setAction(action)
       i.putExtra(ConvIdExtra, conv.str)
@@ -111,14 +111,14 @@ object CallWakeService {
     }
   }
 
-  def trackIntent(context: Context, user: AccountId, conv: ConvId) = intent(context, user, conv, ActionTrack)
+  def trackIntent(context: Context, user: UserId, conv: ConvId) = intent(context, user, conv, ActionTrack)
 
-  def joinIntent(context: Context, user: AccountId, conv: ConvId) = intent(context, user, conv, ActionJoin)
-  def joinGroupIntent(context: Context, user: AccountId, conv: ConvId) = intent(context, user, conv, ActionJoinGroup)
-  def joinWithVideoIntent(context: Context, user: AccountId, conv: ConvId) = intent(context, user, conv, ActionJoinWithVideo)
-  def joinGroupWithVideoIntent(context: Context, user: AccountId, conv: ConvId) = intent(context, user, conv, ActionJoinGroupWithVideo)
+  def joinIntent(context: Context, user: UserId, conv: ConvId) = intent(context, user, conv, ActionJoin)
+  def joinGroupIntent(context: Context, user: UserId, conv: ConvId) = intent(context, user, conv, ActionJoinGroup)
+  def joinWithVideoIntent(context: Context, user: UserId, conv: ConvId) = intent(context, user, conv, ActionJoinWithVideo)
+  def joinGroupWithVideoIntent(context: Context, user: UserId, conv: ConvId) = intent(context, user, conv, ActionJoinGroupWithVideo)
 
-  def leaveIntent(context: Context, user: AccountId, conv: ConvId) = intent(context, user, conv, ActionLeave)
+  def leaveIntent(context: Context, user: UserId, conv: ConvId) = intent(context, user, conv, ActionLeave)
 
-  def silenceIntent(context: Context, user: AccountId, conv: ConvId) = intent(context, user, conv, ActionSilence)
+  def silenceIntent(context: Context, user: UserId, conv: ConvId) = intent(context, user, conv, ActionSilence)
 }

@@ -26,12 +26,16 @@ import akka.serialization.Serialization
 import akka.util.Timeout
 import android.database.Cursor
 import com.typesafe.config.ConfigFactory
+import com.waz.ZLog.ImplicitTag._
+import com.waz.content.Likes
 import com.waz.model.AccountData.AccountDataDao
+import com.waz.model.MessageData.MessageDataDao
 import com.waz.model._
 import com.waz.model.otr.ClientId
 import com.waz.provision.ActorMessage.{ReleaseRemotes, SpawnRemoteDevice, WaitUntilRegistered}
 import com.waz.provision._
 import com.waz.service._
+import com.waz.service.otr.CryptoBoxService
 import com.waz.testutils.Implicits._
 import com.waz.testutils.RoboPermissionProvider
 import com.waz.testutils.TestApplication.notificationsSpy
@@ -44,13 +48,10 @@ import com.waz.{RoboProcess, RobolectricUtils, ShadowLogging}
 import net.hockeyapp.android.Constants
 import org.scalatest._
 import org.scalatest.enablers.{Containing, Emptiness, Length}
-import com.waz.ZLog.ImplicitTag._
-import com.waz.content.Likes
-import com.waz.model.MessageData.MessageDataDao
 import org.threeten.bp.Instant
 
-import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
+import scala.concurrent.{Await, Future}
 import scala.{PartialFunction => =/>}
 
 trait ApiSpec extends BeforeAndAfterEach with BeforeAndAfterAll with Matchers with RobolectricTests with ShadowLogging with RobolectricUtils { suite: Suite with Alerting with Informing =>
@@ -69,10 +70,10 @@ trait ApiSpec extends BeforeAndAfterEach with BeforeAndAfterAll with Matchers wi
   protected case object InitManually extends InitBehaviour
 
   lazy val zmessagingFactory: ZMessagingFactory = new ZMessagingFactory(globalModule) {
-    override def zmessaging(teamId: Option[TeamId], clientId: ClientId, user: UserModule): ZMessaging = new ApiZMessaging(teamId, clientId, user)
+    override def zmessaging(teamId: Option[TeamId], clientId: ClientId, user: UserModule, st: StorageModule, cb: CryptoBoxService): ZMessaging = new ApiZMessaging(teamId, clientId, user, st, cb)
   }
 
-  class ApiZMessaging(teamId: Option[TeamId], clientId: ClientId, user: UserModule) extends ZMessaging(teamId, clientId, user) {
+  class ApiZMessaging(teamId: Option[TeamId], clientId: ClientId, user: UserModule, st: StorageModule, cb: CryptoBoxService) extends ZMessaging(teamId, clientId, user, st, cb) {
     override lazy val eventPipeline = new EventPipelineImpl(Vector(otrService.eventTransformer), events =>
       returning(eventScheduler.enqueue(events))(_ => eventSpies.get.foreach(pf => events.foreach(e => pf.applyOrElse(e, (_: Event) => ())))))
 
@@ -205,24 +206,24 @@ trait ApiSpec extends BeforeAndAfterEach with BeforeAndAfterAll with Matchers wi
   }
 
   protected def logoutAndDestroy(): Unit = {
-    var maybeZms = Await.result(api.ui.getCurrent, 5.seconds)
-    api.logout()
-    pauseApi()
-    api.onDestroy()
-    deleteUserAfterLogout()
-    awaitUi(500.millis)
-    maybeZms.foreach { zms =>
-      awaitUi(zms.websocket.connected.currentValue.forall(_ == false), "websocket connection should be disconnected")
-      zms.storage.db.close()
-      zms.global.storage.close()
-      api.ui.uiCache.clear()
-    }
-    accounts.activeAccountPref := None
-    accounts.accountMap.clear()
-    api = null
-    ZMessaging.context = null
-    maybeZms = null
-    System.gc()
+//    var maybeZms = Await.result(api.ui.getCurrent, 5.seconds)
+//    api.logout()
+//    pauseApi()
+//    api.onDestroy()
+//    deleteUserAfterLogout()
+//    awaitUi(500.millis)
+//    maybeZms.foreach { zms =>
+//      awaitUi(zms.websocket.connected.currentValue.forall(_ == false), "websocket connection should be disconnected")
+//      zms.storage.db.close()
+//      zms.global.storage.close()
+//      api.ui.uiCache.clear()
+//    }
+//    accounts.activeAccountPref := None
+//    accounts.accountMap.clear()
+//    api = null
+//    ZMessaging.context = null
+//    maybeZms = null
+//    System.gc()
   }
 
   def deleteUserAfterLogout(): Unit = Await.result(globalModule.storage(AccountDataDao.deleteForEmail(EmailAddress(email))(_)), 10.seconds)
@@ -275,7 +276,6 @@ trait ApiSpec extends BeforeAndAfterEach with BeforeAndAfterAll with Matchers wi
       if (error.isDefined) alert(s"Login failed: $error")
       else {
         awaitUi { selfUser.get.accountActivated } (10.seconds)
-        awaitUi { selfUser.get.getClientRegistrationState != ClientRegistrationState.UNKNOWN }(10.seconds)
         awaitUi { api.account.isDefined }
         awaitUiFuture { api.account.get.zmessaging.filter(_.isDefined).head }
         awaitUi { Await.result(api.zmessaging, 5.seconds).isDefined }

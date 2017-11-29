@@ -21,7 +21,6 @@ import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import com.waz.ZLog.ImplicitTag._
 import com.waz.ZLog._
-import com.waz.api.ClientRegistrationState
 import com.waz.cache.CacheEntryData.CacheEntryDao
 import com.waz.content.ZmsDatabase
 import com.waz.db.Col._
@@ -139,9 +138,9 @@ object ZGlobalDB {
       }
       c.close()
 
-      val accountData: Map[AccountId, (Option[UserId], Option[ClientId], Option[ClientRegistrationState])] = ids.map { id =>
+      val accountData: Map[AccountId, (Option[UserId], Option[ClientId], Option[String])] = ids.map { id =>
         val values = try {
-          IoUtils.withResource(new ZmsDatabase(AccountId(id), context)) { zmsDb =>
+          IoUtils.withResource(new ZmsDatabase(UserId(id), context)) { zmsDb =>
             IoUtils.withResource(zmsDb.dbHelper.getReadableDatabase) { zd =>
               val c = zd.query("KeyValues", Array("key", "value"), s"key IN ('$SelfUserId', '$OtrClientId', '$OtrClientRegState')", null, null, null, null)
               Seq.tabulate(c.getCount) { i => c.moveToPosition(i); c.getString(0) -> c.getString(1) }.toMap
@@ -151,7 +150,7 @@ object ZGlobalDB {
           case _: Throwable => Map.empty[String, String]
         }
 
-        AccountId(id) -> (values.get(SelfUserId).map(UserId), values.get(OtrClientId).map(ClientId(_)), values.get(OtrClientRegState).map(ClientRegistrationState.valueOf))
+        AccountId(id) -> (values.get(SelfUserId).map(UserId), values.get(OtrClientId).map(ClientId(_)), values.get(OtrClientRegState))
       }.toMap
 
       val moveConvs = new TableMigration(TableDesc("ZUsers", Columns.v12.all), TableDesc("Accounts", Columns.v13.all)) {
@@ -168,7 +167,7 @@ object ZGlobalDB {
           dst.Token := { _ => None },
           dst.UserId := { c => accountData.get(src.Id(c)).flatMap(_._1) },
           dst.ClientId := { c => accountData.get(src.Id(c)).flatMap(_._2) },
-          dst.ClientRegState := { c => accountData.get(src.Id(c)).flatMap(_._3).getOrElse(ClientRegistrationState.UNKNOWN) }
+          dst.ClientRegState := { c => accountData.get(src.Id(c)).flatMap(_._3).getOrElse("UNKNOWN") }
         )
       }
 
@@ -201,7 +200,7 @@ object ZGlobalDB {
       val Token = opt(text[Token]('access_token, JsonEncoder.encodeString[Token], JsonDecoder.decode[Token]))
       val UserId = opt(id[UserId]('user_id))
       val ClientId = opt(id[ClientId]('client_id))
-      val ClientRegState = text[ClientRegistrationState]('reg_state, _.name(), ClientRegistrationState.valueOf)
+      val ClientRegState = text('reg_state)
 
       val all = Seq(Id, Email, Hash, EmailVerified, Cookie, Phone, Token, UserId, ClientId, ClientRegState)
     }

@@ -22,7 +22,7 @@ import com.waz.ZLog.ImplicitTag._
 import com.waz.ZLog._
 import com.waz.api.impl.ErrorResponse
 import com.waz.client.RegistrationClientImpl
-import com.waz.model.{AccountData, EmailAddress}
+import com.waz.model.{EmailAddress, PendingAccount}
 import com.waz.service.BackendConfig
 import com.waz.threading.CancellableFuture.CancelException
 import com.waz.threading.{CancellableFuture, SerialDispatchQueue}
@@ -38,7 +38,7 @@ import scala.util.control.NonFatal
 
 trait LoginClient {
   def access(cookie: Cookie, token: Option[Token]): CancellableFuture[LoginResult]
-  def login(account: AccountData): CancellableFuture[LoginResult]
+  def login(account: PendingAccount): CancellableFuture[LoginResult]
   def requestVerificationEmail(email: EmailAddress): CancellableFuture[Either[ErrorResponse, Unit]]
 }
 
@@ -59,7 +59,7 @@ class LoginClientImpl(client: AsyncClient, backend: BackendConfig) extends Login
       math.max(nextRunTime - System.currentTimeMillis(), 0).millis
     }
 
-  override def login(account: AccountData) = throttled(loginNow(account))
+  override def login(account: PendingAccount) = throttled(loginNow(account))
 
   override def access(cookie: Cookie, token: Option[Token]) = throttled(accessNow(cookie, token))
 
@@ -89,8 +89,8 @@ class LoginClientImpl(client: AsyncClient, backend: BackendConfig) extends Login
     loginFuture
   }.flatten
 
-  def loginNow(account: AccountData) = {
-    debug(s"trying to login to account: ${account.id}")
+  def loginNow(account: PendingAccount) = {
+    debug(s"trying to login to account: $account")
     if (account.canLogin) {
       val request = Request.Post(LoginUriStr, loginRequestBody(account), baseUri = Some(backend.baseUrl), timeout = RegistrationClientImpl.timeout)
       client(request) map responseHandler
@@ -149,7 +149,21 @@ object LoginClient {
 
   val Throttling = new ExponentialBackoff(1000.millis, 10.seconds)
 
-  def loginRequestBody(account: AccountData) = JsonContentEncoder(JsonEncoder(account.addToLoginJson))
+  def loginRequestBody(account: PendingAccount) = JsonContentEncoder(JsonEncoder { o =>
+    import account._
+    (email, handle, password, phone, code) match {
+      case (Some(e), _, Some(p), _, _) =>
+        o.put("email", e.str)
+        o.put("password", p)
+      case (_, Some(h), Some(p), _, _) =>
+        o.put("handle", h.string)
+        o.put("password", p)
+      case (_, _, _, Some(p), Some(c)) =>
+        o.put("phone", p.str)
+        o.put("code", c.str)
+      case _ => //let fail
+    }
+  })
 
   def getCookieFromHeaders(headers: Response.Headers): Option[Cookie] = headers(SetCookie) flatMap {
     case header @ CookieHeader(cookie) =>

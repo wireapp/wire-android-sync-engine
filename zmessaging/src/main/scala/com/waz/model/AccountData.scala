@@ -20,11 +20,10 @@ package com.waz.model
 import android.util.Base64
 import com.waz.ZLog.ImplicitTag._
 import com.waz.ZLog._
-import com.waz.api.ClientRegistrationState
 import com.waz.api.impl.{Credentials, EmailCredentials}
 import com.waz.db.Col._
 import com.waz.db.{Col, Dao, DbTranslator}
-import com.waz.model.AccountData.{PermissionsMasks, TriTeamId}
+import com.waz.model.AccountData.TriTeamId
 import com.waz.model.otr.ClientId
 import com.waz.utils.Locales.currentLocaleOrdering
 import com.waz.utils.scrypt.SCrypt
@@ -35,6 +34,101 @@ import com.waz.znet.AuthenticationManager.{Cookie, Token}
 import org.json.JSONObject
 
 import scala.collection.mutable
+
+
+/**
+  * Represents a user account prior to a successful registration or login with the backend. After either a successful login
+  * or registration, the information here should be cleared
+  *
+  * @param code will not be persisted
+  * @param password will not be persisted
+  *
+  * //TODO invitations?
+  */
+case class PendingAccount(teamName: Option[String]           = None,
+                          email:    Option[EmailAddress]     = None,
+                          handle:   Option[Handle]           = None,
+                          phone:    Option[PhoneNumber]      = None,
+                          name:     Option[String]           = None,
+                          code:     Option[ConfirmationCode] = None,
+                          password: Option[String]           = None,
+                         ) {
+
+  override def toString: String =
+    s"""PendingAccount:
+       | teamName:        $teamName
+       | email:           $email
+       | phone:           $phone
+       | handle:          $handle
+       | name:            $name
+       | password:        In memory?: ${password.isDefined}
+       | code:            $code
+    """.stripMargin
+
+  def canLogin: Boolean =
+    (email.isDefined && password.isDefined) ||
+    (handle.isDefined && password.isDefined) ||
+    (phone.isDefined && code.isDefined)
+}
+
+object PendingAccount {
+
+  def apply(acc: AccountData): PendingAccount = PendingAccount(
+    email     = acc.email,
+    handle    = acc.handle,
+    phone     = acc.phone,
+    name      = acc.name,
+    password  = acc.password
+  )
+
+  implicit lazy val encoder: JsonEncoder[PendingAccount] = new JsonEncoder[PendingAccount] {
+    override def apply(acc: PendingAccount) = JsonEncoder { o =>
+      acc.teamName foreach(v => o.put("email",     v))
+      acc.email    foreach(v => o.put("team_name", v.str))
+      acc.handle   foreach(v => o.put("handle",    v.string))
+      acc.phone    foreach(v => o.put("phone",     v.str))
+      acc.name     foreach(v => o.put("name",      v))
+    }
+  }
+
+  implicit lazy val decoder: JsonDecoder[PendingAccount] = new JsonDecoder[PendingAccount] {
+    import JsonDecoder._
+    override def apply(implicit js: JSONObject) =
+      PendingAccount('team_name, 'email, 'handle, 'phone)
+  }
+}
+
+/**
+  * Should only contain data that might need to exist beyond the life/scope of the user database (for cleanup or for
+  * managing all accounts on the device, for example)
+  */
+case class AccountDataNew(userId:      UserId,
+                          cookie:      Cookie,
+                          accessToken: Token,
+                          pushToken:   Option[PushToken]) {
+
+  override def toString: String =
+    s"""AccountData:
+       | userId:          $userId
+       | cookie:          $cookie
+       | accessToken:     $accessToken
+       | pushToken:       $pushToken
+    """.stripMargin
+}
+
+object AccountDataNew {
+  implicit object AccountDataNewDao extends Dao[AccountDataNew, UserId] {
+    val UserId      = id[UserId]        ('user_id, "PRIMARY KEY").apply(_.userId)
+    val Cookie      = text[Cookie]      ('cookie, _.str, AuthenticationManager.Cookie)(_.cookie)
+    val AccessToken = text[Token]       ('access_token, JsonEncoder.encodeString[Token], JsonDecoder.decode[Token])(_.accessToken)
+    val PushToken   = opt(id[PushToken] ('registered_push))(_.pushToken)
+
+    override val idCol = UserId
+    override val table = Table("Accounts_new", UserId, Cookie, AccessToken, PushToken)
+
+    override def apply(implicit cursor: DBCursor): AccountDataNew = AccountDataNew(UserId, Cookie, AccessToken, PushToken)
+  }
+}
 
 /**
  * Represents a local user account.
@@ -54,8 +148,8 @@ case class AccountData(id:              AccountId                       = Accoun
                        password:        Option[String]                  = None,
                        accessToken:     Option[Token]                   = None,
                        userId:          Option[UserId]                  = None,
-                       clientId:        Option[ClientId]                = None,
-                       clientRegState:  ClientRegistrationState         = ClientRegistrationState.UNKNOWN,
+                       clientId:        Option[ClientId]                = None, //DEPRECATED! use the client id (state) stored in userpreferences instead
+                       clientRegState:  String                          = "UNKNOWN", //DEPRECATED! use the client id (state) stored in userpreferences instead
                        privateMode:     Boolean                         = false,
                        regWaiting:      Boolean                         = false,
                        code:            Option[ConfirmationCode]        = None,
@@ -81,8 +175,6 @@ case class AccountData(id:              AccountId                       = Accoun
        | password:        In memory?: ${password.isDefined}
        | accessToken:     ${accessToken.take(6)}
        | userId:          $userId
-       | clientId:        $clientId
-       | clientRegState:  $clientRegState
        | privateMode:     $privateMode
        | regWaiting:      $regWaiting
        | code:            $code
@@ -129,9 +221,6 @@ case class AccountData(id:              AccountId                       = Accoun
       (phone.orElse(pendingPhone).isDefined && code.isDefined)
   }
 
-  def addToLoginJson(o: JSONObject) =
-    addCredentialsToJson(o)
-
   def addToRegistrationJson(o: JSONObject) =
     addCredentialsToJson(o, isLogin = !regWaiting)
 
@@ -160,12 +249,6 @@ case class AccountData(id:              AccountId                       = Accoun
 
   def updated(user: UserInfo): AccountData =
     copy(userId = Some(user.id), email = user.email.orElse(email), pendingEmail = email.fold(pendingEmail)(_ => Option.empty[EmailAddress]), phone = user.phone.orElse(phone), handle = user.handle.orElse(handle), privateMode = user.privateMode.getOrElse(privateMode))
-
-  def updated(userId: Option[UserId], activated: Boolean, clientId: Option[ClientId], clientRegState: ClientRegistrationState): AccountData =
-    copy(userId = userId orElse this.userId, clientId = clientId orElse this.clientId, clientRegState = clientRegState)
-
-  def withTeam(teamId: Option[TeamId], permissions: Option[PermissionsMasks]): AccountData =
-    copy(teamId = Right(teamId), _selfPermissions = permissions.map(_._1).getOrElse(0), _copyPermissions = permissions.map(_._2).getOrElse(0))
 
   def isTeamAccount: Boolean =
     teamId.fold(_ => false, _.isDefined)
@@ -198,6 +281,15 @@ object AccountData {
     val hash = credentials.maybePassword.map(computeHash(id, _)).getOrElse("")
     new AccountData(id, Left({}), password = credentials.maybePassword, handle = credentials.maybeUsername, pendingPhone = credentials.maybePhone, pendingEmail = credentials.maybeEmail)
   }
+
+  def apply(p: PendingAccount): AccountData =
+    AccountData(
+      email     = p.email,
+      handle    = p.handle,
+      phone     = p.phone,
+      name      = p.name,
+      password  = p.password
+    )
 
   def apply(email: EmailAddress, password: String): AccountData = {
     val id = AccountId()
@@ -283,7 +375,7 @@ object AccountData {
     val Token = opt(text[Token]('access_token, JsonEncoder.encodeString[Token], JsonDecoder.decode[Token]))(_.accessToken)
     val UserId = opt(id[UserId]('user_id)).apply(_.userId)
     val ClientId = opt(id[ClientId]('client_id))(_.clientId)
-    val ClientRegState = text[ClientRegistrationState]('reg_state, _.name(), ClientRegistrationState.valueOf)(_.clientRegState)
+    val ClientRegState = text('reg_state)(_.clientRegState)
     val PrivateMode = bool('private_mode)(_.privateMode)
     val RegWaiting = bool('reg_waiting)(_.regWaiting)
     val Code = opt(text[ConfirmationCode]('code, _.str, ConfirmationCode))(_.code)

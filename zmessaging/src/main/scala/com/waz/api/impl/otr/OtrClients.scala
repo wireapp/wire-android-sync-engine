@@ -20,16 +20,15 @@ package com.waz.api.impl.otr
 import java.util.Locale
 
 import android.os.Parcel
-import com.waz.ZLog._
 import com.waz.ZLog.ImplicitTag._
+import com.waz.ZLog._
 import com.waz.api
 import com.waz.api.OtrClient.{DeleteCallback, ResetCallback}
 import com.waz.api.impl.{CoreList, ErrorResponse, UiObservable, UiSignal}
 import com.waz.api.{Location, OtrClientType, Verification, OtrClient => ApiClient}
 import com.waz.model.otr.{Client, ClientId}
-import com.waz.model.{AccountData, ConvId, UserId, otr}
+import com.waz.model.{ConvId, UserId, otr}
 import com.waz.service.AccountManager
-import com.waz.service.otr.OtrService
 import com.waz.sync.SyncResult
 import com.waz.threading.Threading
 import com.waz.ui.{SignalLoading, UiModule}
@@ -83,28 +82,29 @@ object OtrClients {
     }
 
     for {
-      clients <- account.storage.otrClientsStorage.signal(user)
-      acc     <- account.accountData
+      clients    <- account.storage.flatMap(_.otrClientsStorage.signal(user))
+      acc        <- account.accountData
+      selfClient <- account.clientId
     } yield {
       val cs = clients.clients.values.toVector.sorted(ClientOrdering)
-      (user, if (skipSelf) cs.filter(c => !acc.clientId.contains(c.id)) else cs)
+      (user, if (skipSelf) cs.filter(c => !selfClient.contains(c.id)) else cs)
     }
   })
 
   def incoming(implicit ui: UiModule): OtrClients = new OtrClients({ account =>
-
-    account.accountData.map(ac => (ac.userId, ac.clientId)) flatMap {
-      case (Some(userId), Some(clientId)) =>
-        account.storage.otrClientsStorage.incomingClientsSignal(userId, clientId).map { cs =>
-          (userId, cs.sorted(IncomingClientOrdering).toVector)
-        }
-      case _ => Signal.empty
+    (for {
+      Some(userId)   <- account.accountData.map(_.userId)
+      Some(clientId) <- account.clientId
+    } yield (userId, clientId)).flatMap {
+      case (userId, clientId) =>
+      account.storage.flatMap(_.otrClientsStorage.incomingClientsSignal(userId, clientId)).map { cs =>
+        (userId, cs.sorted(IncomingClientOrdering).toVector)
+      }
     }
   })
 }
 
 class OtrClient(val userId: UserId, val clientId: ClientId, var data: Client)(implicit ui: UiModule) extends api.OtrClient with UiObservable with SignalLoading {
-  import OtrClient._
   import Threading.Implicits.Background
 
   addLoader(_.storage.otrClientsStorage.signal(userId).map(_.clients.get(clientId))) { _ foreach update }
@@ -143,19 +143,13 @@ class OtrClient(val userId: UserId, val clientId: ClientId, var data: Client)(im
 
   override def getType: OtrClientType = data.devType
 
-  override def getFingerprint: api.UiSignal[Fingerprint] = {
-    def signal(acc: AccountManager) = acc.accountData flatMap { account =>
-      if (account.userId.contains(userId) && account.clientId.contains(clientId)) Signal.future(acc.cryptoBox { cb => Future successful cb.getLocalFingerprint })
-      else acc.cryptoBox.sessions.remoteFingerprint(OtrService.sessionId(userId, clientId))
-    }
-
-    UiSignal.accountMapped(signal(_: AccountManager).collect { case Some(bytes) => bytes }, new Fingerprint(_: Array[Byte]))
-  }
+  override def getFingerprint: api.UiSignal[Fingerprint] =
+    UiSignal.accountMapped(_.fingerprintSignal(userId, clientId).collect { case Some(bytes) => bytes }, new Fingerprint(_: Array[Byte]))
 
   // was this client fingerprint verified (manually or by sync from trusted device)
   override def getVerified: Verification = data.verified
 
-  override def setVerified(trusted: Boolean): Unit = ui.getAccount.flatMap(_.storage.otrClientsStorage.updateVerified(userId, clientId, trusted))
+  override def setVerified(trusted: Boolean): Unit = ui.getAccount.flatMap(_.storage.head.flatMap(_.otrClientsStorage.updateVerified(userId, clientId, trusted)))
 
   override def delete(password: String, cb: DeleteCallback): Unit =
     ui.getUserModule.flatMap(_.clientsService.deleteClient(clientId, password)) .map {
