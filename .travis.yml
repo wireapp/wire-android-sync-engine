@@ -30,4 +30,6 @@ before_install:
   - wget https://repo.typesafe.com/typesafe/ivy-releases/org.scala-sbt/sbt-launch/0.13.12/sbt-launch.jar
   - export SBT_OPTS="-Xms512M -Xmx1536M -Xss1M -XX:+CMSClassUnloadingEnabled"
 
+before_script: chmod +x ./travis_large.sh
+
 script: ./travis_large.sh
