@@ -240,12 +240,7 @@ class UserServiceImpl(override val selfUserId: UserId,
       case _ => sync.syncUsersIfNotEmpty(users.filter(_.picture.isEmpty).map(_.id))
     }
 
-  def updateSyncedUsersPictures(users: UserInfo*): Future[_] = {
-    val userAssets = users.map(user => (user.picture.getOrElse(Seq.empty[AssetData]).headOption, user.id == selfUserId)).collect {
-      case (Some(assetData), isSelf) => assets.addImageAsset(assetData, RConvId(selfUserId.str), isSelf = isSelf)
-    }
-    Future.sequence(userAssets)
-  }
+  def updateSyncedUsersPictures(users: UserInfo*): Future[_] = assets.updateAssets(users.flatMap(_.picture.getOrElse(Seq.empty[AssetData])))
 
   def updateSyncedUsers(users: Seq[UserInfo], timestamp: Long = System.currentTimeMillis()): Future[Set[UserData]] = {
     debug(s"update synced users: $users, service: $this")
