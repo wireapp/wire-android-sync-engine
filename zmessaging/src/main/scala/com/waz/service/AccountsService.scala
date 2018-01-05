@@ -209,10 +209,9 @@ class AccountsServiceImpl(val global: GlobalModule) extends AccountsService {
     for {
       cur      <- getActiveAccountManager.map(_.map(_.id))
       if !cur.contains(accountId)
-      _        <- logout(flushCredentials = false)
       account  <- storage.get(accountId)
+      _        <- setAccount(account.map(_.id))
       if account.isDefined
-      _        <- setAccount(Some(accountId))
       _        <- getOrCreateAccountManager(accountId)
     } yield {}
   }
