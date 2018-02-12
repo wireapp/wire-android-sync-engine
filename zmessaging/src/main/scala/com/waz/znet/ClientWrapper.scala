@@ -17,7 +17,7 @@
  */
 package com.waz.znet
 
-import java.security.cert.X509Certificate
+import java.security.cert.{CertificateException, X509Certificate}
 import javax.net.ssl._
 
 import com.google.android.gms.security.ProviderInstaller
@@ -31,7 +31,7 @@ import com.waz.service.ZMessaging
 import com.waz.threading.{CancellableFuture, Threading}
 import com.waz.utils._
 import com.waz.utils.wrappers.Context
-import org.apache.http.conn.ssl.{AbstractVerifier, StrictHostnameVerifier}
+import org.apache.http.conn.ssl.StrictHostnameVerifier
 
 import scala.concurrent.{Future, Promise}
 
@@ -103,20 +103,11 @@ object ClientWrapper {
       client.getSSLSocketMiddleware.setTrustManagers(Array(new X509TrustManager {
         override def checkServerTrusted(chain: Array[X509Certificate], authType: String): Unit = {
           debug(s"checking certificate for authType $authType, name: ${chain(0).getSubjectDN.getName}")
-          chain.headOption.fold(throw new SSLException("expected at least one certificate!")) { cert =>
-            val tm = if (isCertForDomain(zinfra, cert) || isCertForDomain(wire, cert)) {
-              verbose("using backend trust manager")
-              ServerTrust.backendTrustManager
-            } else {
-              verbose("using system trust manager")
-              ServerTrust.systemTrustManager
-            }
-            try {
-              tm.checkServerTrusted(chain, authType)
-            } catch {
-              case e: Throwable =>
-                error("certificate check failed", e)
-                throw e
+          if (chain.isEmpty) {
+            throw new SSLException("expected at least one certificate!")
+          } else {
+            if (!chain.exists(cert => cert.getPublicKey.getEncoded.sameElements(ServerTrust.wireCertPublicKey))) {
+              throw new CertificateException("Wire public key not present in certificate chain")
             }
           }
         }
@@ -124,19 +115,6 @@ object ClientWrapper {
         override def checkClientTrusted(chain: Array[X509Certificate], authType: String): Unit = throw new SSLException("unexpected call to checkClientTrusted")
 
         override def getAcceptedIssuers: Array[X509Certificate] = throw new SSLException("unexpected call to getAcceptedIssuers")
-
-        /**
-          * Checks if certificate matches given domain.
-          * This is used to check if currently verified server is known to wire, and we should do certificate pinning for it.
-          *
-          * Warning: it's very important that this implementation matches used HostnameVerifier.
-          * If HostnameVerifier accepts this cert with some wire sub-domain then this function must return true,
-          * otherwise pinning will be skipped and we risk MITM attack.
-          */
-        private def isCertForDomain(domain: String, cert: X509Certificate): Boolean = {
-          def iter(arr: Array[String]) = Option(arr).fold2(Iterator.empty, _.iterator)
-          (iter(AbstractVerifier.getCNs(cert)) ++ iter(AbstractVerifier.getDNSSubjectAlts(cert))).exists(_.endsWith(s".$domain"))
-        }
       }))
 
       client.getSSLSocketMiddleware.setSSLContext(returning(SSLContext.getInstance("TLSv1.2")) { _.init(null, null, null) })
