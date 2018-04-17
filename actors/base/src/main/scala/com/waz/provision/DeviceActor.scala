@@ -399,7 +399,11 @@ class DeviceActor(val deviceName: String,
 
     case SetStatus(status) =>
       Availability.all.find(_.toString.toLowerCase == status.toLowerCase) match {
-        case Some(availability) => zms.head.flatMap(_.users.updateAvailability(availability)).map(_ => Successful)
+        case Some(availability) =>
+          for {
+            z            <- zms.head
+            _            <- z.users.storeAvailabilities(Map(z.selfUserId -> availability))
+          } yield Successful
         case None => Future.successful(Failed(s"Unknown availability: $status"))
       }
 

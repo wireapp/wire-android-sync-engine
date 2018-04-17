@@ -19,6 +19,7 @@ package com.waz.sync
 
 import com.waz.api.EphemeralExpiration
 import com.waz.api.IConversation.{Access, AccessRole}
+import com.waz.api.impl.AccentColor
 import com.waz.content.UserPreferences
 import com.waz.content.UserPreferences.ShouldSyncInitial
 import com.waz.model.UserData.ConnectionStatus
@@ -58,6 +59,8 @@ trait SyncServiceHandle {
 
   def postSelfUser(info: UserInfo): Future[SyncId]
   def postSelfPicture(picture: Option[AssetId]): Future[SyncId]
+  def postSelfName(name: String): Future[SyncId]
+  def postSelfAccentColor(color: AccentColor): Future[SyncId]
   def postAvailability(status: Availability): Future[SyncId]
   def postMessage(id: MessageId, conv: ConvId, editTime: Instant): Future[SyncId]
   def postDeleted(conv: ConvId, msg: MessageId): Future[SyncId]
@@ -133,6 +136,8 @@ class AndroidSyncServiceHandle(service: SyncRequestService, timeouts: Timeouts, 
 
   def postSelfUser(info: UserInfo) = addRequest(PostSelf(info))
   def postSelfPicture(picture: Option[AssetId]) = addRequest(PostSelfPicture(picture))
+  def postSelfName(name: String) = addRequest(PostSelfName(name))
+  def postSelfAccentColor(color: AccentColor) = addRequest(PostSelfAccentColor(color))
   def postAvailability(status: Availability) = addRequest(PostAvailability(status))
   def postMessage(id: MessageId, conv: ConvId, time: Instant) = addRequest(PostMessage(conv, id, time), timeout = System.currentTimeMillis() + timeouts.messages.sendingTimeout.toMillis, forceRetry = true)
   def postDeleted(conv: ConvId, msg: MessageId) = addRequest(PostDeleted(conv, msg))
@@ -214,6 +219,8 @@ class AccountSyncHandler(zms: ZMessaging) extends SyncHandler {
     case DeleteAccount                          => zms.usersSync.deleteAccount()
     case PostSelf(info)                         => zms.usersSync.postSelfUser(info)
     case PostSelfPicture(_)                     => zms.usersSync.postSelfPicture()
+    case PostSelfName(name)                     => zms.usersSync.postSelfName(name)
+    case PostSelfAccentColor(color)             => zms.usersSync.postSelfAccentColor(color)
     case PostAvailability(availability)         => zms.usersSync.postAvailability(availability)
     case PostAddressBook(ab)                    => zms.addressbookSync.postAddressBook(ab)
     case PostInvitation(i)                      => zms.invitationSync.postInvitation(i)

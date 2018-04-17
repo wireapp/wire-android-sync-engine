@@ -21,6 +21,7 @@ import com.waz.ZLog.error
 import com.waz.ZLog.ImplicitTag._
 import com.waz.api.EphemeralExpiration
 import com.waz.api.IConversation.{Access, AccessRole}
+import com.waz.api.impl.AccentColor
 import com.waz.model.AddressBook.AddressBookDecoder
 import com.waz.model.UserData.ConnectionStatus
 import com.waz.model.otr.ClientId
@@ -123,6 +124,14 @@ object SyncRequest {
 
   case class PostSelfPicture(assetId: Option[AssetId]) extends BaseRequest(Cmd.PostSelfPicture) {
     override def merge(req: SyncRequest) = mergeHelper[PostSelfPicture](req)(Merged(_))
+  }
+
+  case class PostSelfName(name: String) extends BaseRequest(Cmd.PostSelfName) {
+    override def merge(req: SyncRequest) = mergeHelper[PostSelfName](req)(Merged(_))
+  }
+
+  case class PostSelfAccentColor(color: AccentColor) extends BaseRequest(Cmd.PostSelfAccentColor) {
+    override def merge(req: SyncRequest) = mergeHelper[PostSelfName](req)(Merged(_))
   }
 
   case class PostAvailability(availability: Availability) extends BaseRequest(Cmd.PostAvailability) {
@@ -347,6 +356,8 @@ object SyncRequest {
           case Cmd.PostTypingState       => PostTypingState(convId, 'typing)
           case Cmd.PostConnectionStatus  => PostConnectionStatus(userId, opt('status, js => ConnectionStatus(js.getString("status"))))
           case Cmd.PostSelfPicture       => PostSelfPicture(decodeOptAssetId('asset))
+          case Cmd.PostSelfName          => PostSelfName(decodeString('name))
+          case Cmd.PostSelfAccentColor   => PostSelfAccentColor(AccentColor(decodeInt('color)))
           case Cmd.PostAvailability      => PostAvailability(Availability(decodeInt('availability)))
           case Cmd.PostMessage           => PostMessage(convId, messageId, 'time)
           case Cmd.PostDeleted           => PostDeleted(convId, messageId)
@@ -428,6 +439,8 @@ object SyncRequest {
         case RegisterPushToken(token)         => putId("token", token)
         case SyncRichMedia(messageId)         => putId("message", messageId)
         case PostSelfPicture(assetId)         => assetId.foreach(putId("asset", _))
+        case PostSelfName(name)               => o.put("name", name)
+        case PostSelfAccentColor(color)       => o.put("color", color.id)
         case PostAvailability(availability)   => o.put("availability", availability.id)
         case PostMessage(_, messageId, time)  =>
           putId("message", messageId)

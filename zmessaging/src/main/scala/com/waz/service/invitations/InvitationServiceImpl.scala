@@ -44,7 +44,8 @@ trait InvitationService {
   def invitedContacts: Signal[Set[ContactId]]
 }
 
-class InvitationServiceImpl(storage:       Database,
+class InvitationServiceImpl(selfUserId:    UserId,
+                            storage:       Database,
                             users:         UserService,
                             connections:   ConnectionService,
                             contacts:      ContactsService,
@@ -71,10 +72,7 @@ class InvitationServiceImpl(storage:       Database,
     storage(InvitedContacts.forget(onWire.foresets.keys)(_)).map(_ => invitedContactsSource.mutate(_ -- onWire.foresets.keys))
   }
 
-  def generateInvitationUri() = users.getSelfUserId map {
-    case Some(userId) => Some(WebLink(WebLink.Token(userId)))
-    case _ => None
-  }
+  def generateInvitationUri() = WebLink(WebLink.Token(selfUserId))
 
   def connectToInvitingUser(invite: WebLink.Token, message: String) = Future {
     invite.userId
