@@ -90,12 +90,6 @@ object SyncRequest {
     override def isDuplicateOf(req: SyncRequest): Boolean = req.cmd == Cmd.PostAddressBook
   }
 
-  case class PostInvitation(invitation: Invitation) extends BaseRequest(Cmd.PostInvitation) {
-    override val mergeKey: Any = (cmd, invitation.id, invitation.method)
-    override def merge(req: SyncRequest) = mergeHelper[PostInvitation](req)(Merged(_))
-    override def isDuplicateOf(req: SyncRequest) = req.mergeKey == mergeKey
-  }
-
   case class PostSelf(data: UserInfo) extends BaseRequest(Cmd.PostSelf) {
     override def merge(req: SyncRequest) = mergeHelper[PostSelf](req)(Merged(_))
   }
@@ -378,7 +372,6 @@ object SyncRequest {
           case Cmd.RegisterPushToken     => RegisterPushToken(decodeId[PushToken]('token))
           case Cmd.PostSelf              => PostSelf(JsonDecoder[UserInfo]('user))
           case Cmd.PostAddressBook       => PostAddressBook(JsonDecoder.opt[AddressBook]('addressBook).getOrElse(AddressBook.Empty))
-          case Cmd.PostInvitation        => PostInvitation(JsonDecoder[Invitation]('invitation))
           case Cmd.SyncSelfClients       => SyncSelfClients
           case Cmd.SyncSelfPermissions   => SyncSelfPermissions
           case Cmd.SyncClients           => SyncClients(userId)
@@ -489,7 +482,6 @@ object SyncRequest {
           o.put("access", JsonEncoder.encodeAccess(access))
           o.put("access_role", JsonEncoder.encodeAccessRole(accessRole))
         case PostAddressBook(ab) => o.put("addressBook", JsonEncoder.encode(ab))
-        case PostInvitation(i) => o.put("invitation", JsonEncoder.encode(i))
         case PostLiking(_, liking) =>
           o.put("liking", JsonEncoder.encode(liking))
         case PostClientLabel(id, label) =>

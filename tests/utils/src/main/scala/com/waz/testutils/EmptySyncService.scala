@@ -70,7 +70,6 @@ trait EmptySyncServiceTrait extends SyncServiceHandle {
   override def postLastRead(id: ConvId, time: Instant) = sid
   override def postCleared(id: ConvId, time: Instant): Future[SyncId] = sid
   override def postAddressBook(ab: AddressBook) = sid
-  override def postInvitation(i: Invitation) = sid
   override def postTypingState(id: ConvId, t: Boolean) = sid
   override def postOpenGraphData(conv: ConvId, msg: MessageId, time: Instant) = sid
   override def postReceipt(conv: ConvId, message: MessageId, user: UserId, tpe: ReceiptType) = sid

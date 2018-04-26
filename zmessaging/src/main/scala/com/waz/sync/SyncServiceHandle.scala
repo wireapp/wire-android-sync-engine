@@ -77,7 +77,6 @@ trait SyncServiceHandle {
   def postLastRead(id: ConvId, time: Instant): Future[SyncId]
   def postCleared(id: ConvId, time: Instant): Future[SyncId]
   def postAddressBook(ab: AddressBook): Future[SyncId]
-  def postInvitation(i: Invitation): Future[SyncId]
   def postTypingState(id: ConvId, typing: Boolean): Future[SyncId]
   def postOpenGraphData(conv: ConvId, msg: MessageId, editTime: Instant): Future[SyncId]
   def postReceipt(conv: ConvId, message: MessageId, user: UserId, tpe: ReceiptType): Future[SyncId]
@@ -144,7 +143,6 @@ class AndroidSyncServiceHandle(service: SyncRequestService, timeouts: Timeouts, 
   def postRecalled(conv: ConvId, msg: MessageId, recalled: MessageId) = addRequest(PostRecalled(conv, msg, recalled))
   def postAssetStatus(id: MessageId, conv: ConvId, exp: EphemeralExpiration, status: AssetStatus.Syncable) = addRequest(PostAssetStatus(conv, id, exp, status))
   def postAddressBook(ab: AddressBook) = addRequest(PostAddressBook(ab))
-  def postInvitation(i: Invitation) = addRequest(PostInvitation(i))
   def postConnection(user: UserId, name: String, message: String) = addRequest(PostConnection(user, name, message))
   def postConnectionStatus(user: UserId, status: ConnectionStatus) = addRequest(PostConnectionStatus(user, Some(status)))
   def postTypingState(conv: ConvId, typing: Boolean) = addRequest(PostTypingState(conv, typing), optional = true, timeout = System.currentTimeMillis() + timeouts.typing.refreshDelay.toMillis)
@@ -223,7 +221,6 @@ class AccountSyncHandler(zms: ZMessaging) extends SyncHandler {
     case PostSelfAccentColor(color)             => zms.usersSync.postSelfAccentColor(color)
     case PostAvailability(availability)         => zms.usersSync.postAvailability(availability)
     case PostAddressBook(ab)                    => zms.addressbookSync.postAddressBook(ab)
-    case PostInvitation(i)                      => zms.invitationSync.postInvitation(i)
     case RegisterPushToken(token)               => zms.gcmSync.registerPushToken(token)
     case PostLiking(convId, liking)             => zms.reactionsSync.postReaction(convId, liking)
     case PostAddBot(cId, pId, iId)              => zms.integrationsSync.addBot(cId, pId, iId)
