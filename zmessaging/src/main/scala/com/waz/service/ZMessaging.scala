@@ -187,8 +187,8 @@ class ZMessaging(val teamId: Option[TeamId], val clientId: ClientId, account: Ac
   lazy val pushToken: PushTokenService                = wire[PushTokenService]
   lazy val errors                                     = wire[ErrorsServiceImpl]
   lazy val reporting                                  = new ZmsReportingService(selfUserId, global.reporting)
-  lazy val pingInterval: PingIntervalService          = wire[PingIntervalService]
-  lazy val websocket: WebSocketClientService          = wire[WebSocketClientServiceImpl]
+  lazy val wsFactory                                  = OkHttpWebSocketFactory
+  lazy val wsPushService                              = wireWith(WSPushServiceImpl.apply _)
   lazy val userSearch                                 = wire[UserSearchService]
   lazy val assetGenerator                             = wire[ImageAssetGenerator]
   lazy val assetMetaData                              = wire[com.waz.service.assets.MetaDataService]

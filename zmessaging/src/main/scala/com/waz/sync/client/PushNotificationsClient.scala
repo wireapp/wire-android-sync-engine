@@ -23,7 +23,7 @@ import com.waz.model.otr.ClientId
 import com.waz.model._
 import com.waz.sync.client.PushNotificationsClient.LoadNotificationsResponse
 import com.waz.threading.{CancellableFuture, Threading}
-import com.waz.utils.JsonDecoder
+import com.waz.utils.{JsonDecoder, JsonEncoder}
 import com.waz.utils.JsonDecoder.arrayColl
 import com.waz.znet.ZNetClient.ErrorOrResponse
 import com.waz.znet.{JsonObjectResponse, _}
@@ -135,5 +135,12 @@ object PushNotificationEncoded {
 
     override def apply(implicit js: JSONObject): PushNotificationEncoded =
       PushNotificationEncoded('id, js.getJSONArray("payload"), 'transient)
+  }
+  implicit lazy val NotificationEncoder: JsonEncoder[PushNotificationEncoded] = new JsonEncoder[PushNotificationEncoded] {
+    override def apply(v: PushNotificationEncoded): JSONObject = JsonEncoder { o =>
+      o.put("id", v.id.str)
+      o.put("payload", v.events)
+      o.put("transient", v.transient)
+    }
   }
 }

@@ -107,6 +107,43 @@ class CancellableFutureSpec extends AndroidFreeSpec {
     }
   }
 
+  feature("Timeout execution") {
+
+    scenario("Timeout future should not complete if interrupter not provided and shouldLoop always true") {
+      val future = CancellableFuture.timeout(50.millis, interrupter = None, shouldLoop = () => true)
+      an[TimeoutException] mustBe thrownBy { Await.result(future, 200.millis) }
+      future.cancel()
+    }
+
+    scenario("Timeout future should complete earlier then timeout if interrupter completed earlier") {
+      val future = CancellableFuture.timeout(100.millis, interrupter = Some(CancellableFuture.delay(50.millis)))
+      noException mustBe thrownBy { Await.result(future, 60.millis) }
+    }
+
+    scenario("Timeout future should complete after timeout if interrupter completed with failure") {
+      val failedInterrupter = CancellableFuture.delay(50.millis).map(_ => throw new RuntimeException)
+      val future = CancellableFuture.timeout(100.millis, interrupter = Some(failedInterrupter))
+      an[TimeoutException] mustBe thrownBy { Await.result(future, 90.millis) }
+      noException mustBe thrownBy { Await.result(future, 20.millis) }
+    }
+
+    scenario("Timeout future should complete only after timeout and shouldTrue returns false") {
+      val expectedLoops = 2
+      var loopsLeft = expectedLoops
+      val shouldLoopTest = { () =>
+        loopsLeft = loopsLeft - 1
+        loopsLeft > 0
+      }
+
+      val timeout = 100.millis
+      val future = CancellableFuture.timeout(timeout, shouldLoop = shouldLoopTest)
+
+      noException mustBe thrownBy { Await.result(future, (timeout * expectedLoops) + 50.millis) }
+    }
+
+
+  }
+
   feature("Map") {
     scenario("Await for mapped result") {
       Await.result(CancellableFuture { 1 } map (_ + 1), 10.millis) shouldEqual 2
