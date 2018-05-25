@@ -409,44 +409,48 @@ class ConversationsUiServiceImpl(userId:          UserId,
 
   private def sendTextMessage(convId: ConvId, m: String, mentions: Map[UserId, String] = Map.empty) =
     for {
-      msg <- messages.addTextMessage(convId, m, mentions)
-      _ <- updateLastRead(msg)
-      _ <- sync.postMessage(msg.id, convId, msg.editTime)
+      msg      <- messages.addTextMessage(convId, m, mentions)
+      _        <- updateLastRead(msg)
+      isOnline <- checkNetwork(convId, msg)
+      _        <- if (isOnline) sync.postMessage(msg.id, convId, msg.editTime) else Future.successful(())
     } yield Some(msg)
 
   private def sendLocationMessage(convId: ConvId, loc: Location) =
     for {
-      msg <- messages.addLocationMessage(convId, loc)
-      _ <- updateLastRead(msg)
-      _ <- sync.postMessage(msg.id, convId, msg.editTime)
+      msg      <- messages.addLocationMessage(convId, loc)
+      _        <- updateLastRead(msg)
+      isOnline <- checkNetwork(convId, msg)
+      _        <- if (isOnline) sync.postMessage(msg.id, convId, msg.editTime) else Future.successful(())
     } yield Some(msg)
 
   private def sendImageMessage(img: api.ImageAsset, conv: ConversationData) = {
     verbose(s"sendImageMessage($img, $conv)")
     for {
-      data <- assets.addImageAsset(img)
-      msg <- messages.addAssetMessage(conv.id, data)
-      _ <- updateLastRead(msg)
-      _ <- Future.successful(tracking.assetContribution(data.id, userId))
-      _ <- sync.postMessage(msg.id, conv.id, msg.editTime)
+      data     <- assets.addImageAsset(img)
+      msg      <- messages.addAssetMessage(conv.id, data)
+      _        <- updateLastRead(msg)
+      _        <- Future.successful(tracking.assetContribution(data.id, userId))
+      isOnline <- checkNetwork(conv.id, msg)
+      _        <- if (isOnline) sync.postMessage(msg.id, conv.id, msg.editTime) else Future.successful(())
     } yield Some(msg)
   }
 
   private def sendAssetMessage(in: AssetForUpload, conv: ConversationData, handler: ErrorHandler): Future[Option[MessageData]] =
     for {
-      mime <- in.mimeType
-      asset <- assets.addAsset(in, conv.remoteId)
-      message <- messages.addAssetMessage(conv.id, asset)
-      _ <- updateLastRead(message)
-      size <- in.sizeInBytes
-      _ <- Future.successful(tracking.assetContribution(asset.id, userId))
-      shouldSend <- checkSize(conv.id, size, mime, message, handler)
-      _ <- if (shouldSend) sync.postMessage(message.id, conv.id, message.editTime) else Future.successful(())
+      mime       <- in.mimeType
+      asset      <- assets.addAsset(in, conv.remoteId)
+      message    <- messages.addAssetMessage(conv.id, asset)
+      _          <- updateLastRead(message)
+      size       <- in.sizeInBytes
+      _          <- Future.successful(tracking.assetContribution(asset.id, userId))
+      isOnline   <- checkNetwork(conv.id, message)
+      shouldSend <- if (isOnline) checkSize(conv.id, size, mime, message, handler) else Future.successful(false)
+      _          <- if (shouldSend) sync.postMessage(message.id, conv.id, message.editTime) else Future.successful(())
     } yield Some(message)
 
   def isFileTooLarge(size: Long, mime: Mime) = mime match {
     case Mime.Video() => false
-    case _ => size > AssetData.MaxAllowedAssetSizeInBytes
+    case _            => size > AssetData.MaxAllowedAssetSizeInBytes
   }
 
   private def shouldWarnAboutFileSize(size: Long) =
@@ -494,6 +498,10 @@ class ConversationsUiServiceImpl(userId:          UserId,
           Future successful true
       }
   }
+
+  private def checkNetwork(convId: ConvId, message: MessageData) =
+    if (network.isOfflineMode) messages.updateMessageState(convId, message.id, Message.Status.FAILED).map(_ => false)
+    else Future.successful(true)
 
 }
 
