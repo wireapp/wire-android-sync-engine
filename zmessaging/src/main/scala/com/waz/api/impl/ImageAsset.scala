@@ -22,6 +22,7 @@ import android.media.ExifInterface
 import android.os.Parcel
 import com.waz.ZLog.ImplicitTag._
 import com.waz.ZLog._
+import com.waz.api
 import com.waz.api.impl.ImageAsset.{BitmapLoadHandle, Parcelable}
 import com.waz.api.{BitmapCallback, LoadHandle}
 import com.waz.bitmap.BitmapUtils
@@ -162,6 +163,10 @@ object ImageAsset {
     override def writeToParcel(dest: Parcel, flags: Int): Unit = dest.writeInt(Parcelable.FlagEmpty)
   }
 
+  object EmptyLoadHandle extends api.LoadHandle {
+    override def cancel(): Unit = {}
+  }
+
   class BitmapLoadHandle(signal: Option[ZMessaging] => Signal[BitmapResult], callback: BitmapCallback)(implicit ui: UiModule) extends LoadHandle with SignalLoading {
     private var prev = Option.empty[(WeakReference[Bitmap], Int)]
 
@@ -178,12 +183,6 @@ object ImageAsset {
       case BitmapResult.Empty =>
         verbose(s"ignoring empty bitmap")
     })
-
-
-    override def getProgressIndicator: ProgressIndicator = {
-      //TODO: implement progress indicator
-      ProgressIndicator.Empty
-    }
 
     override def cancel(): Unit = {
       loader.foreach(_.destroy())
