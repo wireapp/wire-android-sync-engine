@@ -17,7 +17,7 @@
  */
 package com.waz.api;
 
-public interface IConversation extends UiObservable {
+public interface IConversation {
 
     enum Type {
         UNKNOWN(-1), GROUP(0), SELF(1), ONE_TO_ONE(2), WAIT_FOR_CONNECTION(3), INCOMING_CONNECTION(4);
@@ -64,13 +64,4 @@ public interface IConversation extends UiObservable {
         NON_ACTIVATED, //"wireless" users may join the conversation
         PRIVATE        //for 1:1 conversations
     }
-
-    /*
-        For now me is retrieved by another core lib function and
-        if this is empty there is another function constructing
-        a friendly name via the id
-    */
-    String getName();
-
-    String getId();
 }
