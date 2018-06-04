@@ -27,7 +27,7 @@ class InstanceIdListenerService extends FirebaseInstanceIdService with ZMessagin
 
   override def onTokenRefresh(): Unit = {
     ZMessaging.globalModule.map {
-      info(s"FCM: onTokenRefresh()")
+      verbose(s"FCM: onTokenRefresh()")
       _.tokenService.setNewToken()
     } (Threading.Background)
   }

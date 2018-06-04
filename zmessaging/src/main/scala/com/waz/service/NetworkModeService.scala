@@ -123,7 +123,7 @@ object NetworkModeService {
         case TelephonyManager.NETWORK_TYPE_LTE =>
           NetworkMode._4G
         case _ =>
-          info("Unknown network type, defaulting to Wifi")
+          verbose("Unknown network type, defaulting to Wifi")
           NetworkMode.WIFI
       }
   }.getOrElse(NetworkMode.OFFLINE)

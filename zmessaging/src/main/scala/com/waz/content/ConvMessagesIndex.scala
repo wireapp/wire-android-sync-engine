@@ -70,7 +70,7 @@ class ConvMessagesIndex(conv: ConvId, messages: MessagesStorageImpl, selfUserId:
     val lastMessageFromOther: Signal[Option[MessageData]] = returning(sources.lastMessageFromOther)(_.disableAutowiring())
 
     lastMessageFromSelf { msg =>
-      info(s"last message from self is now $msg")
+      verbose(s"last message from self is now $msg")
     }
 
     val unreadCount = for {
@@ -215,7 +215,7 @@ class ConvMessagesIndex(conv: ConvId, messages: MessagesStorageImpl, selfUserId:
       if (msg.isLocal && !updated.isLocal && lastLocalMessageByType.get(msg.msgType).exists(_.id == msg.id))
         lastLocalMessageByType.remove(msg.msgType)
       else if (updated.isLocal && !msg.isLocal)
-        debug(s"non-local message was updated to local: $msg -> $updated")
+        verbose(s"non-local message was updated to local: $msg -> $updated")
     }
 
     if (updates.nonEmpty) {

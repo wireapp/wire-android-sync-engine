@@ -61,7 +61,7 @@ object BitmapUtils {
   }
   
   def createRoundBitmap(input: Bitmap, width: Int, borderWidth: Int, borderColor: Int): Bitmap = {
-    debug(s"createRoundBitmap($input, $width, $borderWidth)")
+    verbose(s"createRoundBitmap($input, $width, $borderWidth)")
 
     val output: Bitmap = Bitmap.createBitmap(width, width, Config.ARGB_8888)
     val canvas: Canvas = new Canvas(output)

@@ -43,7 +43,7 @@ class ZGlobalDB(context: Context, dbNameSuffix: String = "")
   }
 
   def clearAllData(db: SQLiteDatabase) = {
-    debug("wiping global db...")
+    verbose("wiping global db...")
     dropAllTables(db)
     onCreate(db)
   }

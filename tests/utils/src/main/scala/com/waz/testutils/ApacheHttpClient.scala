@@ -20,7 +20,7 @@ package com.waz.testutils
 import java.net.{URI => JURI}
 
 import com.waz.ZLog.ImplicitTag._
-import com.waz.ZLog.debug
+import com.waz.ZLog.verbose
 import com.waz.threading.CancellableFuture
 import com.waz.utils.returning
 import com.waz.utils.wrappers.JavaURI

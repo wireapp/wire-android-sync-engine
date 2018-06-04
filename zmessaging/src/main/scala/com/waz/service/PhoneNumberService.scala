@@ -71,7 +71,7 @@ class PhoneNumberServiceImpl(context: Context) extends PhoneNumberService{
         Some(PhoneNumber(util.format(number, PhoneNumberUtil.PhoneNumberFormat.E164)))
       } catch {
         case ex: Throwable =>
-          debug(s"phone number normalization failed for $phone ($defaultRegion): ${ex.getMessage}")
+          verbose(s"phone number normalization failed for $phone ($defaultRegion): ${ex.getMessage}")
           None
       }
   }

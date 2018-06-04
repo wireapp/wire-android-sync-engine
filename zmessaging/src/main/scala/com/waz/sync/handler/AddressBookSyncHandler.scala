@@ -41,11 +41,11 @@ class AddressBookSyncHandler(contacts: ContactsServiceImpl, client: AddressBookC
         postRes <- client.postAddressBook(ab).future
         result <- postRes match {
           case Left(error) =>
-            debug(s"postAddressBook failed with error: $error")
+            verbose(s"postAddressBook failed with error: $error")
             if (error.isFatal) tracking.exception(new RuntimeException(s"upload failed: ${error.code}") with NoStackTrace, error.toString)
             Future.successful(SyncResult(error))
           case Right(users) =>
-            debug("postAddressBook successful")
+            verbose("postAddressBook successful")
             contacts.onAddressBookUploaded(ab, users) map (_ => SyncResult.Success) recover {
               case e: Throwable =>
                 tracking.exception(e, s"address book upload result processing failed")

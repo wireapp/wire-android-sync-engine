@@ -40,7 +40,7 @@ class AssetSyncHandler(cache:   CacheService,
   def uploadAssetData(assetId: AssetId, public: Boolean = false, retention: Retention): ErrorOrResponse[Option[AssetData]] =
     CancellableFuture.lift(assets.updateAsset(assetId, asset => asset.copy(status = if (asset.status == UploadNotStarted) UploadInProgress else asset.status )).zip(assets.getLocalData(assetId))) flatMap {
       case (Some(asset), Some(data)) if data.length > AssetData.MaxAllowedAssetSizeInBytes =>
-        debug(s"Local data too big. Data length: ${data.length}, max size: ${AssetData.MaxAllowedAssetSizeInBytes}, local data: $data, asset: $asset")
+        verbose(s"Local data too big. Data length: ${data.length}, max size: ${AssetData.MaxAllowedAssetSizeInBytes}, local data: $data, asset: $asset")
         CancellableFuture successful Left(internalError(AssetSyncHandler.AssetTooLarge))
       case (Some(asset), _) if asset.remoteId.isDefined =>
         warn(s"asset has already been uploaded, skipping: $asset")
@@ -53,19 +53,19 @@ class AssetSyncHandler(cache:   CacheService,
           case Left(err) => CancellableFuture successful Left(err)
         }
       case (Some(asset), Some(_)) if asset.status == UploadCancelled =>
-        debug(s"Upload for asset was cancelled")
+        verbose(s"Upload for asset was cancelled")
         CancellableFuture successful Right(None)
       case (Some(asset), None) =>
-        debug(s"An asset found, but its remote id is not defined, and local data is missing. Asset: $asset")
+        verbose(s"An asset found, but its remote id is not defined, and local data is missing. Asset: $asset")
         CancellableFuture successful Right(None)
       case (None, Some(data)) =>
-        debug(s"No asset data found, got local data: $data")
+        verbose(s"No asset data found, got local data: $data")
         CancellableFuture successful Right(None)
       case (None, None) =>
-        debug(s"No asset data found, no local data found")
+        verbose(s"No asset data found, no local data found")
         CancellableFuture successful Right(None)
       case _ =>
-        debug(s"Unexpected error")
+        verbose(s"Unexpected error")
         CancellableFuture successful Right(None)
     }
 }

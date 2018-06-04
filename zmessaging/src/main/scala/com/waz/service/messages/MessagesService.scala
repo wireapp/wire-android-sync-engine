@@ -209,7 +209,7 @@ class MessagesServiceImpl(selfUserId: UserId,
   }
 
   override def addKnockMessage(convId: ConvId, selfUserId: UserId) = {
-    debug(s"addKnockMessage($convId, $selfUserId)")
+    verbose(s"addKnockMessage($convId, $selfUserId)")
     updater.addLocalMessage(MessageData(MessageId(), convId, Message.Type.KNOCK, selfUserId))
   }
 

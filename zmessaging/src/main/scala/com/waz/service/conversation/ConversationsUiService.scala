@@ -123,7 +123,7 @@ class ConversationsUiServiceImpl(selfUserId:      UserId,
   @Deprecated
   override def sendMessage(convId: ConvId, content: api.MessageContent): Future[Option[MessageData]] = content match {
     case m: api.MessageContent.Text =>
-      debug(s"send text message ${m.getContent.take(4)}...")
+      verbose(s"send text message ${m.getContent.take(4)}...")
       sendTextMessage(convId, m.getContent)
 
     case m: api.MessageContent.Location =>
@@ -138,7 +138,7 @@ class ConversationsUiServiceImpl(selfUserId:      UserId,
     case m: api.MessageContent.Asset =>
       convsContent.convById(convId) flatMap {
         case Some(conv) =>
-          debug(s"send asset message ${m.getContent}")
+          verbose(s"send asset message ${m.getContent}")
           m.getContent match {
             case a@ContentUriAssetForUpload(_, uri) =>
               a.mimeType.flatMap {

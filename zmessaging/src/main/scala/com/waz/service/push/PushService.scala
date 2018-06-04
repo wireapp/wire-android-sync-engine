@@ -192,14 +192,14 @@ class PushServiceImpl(userId:               UserId,
 
   wsActive {
     case true =>
-      debug(s"Active, client: $clientId")
+      verbose(s"Active, client: $clientId")
       wsPushService.activate()
       if (accountState.currentValue.forall(_ == InBackground)) {
         // start android service to keep the app running while we need to be connected.
         com.waz.zms.WebSocketService(context)
       }
     case _ =>
-      debug(s"onInactive")
+      info(s"onInactive")
       wsPushService.deactivate()
   }
 

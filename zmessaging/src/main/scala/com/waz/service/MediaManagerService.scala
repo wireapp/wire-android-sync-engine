@@ -58,7 +58,7 @@ class DefaultMediaManagerService(context: Context) extends MediaManagerService {
 
       override def onPlaybackRouteChanged(route: Int): Unit = {
         val pbr = PlaybackRoute.fromAvsIndex(route)
-        debug(s"onPlaybackRouteChanged($pbr)")
+        verbose(s"onPlaybackRouteChanged($pbr)")
         self.onPlaybackRouteChanged ! pbr
       }
     })

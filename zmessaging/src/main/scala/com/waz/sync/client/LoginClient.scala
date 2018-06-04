@@ -114,7 +114,7 @@ class LoginClientImpl(tracking: TrackingService)
   }
 
   def loginNow(credentials: Credentials): ErrorOr[LoginResult] = {
-    debug(s"trying to login with credentials: $credentials")
+    verbose(s"trying to login with credentials: $credentials")
     val label = Label()
     val params = JsonEncoder { o =>
       credentials.addToLoginJson(o)

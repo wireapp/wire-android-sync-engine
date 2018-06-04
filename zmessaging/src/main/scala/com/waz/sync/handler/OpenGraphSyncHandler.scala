@@ -60,7 +60,7 @@ class OpenGraphSyncHandler(convs:           ConversationStorage,
   def postMessageMeta(convId: ConvId, msgId: MessageId, editTime: Instant): Future[SyncResult] = messages.getMessage(msgId) flatMap {
     case None => Future successful SyncResult(internalError(s"No message found with id: $msgId"))
     case Some(msg) if msg.msgType != Message.Type.RICH_MEDIA =>
-      debug(s"postMessageMeta, message is not RICH_MEDIA: $msg")
+      verbose(s"postMessageMeta, message is not RICH_MEDIA: $msg")
       Future successful SyncResult.Success
     case Some(msg) if msg.content.forall(_.tpe != Part.Type.WEB_LINK) =>
       verbose(s"postMessageMeta, no WEB_LINK found in msg: $msg")

@@ -88,7 +88,7 @@ class ShadowMediaMetadataRetriever2 {
       (tb.getWidth.toInt, tb.getHeight.toInt, rotation)
     }
 
-    ZLog.debug(s"getMeta, duration: $duration, dimens: $dimens")
+    ZLog.verbose(s"getMeta, duration: $duration, dimens: $dimens")
 
     Map(
       MediaMetadataRetriever.METADATA_KEY_DURATION -> duration.toMillis.toString,
@@ -101,13 +101,13 @@ class ShadowMediaMetadataRetriever2 {
   }
 
   @Implementation def setDataSource(path: String): Unit = {
-    ZLog.debug(s"getMeta, setDataSource $path")
+    ZLog.verbose(s"getMeta, setDataSource $path")
     meta = metadata.getOrElse(path, getMeta(new FileInputStream(path))).toMap
     frame = frames.getOrElse(path, Map.empty).toMap
   }
 
   @Implementation def setDataSource(context: Context, uri: Uri): Unit = {
-    ZLog.debug(s"getMeta, setDataSource $uri")
+    ZLog.verbose(s"getMeta, setDataSource $uri")
     meta = metadata.getOrElse(uri.toString, getMeta(context.getContentResolver.openInputStream(uri))).toMap
     frame = frames.getOrElse(uri.toString, Map.empty).toMap
   }

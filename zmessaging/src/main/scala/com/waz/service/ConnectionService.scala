@@ -141,7 +141,7 @@ class ConnectionServiceImpl(selfUserId:      UserId,
 
     def connectIfUnconnected() = getOrCreateUser(userId) flatMap { user =>
       if (user.isConnected) {
-        info(s"User already connected: $user")
+        verbose(s"User already connected: $user")
         Future successful None
       } else {
         updateConnectionStatus(user.id, ConnectionStatus.PendingFromUser) flatMap {

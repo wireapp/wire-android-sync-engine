@@ -35,7 +35,7 @@ class PushTokenSyncHandler(pushTokenService: PushTokenService, backend: BackendC
   import Threading.Implicits.Background
 
   def registerPushToken(token: PushToken): Future[SyncResult] = {
-    debug(s"registerPushToken: $token")
+    verbose(s"registerPushToken: $token")
     client.postPushToken(PushTokenRegistration(token, backend.pushSenderId, clientId)).future.flatMap {
       case Right(PushTokenRegistration(`token`, _, `clientId`, _)) => pushTokenService.onTokenRegistered(token).map(_ => SyncResult.Success)
       case Right(_)  => Future.successful(SyncResult.Failure(None, shouldRetry = false))
@@ -44,7 +44,7 @@ class PushTokenSyncHandler(pushTokenService: PushTokenService, backend: BackendC
   }
 
   def deleteGcmToken(token: PushToken): CancellableFuture[SyncResult] = {
-    debug(s"deleteGcmToken($token)")
+    verbose(s"deleteGcmToken($token)")
     client.deletePushToken(token.str) map { _.fold(SyncResult(_), _ => SyncResult.Success) }
   }
 }

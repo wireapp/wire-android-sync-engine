@@ -24,7 +24,7 @@ import com.google.android.gms.common.ConnectionResult._
 import com.google.android.gms.common.GoogleApiAvailability
 import com.google.firebase.iid.FirebaseInstanceId
 import com.waz.ZLog.ImplicitTag._
-import com.waz.ZLog.{info, warn}
+import com.waz.ZLog.{verbose, warn}
 import com.waz.content.GlobalPreferences
 import com.waz.content.GlobalPreferences.GPSErrorDialogShowCount
 import com.waz.model.PushToken
@@ -55,10 +55,10 @@ class GoogleApiImpl(context: Context, beConfig: BackendConfig, prefs: GlobalPref
 
   override def checkGooglePlayServicesAvailable(activity: Activity) = api.isGooglePlayServicesAvailable(activity) match {
     case SUCCESS =>
-      info("Google Play Services available")
+      verbose("Google Play Services available")
       isGooglePlayServicesAvailable ! true
     case SERVICE_VERSION_UPDATE_REQUIRED if prefs.getFromPref(GPSErrorDialogShowCount) <= MaxErrorDialogShowCount =>
-      info(s"Google Play Services requires update - prompting user")
+      verbose(s"Google Play Services requires update - prompting user")
       prefs.preference(GPSErrorDialogShowCount).mutate(_ + 1)
       api.getErrorDialog(activity, SERVICE_VERSION_UPDATE_REQUIRED, RequestGooglePlayServices).show()
     case code =>
@@ -68,7 +68,7 @@ class GoogleApiImpl(context: Context, beConfig: BackendConfig, prefs: GlobalPref
 
   override def onActivityResult(requestCode: Int, resultCode: Int) = requestCode match {
     case RequestGooglePlayServices =>
-      info(s"Google Play Services request completed, result: $resultCode")
+      verbose(s"Google Play Services request completed, result: $resultCode")
       //It's quite natural for the user to click the back button after updating GPS, which results in a ACTIVITY_CANCELLED
       //result code. So just check if the services are available again on any result.
       isGooglePlayServicesAvailable ! isGPSAvailable

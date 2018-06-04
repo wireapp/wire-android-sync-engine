@@ -136,7 +136,7 @@ class ConversationsContentUpdaterImpl(val storage:     ConversationStorage,
 
     if (conv.lastEventTime.isAfter(time)) conv
     else {
-      debug(s"updating: $conv, lastEventTime: $time")
+      verbose(s"updating: $conv, lastEventTime: $time")
       conv.copy(lastEventTime = conv.lastEventTime max time)
     }
   })

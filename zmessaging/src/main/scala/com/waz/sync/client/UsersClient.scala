@@ -75,7 +75,7 @@ class UsersClientImpl(implicit
   }
 
   override def updateSelf(info: UserInfo): ErrorOrResponse[Unit] = {
-    debug(s"updateSelf: $info, picture: ${info.picture}")
+    verbose(s"updateSelf: $info, picture: ${info.picture}")
     Request.Put(url = backendUrl(SelfPath), body = info)
       .withResultType[Unit]
       .withErrorType[ErrorResponse]

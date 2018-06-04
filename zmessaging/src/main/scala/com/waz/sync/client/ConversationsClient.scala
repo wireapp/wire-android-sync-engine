@@ -209,7 +209,7 @@ class ConversationsClientImpl(implicit
   }
 
   def postConversation(users: Set[UserId], name: Option[String] = None, team: Option[TeamId], access: Set[Access], accessRole: AccessRole): ErrorOrResponse[ConversationResponse] = {
-    debug(s"postConversation($users, $name)")
+    verbose(s"postConversation($users, $name)")
     val payload = JsonEncoder { o =>
       o.put("users", Json(users))
       name.foreach(o.put("name", _))
@@ -256,8 +256,7 @@ object ConversationsClient {
 
     implicit lazy val Decoder: JsonDecoder[ConversationResponse] = new JsonDecoder[ConversationResponse] {
       override def apply(implicit js: JSONObject): ConversationResponse = {
-        debug(s"decoding response: $js")
-
+        verbose(s"decoding response: $js")
         val members = js.getJSONObject("members")
         val state = ConversationState.Decoder(members.getJSONObject("self"))
 

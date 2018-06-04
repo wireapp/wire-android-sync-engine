@@ -58,7 +58,7 @@ class VersionBlacklistService(metadata: MetaDataService, prefs: GlobalPreference
   }
 
   def syncVersionBlackList() = client.loadVersionBlacklist().future flatMap { blacklist =>
-    debug(s"Retrieved version blacklist: $blacklist")
+    verbose(s"Retrieved version blacklist: $blacklist")
     updateBlacklist(blacklist.right.getOrElse(VersionBlacklist()))
   }
 

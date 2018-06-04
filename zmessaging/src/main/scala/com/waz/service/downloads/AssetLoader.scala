@@ -24,7 +24,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import android.graphics.Bitmap
 import android.media.ExifInterface
 import com.waz.ZLog.ImplicitTag._
-import com.waz.ZLog.{LogTag, debug, verbose, warn}
+import com.waz.ZLog.{LogTag, verbose, warn}
 import com.waz.api.NetworkMode
 import com.waz.api.impl.ErrorResponse
 import com.waz.api.impl.ErrorResponse.internalError
@@ -248,7 +248,7 @@ class AssetLoaderImpl(context:         Context,
     img.compress(format, 85, bos)
     val bytes = bos.toByteArray
     val duration = (System.nanoTime - before) / 1e6d
-    debug(s"compression took: $duration ms (${img.getWidth} x ${img.getHeight}, ${img.getByteCount} bytes -> ${bytes.length} bytes, ${img.getConfig}, $mime, $format)")
+    verbose(s"compression took: $duration ms (${img.getWidth} x ${img.getHeight}, ${img.getByteCount} bytes -> ${bytes.length} bytes, ${img.getConfig}, $mime, $format)")
     bytes
   }(Threading.ImageDispatcher)
 

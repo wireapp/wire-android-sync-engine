@@ -51,7 +51,7 @@ class UserSearchClientImpl(implicit
     RawBodyDeserializer[JSONObject].map(json => UserSearchResponse.unapply(JsonObjectResponse(json)).get)
 
   override def getContacts(query: SearchQuery, limit: Int = DefaultLimit): ErrorOrResponse[Seq[UserSearchEntry]] = {
-    debug(s"graphSearch('$query', $limit)")
+    verbose(s"graphSearch('$query', $limit)")
 
     //TODO Get rid of this
     if (query.isInstanceOf[TopPeople.type]) {

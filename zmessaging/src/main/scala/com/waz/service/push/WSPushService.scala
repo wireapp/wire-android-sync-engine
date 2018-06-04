@@ -105,10 +105,10 @@ class WSPushServiceImpl(userId:              UserId,
 
   activated.on(dispatcher) {
     case false  =>
-      debug("WebSocket will be deactivated")
+      info("WebSocket will be deactivated")
       finishWebSocketProcess()
     case true   =>
-      debug("WebSocket will be activated")
+      info("WebSocket will be activated")
       restartWebSocketProcess()
   }
 

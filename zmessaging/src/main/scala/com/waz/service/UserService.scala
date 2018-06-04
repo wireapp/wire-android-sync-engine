@@ -200,7 +200,7 @@ class UserServiceImpl(selfUserId:        UserId,
   }
 
   override def getUser(id: UserId) = {
-    debug(s"getUser($id)")
+    verbose(s"getUser($id)")
 
     usersStorage.get(id) map {
       case Some(data) =>

@@ -183,10 +183,10 @@ class GlobalPreferences(context: Context, prefs: SharedPreferences) extends Pref
       .foreach {
         case (key, value) =>
           value match {
-            case v: String  => debug(s"Migrating String:  $key: $value"); editor.putString(key, v)
-            case v: Boolean => debug(s"Migrating Boolean: $key: $value"); editor.putBoolean(key, v)
-            case v: Int     => debug(s"Migrating Int:     $key: $value"); editor.putInt(key, v)
-            case v: Long    => debug(s"Migrating Long:    $key: $value"); editor.putLong(key, v)
+            case v: String  => verbose(s"Migrating String:  $key: $value"); editor.putString(key, v)
+            case v: Boolean => verbose(s"Migrating Boolean: $key: $value"); editor.putBoolean(key, v)
+            case v: Int     => verbose(s"Migrating Int:     $key: $value"); editor.putInt(key, v)
+            case v: Long    => verbose(s"Migrating Long:    $key: $value"); editor.putLong(key, v)
             case v => warn(s"Preference $key: $v has unexpected type. Leaving out of migration")
           }
       }

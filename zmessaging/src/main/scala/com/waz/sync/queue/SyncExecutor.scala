@@ -75,7 +75,7 @@ class SyncExecutor(scheduler:   SyncScheduler,
     verbose(s"executeJob: $job")
 
     if (job.optional && job.timeout > 0 && job.timeout < System.currentTimeMillis()) {
-      info(s"Optional request timeout elapsed, dropping: $job")
+      verbose(s"Optional request timeout elapsed, dropping: $job")
       content.removeSyncJob(job.id) map { _ => SyncResult.Success}
     } else {
       val future = content.updateSyncJob(job.id)(job => job.copy(attempts = job.attempts + 1, state = SyncState.SYNCING, error = None, offline = !network.isOnlineMode))
@@ -108,7 +108,7 @@ class SyncExecutor(scheduler:   SyncScheduler,
 
     result match {
       case SyncResult.Success =>
-        debug(s"SyncRequest: $job completed successfully")
+        verbose(s"SyncRequest: $job completed successfully")
         delete()
       case SyncResult.Failure(error, false) =>
         warn(s"SyncRequest: $job, failed permanently with error: $error")

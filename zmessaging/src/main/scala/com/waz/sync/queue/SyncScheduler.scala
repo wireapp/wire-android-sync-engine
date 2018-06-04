@@ -181,7 +181,7 @@ class SyncSchedulerImpl(context:     Context,
   }
 
   private def startSyncService(): Unit = {
-    debug("starting service")
+    verbose("starting service")
     syncIntent.foreach { sI =>
       val res = WakefulBroadcastReceiver.startWakefulService(context, sI)
       if (res == null) error("Couldn't start sync service. Make sure zeta sync service is included in the app manifest.")
@@ -189,7 +189,7 @@ class SyncSchedulerImpl(context:     Context,
   }
 
   private def updateRetryAlarm(time: Option[Long]) = {
-    debug(s"updateRetryAlarm: $time")
+    verbose(s"updateRetryAlarm: $time")
     (time, alarmManager, alarmSyncIntent) match {
       case (Some(t), Some(am), Some(aI)) =>
         am.set(AlarmManager.RTC, t, aI)

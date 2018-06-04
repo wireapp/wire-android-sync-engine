@@ -144,7 +144,7 @@ class AccountManager(val userId:   UserId,
   private var hasClient = false
   otrCurrentClient.map(_.isDefined) { exists =>
     if (hasClient && !exists) {
-      info(s"client has been removed on backend, logging out")
+      verbose(s"client has been removed on backend, logging out")
       global.trackingService.loggedOut(LoggedOutEvent.RemovedClient, userId)
       logoutAndResetClient()
     }

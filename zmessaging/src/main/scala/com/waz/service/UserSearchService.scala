@@ -198,7 +198,7 @@ class UserSearchService(selfUserId:           UserId,
 
     query match {
       case RecommendedHandle(handle) if !results.map(_.handle).exists(_.exactMatchQuery(handle)) =>
-        debug(s"exact match requested: $handle")
+        verbose(s"exact match requested: $handle")
         sync.exactMatchHandle(Handle(Handle.stripSymbol(handle)))
       case _ =>
     }
@@ -210,10 +210,10 @@ class UserSearchService(selfUserId:           UserId,
     val query = RecommendedHandle(handle.withSymbol)
     def updating(id: UserId)(cached: SearchQueryCache) = cached.copy(query, Instant.now, Some(cached.entries.map(_.toSet ++ Set(userId)).getOrElse(Set(userId)).toVector))
 
-    debug(s"update exact match: $handle, $userId")
+    verbose(s"update exact match: $handle, $userId")
     userService.getUser(userId).collect {
       case Some(user) =>
-        debug(s"received exact match: ${user.handle}")
+        verbose(s"received exact match: ${user.handle}")
         exactMatchUser ! Some(user)
         queryCache.updateOrCreate(query, updating(userId), SearchQueryCache(query, Instant.now, Some(Vector(userId))))
     }(Threading.Background)
