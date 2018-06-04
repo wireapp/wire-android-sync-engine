@@ -18,8 +18,8 @@
 package com.waz
 
 import android.os.Parcel
+import com.waz.api.CoreList
 import com.waz.api.impl._
-import com.waz.api.{CoreList, IConversation}
 import com.waz.content.MsgCursor
 import com.waz.service.messages.MessageAndLikes
 import com.waz.threading.Threading
@@ -31,7 +31,6 @@ package object testutils {
   private implicit lazy val ec = Threading.Background
 
   object Implicits {
-    implicit def apiuser_to_user(user: com.waz.api.User): User = user.asInstanceOf[User]
     implicit def apiim_to_im(im: com.waz.api.ImageAsset): ImageAsset = im.asInstanceOf[ImageAsset]
 
     implicit class MessagesCursorSeq(list: MsgCursor) extends Seq[MessageAndLikes] {
