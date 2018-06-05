@@ -33,7 +33,7 @@ import com.waz.service.ZMessaging.clock
 import com.waz.service.media.{MessageContentBuilder, RichMediaContentParser}
 import com.waz.sync.client.OpenGraphClient.OpenGraphData
 import com.waz.utils.wrappers.{DB, DBCursor, URI}
-import com.waz.utils.{EnumCodec, JsonDecoder, JsonEncoder, returning}
+import com.waz.utils.{EnumCodec, JsonDecoder, JsonEncoder, returning, sha2}
 import org.json.JSONObject
 import org.threeten.bp.Instant.now
 import org.threeten.bp.Instant
@@ -65,17 +65,25 @@ case class MessageData(id:            MessageId              = MessageId(),
   override def toString: String =
     s"""
        |MessageData:
-       | id:            $id
-       | convId:        $convId
-       | msgType:       $msgType
-       | userId:        $userId
-       | protos:        ${protos.toString().replace("\n", "")}
-       | state:         $state
-       | time:          $time
-       | localTime:     $localTime
-       | editTime:      $editTime
-       | members:       $members
-       | other fields:  $content, $firstMessage, , $recipient, $email, $name, $ephemeral, $expiryTime, $expired, $duration
+       |   id:             $id
+       |   convId:         $convId
+       |   msgType:        $msgType
+       |   userId:         $userId
+       |   content (size): ${content.size}
+       |   protos (size):  ${protos.size}
+       |   firstMessage:   $firstMessage
+       |   members:        $members
+       |   recipient:      $recipient
+       |   email:          $email
+       |   name:           $name
+       |   state:          $state
+       |   time:           $time
+       |   localTime:      $localTime
+       |   editTime:       $editTime
+       |   ephemeral:      $ephemeral
+       |   expiryTime:     $expiryTime
+       |   expired:        $expired
+       |   duration:       $duration
     """.stripMargin
 
 
@@ -138,20 +146,30 @@ case class MessageData(id:            MessageId              = MessageId(),
   }
 }
 
-case class MessageContent(
-                           tpe: Message.Part.Type,
-                           content: String,
-                           richMedia: Option[MediaAssetData],
-                           openGraph: Option[OpenGraphData],
-                           asset: Option[AssetId],
-                           width: Int,
-                           height: Int,
-                           syncNeeded: Boolean,
-                           mentions: Map[UserId, String]
-                         ) {
-
+case class MessageContent(tpe:        Message.Part.Type,
+                          content:    String,
+                          richMedia:  Option[MediaAssetData],
+                          openGraph:  Option[OpenGraphData],
+                          asset:      Option[AssetId],
+                          width:      Int,
+                          height:     Int,
+                          syncNeeded: Boolean,
+                          mentions:   Map[UserId, String]) {
   def contentAsUri: URI = RichMediaContentParser.parseUriWithScheme(content)
-  override def toString: String = s"MessageContent($tpe, ${content.take(4)}..., $richMedia, $openGraph, $asset, $width, $height, $syncNeeded, $mentions)"
+
+  override def toString: String =
+    s"""
+       |MessageContent:
+       | tpe:            $tpe
+       | content (sha2): ${sha2(content)}
+       | richMedia:      $richMedia
+       | openGraph:      $openGraph
+       | asset:          $asset
+       | width:          $width
+       | height:         $height
+       | syncNeeded:     $syncNeeded
+       | mentions:       $mentions
+    """.stripMargin
 }
 
 object MessageContent extends ((Message.Part.Type, String, Option[MediaAssetData], Option[OpenGraphData], Option[AssetId], Int, Int, Boolean, Map[UserId, String]) => MessageContent) {

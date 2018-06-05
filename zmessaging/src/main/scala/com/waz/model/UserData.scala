@@ -55,6 +55,34 @@ case class UserData(id:                    UserId,
                     integrationId:         Option[IntegrationId] = None,
                     expiresAt:             Option[Instant]       = None) {
 
+  override def toString: String =
+    s"""
+       |UserData:
+       |   id:                    $id
+       |   teamId:                $teamId
+       |   name:                  $name
+       |   email:                 $email
+       |   phone:                 $phone
+       |   trackingId:            $trackingId
+       |   picture:               $picture
+       |   accent:                $accent
+       |   searchKey:             $searchKey
+       |   connection:            $connection
+       |   connectionLastUpdated: $connectionLastUpdated
+       |   connectionMessage:     $connectionMessage
+       |   conversation:          $conversation
+       |   relation:              $relation
+       |   syncTimestamp:         $syncTimestamp
+       |   displayName:           $displayName
+       |   verified:              $verified
+       |   deleted:               $deleted
+       |   availability:          $availability
+       |   handle:                $handle
+       |   providerId:            $providerId
+       |   integrationId:         $integrationId
+       |   expiresAt:             $expiresAt
+    """.stripMargin
+
   def isConnected = ConnectionStatus.isConnected(connection)
   def hasEmailOrPhone = email.isDefined || phone.isDefined
   def isSelf = connection == ConnectionStatus.Self
