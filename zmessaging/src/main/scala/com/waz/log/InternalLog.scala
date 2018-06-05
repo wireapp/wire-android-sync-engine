@@ -22,6 +22,7 @@ import java.io._
 import com.waz.ZLog.LogTag
 import com.waz.api.ZmsVersion
 import com.waz.service.ZMessaging.clock
+import com.waz.utils.sha2
 
 import scala.collection.mutable
 
@@ -34,7 +35,6 @@ object InternalLog {
     case object Debug   extends LogLevel { override def toString = "D" }
     case object Verbose extends LogLevel { override def toString = "V" }
   }
-
 
   private val outputs = mutable.HashMap[String, LogOutput]()
 
@@ -96,4 +96,9 @@ object InternalLog {
 
   private def log(msg: String, level: LogLevel, tag: LogTag): Unit = outputs.values.foreach { _.log(msg, level, tag) }
   private def log(msg: String, cause: Throwable, level: LogLevel, tag: LogTag): Unit = outputs.values.foreach { _.log(msg, cause, level, tag) }
+
+  trait ProductionLoggable {
+    def str: String
+    override def toString = s"${getClass.getSimpleName}(${if (ZmsVersion.DEBUG) str else sha2(str)})"
+  }
 }
