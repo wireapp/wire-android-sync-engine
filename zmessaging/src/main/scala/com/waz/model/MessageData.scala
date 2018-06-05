@@ -19,8 +19,6 @@ package com.waz.model
 
 import android.database.DatabaseUtils.queryNumEntries
 import android.database.sqlite.SQLiteQueryBuilder
-import com.waz.ZLog.ImplicitTag._
-import com.waz.ZLog._
 import com.waz.api
 import com.waz.api.Message.Type._
 import com.waz.api.{Message, TypeFilter}
@@ -110,7 +108,6 @@ case class MessageData(id:            MessageId              = MessageId(),
     } orElse content.headOption.collect {
       case MessageContent(_, _, _, _, Some(_), w, h, _, _) => Dim2(w, h)
     }
-    verbose(s"dims $dims from protos: $protos")
     dims
   }
 

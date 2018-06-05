@@ -45,7 +45,7 @@ case class AudioOverview(allLevels: Option[Vector[Float]]) extends api.AudioOver
   override def isEmpty: Boolean = allLevels.forall(_.isEmpty)
 
   override def getLevels(numberOfLevels: Int): Array[Float] = {
-    verbose(s"getLevels($numberOfLevels) from $toString")
+    info(s"getLevels($numberOfLevels) from $toString")
     allLevels.filterNot(_.isEmpty).fold(Array.fill(numberOfLevels)(0f)) { levels =>
       if (numberOfLevels == 0) Array.empty[Float]
       else if (levels.length == 1) Array.fill(numberOfLevels)(levels(0))

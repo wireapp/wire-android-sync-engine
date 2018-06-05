@@ -118,7 +118,7 @@ class LocalImageAssetWithPreview(preview: Option[AssetData], medium: AssetData)(
 
 class LocalBitmapAsset(bitmap: Bitmap, orientation: Int = ExifInterface.ORIENTATION_NORMAL)(implicit ui: UiModule) extends ImageAsset(AssetId()) {
 
-  verbose(s"creating asset from bitmap, orientation: $orientation")
+  info(s"creating asset from bitmap, orientation: $orientation")
 
   val mime   = Mime(BitmapUtils.getMime(bitmap))
   val (w, h) = if (ImageLoader.Metadata.shouldSwapDimens(orientation)) (bitmap.getHeight, bitmap.getWidth) else (bitmap.getWidth, bitmap.getHeight)
@@ -129,14 +129,14 @@ class LocalBitmapAsset(bitmap: Bitmap, orientation: Int = ExifInterface.ORIENTAT
     mime = mime,
     metaData = Some(AssetMetaData.Image(Dim2(w, h), Medium)),
     data = {
-      verbose(s"data requested, compress completed: ${imageData.isCompleted}")
+      info(s"data requested, compress completed: ${imageData.isCompleted}")
       // XXX: this is ugly, but will only be accessed from bg thread and very rarely, so we should be fine with that hack
       LoggedTry(Await.result(imageData, 15.seconds)).toOption
     }
   )
 
   override def getBitmap(req: BitmapRequest, callback: BitmapCallback): LoadHandle = {
-    verbose(s"get bitmap")
+    info(s"get bitmap")
     new BitmapLoadHandle(_ => Signal.future(imageData) flatMap { _ => BitmapSignal(data, req, ui.globalImageLoader, ui.network) }, callback)
   }
 
@@ -181,7 +181,7 @@ object ImageAsset {
         warn(s"bitmap loading failed", ex)
         callback.onBitmapLoadingFailed()
       case BitmapResult.Empty =>
-        verbose(s"ignoring empty bitmap")
+        info(s"ignoring empty bitmap")
     })
 
     override def cancel(): Unit = {

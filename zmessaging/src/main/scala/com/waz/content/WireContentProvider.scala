@@ -48,9 +48,9 @@ class WireContentProvider extends ContentProvider {
     verbose(s"getType($uri)")
     uri match {
       case CacheUriExtractor(key) =>
-        returning(getEntry(key).map(_.data.mimeType.str).orNull) { tpe => verbose(s"found entry type: $tpe")}
+        returning(getEntry(key).map(_.data.mimeType.str).orNull) { tpe => info(s"found entry type: $tpe")}
       case _ =>
-        verbose(s"content not found")
+        info(s"content not found")
         null
     }
   }
@@ -62,7 +62,7 @@ class WireContentProvider extends ContentProvider {
   override def delete(uri: Uri, selection: String, selectionArgs: Array[String]): Int = 0
 
   override def onCreate(): Boolean = {
-    verbose(s"onCreate")
+    info(s"onCreate")
     true
   }
 
@@ -109,10 +109,10 @@ class WireContentProvider extends ContentProvider {
   private def getDecryptedEntry(key: CacheKey) =
     cache.getEntry(key) flatMap {
       case Some(entry) if entry.data.encKey.isDefined =>
-        verbose("getDecryptedEntry: entry was decrypted")
+        info("getDecryptedEntry: entry was decrypted")
         cache.getOrElse(CacheKey.decrypted(key), cache.addStream(key, entry.inputStream, entry.data.mimeType, entry.data.fileName, Some(cache.intCacheDir))(Expiration.in(12.hours))) map (Some(_))
       case res =>
-        verbose("getDecryptedEntry: entry was NOT decrypted")
+        info("getDecryptedEntry: entry was NOT decrypted")
         CancellableFuture successful res
     }
 

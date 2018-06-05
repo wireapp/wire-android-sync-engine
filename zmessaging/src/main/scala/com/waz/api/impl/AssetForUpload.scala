@@ -87,12 +87,12 @@ case class AudioAssetForUpload(override val id: AssetId, data: CacheEntry, durat
   override def getDuration: bp.Duration = duration
 
   override def delete(): Unit = {
-    verbose(s"delete() $this")
+    info(s"delete() $this")
     data.delete()
   }
 
   override def applyEffect(effect: api.AudioEffect, callback: LoadCallback[api.AudioAssetForUpload]): Unit = {
-    verbose(s"applyEffect($effect) $this")
+    info(s"applyEffect($effect) $this")
     fx(effect, data.cacheFile).onComplete {
       case Success(asset) =>
         callback.onLoaded(asset)

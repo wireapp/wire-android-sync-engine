@@ -44,7 +44,7 @@ class GsmInterruptService(context: Context, callingService: CallingService) {
         case CALL_STATE_OFFHOOK => "offhook"
       }
 
-      verbose(s"GSM call state changed: $stateStr")
+      info(s"GSM call state changed: $stateStr")
       if (state == CALL_STATE_OFFHOOK) dropWireCalls()
     }
   }
@@ -53,20 +53,20 @@ class GsmInterruptService(context: Context, callingService: CallingService) {
     case false => stopListening()
     case true =>
       if (hasGsmCall) {
-        verbose(s"GSM call in progress, leaving voice channels or v3 call")
+        info(s"GSM call in progress, leaving voice channels or v3 call")
         dropWireCalls()
       }
       else startListening()
   }
   
   private def startListening() = if (!listening) {
-    verbose("startListening")
+    info("startListening")
     telephonyManager.listen(listener, PhoneStateListener.LISTEN_CALL_STATE)
     listening = true
   }
 
   private def stopListening() = if (listening) {
-    verbose("stopListening")
+    info("stopListening")
     telephonyManager.listen(listener, PhoneStateListener.LISTEN_NONE)
     listening = false
   }

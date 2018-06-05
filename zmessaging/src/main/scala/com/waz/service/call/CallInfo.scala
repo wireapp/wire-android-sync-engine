@@ -18,7 +18,6 @@
 package com.waz.service.call
 
 import com.sun.jna.Pointer
-import com.waz.ZLog
 import com.waz.model.{ConvId, GenericMessage, UserId}
 import com.waz.service.ZMessaging.clock
 import com.waz.service.call.Avs.VideoState
@@ -114,12 +113,9 @@ case class CallInfo(convId:             ConvId,
   }
 
   def updateVideoState(userId: UserId, videoState: VideoState): CallInfo = {
-
     val newCall: CallInfo =
       if (userId == account) this.copy(videoSendState = videoState)
       else this.copy(videoReceiveStates = this.videoReceiveStates + (userId -> videoState))
-
-    ZLog.verbose(s"updateVideoSendState: $userId, $videoState, newCall: $newCall")("CallInfo")
 
     val wasVideoToggled = newCall.wasVideoToggled || (newCall.isVideoCall != this.isVideoCall)
     newCall.copy(wasVideoToggled = wasVideoToggled)

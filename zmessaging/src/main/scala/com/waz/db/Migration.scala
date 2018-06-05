@@ -19,7 +19,6 @@ package com.waz.db
 
 import android.database.sqlite.SQLiteDatabase
 import com.waz.ZLog._
-import com.waz.service.ZMessaging
 import com.waz.service.tracking.TrackingService
 import com.waz.utils.wrappers.DB
 
@@ -95,7 +94,7 @@ class Migrations(migrations: Migration*) {
         case ms =>
           try {
             ms.foreach { m =>
-              verbose(s"applying migration: $m")
+              info(s"applying migration: $m")
               m(db)
               db.execSQL(s"PRAGMA user_version = ${m.toVersion}")
             }

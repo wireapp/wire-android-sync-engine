@@ -100,10 +100,10 @@ class ImageAssetGenerator(context: Context, cache: CacheService, loader: ImageLo
       imageCache.reserve(asset.id, options.req, memoryNeeded)
       input.fold(ld => bitmapLoader(() => ld.inputStream, sampleSize, meta.orientation).map(Bitmap.toAndroid), CancellableFuture.successful) map { image =>
         if (crop) {
-          verbose(s"cropping to $w")
+          info(s"cropping to $w")
           BitmapUtils.cropRect(image, w)
         } else if (image.getWidth > w) {
-          verbose(s"scaling to $w, $h")
+          info(s"scaling to $w, $h")
           BitmapUtils.scale(image, w, h)
         } else image
       }
@@ -113,7 +113,7 @@ class ImageAssetGenerator(context: Context, cache: CacheService, loader: ImageLo
       val (w, h) = options.calculateScaledSize(meta.width, meta.height)
       verbose(s"calculated scaled size: ($w, $h) for $meta and $options")
       loadScaled(w, h, options.cropToSquare) flatMap { image =>
-        verbose(s"loaded scaled: (${image.getWidth}, ${image.getHeight})")
+        info(s"loaded scaled: (${image.getWidth}, ${image.getHeight})")
         save(image)
       }
     }

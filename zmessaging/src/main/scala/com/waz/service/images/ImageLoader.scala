@@ -136,7 +136,7 @@ class ImageLoaderImpl(context:                  Context,
       case Some(data) =>
         saveImageToGallery(data, asset.mime)
       case None =>
-        error(s"No image data found for: $asset")
+//        error(s"No image data found for: $asset") TODO revert when ids can be obfuscated
         Future.successful(None)
     }
   }

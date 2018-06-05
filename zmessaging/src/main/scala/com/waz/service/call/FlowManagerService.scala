@@ -69,7 +69,7 @@ class DefaultFlowManagerService(context:      Context,
 
   private val flowListener = new FlowManagerListener {
     override def cameraFailed(): Unit = {
-      verbose(s"cameraFailed")
+      info(s"cameraFailed")
       cameraFailedSig ! true
     }
 
@@ -87,7 +87,7 @@ class DefaultFlowManagerService(context:      Context,
   }
 
   def getVideoCaptureDevices: Future[Vector[VideoCaptureDevice]] = scheduleOr[Array[CaptureDevice]]({ fm =>
-    verbose("getVideoCaptureDevices")
+    info("getVideoCaptureDevices")
     safeguardAgainstOldAvs(fm.getVideoCaptureDevices, fallback = Array.empty)
   }, Array.empty).map(_.map(d => VideoCaptureDevice(d.devId, d.devName))(breakOut))
 
@@ -99,7 +99,7 @@ class DefaultFlowManagerService(context:      Context,
   // This is the preview of the outgoing video stream.
   // Call this from the callback telling us to.
   def setVideoPreview(view: View): Future[Unit] = schedule { fm =>
-    verbose(s"setVideoPreview($view)")
+    info(s"setVideoPreview($view)")
     cameraFailedSig ! false //reset this signal since we are trying to start the capture again
     fm.setVideoPreview(null, view)
   }

@@ -26,12 +26,11 @@ import com.waz.model.AccountData.Password
 import com.waz.model.AccountDataOld.{PermissionsMasks, TriTeamId}
 import com.waz.model.otr.ClientId
 import com.waz.sync.client.AuthenticationManager
+import com.waz.sync.client.AuthenticationManager.{AccessToken, Cookie}
 import com.waz.utils.Locales.currentLocaleOrdering
 import com.waz.utils.scrypt.SCrypt
 import com.waz.utils.wrappers.{DB, DBContentValues, DBCursor, DBProgram}
 import com.waz.utils.{JsonDecoder, JsonEncoder}
-import com.waz.zms.BuildConfig
-import com.waz.sync.client.AuthenticationManager.{AccessToken, Cookie}
 import org.json.JSONObject
 
 import scala.collection.mutable

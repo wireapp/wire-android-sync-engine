@@ -111,7 +111,7 @@ case class AudioLevels(context: Context) {
   private def extractAudioTrackInfo(extractor: MediaExtractor, content: URI): TrackInfo = {
     verbose(s"data source: $content")
     extractor.setDataSource(context, URI.unwrap(content), null)
-    verbose(s"track count: ${extractor.getTrackCount}")
+    info(s"track count: ${extractor.getTrackCount}")
 
     val audioTrack = Iterator.range(0, extractor.getTrackCount).map { n =>
       val fmt = extractor.getTrackFormat(n)

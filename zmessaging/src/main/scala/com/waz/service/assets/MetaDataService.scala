@@ -69,7 +69,7 @@ class MetaDataService(context: Context, cache: CacheService, storage: AssetsStor
           MetaDataRetriever(entry.cacheFile)(loadPreview).flatMap(createVideoPreview).flatMap {
             case Some(prev) => storage.mergeOrCreateAsset(prev)
             case _ =>
-              verbose(s"Failed to create video preview for asset: $asset.id")
+              verbose(s"Failed to create video preview for asset: ${asset.id}")
               Future.successful(None)
         }
         case _ => //possible plans to add previews for other types (images, pdfs etc?)

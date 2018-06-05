@@ -18,7 +18,6 @@
 package com.waz.service.conversation
 
 import com.waz.ZLog.ImplicitTag._
-import com.waz.ZLog._
 import com.waz.content.GlobalPreferences.BackendDrift
 import com.waz.content.{ConversationStorage, GlobalPreferences}
 import com.waz.model._
@@ -69,7 +68,7 @@ class TypingService(userId:        UserId,
       case true =>
         conversations.getByRemoteId(e.convId) map {
           case Some(conv) => setUserTyping(conv.id, e.from, e.time, e.isTyping)
-          case None => warn(s"Conversation ${e.convId} not found, ignoring.")
+          case None => // warn(s"Conversation ${e.convId} not found, ignoring.") TODO reintroduce when ids can be obfuscated
         }
       case _ => Future.successful(())
     }

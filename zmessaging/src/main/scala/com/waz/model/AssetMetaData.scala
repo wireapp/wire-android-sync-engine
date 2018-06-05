@@ -111,7 +111,7 @@ object AssetMetaData {
         dim       = if (rotation / 90 % 2 == 0) Dim2(width, height) else Dim2(height, width)
         duration <- retrieve(METADATA_KEY_DURATION, "duration", s => bp.Duration.ofMillis(s.toLong))
       } yield {
-        verbose(s"width: $width, height: $height, rotation: $rotation, dim: $dim, duration: $duration")
+        info(s"width: $width, height: $height, rotation: $rotation, dim: $dim, duration: $duration")
         AssetMetaData.Video(dim, duration)
       }
     }

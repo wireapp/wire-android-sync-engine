@@ -79,22 +79,22 @@ class PermissionsService() {
     * @return the same set of permissions as requested, but providing their status too.
     */
   def requestPermissions(keys: Set[PermissionKey]): Future[Set[Permission]] = {
-    verbose(s"requestPermissions: $keys")
+    info(s"requestPermissions: $keys")
     knownKeys.mutate(_ ++ keys)
-    verbose(s"Known: ${knownKeys.currentValue}")
+    info(s"Known: ${knownKeys.currentValue}")
 
     def request() = {
       currentRequest = Promise()
       providerSignal.head.flatMap {
         case Some(prov) =>
-          verbose(s"requesting from provider: $prov")
+          info(s"requesting from provider: $prov")
           for {
             ps <- permissions.head
-            _ = verbose(s"current ps: $ps")
+            _ = info(s"current ps: $ps")
             fromKeys       = ps.filter(p => keys.contains(p.key))
             toRequest      = fromKeys.filter(!_.granted)
             alreadyGranted = fromKeys -- toRequest
-            _ = verbose(s"to request: $toRequest, already granted: $alreadyGranted")
+            _ = info(s"to request: $toRequest, already granted: $alreadyGranted")
             res <-
               if (toRequest.isEmpty) {
                 currentRequest.tryComplete(Try(toRequest))
@@ -112,10 +112,10 @@ class PermissionsService() {
     }
 
     if (currentRequest.isCompleted) {
-      verbose("no outstanding requests")
+      info("no outstanding requests")
       request()
     } else {
-      verbose("outstanding request, waiting for it to finish first")
+      info("outstanding request, waiting for it to finish first")
       currentRequest.future.flatMap(_ => request())
     }
   }

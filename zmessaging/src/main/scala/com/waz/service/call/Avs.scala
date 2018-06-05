@@ -71,7 +71,7 @@ class AvsImpl() extends Avs {
           }
         }
       }, null)
-      verbose(s"AVS initialized: $res")
+      info(s"AVS initialized: $res")
     }
   }.map(_ => {})
 
@@ -195,7 +195,7 @@ object Avs {
   def instant(uint32_t: Uint32_t) = Instant.ofEpochMilli(uint32_t.value.toLong * 1000)
 
   def uint32_tTime(instant: Instant) =
-    returning(Uint32_t((instant.toEpochMilli / 1000).toInt))(t => verbose(s"uint32_tTime for $instant = ${t.value}"))
+    returning(Uint32_t((instant.toEpochMilli / 1000).toInt))(t => info(s"uint32_tTime for $instant = ${t.value}"))
 
   /**
     * NOTE: All values should be kept up to date as defined in:

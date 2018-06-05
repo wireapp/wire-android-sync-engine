@@ -123,7 +123,7 @@ class PCMPlayer private (content: PCMContent, track: AudioTrack, totalSamples: L
     })
 
     override def run: Unit = {
-      verbose("scooping started")
+      info("scooping started")
       playing = true
       scoop()
     }
@@ -151,14 +151,14 @@ class PCMPlayer private (content: PCMContent, track: AudioTrack, totalSamples: L
         }
         scoop()
       }
-    } else verbose("scooping stopped")
+    } else info("scooping stopped")
   }
 }
 
 object PCMPlayer {
   def apply(content: PCMContent, observer: Player.Observer): Future[PCMPlayer] = Threading.BackgroundHandler.map { handler =>
     val track = new AudioTrack(STREAM_MUSIC, PCM.sampleRate, PCM.outputChannelConfig, PCM.sampleFormat, playerBufferSize, MODE_STREAM)
-    verbose(s"created audio track; buffer size: $playerBufferSize")
+    info(s"created audio track; buffer size: $playerBufferSize")
     val totalSamples = content.file.length / SizeOf.SHORT
 
     track.setNotificationMarkerPosition(totalSamples.toInt)

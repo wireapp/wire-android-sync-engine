@@ -55,7 +55,7 @@ object PCMRecorder {
     val maxAmplitude = new AtomicReference[Short](0)
     @volatile var completionRequest = Option.empty[CompletionCause]
 
-    verbose(s"created new audio recorder (buffer size: $recorderBufferSize)")
+    info(s"created new audio recorder (buffer size: $recorderBufferSize)")
 
     def extremumOf(a: Short, b: Short) = if (abs(a.toInt) > abs(b.toInt)) a else b
 
@@ -91,10 +91,10 @@ object PCMRecorder {
           }
 
         recorder.startRecording()
-        verbose("audio recording started")
+        info("audio recording started")
         returning(scoop(0L)) { cause =>
           recorder.stop()
-          verbose(s"audio recording stopped: $cause")
+          info(s"audio recording stopped: $cause")
         }
       }(BlockingIO).flatMap { cause =>
         writer.finish()
@@ -104,7 +104,7 @@ object PCMRecorder {
         writer.finish()
         writer.completion
       }.andThen { case _ =>
-        verbose("releasing audio recorder")
+        info("releasing audio recorder")
         recorder.release()
       }
 

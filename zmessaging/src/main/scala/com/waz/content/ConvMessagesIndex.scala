@@ -122,7 +122,7 @@ class ConvMessagesIndex(conv: ConvId, messages: MessagesStorageImpl, selfUserId:
       }
       val time = lastReadTime.currentValue.getOrElse(Instant.EPOCH)
       val readMessagesCount = MessageDataDao.countAtLeastAsOld(conv, time).toInt
-      verbose(s"index of $time = $readMessagesCount")
+      info(s"index of $time = $readMessagesCount")
       (cursor, order, time, math.max(0, readMessagesCount - 1))
     }.map { case (cursor, order, time, lastReadIndex) =>
       new MessagesCursor(cursor, lastReadIndex, time, msgAndLikes, tracking)(order)
@@ -167,7 +167,7 @@ class ConvMessagesIndex(conv: ConvId, messages: MessagesStorageImpl, selfUserId:
     val lastFromOtherRemoved = lastMessageFromOther.mutate(_ filterNot f)
 
     if (lastRemoved || lastSentRemoved || lastFromSelfRemoved) {
-      verbose("last message was removed, need to fetch it from db")
+      info("last message was removed, need to fetch it from db")
       storage.read { implicit db =>
         MessageDataDao.last(conv) foreach updateSignal(lastMessage)
         MessageDataDao.lastSent(conv) foreach updateSignal(lastSentMessage)

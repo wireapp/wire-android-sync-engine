@@ -18,23 +18,20 @@
 package com.waz.model
 
 import android.util.Base64
-import com.waz.model.AssetMetaData.Image.Tag
-import com.waz.model.AssetStatus.UploadCancelled
-import com.waz.service.UserService
-import com.waz.utils.wrappers.DBCursor
-//import com.waz.ZLog.ImplicitTag._
-//import com.waz.ZLog.verbose
+import com.waz.ZLog.ImplicitTag._
+import com.waz.ZLog.verbose
 import com.waz.content.WireContentProvider
 import com.waz.db.Col._
 import com.waz.db.Dao
 import com.waz.model.AssetMetaData.Image
-import com.waz.model.AssetStatus.UploadDone
+import com.waz.model.AssetMetaData.Image.Tag
+import com.waz.model.AssetStatus.{UploadCancelled, UploadDone}
 import com.waz.model.GenericContent.EncryptionAlgorithm
 import com.waz.model.otr.SignalingKey
-import com.waz.service.ZMessaging
+import com.waz.service.{UserService, ZMessaging}
 import com.waz.utils.JsonDecoder.{apply => _, opt => _}
 import com.waz.utils._
-import com.waz.utils.wrappers.URI
+import com.waz.utils.wrappers.{DBCursor, URI}
 import org.json.JSONObject
 import org.threeten.bp.Duration
 
@@ -102,7 +99,7 @@ case class AssetData(id:          AssetId               = AssetId(),
       case (_, Some(uri)) if !NonKeyURIs.contains(uri) => CacheKey.fromUri(uri)
       case _                                           => CacheKey.fromAssetId(id)
     }
-    //verbose(s"created cache key: $key for asset: $id")
+    verbose(s"created cache key: $key for asset: $id")
     key
   }
 
@@ -329,17 +326,15 @@ object AssetData {
   lazy val ImageAssetDataDecoder: JsonDecoder[AssetData] = new JsonDecoder[AssetData] {
     import JsonDecoder._
     override def apply(implicit js: JSONObject): AssetData = {
-      //verbose(s"decoding ImageAssetData: $js")
       val id = decodeId[AssetId]('id)
       val convId = decodeOptRConvId('convId)
 
       Try(js.getJSONArray("versions")).toOption.flatMap { arr =>
-        Seq.tabulate(arr.length())(arr.getJSONObject).map{ obj =>
-          //verbose(s"applying ImageDataDecoder to $obj")
+        Seq.tabulate(arr.length())(arr.getJSONObject).map { obj =>
           ImageDataDecoder.apply(obj)
-        }.collect {
+        }.collectFirst {
           case a@AssetData.IsImageWithTag(Image.Tag.Medium) => a.copy(id = id, convId = convId)
-        }.headOption
+        }
       }.getOrElse(AssetData(id, convId = convId))
     }
   }
@@ -349,7 +344,6 @@ object AssetData {
   lazy val ImageDataDecoder: JsonDecoder[AssetData] = new JsonDecoder[AssetData] {
     import JsonDecoder._
     override def apply(implicit js: JSONObject): AssetData = {
-      //verbose(s"decoding ImageData: $js")
       val otrKey = js.opt("otrKey") match {
         case o: JSONObject => Try(implicitly[JsonDecoder[SignalingKey]].apply(o).encKey).toOption
         case str: String => Some(AESKey(str))
@@ -371,7 +365,6 @@ object AssetData {
   implicit lazy val AnyAssetDataDecoder: JsonDecoder[AssetData] = new JsonDecoder[AssetData] {
     import JsonDecoder._
     override def apply(implicit js: JSONObject): AssetData = {
-      //verbose(s"decoding AnyAssetData: $js")
 
       val remoteData = decodeOptObject('key)(js.getJSONObject("status")).map { key =>
         val remoteId = decodeOptRAssetId('remoteId)(key).orElse(decodeOptRAssetId('remoteKey)(key))

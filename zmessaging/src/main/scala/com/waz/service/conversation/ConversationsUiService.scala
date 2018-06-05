@@ -123,7 +123,7 @@ class ConversationsUiServiceImpl(selfUserId:      UserId,
   @Deprecated
   override def sendMessage(convId: ConvId, content: api.MessageContent): Future[Option[MessageData]] = content match {
     case m: api.MessageContent.Text =>
-      verbose(s"send text message ${m.getContent.take(4)}...")
+      info(s"send text message (sha2): ${sha2(m.getContent)}...")
       sendTextMessage(convId, m.getContent)
 
     case m: api.MessageContent.Location =>
@@ -138,7 +138,7 @@ class ConversationsUiServiceImpl(selfUserId:      UserId,
     case m: api.MessageContent.Asset =>
       convsContent.convById(convId) flatMap {
         case Some(conv) =>
-          verbose(s"send asset message ${m.getContent}")
+          info(s"send asset message ${m.getContent.getClass.getSimpleName}")
           m.getContent match {
             case a@ContentUriAssetForUpload(_, uri) =>
               a.mimeType.flatMap {
@@ -154,7 +154,7 @@ class ConversationsUiServiceImpl(selfUserId:      UserId,
       }
 
     case _ =>
-      error(s"sendMessage($content) not supported yet")
+      error(s"sendMessage(${content.getClass.getSimpleName}) not supported yet")
       Future.failed(new IllegalArgumentException(s"MessageContent: $content is not supported yet"))
   }
 
@@ -198,14 +198,14 @@ class ConversationsUiServiceImpl(selfUserId:      UserId,
   override def updateMessage(convId: ConvId, id: MessageId, text: Text): Future[Option[MessageData]] = updateMessage(convId, id, text.getContent)
 
   override def updateMessage(convId: ConvId, id: MessageId, text: String): Future[Option[MessageData]] = {
-    verbose(s"updateMessage($convId, $id, $text")
+    verbose(s"updateMessage($convId, $id, ${sha2(text)}")
     messagesContent.updateMessage(id) {
       case m if m.convId == convId && m.userId == selfUserId =>
         val (tpe, ct) = MessageData.messageContent(text, weblinkEnabled = true)
-        verbose(s"updated content: ${(tpe, ct)}")
+        info(s"updated content: ${(tpe, ct)}")
         m.copy(msgType = tpe, content = ct, protos = Seq(GenericMessage(Uid(), MsgEdit(id, GenericContent.Text(text)))), state = Message.Status.PENDING, editTime = (m.time max m.editTime).plus(1.millis) max Instant.now)
       case m =>
-        warn(s"Can not update msg: $m")
+//        warn(s"Can not update msg: $m") //TODO reintroduce when ids can be obfuscated
         m
     } flatMap {
       case Some(m) => sync.postMessage(m.id, m.convId, m.editTime) map { _ => Some(m) } // using PostMessage sync request to use the same logic for failures and retrying
@@ -223,7 +223,7 @@ class ConversationsUiServiceImpl(selfUserId:      UserId,
       case Some(msg) =>
         sync.postRecalled(convId, msg.id, id) map { _ => Some(msg) }
       case None =>
-        warn(s"could not recall message $convId, $id")
+//        warn(s"could not recall message $convId, $id") //TODO reintroduce when ids can be obfuscated
         Future successful None
     }
 
@@ -244,7 +244,7 @@ class ConversationsUiServiceImpl(selfUserId:      UserId,
         sync.postConversationName(id, conv.name.getOrElse(""))
         messages.addRenameConversationMessage(id, selfUserId, name) map (_ => Some(conv))
       case conv =>
-        warn(s"Conversation name could not be changed for: $id, conv: $conv")
+//        warn(s"Conversation name could not be changed for: $id, conv: $conv") //TODO reintroduce when ids can be obfuscated
         CancellableFuture.successful(None)
     }
   }
@@ -258,7 +258,7 @@ class ConversationsUiServiceImpl(selfUserId:      UserId,
     } yield Option(syncId))
       .recover {
         case NonFatal(e) =>
-          warn(s"Failed to add members: $users to conv: $conv", e)
+//          warn(s"Failed to add members: $users to conv: $conv", e) TODO reintroduce when ids can be obfuscated
           Option.empty[SyncId]
       }
   }
@@ -272,7 +272,7 @@ class ConversationsUiServiceImpl(selfUserId:      UserId,
     } yield Some(syncId))
       .recover {
         case NonFatal(e) =>
-          warn(s"Failed to remove member: $user from conv: $conv", e)
+//          warn(s"Failed to remove member: $user from conv: $conv", e)
           Option.empty[SyncId]
       }
   }
@@ -313,14 +313,14 @@ class ConversationsUiServiceImpl(selfUserId:      UserId,
             _ <- c.cleared.fold(Future.successful({}))(sync.postCleared(c.id, _).map(_ => ()))
           } yield Some(c)
         case None =>
-          verbose("updateConversationCleared did nothing - already cleared")
+          info("updateConversationCleared did nothing - already cleared")
           Future successful None
       }
     case Some(conv) =>
       warn(s"conversation of type ${conv.convType} can not be cleared")
       Future successful None
     case None =>
-      warn(s"conversation to be cleared not found: $id")
+//      warn(s"conversation to be cleared not found: $id") TODO reintroduce when ids can be obfuscated
       Future successful None
   }
 

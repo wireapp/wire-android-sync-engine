@@ -18,11 +18,9 @@
 package com.waz.log
 
 import java.io._
-import java.util.Calendar
 
 import com.waz.ZLog.LogTag
 import com.waz.api.ZmsVersion
-import com.waz.service.ZMessaging
 import com.waz.service.ZMessaging.clock
 
 import scala.collection.mutable
