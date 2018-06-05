@@ -21,8 +21,7 @@ import android.content.{ComponentCallbacks2, Context}
 import com.evernote.android.job.{JobCreator, JobManager}
 import com.softwaremill.macwire._
 import com.waz.ZLog._
-import com.waz.api.ContentSearchQuery
-import com.waz.client.RegistrationClientImpl
+import com.waz.api.{ContentSearchQuery, ZmsVersion}
 import com.waz.content.{MembersStorageImpl, UsersStorageImpl, ZmsDatabase, _}
 import com.waz.model._
 import com.waz.model.otr.ClientId
@@ -45,12 +44,11 @@ import com.waz.sync.otr.{OtrClientsSyncHandler, OtrClientsSyncHandlerImpl, OtrSy
 import com.waz.sync.queue.{SyncContentUpdater, SyncContentUpdaterImpl}
 import com.waz.threading.{CancellableFuture, SerialDispatchQueue, Threading}
 import com.waz.ui.UiModule
-import com.waz.utils.Locales
 import com.waz.utils.wrappers.AndroidContext
+import com.waz.utils.{Locales, sha2}
 import com.waz.zms.FetchJob
-import com.waz.znet._
-import com.waz.znet2.http.{HttpClient, RequestInterceptor}
-import com.waz.znet2.{AuthRequestInterceptor, HttpClientOkHttpImpl, OkHttpWebSocketFactory}
+import com.waz.znet2.http.HttpClient
+import com.waz.znet2.{AuthRequestInterceptor, OkHttpWebSocketFactory}
 import org.threeten.bp.{Clock, Instant}
 
 import scala.concurrent.{Future, Promise}
@@ -317,7 +315,10 @@ class ZMessaging(val teamId: Option[TeamId], val clientId: ClientId, account: Ac
   */
 object ZMessaging { self =>
 
-  def accountTag[A: reflect.Manifest](userId: UserId): LogTag = s"${implicitly[reflect.Manifest[A]].runtimeClass.getSimpleName}#${userId.str.take(8)}"
+  def accountTag[A: reflect.Manifest](userId: UserId): LogTag = {
+    val id = (if (ZmsVersion.DEBUG) userId.str else sha2(userId.str)).take(8)
+    s"${implicitly[reflect.Manifest[A]].runtimeClass.getSimpleName}#$id"
+  }
 
   private implicit val logTag: LogTag = logTagFor(ZMessaging)
 
