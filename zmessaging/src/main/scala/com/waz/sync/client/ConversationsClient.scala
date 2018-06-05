@@ -42,7 +42,7 @@ trait ConversationsClient {
   def loadConversations(start: Option[RConvId] = None, limit: Int = ConversationsPageSize): ErrorOrResponse[ConversationsResult]
   def loadConversations(ids: Seq[RConvId]): ErrorOrResponse[Seq[ConversationResponse]]
   def loadConversation(id: RConvId): ErrorOrResponse[ConversationResponse]
-  def postName(convId: RConvId, name: String): ErrorOrResponse[Option[RenameConversationEvent]]
+  def postName(convId: RConvId, name: Name): ErrorOrResponse[Option[RenameConversationEvent]]
   def postConversationState(convId: RConvId, state: ConversationState): ErrorOrResponse[Boolean]
   def postMessageTimer(convId: RConvId, duration: Option[FiniteDuration]): ErrorOrResponse[Unit]
   def postMemberJoin(conv: RConvId, members: Set[UserId]): ErrorOrResponse[Option[MemberJoinEvent]]
@@ -51,8 +51,7 @@ trait ConversationsClient {
   def removeLink(conv: RConvId): ErrorOrResponse[Unit]
   def getLink(conv: RConvId): ErrorOrResponse[Option[Link]]
   def postAccessUpdate(conv: RConvId, access: Set[Access], accessRole: AccessRole): ErrorOrResponse[Unit]
-  //TODO Use case class instead of this parameters list
-  def postConversation(users: Set[UserId], name: Option[String] = None, team: Option[TeamId], access: Set[Access], accessRole: AccessRole): ErrorOrResponse[ConversationResponse]
+  def postConversation(users: Set[UserId], name: Option[Name] = None, team: Option[TeamId], access: Set[Access], accessRole: AccessRole): ErrorOrResponse[ConversationResponse]
 }
 
 class ConversationsClientImpl(implicit
@@ -112,8 +111,8 @@ class ConversationsClientImpl(implicit
   private implicit val EventsResponseDeserializer: RawBodyDeserializer[List[ConversationEvent]] =
     RawBodyDeserializer[JSONObject].map(json => EventsResponse.unapplySeq(JsonObjectResponse(json)).get)
 
-  override def postName(convId: RConvId, name: String): ErrorOrResponse[Option[RenameConversationEvent]] = {
-    Request.Put(url = backendUrl(s"$ConversationsPath/$convId"), body = Json("name" -> name))
+  override def postName(convId: RConvId, name: Name): ErrorOrResponse[Option[RenameConversationEvent]] = {
+    Request.Put(url = backendUrl(s"$ConversationsPath/$convId"), body = Json("name" -> name.str))
       .withResultType[List[ConversationEvent]]
       .withErrorType[ErrorResponse]
       .executeSafe {
@@ -208,11 +207,11 @@ class ConversationsClientImpl(implicit
       .executeSafe
   }
 
-  def postConversation(users: Set[UserId], name: Option[String] = None, team: Option[TeamId], access: Set[Access], accessRole: AccessRole): ErrorOrResponse[ConversationResponse] = {
+  def postConversation(users: Set[UserId], name: Option[Name] = None, team: Option[TeamId], access: Set[Access], accessRole: AccessRole): ErrorOrResponse[ConversationResponse] = {
     verbose(s"postConversation($users, $name)")
     val payload = JsonEncoder { o =>
       o.put("users", Json(users))
-      name.foreach(o.put("name", _))
+      name.foreach(v => o.put("name", v.str))
       team.foreach(t => o.put("team", returning(new json.JSONObject()) { o =>
         o.put("teamid", t.str)
         o.put("managed", false)
@@ -237,7 +236,7 @@ object ConversationsClient {
   def accessUpdatePath(id: RConvId) = s"$ConversationsPath/${id.str}/access"
 
   case class ConversationResponse(id:           RConvId,
-                                  name:         Option[String],
+                                  name:         Option[Name],
                                   creator:      UserId,
                                   convType:     ConversationType,
                                   team:         Option[TeamId],

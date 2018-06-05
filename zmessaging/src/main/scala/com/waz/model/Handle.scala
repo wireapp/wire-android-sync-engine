@@ -19,7 +19,39 @@ package com.waz.model
 
 import java.util.UUID
 
+import com.waz.log.InternalLog.ProductionLoggable
 import com.waz.utils.Locales
+
+import scala.language.implicitConversions
+import scala.math.Ordering
+
+case class Name(str: String) extends ProductionLoggable {
+  def isEmpty  = str.isEmpty
+  def length   = str.length
+  def nonEmpty = str.nonEmpty
+
+  def contains(substr: String): Boolean = str.contains(substr)
+  def compareTo(other: Name): Int = str.compareTo(other.str)
+
+  def split(regex: String): Array[String] = str.split(regex)
+  def split(separator: Char): Array[String] = str.split(separator)
+
+  def substring(begin: Int, end: Int): Name =
+    Name(str.substring(begin, end))
+}
+
+object Name extends (String => Name) {
+
+  implicit def fromSafeString(ss: Name): String = ss.str
+
+  implicit def toSafeString(str: String): Name = Name(str)
+
+  implicit val Ordering = new Ordering[Name] {
+    override def compare(x: Name, y: Name) = x.compareTo(y)
+  }
+
+  val Empty = Name("")
+}
 
 case class Handle(string: String) extends AnyVal {
   override def toString : String = string

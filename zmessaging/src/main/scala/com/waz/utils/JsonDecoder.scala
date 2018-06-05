@@ -133,6 +133,7 @@ object JsonDecoder {
   implicit def decodeFiniteDuration(s: Symbol)(implicit js: JSONObject): FiniteDuration = FiniteDuration(withDefault(s, 0L, _.getLong(s.name)), TimeUnit.MILLISECONDS)
   implicit def decodeLocale(s: Symbol)(implicit js: JSONObject): Option[Locale] = withDefault(s, None, o => Locales.bcp47.localeFor(o.getString(s.name)))
   implicit def decodeUid(s: Symbol)(implicit js: JSONObject): Uid = Uid(js.getString(s.name))
+  implicit def decodeName(s: Symbol)(implicit js: JSONObject): Name = Name(js.getString(s.name))
   implicit def decodeLoudness(s: Symbol)(implicit js: JSONObject): Loudness = Loudness(decodeFloatSeq(s).toVector)
 
   implicit def decodeOptObject(s: Symbol)(implicit js: JSONObject): Option[JSONObject] = Try(js.getJSONObject(s.name)).toOption
@@ -142,6 +143,7 @@ object JsonDecoder {
   implicit def decodeOptBoolean(s: Symbol)(implicit js: JSONObject): Option[Boolean] = opt(s, _.getBoolean(s.name))
   implicit def decodeOptFloat(s: Symbol)(implicit js: JSONObject): Option[Float] = opt(s, _.getDouble(s.name).toFloat)
   implicit def decodeOptUid(s: Symbol)(implicit js: JSONObject): Option[Uid] = opt(s, js => Uid(js.getString(s.name)))
+  implicit def decodeOptName(s: Symbol)(implicit js: JSONObject): Option[Name] = opt(s, js => Name(js.getString(s.name)))
   implicit def decodeOptAssetId(s: Symbol)(implicit js: JSONObject): Option[AssetId] = opt(s, js => AssetId(js.getString(s.name)))
   implicit def decodeOptClientId(s: Symbol)(implicit js: JSONObject): Option[ClientId] = opt(s, js => ClientId(js.getString(s.name)))
   implicit def decodeOptTeamId(s: Symbol)(implicit js: JSONObject): Option[TeamId] = opt(s, js => TeamId(js.getString(s.name)))

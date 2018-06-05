@@ -31,7 +31,7 @@ import com.waz.model.UserInfo.Service
 import org.threeten.bp.Instant
 
 case class UserInfo(id:           UserId,
-                    name:         Option[String]          = None,
+                    name:         Option[Name]            = None,
                     accentId:     Option[Int]             = None,
                     email:        Option[EmailAddress]    = None,
                     phone:        Option[PhoneNumber]     = None,
@@ -145,7 +145,7 @@ object UserInfo {
   implicit lazy val Encoder: JsonEncoder[UserInfo] = new JsonEncoder[UserInfo] {
     override def apply(info: UserInfo): JSONObject = JsonEncoder { o =>
       o.put("id", info.id.str)
-      info.name.foreach(o.put("name", _))
+      info.name.foreach(v => o.put("name", v.str))
       info.phone.foreach(p => o.put("phone", p.str))
       info.email.foreach(e => o.put("email", e.str))
       info.accentId.foreach(o.put("accent_id", _))
@@ -155,11 +155,4 @@ object UserInfo {
     }
   }
 
-//  implicit lazy val ContentEncoder: ContentEncoder[UserInfo] = JsonContentEncoder.map { (info: UserInfo) =>
-//    JsonEncoder { o =>
-//      info.name.foreach(o.put("name", _))
-//      info.accentId.foreach(o.put("accent_id", _))
-//      info.picture.foreach(ps => o.put("assets", encodeAsset(ps)))
-//    }
-//  }
 }

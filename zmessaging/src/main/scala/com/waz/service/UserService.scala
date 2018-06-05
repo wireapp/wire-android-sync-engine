@@ -80,7 +80,7 @@ trait UserService {
   def updateHandle(handle: Handle): ErrorOr[Unit]
 
   //These self user properties should always succeed given no fatal errors, so we update locally and create sync jobs
-  def updateName(name: String): Future[Unit]
+  def updateName(name: Name): Future[Unit]
   def updateAccentColor(color: AccentColor): Future[Unit]
   def updateAvailability(availability: Availability): Future[Unit]
 
@@ -183,7 +183,7 @@ class UserServiceImpl(selfUserId:        UserId,
 
   override def getOrCreateUser(id: UserId) = usersStorage.getOrElseUpdate(id, {
     sync.syncUsers(id)
-    UserData(id, None, DefaultUserName, None, None, connection = ConnectionStatus.Unconnected, searchKey = SearchKey(DefaultUserName), handle = None)
+    UserData(id, None, "", None, None, connection = ConnectionStatus.Unconnected, searchKey = SearchKey(Name.Empty), handle = None)
   })
 
   override def updateConnectionStatus(id: UserId, status: UserData.ConnectionStatus, time: Option[Date] = None, message: Option[String] = None) =
@@ -336,7 +336,7 @@ class UserServiceImpl(selfUserId:        UserId,
     }
   }
 
-  override def updateName(name: String) = {
+  override def updateName(name: Name) = {
     verbose(s"updateName: $name")
     updateAndSync(_.copy(name = name), _ => sync.postSelfName(name))
   }
@@ -395,8 +395,6 @@ class UserServiceImpl(selfUserId:        UserId,
 }
 
 object UserService {
-  val DefaultUserName: String = ""
-
   val UnsplashUrl = AndroidURIUtil.parse("https://source.unsplash.com/800x800/?landscape")
 
   lazy val AcceptedOrBlocked = Set(ConnectionStatus.Accepted, ConnectionStatus.Blocked)

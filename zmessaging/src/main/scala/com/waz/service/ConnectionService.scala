@@ -38,7 +38,7 @@ import scala.collection.breakOut
 import scala.concurrent.Future
 
 trait ConnectionService {
-  def connectToUser(userId: UserId, message: String, name: String): Future[Option[ConversationData]]
+  def connectToUser(userId: UserId, message: String, name: Name): Future[Option[ConversationData]]
   def handleUserConnectionEvents(events: Seq[UserConnectionEvent]): Future[Unit]
   def syncConversationInitiallyAfterCreation(convId: RConvId, selfUserId: UserId, userId: UserId): Future[SyncId]
 }
@@ -66,7 +66,7 @@ class ConnectionServiceImpl(selfUserId:      UserId,
     RichFuture.processSequential(es) { e =>
       getOrCreateUser(e.user) flatMap { _ =>
         // update user name if it was just created (has empty name)
-        updateUserData(e.user, u => u.copy(name = if (u.name == "") e.name else u.name))
+        updateUserData(e.user, u => u.copy(name = if (u.name.isEmpty) e.name else u.name))
       }
     }
   }
@@ -80,8 +80,7 @@ class ConnectionServiceImpl(selfUserId:      UserId,
     verbose(s"handleUserConnectionEvents: $events")
     def updateOrCreate(event: UserConnectionEvent)(user: Option[UserData]): UserData =
       user.fold {
-        UserData(event.to, None, UserService.DefaultUserName, None, None, connection = event.status, conversation = Some(event.convId), connectionMessage = event.message, searchKey = SearchKey(UserService.DefaultUserName), connectionLastUpdated = event.lastUpdated,
-          handle = None)
+        UserData(event.to, None, Name.Empty, None, None, connection = event.status, conversation = Some(event.convId), connectionMessage = event.message, searchKey = SearchKey(Name.Empty), connectionLastUpdated = event.lastUpdated, handle = None)
       } {
         _.copy(conversation = Some(event.convId)).updateConnectionStatus(event.status, Some(event.lastUpdated), event.message)
       }
@@ -135,9 +134,9 @@ class ConnectionServiceImpl(selfUserId:      UserId,
   /**
    * Connects to user and creates one-to-one conversation if needed. Returns existing conversation if user is already connected.
    */
-  def connectToUser(userId: UserId, message: String, name: String): Future[Option[ConversationData]] = {
+  override def connectToUser(userId: UserId, message: String, name: Name) = {
 
-    def sanitizedName = if (name.isEmpty) "_" else if (name.length >= 256) name.substring(0, 256) else name
+    def sanitizedName = if (name.isEmpty) Name("_") else if (name.length >= 256) name.substring(0, 256) else name
 
     def connectIfUnconnected() = getOrCreateUser(userId) flatMap { user =>
       if (user.isConnected) {

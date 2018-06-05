@@ -19,7 +19,7 @@ package com.waz.model
 
 import android.database.DatabaseUtils.queryNumEntries
 import android.database.sqlite.SQLiteQueryBuilder
-import com.waz.api
+import com.waz.{api, model}
 import com.waz.api.Message.Type._
 import com.waz.api.{Message, TypeFilter}
 import com.waz.db.Col._
@@ -35,8 +35,8 @@ import com.waz.sync.client.OpenGraphClient.OpenGraphData
 import com.waz.utils.wrappers.{DB, DBCursor, URI}
 import com.waz.utils.{EnumCodec, JsonDecoder, JsonEncoder, returning, sha2}
 import org.json.JSONObject
-import org.threeten.bp.Instant.now
 import org.threeten.bp.Instant
+import org.threeten.bp.Instant.now
 
 import scala.collection.breakOut
 import scala.concurrent.duration._
@@ -51,7 +51,7 @@ case class MessageData(id:            MessageId              = MessageId(),
                        members:       Set[UserId]            = Set.empty[UserId],
                        recipient:     Option[UserId]         = None,
                        email:         Option[String]         = None,
-                       name:          Option[String]         = None,
+                       name:          Option[Name]           = None,
                        state:         MessageState           = Message.Status.SENT,
                        time:          Instant                = now(clock),
                        localTime:     Instant                = MessageData.UnknownInstant,
@@ -154,7 +154,7 @@ case class MessageContent(tpe:        Message.Part.Type,
                           width:      Int,
                           height:     Int,
                           syncNeeded: Boolean,
-                          mentions:   Map[UserId, String]) {
+                          mentions:   Map[UserId, Name]) {
   def contentAsUri: URI = RichMediaContentParser.parseUriWithScheme(content)
 
   override def toString: String =
@@ -172,18 +172,19 @@ case class MessageContent(tpe:        Message.Part.Type,
     """.stripMargin
 }
 
-object MessageContent extends ((Message.Part.Type, String, Option[MediaAssetData], Option[OpenGraphData], Option[AssetId], Int, Int, Boolean, Map[UserId, String]) => MessageContent) {
+object MessageContent extends ((Message.Part.Type, String, Option[MediaAssetData], Option[OpenGraphData], Option[AssetId], Int, Int, Boolean, Map[UserId, Name]) => MessageContent) {
   import MediaAssetDataProtocol._
 
   val Empty = apply(Message.Part.Type.TEXT, "")
 
-  def apply(tpe: Message.Part.Type,
-            content: String,
-            openGraph: Option[OpenGraphData] = None,
-            asset: Option[AssetId] = None,
-            width: Int = 0, height: Int = 0,
-            syncNeeded: Boolean = false,
-            mentions: Map[UserId, String] = Map.empty): MessageContent = {
+  def apply(tpe:        Message.Part.Type,
+            content:    String,
+            openGraph:  Option[OpenGraphData]   = None,
+            asset:      Option[AssetId]         = None,
+            width:      Int                     = 0,
+            height:     Int                     = 0,
+            syncNeeded: Boolean                 = false,
+            mentions:   Map[UserId, Name] = Map.empty): MessageContent = {
     MessageContent(tpe, content, emptyMediaAsset(tpe), openGraph, asset, width, height, syncNeeded, mentions)
   }
 
@@ -195,12 +196,12 @@ object MessageContent extends ((Message.Part.Type, String, Option[MediaAssetData
 
     import scala.collection.JavaConverters._
 
-    def mentionsMap(js: JSONObject): Map[UserId, String] =
-      js.keys().asScala.map(key => UserId(key) -> js.getString(key)).toMap
+    def mentionsMap(js: JSONObject): Map[UserId, Name] =
+      js.keys().asScala.map(key => UserId(key) -> Name(js.getString(key))).toMap
 
     override def apply(implicit js: JSONObject): MessageContent = {
       val tpe = ContentTypeCodec.decode('type)
-      val mentions = if (js.has("mentions") && !js.isNull("mentions")) mentionsMap(js.getJSONObject("mentions")) else Map.empty[UserId, String]
+      val mentions = if (js.has("mentions") && !js.isNull("mentions")) mentionsMap(js.getJSONObject("mentions")) else Map.empty[UserId, Name]
       val richMedia = opt[MediaAssetData]('richMedia) orElse { // if there's no media asset for rich media message contents, we create an expired empty one
         if (tpe == Message.Part.Type.SPOTIFY || tpe == Message.Part.Type.SOUNDCLOUD || tpe == Message.Part.Type.YOUTUBE) Some(MediaAssetData.empty(tpe)) else None
       }
@@ -220,7 +221,7 @@ object MessageContent extends ((Message.Part.Type, String, Option[MediaAssetData
       if (v.height != 0) o.put("height", v.height)
       if (v.syncNeeded) o.put("syncNeeded", v.syncNeeded)
       if (v.mentions.nonEmpty) o.put("mentions", JsonEncoder { o =>
-        v.mentions foreach { case (user, name) => o.put(user.str, name) }
+        v.mentions foreach { case (user, name) => o.put(user.str, name.str) }
       })
     }
   }
@@ -239,7 +240,7 @@ object MessageContent extends ((Message.Part.Type, String, Option[MediaAssetData
   }
 }
 
-object MessageData extends ((MessageId, ConvId, Message.Type, UserId, Seq[MessageContent], Seq[GenericMessage], Boolean, Set[UserId], Option[UserId], Option[String], Option[String], Message.Status, Instant, Instant, Instant, Option[FiniteDuration], Option[Instant], Boolean, Option[FiniteDuration]) => MessageData) {
+object MessageData {
   val Empty = new MessageData(MessageId(""), ConvId(""), Message.Type.UNKNOWN, UserId(""))
   val Deleted = new MessageData(MessageId(""), ConvId(""), Message.Type.UNKNOWN, UserId(""), state = Message.Status.DELETED)
   val UnknownInstant = Instant.EPOCH
@@ -294,7 +295,7 @@ object MessageData extends ((MessageId, ConvId, Message.Type, UserId, Seq[Messag
     val Members = set[UserId]('members, _.mkString(","), _.split(",").filter(!_.isEmpty).map(UserId(_))(breakOut))(_.members)
     val Recipient = opt(id[UserId]('recipient))(_.recipient)
     val Email = opt(text('email))(_.email)
-    val Name = opt(text('name))(_.name)
+    val Name = opt(text[model.Name]('name, _.str, model.Name))(_.name)
     val State = text[MessageState]('msg_state, _.name, Message.Status.valueOf)(_.state)
     val Time = timestamp('time)(_.time)
     val LocalTime = timestamp('local_time)(_.localTime)
@@ -420,7 +421,7 @@ object MessageData extends ((MessageId, ConvId, Message.Type, UserId, Seq[Messag
 
   case class MessageEntry(id: MessageId, user: UserId, tpe: Message.Type = Message.Type.TEXT, state: Message.Status = Message.Status.DEFAULT, contentSize: Int = 1)
 
-  def messageContent(message: String, mentions: Map[UserId, String] = Map.empty, links: Seq[LinkPreview] = Nil, weblinkEnabled: Boolean = false): (Message.Type, Seq[MessageContent]) =
+  def messageContent(message: String, mentions: Map[UserId, Name] = Map.empty, links: Seq[LinkPreview] = Nil, weblinkEnabled: Boolean = false): (Message.Type, Seq[MessageContent]) =
     if (message.trim.isEmpty) (Message.Type.TEXT, textContent(message))
     else if (links.isEmpty) {
       val ct = RichMediaContentParser.splitContent(message, weblinkEnabled)
@@ -466,7 +467,7 @@ object MessageData extends ((MessageId, ConvId, Message.Type, UserId, Seq[Messag
     }
   }
 
-  private def applyMentions(content: Seq[MessageContent], mentions: Map[UserId, String]) =
+  private def applyMentions(content: Seq[MessageContent], mentions: Map[UserId, Name]) =
     if (mentions.isEmpty) content
     else if (content.size == 1) content.map(_.copy(mentions = mentions))
     else content map { ct =>

@@ -57,7 +57,7 @@ trait SyncServiceHandle {
 
   def postSelfUser(info: UserInfo): Future[SyncId]
   def postSelfPicture(picture: Option[AssetId]): Future[SyncId]
-  def postSelfName(name: String): Future[SyncId]
+  def postSelfName(name: Name): Future[SyncId]
   def postSelfAccentColor(color: AccentColor): Future[SyncId]
   def postAvailability(status: Availability): Future[SyncId]
   def postMessage(id: MessageId, conv: ConvId, editTime: Instant): Future[SyncId]
@@ -65,13 +65,13 @@ trait SyncServiceHandle {
   def postRecalled(conv: ConvId, currentMsgId: MessageId, recalledMsgId: MessageId): Future[SyncId]
   def postAssetStatus(id: MessageId, conv: ConvId, exp: Option[FiniteDuration], status: AssetStatus.Syncable): Future[SyncId]
   def postLiking(id: ConvId, liking: Liking): Future[SyncId]
-  def postConnection(user: UserId, name: String, message: String): Future[SyncId]
+  def postConnection(user: UserId, name: Name, message: String): Future[SyncId]
   def postConnectionStatus(user: UserId, status: ConnectionStatus): Future[SyncId]
-  def postConversationName(id: ConvId, name: String): Future[SyncId]
+  def postConversationName(id: ConvId, name: Name): Future[SyncId]
   def postConversationMemberJoin(id: ConvId, members: Seq[UserId]): Future[SyncId]
   def postConversationMemberLeave(id: ConvId, member: UserId): Future[SyncId]
   def postConversationState(id: ConvId, state: ConversationState): Future[SyncId]
-  def postConversation(id: ConvId, users: Set[UserId], name: Option[String], team: Option[TeamId], access: Set[Access], accessRole: AccessRole): Future[SyncId]
+  def postConversation(id: ConvId, users: Set[UserId], name: Option[Name], team: Option[TeamId], access: Set[Access], accessRole: AccessRole): Future[SyncId]
   def postLastRead(id: ConvId, time: Instant): Future[SyncId]
   def postCleared(id: ConvId, time: Instant): Future[SyncId]
   def postAddressBook(ab: AddressBook): Future[SyncId]
@@ -140,7 +140,7 @@ class AndroidSyncServiceHandle(service: SyncRequestService, timeouts: Timeouts, 
 
   def postSelfUser(info: UserInfo) = addRequest(PostSelf(info))
   def postSelfPicture(picture: Option[AssetId]) = addRequest(PostSelfPicture(picture))
-  def postSelfName(name: String) = addRequest(PostSelfName(name))
+  def postSelfName(name: Name) = addRequest(PostSelfName(name))
   def postSelfAccentColor(color: AccentColor) = addRequest(PostSelfAccentColor(color))
   def postAvailability(status: Availability) = addRequest(PostAvailability(status))
   def postMessage(id: MessageId, conv: ConvId, time: Instant) = addRequest(PostMessage(conv, id, time), timeout = System.currentTimeMillis() + timeouts.messages.sendingTimeout.toMillis, forceRetry = true)
@@ -148,14 +148,14 @@ class AndroidSyncServiceHandle(service: SyncRequestService, timeouts: Timeouts, 
   def postRecalled(conv: ConvId, msg: MessageId, recalled: MessageId) = addRequest(PostRecalled(conv, msg, recalled))
   def postAssetStatus(id: MessageId, conv: ConvId, exp: Option[FiniteDuration], status: AssetStatus.Syncable) = addRequest(PostAssetStatus(conv, id, exp, status))
   def postAddressBook(ab: AddressBook) = addRequest(PostAddressBook(ab))
-  def postConnection(user: UserId, name: String, message: String) = addRequest(PostConnection(user, name, message))
+  def postConnection(user: UserId, name: Name, message: String) = addRequest(PostConnection(user, name, message))
   def postConnectionStatus(user: UserId, status: ConnectionStatus) = addRequest(PostConnectionStatus(user, Some(status)))
   def postTypingState(conv: ConvId, typing: Boolean) = addRequest(PostTypingState(conv, typing), optional = true, timeout = System.currentTimeMillis() + timeouts.typing.refreshDelay.toMillis)
-  def postConversationName(id: ConvId, name: String) = addRequest(PostConvName(id, name))
+  def postConversationName(id: ConvId, name: Name) = addRequest(PostConvName(id, name))
   def postConversationState(id: ConvId, state: ConversationState) = addRequest(PostConvState(id, state))
   def postConversationMemberJoin(id: ConvId, members: Seq[UserId]) = addRequest(PostConvJoin(id, members.toSet))
   def postConversationMemberLeave(id: ConvId, member: UserId) = addRequest(PostConvLeave(id, member))
-  def postConversation(id: ConvId, users: Set[UserId], name: Option[String], team: Option[TeamId], access: Set[Access], accessRole: AccessRole) = addRequest(PostConv(id, users, name, team, access, accessRole))
+  def postConversation(id: ConvId, users: Set[UserId], name: Option[Name], team: Option[TeamId], access: Set[Access], accessRole: AccessRole) = addRequest(PostConv(id, users, name, team, access, accessRole))
   def postLiking(id: ConvId, liking: Liking): Future[SyncId] = addRequest(PostLiking(id, liking))
   def postLastRead(id: ConvId, time: Instant) = addRequest(PostLastRead(id, time), priority = Priority.Low, delay = timeouts.messages.lastReadPostDelay)
   def postCleared(id: ConvId, time: Instant) = addRequest(PostCleared(id, time))

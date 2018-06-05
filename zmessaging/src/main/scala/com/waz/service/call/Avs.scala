@@ -23,7 +23,6 @@ import com.waz.ZLog._
 import com.waz.log.InternalLog
 import com.waz.model._
 import com.waz.model.otr.ClientId
-import com.waz.service.call.Avs.WCall
 import com.waz.service.call.Calling._
 import com.waz.threading.SerialDispatchQueue
 import com.waz.utils.jna.{Size_t, Uint32_t}

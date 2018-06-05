@@ -19,6 +19,7 @@ package com.waz.service
 
 import java.util.regex.Pattern.{compile, quote}
 
+import com.waz.model.Name
 import com.waz.utils.Locales
 
 final class SearchKey private (val asciiRepresentation: String) extends Serializable {

@@ -32,7 +32,7 @@ case class NotificationData(id:                NotId             = NotId(),
                             user:              UserId            = UserId(),
                             msgType:           NotificationType  = NotificationType.TEXT,
                             time:              Instant           = clock.instant(),
-                            userName:          Option[String]    = None,
+                            userName:          Option[Name]      = None,
                             ephemeral:         Boolean           = false,
                             mentions:          Seq[UserId]       = Seq.empty,
                             referencedMessage: Option[MessageId] = None,
@@ -60,7 +60,7 @@ object NotificationData {
       o.put("time", v.time.toEpochMilli)
       o.put("ephemeral", v.ephemeral)
       o.put("hasBeenDisplayed", v.hasBeenDisplayed)
-      v.userName foreach (o.put("userName", _))
+      v.userName.foreach(v => o.put("userName", v.str))
       if (v.mentions.nonEmpty) o.put("mentions", JsonEncoder.arrString(v.mentions.map(_.str)))
       v.referencedMessage foreach (o.put("referencedMessage", _))
     }

@@ -378,14 +378,15 @@ object GenericContent {
 
     def apply(content: String, links: Seq[LinkPreview]): Text = apply(content, Map.empty, links)
 
-    def apply(content: String, mentions: Map[UserId, String], links: Seq[LinkPreview]): Text = returning(new Messages.Text()) { t =>
-      t.content = content
-      t.mention = mentions.map { case (user, name) => Mention(user, name) }(breakOut)
-      t.linkPreview = links.toArray
-    }
+    def apply(content: String, mentions: Map[UserId, Name], links: Seq[LinkPreview]): Text =
+      returning(new Messages.Text()) { t =>
+        t.content = content
+        t.mention = mentions.map { case (user, name) => Mention(user, name.str) }(breakOut)
+        t.linkPreview = links.toArray
+      }
 
-    def unapply(proto: Text): Option[(String, Map[UserId, String], Seq[LinkPreview])] =
-      Some((proto.content, proto.mention.map(m => UserId(m.userId) -> m.userName).toMap, proto.linkPreview.toSeq))
+    def unapply(proto: Text): Option[(String, Map[UserId, Name], Seq[LinkPreview])] =
+      Some((proto.content, proto.mention.map(m => UserId(m.userId) -> Name(m.userName)).toMap, proto.linkPreview.toSeq))
   }
 
   implicit object EphemeralText extends EphemeralContent[Text] {
@@ -602,11 +603,11 @@ object GenericContent {
   implicit object Calling extends GenericContent[Calling] {
     override def set(msg: GenericMessage): (Calling) => GenericMessage = msg.setCalling
 
-    def apply(content: String): Calling = returning(new Calling) { c =>
+    def apply(content: Name): Calling = returning(new Calling) { c =>
       c.content = content
     }
 
-    def unapply(calling: Calling): Option[String] = Option(calling.content)
+    def unapply(calling: Calling): Option[Name] = Option(calling.content)
   }
 
   sealed trait EncryptionAlgorithm {

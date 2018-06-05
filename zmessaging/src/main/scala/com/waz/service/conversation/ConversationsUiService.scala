@@ -73,7 +73,7 @@ trait ConversationsUiService {
   def recallMessage(convId: ConvId, id: MessageId): Future[Option[MessageData]]
   def setConversationArchived(id: ConvId, archived: Boolean): Future[Option[ConversationData]]
   def setConversationMuted(id: ConvId, muted: Boolean): Future[Option[ConversationData]]
-  def setConversationName(id: ConvId, name: String): Future[Option[ConversationData]]
+  def setConversationName(id: ConvId, name: Name): Future[Option[ConversationData]]
 
   def addConversationMembers(conv: ConvId, users: Set[UserId]): Future[Option[SyncId]]
   def removeConversationMember(conv: ConvId, user: UserId): Future[Option[SyncId]]
@@ -89,7 +89,7 @@ trait ConversationsUiService {
 
   //conversation creation methods
   def getOrCreateOneToOneConversation(toUser: UserId): Future[ConversationData]
-  def createGroupConversation(name: Option[String] = None, members: Set[UserId] = Set.empty, teamOnly: Boolean = false): Future[(ConversationData, SyncId)]
+  def createGroupConversation(name: Option[Name] = None, members: Set[UserId] = Set.empty, teamOnly: Boolean = false): Future[(ConversationData, SyncId)]
 
   def assetUploadCancelled : EventStream[Mime]
   def assetUploadFailed    : EventStream[ErrorResponse]
@@ -237,7 +237,7 @@ class ConversationsUiServiceImpl(selfUserId:      UserId,
       case None => None
     }
 
-  override def setConversationName(id: ConvId, name: String): Future[Option[ConversationData]] = {
+  override def setConversationName(id: ConvId, name: Name): Future[Option[ConversationData]] = {
     verbose(s"setConversationName($id, $name)")
     convsContent.updateConversationName(id, name) flatMap {
       case Some((_, conv)) if conv.name.contains(name) =>
@@ -374,10 +374,10 @@ class ConversationsUiServiceImpl(selfUserId:      UserId,
     }
   }
 
-  override def createGroupConversation(name: Option[String] = None, members: Set[UserId] = Set.empty, teamOnly: Boolean = false) =
+  override def createGroupConversation(name: Option[Name] = None, members: Set[UserId] = Set.empty, teamOnly: Boolean = false) =
     createAndPostConversation(ConvId(), name, members, teamOnly)
 
-  private def createAndPostConversation(id: ConvId, name: Option[String], members: Set[UserId], teamOnly: Boolean = false) = {
+  private def createAndPostConversation(id: ConvId, name: Option[Name], members: Set[UserId], teamOnly: Boolean = false) = {
     val (ac, ar) = getAccessAndRoleForGroupConv(teamOnly, teamId)
     for {
       conv <- convsContent.createConversationWithMembers(id, generateTempConversationId(members + selfUserId), ConversationType.Group, selfUserId, members, name, access = ac, accessRole = ar)
@@ -388,7 +388,7 @@ class ConversationsUiServiceImpl(selfUserId:      UserId,
   }
 
   override def findGroupConversations(prefix: SearchKey, limit: Int, handleOnly: Boolean): Future[Seq[ConversationData]] =
-    convStorage.search(prefix, selfUserId, handleOnly).map(_.sortBy(_.displayName)(currentLocaleOrdering).take(limit))
+    convStorage.search(prefix, selfUserId, handleOnly).map(_.sortBy(_.displayName.str)(currentLocaleOrdering).take(limit))
 
   override def knock(id: ConvId): Future[Option[MessageData]] = for {
     msg <- messages.addKnockMessage(id, selfUserId)
@@ -415,12 +415,12 @@ class ConversationsUiServiceImpl(selfUserId:      UserId,
       _          <- resp.mapFuture(_ => messages.addTimerChangedMessage(id, selfUserId, expiration))
     } yield resp
 
-  private def mentionsMap(us: Set[UserId]): Future[Map[UserId, String]] =
+  private def mentionsMap(us: Set[UserId]): Future[Map[UserId, Name]] =
     users.getUsers(us.toSeq) map { uss =>
       uss.map(u => u.id -> u.getDisplayName)(breakOut)
     }
 
-  private def sendTextMessage(convId: ConvId, m: String, mentions: Map[UserId, String] = Map.empty) =
+  private def sendTextMessage(convId: ConvId, m: String, mentions: Map[UserId, SafeString] = Map.empty) =
     for {
       msg <- messages.addTextMessage(convId, m, mentions)
       _ <- updateLastRead(msg)

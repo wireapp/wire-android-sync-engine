@@ -167,7 +167,7 @@ object MessageId {
   def fromUid(uid: Uid): MessageId = MessageId(uid.str)
 
   implicit object Id extends Id[MessageId] {
-    override def random() = MessageId(Uid().toString)
+    override def random() = MessageId(Uid().str)
     override def decode(str: String) = MessageId(str)
   }
 }
@@ -180,7 +180,7 @@ object ConvId extends (String => ConvId) {
   def apply(): ConvId = Id.random()
 
   implicit object Id extends Id[ConvId] {
-    override def random(): ConvId = ConvId(Uid().toString)
+    override def random(): ConvId = ConvId(Uid().str)
     override def decode(str: String): ConvId = ConvId(str)
   }
 }
@@ -194,7 +194,7 @@ object RConvId {
   def apply(): RConvId = Id.random()
 
   implicit object Id extends Id[RConvId] {
-    override def random(): RConvId = RConvId(Uid().toString)
+    override def random(): RConvId = RConvId(Uid().str)
     override def decode(str: String): RConvId = RConvId(str)
   }
 }
@@ -207,7 +207,7 @@ object SyncId {
   def apply(): SyncId = Id.random()
 
   implicit object Id extends Id[SyncId] {
-    override def random(): SyncId = SyncId(Uid().toString)
+    override def random(): SyncId = SyncId(Uid().str)
     override def decode(str: String): SyncId = SyncId(str)
   }
 }
@@ -220,7 +220,7 @@ object PushToken {
   def apply(): PushToken = Id.random()
 
   implicit object Id extends Id[PushToken] {
-    override def random(): PushToken = PushToken(Uid().toString)
+    override def random(): PushToken = PushToken(Uid().str)
     override def decode(str: String): PushToken = PushToken(str)
   }
 }
@@ -233,7 +233,7 @@ object TrackingId {
   def apply(): TrackingId = Id.random()
 
   implicit object Id extends Id[TrackingId] {
-    override def random(): TrackingId = TrackingId(Uid().toString)
+    override def random(): TrackingId = TrackingId(Uid().str)
     override def decode(str: String): TrackingId = TrackingId(str)
   }
 }
@@ -246,7 +246,7 @@ object CallSessionId extends (String => CallSessionId) {
   def apply(): CallSessionId = Id.random()
 
   implicit object Id extends Id[CallSessionId] {
-    override def random(): CallSessionId = CallSessionId(Uid().toString)
+    override def random(): CallSessionId = CallSessionId(Uid().str)
     override def decode(str: String): CallSessionId = CallSessionId(str)
   }
 
@@ -263,7 +263,7 @@ object ContactId extends (String => ContactId) {
   def apply(): ContactId = Id.random()
 
   implicit object Id extends Id[ContactId] {
-    override def random(): ContactId = ContactId(Uid().toString)
+    override def random(): ContactId = ContactId(Uid().str)
     override def decode(str: String): ContactId = ContactId(str)
   }
 }
@@ -276,7 +276,7 @@ object InvitationId extends (String => InvitationId) {
   def apply(): InvitationId = Id.random()
 
   implicit object Id extends Id[InvitationId] {
-    override def random(): InvitationId = InvitationId(Uid().toString)
+    override def random(): InvitationId = InvitationId(Uid().str)
     override def decode(str: String): InvitationId = InvitationId(str)
   }
 }
@@ -307,7 +307,7 @@ object ProviderId extends (String => ProviderId) {
   def apply(): ProviderId = Id.random()
 
   implicit object Id extends Id[ProviderId] {
-    override def random(): ProviderId = ProviderId(Uid().toString)
+    override def random(): ProviderId = ProviderId(Uid().str)
     override def decode(str: String): ProviderId = ProviderId(str)
   }
 }
@@ -320,7 +320,7 @@ object IntegrationId extends (String => IntegrationId) {
   def apply(): IntegrationId = Id.random()
 
   implicit object Id extends Id[IntegrationId] {
-    override def random(): IntegrationId = IntegrationId(Uid().toString)
+    override def random(): IntegrationId = IntegrationId(Uid().str)
     override def decode(str: String): IntegrationId = IntegrationId(str)
   }
 }

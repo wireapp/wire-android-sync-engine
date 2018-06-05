@@ -17,12 +17,12 @@
  */
 package com.waz.sync.handler
 
-import com.waz.ZLog._
 import com.waz.ZLog.ImplicitTag._
+import com.waz.ZLog._
 import com.waz.content.UsersStorage
 import com.waz.model.UserData.ConnectionStatus
-import com.waz.model.UserId
-import com.waz.service.{ConnectionServiceImpl, EventPipeline}
+import com.waz.model.{Name, UserId}
+import com.waz.service.ConnectionServiceImpl
 import com.waz.sync.SyncResult
 import com.waz.sync.client.ConnectionsClient
 import com.waz.threading.Threading
@@ -47,7 +47,7 @@ class ConnectionsSyncHandler(usersStorage:      UsersStorage,
     }
   }
 
-  def postConnection(userId: UserId, name: String, message: String): Future[SyncResult] =
+  def postConnection(userId: UserId, name: Name, message: String): Future[SyncResult] =
     connectionsClient.createConnection(userId, name, message).future flatMap {
       case Right(event) =>
         verbose(s"postConnection($userId) success: $event")

@@ -442,7 +442,7 @@ class CallingService(val accountId:       UserId,
     })
   }
 
-  private def receiveCallEvent(msg: String, msgTime: Instant, convId: RConvId, from: UserId, sender: ClientId): Unit =
+  private def receiveCallEvent(msg: Name, msgTime: Instant, convId: RConvId, from: UserId, sender: ClientId): Unit =
     wCall.map { w =>
       val drift = pushService.beDrift.currentValue.getOrElse(Duration.ZERO)
       val curTime = clock.instant + drift

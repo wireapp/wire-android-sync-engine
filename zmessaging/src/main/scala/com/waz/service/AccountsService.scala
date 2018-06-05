@@ -72,7 +72,7 @@ trait AccountsService {
   def loginPhone(phone: String, code: String) = login(PhoneCredentials(PhoneNumber(phone), ConfirmationCode(code)))
   def login(loginCredentials: Credentials): ErrorOr[UserId]
 
-  def register(registerCredentials: Credentials, name: String, teamName: Option[String] = None): ErrorOr[Option[AccountManager]]
+  def register(registerCredentials: Credentials, name: Name, teamName: Option[Name] = None): ErrorOr[Option[AccountManager]]
 
   def createAccountManager(userId: UserId, dbFile: Option[File], isLogin: Option[Boolean], initialUser: Option[UserInfo] = None): Future[Option[AccountManager]] //TODO return error codes on failure?
 
@@ -419,8 +419,8 @@ class AccountsServiceImpl(val global: GlobalModule) extends AccountsService {
     }
   }
 
-  override def register(registerCredentials: Credentials, name: String, teamName: Option[String] = None) = {
-    verbose(s"register: $registerCredentials, name: $name, teamName: $teamName")
+  override def register(registerCredentials: Credentials, name: Name, teamName: Option[Name] = None) = {
+    info(s"register: $registerCredentials, name: $name, teamName: $teamName")
     regClient.register(registerCredentials, name, teamName).flatMap {
       case Right((user, Some((cookie, _)))) =>
         for {
