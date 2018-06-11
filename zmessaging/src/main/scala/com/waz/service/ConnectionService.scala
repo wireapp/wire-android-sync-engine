@@ -38,7 +38,7 @@ import scala.collection.breakOut
 import scala.concurrent.Future
 
 trait ConnectionService {
-  def connectToUser(userId: UserId, message: String, name: Name): Future[Option[ConversationData]]
+  def connectToUser(userId: UserId, message: SensitiveString, name: Name): Future[Option[ConversationData]]
   def handleUserConnectionEvents(events: Seq[UserConnectionEvent]): Future[Unit]
   def syncConversationInitiallyAfterCreation(convId: RConvId, selfUserId: UserId, userId: UserId): Future[SyncId]
 }
@@ -117,7 +117,7 @@ class ConnectionServiceImpl(selfUserId:      UserId,
         convStorage.update(conv.id, c => c.copy(convType = convType, hidden = hidden, lastEventTime = c.lastEventTime max Instant.ofEpochMilli(lastEventTime.getTime))) flatMap { updated =>
           messagesStorage.getLastMessage(conv.id) flatMap {
             case None if convType == ConversationType.Incoming =>
-              addConnectRequestMessage(conv.id, user.id, selfUserId, user.connectionMessage.getOrElse(""), user.getDisplayName, fromSync = fromSync)
+              addConnectRequestMessage(conv.id, user.id, selfUserId, user.connectionMessage.getOrElse(SensitiveString.Empty), user.getDisplayName, fromSync = fromSync)
             case None if convType == ConversationType.OneToOne =>
               messages.addDeviceStartMessages(Seq(conv), selfUserId)
             case _ =>
@@ -134,7 +134,7 @@ class ConnectionServiceImpl(selfUserId:      UserId,
   /**
    * Connects to user and creates one-to-one conversation if needed. Returns existing conversation if user is already connected.
    */
-  override def connectToUser(userId: UserId, message: String, name: Name) = {
+  override def connectToUser(userId: UserId, message: SensitiveString, name: Name) = {
 
     def sanitizedName = if (name.isEmpty) Name("_") else if (name.length >= 256) name.substring(0, 256) else name
 

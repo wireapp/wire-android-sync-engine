@@ -33,6 +33,7 @@ import com.waz.log.{InternalLog, LogOutput}
 import com.waz.media.manager.context.IntensityLevel
 import com.waz.model.AccountData.Password
 import com.waz.model.ConversationData.ConversationType
+import com.waz.model.GenericContent.Location
 import com.waz.model.UserData.ConnectionStatus
 import com.waz.model.otr.ClientId
 import com.waz.model.{ConvId, Liking, RConvId, MessageContent => _, _}
@@ -310,7 +311,7 @@ class DeviceActor(val deviceName: String,
 
     case SendLocation(remoteId, lon, lat, name, zoom) =>
       zmsWithLocalConv(remoteId).flatMap { case (z, convId) =>
-        z.convsUi.sendMessage(convId, new MessageContent.Location(lon, lat, name, zoom))
+        z.convsUi.sendMessage(convId, Location(lon, lat, name, zoom))
       }.map(_.fold2(Failed("no message sent"), m => Successful(m.id.str)))
 
     case SendFile(remoteId, path, mime) =>

@@ -374,19 +374,19 @@ object GenericContent {
   implicit object Text extends GenericContent[Text] {
     override def set(msg: GenericMessage) = msg.setText
 
-    def apply(content: String): Text = apply(content, Map.empty, Nil)
+    def apply(content: SensitiveString): Text = apply(content, Map.empty, Nil)
 
-    def apply(content: String, links: Seq[LinkPreview]): Text = apply(content, Map.empty, links)
+    def apply(content: SensitiveString, links: Seq[LinkPreview]): Text = apply(content, Map.empty, links)
 
-    def apply(content: String, mentions: Map[UserId, Name], links: Seq[LinkPreview]): Text =
+    def apply(content: SensitiveString, mentions: Map[UserId, Name], links: Seq[LinkPreview]): Text =
       returning(new Messages.Text()) { t =>
-        t.content = content
+        t.content = content.str
         t.mention = mentions.map { case (user, name) => Mention(user, name.str) }(breakOut)
         t.linkPreview = links.toArray
       }
 
-    def unapply(proto: Text): Option[(String, Map[UserId, Name], Seq[LinkPreview])] =
-      Some((proto.content, proto.mention.map(m => UserId(m.userId) -> Name(m.userName)).toMap, proto.linkPreview.toSeq))
+    def unapply(proto: Text): Option[(SensitiveString, Map[UserId, Name], Seq[LinkPreview])] =
+      Some((SensitiveString(proto.content), proto.mention.map(m => UserId(m.userId) -> Name(m.userName)).toMap, proto.linkPreview.toSeq))
   }
 
   implicit object EphemeralText extends EphemeralContent[Text] {

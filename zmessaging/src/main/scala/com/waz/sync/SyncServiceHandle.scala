@@ -65,7 +65,7 @@ trait SyncServiceHandle {
   def postRecalled(conv: ConvId, currentMsgId: MessageId, recalledMsgId: MessageId): Future[SyncId]
   def postAssetStatus(id: MessageId, conv: ConvId, exp: Option[FiniteDuration], status: AssetStatus.Syncable): Future[SyncId]
   def postLiking(id: ConvId, liking: Liking): Future[SyncId]
-  def postConnection(user: UserId, name: Name, message: String): Future[SyncId]
+  def postConnection(user: UserId, name: Name, message: SensitiveString): Future[SyncId]
   def postConnectionStatus(user: UserId, status: ConnectionStatus): Future[SyncId]
   def postConversationName(id: ConvId, name: Name): Future[SyncId]
   def postConversationMemberJoin(id: ConvId, members: Seq[UserId]): Future[SyncId]
@@ -148,7 +148,7 @@ class AndroidSyncServiceHandle(service: SyncRequestService, timeouts: Timeouts, 
   def postRecalled(conv: ConvId, msg: MessageId, recalled: MessageId) = addRequest(PostRecalled(conv, msg, recalled))
   def postAssetStatus(id: MessageId, conv: ConvId, exp: Option[FiniteDuration], status: AssetStatus.Syncable) = addRequest(PostAssetStatus(conv, id, exp, status))
   def postAddressBook(ab: AddressBook) = addRequest(PostAddressBook(ab))
-  def postConnection(user: UserId, name: Name, message: String) = addRequest(PostConnection(user, name, message))
+  def postConnection(user: UserId, name: Name, message: SensitiveString) = addRequest(PostConnection(user, name, message))
   def postConnectionStatus(user: UserId, status: ConnectionStatus) = addRequest(PostConnectionStatus(user, Some(status)))
   def postTypingState(conv: ConvId, typing: Boolean) = addRequest(PostTypingState(conv, typing), optional = true, timeout = System.currentTimeMillis() + timeouts.typing.refreshDelay.toMillis)
   def postConversationName(id: ConvId, name: Name) = addRequest(PostConvName(id, name))

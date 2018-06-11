@@ -98,7 +98,7 @@ class MessageEventProcessor(selfUserId:          UserId,
     //For assets v3, the RAssetId will be contained in the proto content. For v2, it will be passed along with in the GenericAssetEvent
     //A defined convId marks that the asset is a v2 asset.
     def update(id: Uid, convId: Option[RConvId], ct: Any, v2RId: Option[RAssetId], data: Option[Array[Byte]]): Future[Seq[AssetData]] = {
-      verbose(s"update asset for event: $id, convId: $convId, ct: $ct, v2RId: $v2RId, data: $data")
+      verbose(s"update asset for event: $id, convId: $convId")
 
       (ct, v2RId) match {
         case (Asset(a@AssetData.WithRemoteId(_), preview), _) =>

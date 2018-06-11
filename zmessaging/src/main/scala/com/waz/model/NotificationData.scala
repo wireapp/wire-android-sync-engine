@@ -26,18 +26,18 @@ import com.waz.utils.{EnumCodec, JsonDecoder, JsonEncoder}
 import org.json.JSONObject
 import org.threeten.bp.Instant
 
-case class NotificationData(id:                NotId             = NotId(),
-                            msg:               String            = "",
-                            conv:              ConvId            = ConvId(),
-                            user:              UserId            = UserId(),
-                            msgType:           NotificationType  = NotificationType.TEXT,
-                            time:              Instant           = clock.instant(),
-                            userName:          Option[Name]      = None,
-                            ephemeral:         Boolean           = false,
-                            mentions:          Seq[UserId]       = Seq.empty,
-                            referencedMessage: Option[MessageId] = None,
-                            hasBeenDisplayed:  Boolean           = false) {
-  override def toString: String = s"NotificationData($id, ${msg.take(4)}..., $conv, $user, $msgType, $time, $userName, $ephemeral, $mentions, $referencedMessage, $hasBeenDisplayed)"
+case class NotificationData(id:                NotId              = NotId(),
+                            msg:               SensitiveString      = SensitiveString.Empty,
+                            conv:              ConvId             = ConvId(),
+                            user:              UserId             = UserId(),
+                            msgType:           NotificationType   = NotificationType.TEXT,
+                            time:              Instant            = clock.instant(),
+                            userName:          Option[Name]       = None,
+                            ephemeral:         Boolean            = false,
+                            mentions:          Seq[UserId]        = Seq.empty,
+                            referencedMessage: Option[MessageId]  = None,
+                            hasBeenDisplayed:  Boolean            = false) {
+  override def toString: String = s"NotificationData($id, $msg, $conv, $user, $msgType, $time, $userName, $ephemeral, $mentions, $referencedMessage, $hasBeenDisplayed)"
 }
 
 object NotificationData {
@@ -53,7 +53,7 @@ object NotificationData {
   implicit lazy val Encoder: JsonEncoder[NotificationData] = new JsonEncoder[NotificationData] {
     override def apply(v: NotificationData): JSONObject = JsonEncoder { o =>
       o.put("id", v.id.str)
-      o.put("message", v.msg)
+      o.put("message", v.msg.str)
       o.put("conv", v.conv.str)
       o.put("user", v.user.str)
       o.put("msgType", NotificationCodec.encode(v.msgType))
@@ -62,7 +62,7 @@ object NotificationData {
       o.put("hasBeenDisplayed", v.hasBeenDisplayed)
       v.userName.foreach(v => o.put("userName", v.str))
       if (v.mentions.nonEmpty) o.put("mentions", JsonEncoder.arrString(v.mentions.map(_.str)))
-      v.referencedMessage foreach (o.put("referencedMessage", _))
+      v.referencedMessage.foreach(v => o.put("referencedMessage", v.str))
     }
   }
 

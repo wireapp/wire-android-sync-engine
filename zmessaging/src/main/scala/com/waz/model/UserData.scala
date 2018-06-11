@@ -43,7 +43,7 @@ case class UserData(id:                    UserId,
                     searchKey:             SearchKey,
                     connection:            ConnectionStatus      = ConnectionStatus.Unconnected,
                     connectionLastUpdated: Date                  = new Date(0), // server side timestamp of last connection update
-                    connectionMessage:     Option[String]        = None, // incoming connection request message
+                    connectionMessage:     Option[SensitiveString] = None, // incoming connection request message
                     conversation:          Option[RConvId]       = None, // remote conversation id with this contact (one-to-one)
                     relation:              Relation              = Relation.Other, //unused - remove in future migration
                     syncTimestamp:         Long                  = 0,
@@ -123,7 +123,7 @@ case class UserData(id:                    UserId,
 
   def updated(teamId: Option[TeamId]): UserData = copy(teamId = teamId)
 
-  def updateConnectionStatus(status: UserData.ConnectionStatus, time: Option[Date] = None, message: Option[String] = None): UserData = {
+  def updateConnectionStatus(status: UserData.ConnectionStatus, time: Option[Date] = None, message: Option[SensitiveString] = None): UserData = {
     if (time.exists(_.before(this.connectionLastUpdated))) this
     else if (this.connection == status) time.fold(this) { time => this.copy(connectionLastUpdated = time) }
     else {
@@ -233,7 +233,7 @@ object UserData {
       o.put("accent", v.accent)
       o.put("connection", v.connection.code)
       o.put("connectionLastUpdated", v.connectionLastUpdated.getTime)
-      v.connectionMessage.foreach(o.put("connectionMessage", _))
+      v.connectionMessage.foreach(v => o.put("connectionMessage", v.str))
       v.conversation.foreach(id => o.put("rconvId", id.str))
       o.put("relation", v.relation.id)
       o.put("syncTimestamp", v.syncTimestamp)
@@ -260,7 +260,7 @@ object UserData {
     val SKey = text[SearchKey]('skey, _.asciiRepresentation, SearchKey.unsafeRestore)(_.searchKey)
     val Conn = text[ConnectionStatus]('connection, _.code, ConnectionStatus(_))(_.connection)
     val ConnTime = date('conn_timestamp)(_.connectionLastUpdated)
-    val ConnMessage = opt(text('conn_msg))(_.connectionMessage)
+    val ConnMessage = opt(text[SensitiveString]('conn_msg, _.str, SensitiveString))(_.connectionMessage)
     val Conversation = opt(id[RConvId]('conversation))(_.conversation)
     val Rel = text[Relation]('relation, _.name, Relation.valueOf)(_.relation)
     val Timestamp = long('timestamp)(_.syncTimestamp)

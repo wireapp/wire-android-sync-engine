@@ -23,7 +23,7 @@ import android.util.Patterns
 import com.waz.ZLog.ImplicitTag._
 import com.waz.ZLog._
 import com.waz.api.Message.Part
-import com.waz.model.MessageContent
+import com.waz.model.{SensitiveString, MessageContent}
 import com.waz.sync.client.{SoundCloudClient, YouTubeClient}
 import com.waz.utils.LoggedTry
 import com.waz.utils.wrappers.URI
@@ -35,7 +35,7 @@ object RichMediaContentParser {
 
   import Part.Type._
 
-  def findMatches(content: String, weblinkEnabled: Boolean = false) = {
+  def findMatches(content: SensitiveString, weblinkEnabled: Boolean = false) = {
 
     val knownDomains = (YouTubeClient.DomainNames.map(_ -> YOUTUBE) ++
       SoundCloudClient.domainNames.map(_ -> SOUNDCLOUD)
@@ -65,7 +65,7 @@ object RichMediaContentParser {
       }
     }
 
-    val m = Patterns.WEB_URL.matcher(content.replace("HTTP://", "http://")) // XXX: upper case HTTP is not matched by WEB_URL pattern
+    val m = Patterns.WEB_URL.matcher(content.str.replace("HTTP://", "http://")) // XXX: upper case HTTP is not matched by WEB_URL pattern
     Iterator.continually(m.find()).takeWhile(identity).map { _ =>
       val start = m.start
       val end = m.end
@@ -75,7 +75,7 @@ object RichMediaContentParser {
     }.flatten
   }
 
-  def splitContent(content: String, weblinkEnabled: Boolean = false): Seq[MessageContent] = {
+  def splitContent(content: SensitiveString, weblinkEnabled: Boolean = false): Seq[MessageContent] = {
     try {
       val res = new MessageContentBuilder
 
@@ -94,8 +94,6 @@ object RichMediaContentParser {
         Seq(MessageContent(TEXT, content))
     }
   }
-
-  def javaSplitContent(content: String) = splitContent(content).asJava
 
   case class GoogleMapsLocation(x: String, y: String, zoom: String)
 
@@ -118,7 +116,7 @@ object RichMediaContentParser {
 
   private def decode[T](url: String)(op: URI => Option[T]): Option[T] = op(URI.parse(URLDecoder.decode(url, "UTF-8")))
 
-  def textMessageContent(part: String) = MessageContent(if (containsOnlyEmojis(part)) TEXT_EMOJI_ONLY else TEXT, part)
+  def textMessageContent(part: SensitiveString) = MessageContent(if (containsOnlyEmojis(part.str)) TEXT_EMOJI_ONLY else TEXT, part)
 
   def containsOnlyEmojis(part: String): Boolean = {
 
@@ -172,12 +170,12 @@ object RichMediaContentParser {
 class MessageContentBuilder {
   val res = Seq.newBuilder[MessageContent]
 
-  def +=(part: String) = {
+  def +=(part: SensitiveString) = {
     val trimmed = part.trim
     if (trimmed.nonEmpty) res += RichMediaContentParser.textMessageContent(trimmed)
   }
 
-  def +=(tpe: Part.Type, part: String) = {
+  def +=(tpe: Part.Type, part: SensitiveString) = {
     val trimmed = part.trim
     if (trimmed.nonEmpty) res += MessageContent(tpe, trimmed)
   }

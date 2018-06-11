@@ -71,7 +71,7 @@ object RConvEvent extends (Event => RConvId) {
 }
 case class UserUpdateEvent(user: UserInfo, removeIdentity: Boolean = false) extends UserEvent
 case class UserPropertiesSetEvent(key: String, value: String) extends UserEvent // value is always json string, so maybe we should parse it already (or maybe not)
-case class UserConnectionEvent(convId: RConvId, from: UserId, to: UserId, message: Option[String], status: ConnectionStatus, lastUpdated: Date, fromUserName: Option[Name] = None) extends UserEvent with RConvEvent
+case class UserConnectionEvent(convId: RConvId, from: UserId, to: UserId, message: Option[SensitiveString], status: ConnectionStatus, lastUpdated: Date, fromUserName: Option[Name] = None) extends UserEvent with RConvEvent
 case class UserDeleteEvent(user: UserId) extends UserEvent
 case class OtrClientAddEvent(client: Client) extends OtrClientEvent
 case class OtrClientRemoveEvent(client: ClientId) extends OtrClientEvent
@@ -124,7 +124,7 @@ case class MemberJoinEvent(convId: RConvId, time: Instant, from: UserId, userIds
 case class MemberLeaveEvent(convId: RConvId, time: Instant, from: UserId, userIds: Seq[UserId]) extends MessageEvent with ConversationStateEvent
 case class MemberUpdateEvent(convId: RConvId, time: Instant, from: UserId, state: ConversationState) extends ConversationStateEvent
 
-case class ConnectRequestEvent(convId: RConvId, time: Instant, from: UserId, message: String, recipient: UserId, name: Name, email: Option[String]) extends MessageEvent with ConversationStateEvent
+case class ConnectRequestEvent(convId: RConvId, time: Instant, from: UserId, message: SensitiveString, recipient: UserId, name: Name, email: Option[String]) extends MessageEvent with ConversationStateEvent
 
 case class ConversationAccessEvent(convId: RConvId, time: Instant, from: UserId, access: Set[Access], accessRole: AccessRole) extends ConversationStateEvent
 case class ConversationCodeUpdateEvent(convId: RConvId, time: Instant, from: UserId, link: ConversationData.Link) extends ConversationStateEvent
@@ -240,7 +240,7 @@ object ConversationEvent {
         case "conversation.member-join"          => MemberJoinEvent('conversation, time, 'from, decodeUserIdSeq('user_ids)(d.get), decodeString('id).startsWith("1."))
         case "conversation.member-leave"         => MemberLeaveEvent('conversation, time, 'from, decodeUserIdSeq('user_ids)(d.get))
         case "conversation.member-update"        => MemberUpdateEvent('conversation, time, 'from, ConversationState.Decoder(d.get))
-        case "conversation.connect-request"      => ConnectRequestEvent('conversation, time, 'from, decodeString('message)(d.get), decodeUserId('recipient)(d.get), decodeName('name)(d.get), decodeOptString('email)(d.get))
+        case "conversation.connect-request"      => ConnectRequestEvent('conversation, time, 'from, decodeSensitiveString('message)(d.get), decodeUserId('recipient)(d.get), decodeName('name)(d.get), decodeOptString('email)(d.get))
         case "conversation.typing"               => TypingEvent('conversation, time, 'from, isTyping = d.fold(false)(data => decodeString('status)(data) == "started"))
         case "conversation.otr-message-add"      => OtrMessageEvent('conversation, time, 'from, decodeClientId('sender)(d.get), decodeClientId('recipient)(d.get), decodeByteString('text)(d.get), decodeOptByteString('data)(d.get))
         case "conversation.access-update"        => ConversationAccessEvent('conversation, time, 'from, decodeAccess('access)(d.get), decodeAccessRole('access_role)(d.get))

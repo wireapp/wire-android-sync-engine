@@ -33,7 +33,7 @@ import com.waz.service.ZMessaging.clock
 import com.waz.service.media.{MessageContentBuilder, RichMediaContentParser}
 import com.waz.sync.client.OpenGraphClient.OpenGraphData
 import com.waz.utils.wrappers.{DB, DBCursor, URI}
-import com.waz.utils.{EnumCodec, JsonDecoder, JsonEncoder, returning, sha2}
+import com.waz.utils.{EnumCodec, JsonDecoder, JsonEncoder, returning}
 import org.json.JSONObject
 import org.threeten.bp.Instant
 import org.threeten.bp.Instant.now
@@ -92,7 +92,7 @@ case class MessageData(id:            MessageId              = MessageId(),
     else content.drop(index).headOption.getOrElse(MessageContent.Empty)
   }
 
-  lazy val contentString = protos.lastOption match {
+  lazy val contentString: SensitiveString = protos.lastOption match {
     case Some(TextMessage(ct, _, _)) => ct
     case _ if msgType == api.Message.Type.RICH_MEDIA => content.map(_.content).mkString(" ")
     case _ => content.headOption.fold("")(_.content)
@@ -147,7 +147,7 @@ case class MessageData(id:            MessageId              = MessageId(),
 }
 
 case class MessageContent(tpe:        Message.Part.Type,
-                          content:    String,
+                          content:    SensitiveString,
                           richMedia:  Option[MediaAssetData],
                           openGraph:  Option[OpenGraphData],
                           asset:      Option[AssetId],
@@ -155,13 +155,13 @@ case class MessageContent(tpe:        Message.Part.Type,
                           height:     Int,
                           syncNeeded: Boolean,
                           mentions:   Map[UserId, Name]) {
-  def contentAsUri: URI = RichMediaContentParser.parseUriWithScheme(content)
+  def contentAsUri: URI = RichMediaContentParser.parseUriWithScheme(content.str)
 
   override def toString: String =
     s"""
        |MessageContent:
        | tpe:            $tpe
-       | content (sha2): ${sha2(content)}
+       | content:        $content
        | richMedia:      $richMedia
        | openGraph:      $openGraph
        | asset:          $asset
@@ -172,13 +172,13 @@ case class MessageContent(tpe:        Message.Part.Type,
     """.stripMargin
 }
 
-object MessageContent extends ((Message.Part.Type, String, Option[MediaAssetData], Option[OpenGraphData], Option[AssetId], Int, Int, Boolean, Map[UserId, Name]) => MessageContent) {
+object MessageContent extends ((Message.Part.Type, SensitiveString, Option[MediaAssetData], Option[OpenGraphData], Option[AssetId], Int, Int, Boolean, Map[UserId, Name]) => MessageContent) {
   import MediaAssetDataProtocol._
 
-  val Empty = apply(Message.Part.Type.TEXT, "")
+  val Empty = apply(Message.Part.Type.TEXT, SensitiveString.Empty)
 
   def apply(tpe:        Message.Part.Type,
-            content:    String,
+            content:    SensitiveString,
             openGraph:  Option[OpenGraphData]   = None,
             asset:      Option[AssetId]         = None,
             width:      Int                     = 0,
@@ -206,14 +206,14 @@ object MessageContent extends ((Message.Part.Type, String, Option[MediaAssetData
         if (tpe == Message.Part.Type.SPOTIFY || tpe == Message.Part.Type.SOUNDCLOUD || tpe == Message.Part.Type.YOUTUBE) Some(MediaAssetData.empty(tpe)) else None
       }
 
-      MessageContent(tpe, 'content, richMedia, opt[OpenGraphData]('openGraph), decodeOptId[AssetId]('asset), 'width, 'height, 'syncNeeded, mentions)
+      MessageContent(tpe, SensitiveString('content), richMedia, opt[OpenGraphData]('openGraph), decodeOptId[AssetId]('asset), 'width, 'height, 'syncNeeded, mentions)
     }
   }
 
   implicit lazy val Encoder: JsonEncoder[MessageContent] = new JsonEncoder[MessageContent] {
     override def apply(v: MessageContent): JSONObject = JsonEncoder { o =>
       o.put("type", ContentTypeCodec.encode(v.tpe))
-      if (v.content != "") o.put("content", v.content)
+      if (v.content.str != "") o.put("content", v.content.str)
       v.richMedia foreach (m => o.put("richMedia", MediaAssetEncoder(m)))
       v.asset.foreach { id => o.put("asset", id.str) }
       v.openGraph foreach { og => o.put("openGraph", OpenGraphData.Encoder(og)) }
@@ -421,7 +421,7 @@ object MessageData {
 
   case class MessageEntry(id: MessageId, user: UserId, tpe: Message.Type = Message.Type.TEXT, state: Message.Status = Message.Status.DEFAULT, contentSize: Int = 1)
 
-  def messageContent(message: String, mentions: Map[UserId, Name] = Map.empty, links: Seq[LinkPreview] = Nil, weblinkEnabled: Boolean = false): (Message.Type, Seq[MessageContent]) =
+  def messageContent(message: SensitiveString, mentions: Map[UserId, Name] = Map.empty, links: Seq[LinkPreview] = Nil, weblinkEnabled: Boolean = false): (Message.Type, Seq[MessageContent]) =
     if (message.trim.isEmpty) (Message.Type.TEXT, textContent(message))
     else if (links.isEmpty) {
       val ct = RichMediaContentParser.splitContent(message, weblinkEnabled)
@@ -457,7 +457,7 @@ object MessageData {
     }
 
 
-  def textContent(message: String): Seq[MessageContent] = Seq(RichMediaContentParser.textMessageContent(message))
+  def textContent(message: SensitiveString): Seq[MessageContent] = Seq(RichMediaContentParser.textMessageContent(message))
 
   object IsAsset {
     def apply(tpe: Message.Type): Boolean = unapply(tpe)

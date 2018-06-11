@@ -104,7 +104,7 @@ object Generators {
     searchKey = SearchKey(name)
     connection <- arbitrary[ConnectionStatus]
     connectionLastUpdated <- arbitrary[Date]
-    connectionMessage <- arbitrary[Option[String]]
+    connectionMessage <- arbitrary[Option[SensitiveString]]
     conversation <- arbitrary[Option[RConvId]]
     relation <- arbitrary[Relation]
     syncTimestamp <- posNum[Long]
@@ -222,6 +222,7 @@ object Generators {
   }
 
   implicit lazy val arbSafeString: Arbitrary[Name] = Arbitrary(alphaNumStr.map(Name))
+  implicit lazy val arbContentString: Arbitrary[SensitiveString] = Arbitrary(alphaNumStr.map(SensitiveString))
 
   implicit lazy val arbUid: Arbitrary[Uid]               = Arbitrary(sideEffect(Uid()))
   implicit lazy val arbConvId: Arbitrary[ConvId]         = Arbitrary(sideEffect(ConvId()))

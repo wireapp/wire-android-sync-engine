@@ -324,7 +324,7 @@ object NotificationService {
   case class NotificationInfo(id: NotId,
                               tpe: NotificationType,
                               time: Instant,
-                              message: String,
+                              message: SensitiveString,
                               convId: ConvId,
                               convName: Option[Name] = None,
                               userName: Option[Name] = None,

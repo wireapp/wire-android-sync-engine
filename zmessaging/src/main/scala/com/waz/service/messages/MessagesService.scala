@@ -46,7 +46,7 @@ import scala.concurrent.duration.{Duration, FiniteDuration}
 import scala.util.Success
 
 trait MessagesService {
-  def addTextMessage(convId: ConvId, content: String, mentions: Map[UserId, Name] = Map.empty): Future[MessageData]
+  def addTextMessage(convId: ConvId, content: SensitiveString, mentions: Map[UserId, Name] = Map.empty): Future[MessageData]
   def addKnockMessage(convId: ConvId, selfUserId: UserId): Future[MessageData]
   def addAssetMessage(convId: ConvId, asset: AssetData): Future[MessageData]
   def addLocationMessage(convId: ConvId, content: Location): Future[MessageData]
@@ -55,7 +55,7 @@ trait MessagesService {
   def addMissedCallMessage(convId: ConvId, from: UserId, time: Instant): Future[Option[MessageData]]
   def addSuccessfulCallMessage(convId: ConvId, from: UserId, time: Instant, duration: FiniteDuration): Future[Option[MessageData]]
 
-  def addConnectRequestMessage(convId: ConvId, fromUser: UserId, toUser: UserId, message: String, name: Name, fromSync: Boolean = false): Future[MessageData]
+  def addConnectRequestMessage(convId: ConvId, fromUser: UserId, toUser: UserId, message: SensitiveString, name: Name, fromSync: Boolean = false): Future[MessageData]
   def addConversationStartMessage(convId: ConvId, creator: UserId, users: Set[UserId], name: Option[Name], time: Option[Instant] = None): Future[MessageData]
 
   def addMemberJoinMessage(convId: ConvId, creator: UserId, users: Set[UserId], firstMessage: Boolean = false): Future[Option[MessageData]]
@@ -169,7 +169,7 @@ class MessagesServiceImpl(selfUserId: UserId,
     }
   }
 
-  override def addTextMessage(convId: ConvId, content: String, mentions: Map[UserId, Name] = Map.empty) = {
+  override def addTextMessage(convId: ConvId, content: SensitiveString, mentions: Map[UserId, Name] = Map.empty) = {
     verbose(s"addTextMessage($convId, $content, $mentions)")
     val (tpe, ct) = MessageData.messageContent(content, mentions, weblinkEnabled = true)
     verbose(s"parsed content: $ct")
@@ -201,7 +201,7 @@ class MessagesServiceImpl(selfUserId: UserId,
     else updater.addLocalMessage(create, state = Message.Status.DELIVERED).map(Some(_))
   }
 
-  override def addConnectRequestMessage(convId: ConvId, fromUser: UserId, toUser: UserId, message: String, name: Name, fromSync: Boolean = false) = {
+  override def addConnectRequestMessage(convId: ConvId, fromUser: UserId, toUser: UserId, message: SensitiveString, name: Name, fromSync: Boolean = false) = {
     val msg = MessageData(
       MessageId(), convId, Message.Type.CONNECT_REQUEST, fromUser, content = MessageData.textContent(message), name = Some(name), recipient = Some(toUser),
       time = if (fromSync) MessageData.UnknownInstant else now(clock))

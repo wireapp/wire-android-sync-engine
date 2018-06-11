@@ -252,7 +252,7 @@ object SyncRequest {
     override val mergeKey = (cmd, userId)
   }
 
-  case class PostConnection(userId: UserId, name: Name, message: String) extends RequestForUser(Cmd.PostConnection)
+  case class PostConnection(userId: UserId, name: Name, message: SensitiveString) extends RequestForUser(Cmd.PostConnection)
 
   case class PostConnectionStatus(userId: UserId, status: Option[ConnectionStatus]) extends RequestForUser(Cmd.PostConnectionStatus) {
     override def merge(req: SyncRequest) = mergeHelper[PostConnectionStatus](req)(Merged(_)) // always use incoming request value
@@ -458,7 +458,7 @@ object SyncRequest {
 
         case PostConnection(_, name, message) =>
           o.put("name", name.str)
-          o.put("message", message)
+          o.put("message", message.str)
 
         case PostLastRead(_, time) =>
           o.put("time", time.toEpochMilli)

@@ -56,7 +56,7 @@ trait UserService {
   def getSelfUser: Future[Option[UserData]]
   def getOrCreateUser(id: UserId): Future[UserData]
   def updateUserData(id: UserId, updater: UserData => UserData): Future[Option[(UserData, UserData)]]
-  def updateConnectionStatus(id: UserId, status: UserData.ConnectionStatus, time: Option[Date] = None, message: Option[String] = None): Future[Option[UserData]]
+  def updateConnectionStatus(id: UserId, status: UserData.ConnectionStatus, time: Option[Date] = None, message: Option[SensitiveString] = None): Future[Option[UserData]]
   def getUsers(ids: Seq[UserId]): Future[Seq[UserData]]
   def getUser(id: UserId): Future[Option[UserData]]
   def syncIfNeeded(users: UserData*): Future[Option[SyncId]]
@@ -186,7 +186,7 @@ class UserServiceImpl(selfUserId:        UserId,
     UserData(id, None, "", None, None, connection = ConnectionStatus.Unconnected, searchKey = SearchKey(Name.Empty), handle = None)
   })
 
-  override def updateConnectionStatus(id: UserId, status: UserData.ConnectionStatus, time: Option[Date] = None, message: Option[String] = None) =
+  override def updateConnectionStatus(id: UserId, status: UserData.ConnectionStatus, time: Option[Date] = None, message: Option[SensitiveString] = None) =
     usersStorage.update(id, { user => returning(user.updateConnectionStatus(status, time, message))(u => verbose(s"updateConnectionStatus($u)")) }) map {
       case Some((prev, updated)) if prev != updated => Some(updated)
       case _ => None
