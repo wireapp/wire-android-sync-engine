@@ -25,6 +25,7 @@ import com.waz.ZLog._
 import com.waz.api.IConversation.{Access, AccessRole}
 import com.waz.model.ConversationEvent.ConversationEventDecoder
 import com.waz.model.Event.EventDecoder
+import com.waz.model.GenericMessage.safeLog
 import com.waz.model.UserData.ConnectionStatus
 import com.waz.model.otr.{Client, ClientId}
 import com.waz.service.ZMessaging.clock
@@ -104,7 +105,9 @@ case class MessageTimerEvent(convId: RConvId, time: Instant, from: UserId, durat
 
 case class RenameConversationEvent(convId: RConvId, time: Instant, from: UserId, name: Name) extends MessageEvent with ConversationStateEvent
 
-case class GenericMessageEvent(convId: RConvId, time: Instant, from: UserId, content: GenericMessage) extends MessageEvent
+case class GenericMessageEvent(convId: RConvId, time: Instant, from: UserId, content: GenericMessage) extends MessageEvent {
+  override def toString = s"GenericMessageEvent($convId, $time, $from, ${safeLog(content)})"
+}
 
 case class CallMessageEvent(convId: RConvId, time: Instant, from: UserId, sender: ClientId, content: Name) extends MessageEvent
 

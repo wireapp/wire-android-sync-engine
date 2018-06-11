@@ -53,7 +53,7 @@ class MessageEventProcessor(selfUserId:          UserId,
   val messageEventProcessingStage = EventScheduler.Stage[MessageEvent] { (convId, events) =>
     verbose(s"got events to process: $events")
     convs.processConvWithRemoteId(convId, retryAsync = true) { conv =>
-      verbose(s"processing events for conv: $conv, events: $events")
+      verbose(s"processing events for conv: ${conv.id}, events: $events")
       processEvents(conv, events)
     }
   }
