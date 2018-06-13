@@ -12,10 +12,12 @@ val MinorVersion = "7" // hotfix release
 
 version in ThisBuild := {
   val jobName = sys.env.get("JOB_NAME")
+  val isPR = sys.env.get("PR").fold(false)(_.toBoolean)
   val buildNumber = sys.env.get("BUILD_NUMBER")
   val master = jobName.exists(_.endsWith("-master"))
   val buildNumberString = buildNumber.fold("-SNAPSHOT")("." + _)
   if (master) MajorVersion + "." + MinorVersion + buildNumberString
+  else if (isPR) MajorVersion + buildNumber.fold("-PR")("." + _ + "-PR")
   else MajorVersion + buildNumberString
 }
 
