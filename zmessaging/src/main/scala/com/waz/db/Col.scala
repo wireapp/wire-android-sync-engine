@@ -85,7 +85,7 @@ object Col {
     override def load(cursor: DBCursor, index: Int): A = dec(cursor.getString(index))
     override def literal(value: A): String = enc(value)
   })
-  def id[A: Id](name: Symbol, modifiers: String = "") = Col[A](name.name, "TEXT", modifiers)(DbTranslator.idTranslator())
+  def id[A <: Id: IdCodec](name: Symbol, modifiers: String = "") = Col[A](name.name, "TEXT", modifiers)(DbTranslator.idTranslator())
   def uid(name: Symbol, modifiers: String = "") = Col[Uid](name.name, "TEXT", modifiers)
   def int(name: Symbol, modifiers: String = "") = Col[Int](name.name, "INTEGER", modifiers)
   def int[A](name: Symbol, enc: A => Int, dec: Int => A) = Col[A](name.name, "INTEGER")(new DbTranslator[A] {

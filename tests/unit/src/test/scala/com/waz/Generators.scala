@@ -236,7 +236,6 @@ object Generators {
   implicit lazy val arbMessageId: Arbitrary[MessageId]   = Arbitrary(sideEffect(MessageId()))
   implicit lazy val arbTrackingId: Arbitrary[TrackingId] = Arbitrary(sideEffect(TrackingId()))
   implicit lazy val arbContactId: Arbitrary[ContactId]   = Arbitrary(sideEffect(ContactId()))
-  implicit lazy val arbCallSessionId: Arbitrary[CallSessionId] = Arbitrary(sideEffect(CallSessionId()))
   implicit lazy val arbClientId: Arbitrary[ClientId] = Arbitrary(sideEffect(ClientId()))
 
   implicit lazy val arbDate: Arbitrary[Date] = Arbitrary(choose(0L, 999999L).map(i => new Date(currentTimeMillis - 1000000000L + i * 1000L)))

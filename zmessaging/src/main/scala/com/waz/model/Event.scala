@@ -406,7 +406,7 @@ object OtrClientRemoveEvent {
     new JsonEncoder[OtrClientRemoveEvent] {
       override def apply(error: OtrClientRemoveEvent): JSONObject = JsonEncoder { json =>
         json.setType("user.client-remove")
-        json.put("client", new JSONObject().put("id", error.client.toString))
+        json.put("client", new JSONObject().put("id", error.client.str))
       }
     }
 }

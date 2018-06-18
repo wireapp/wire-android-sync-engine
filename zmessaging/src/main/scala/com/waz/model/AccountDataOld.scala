@@ -67,18 +67,8 @@ object AccountData {
 
   //Labels can be used to revoke all cookies for a given client
   //TODO save labels and use them for cleanup later
-  case class Label(str: String) {
-    override def toString: String = str
-  }
-
-  object Label extends (String => Label) {
-    def apply(): Label = Id.random()
-
-    implicit object Id extends Id[Label] {
-      override def random(): Label = Label(Uid().toString)
-      override def decode(str: String): Label = Label(str)
-    }
-  }
+  case class Label(str: String) extends Id
+  object Label extends (String => Label) with IdGen[Label]
 
   implicit object AccountDataDao extends Dao[AccountData, UserId] {
     val Id = id[UserId]('_id, "PRIMARY KEY").apply(_.id)

@@ -317,15 +317,15 @@ object MessageData {
     override def apply(implicit cursor: DBCursor): MessageData =
       MessageData(Id, Conv, Type, User, Content, Protos, FirstMessage, Members, Recipient, Email, Name, State, Time, LocalTime, EditTime, Ephemeral, ExpiryTime, Expired, Duration)
 
-    def deleteForConv(id: ConvId)(implicit db: DB) = delete(Conv, id)
+    def deleteForConv(conv: ConvId)(implicit db: DB) = delete(Conv, conv)
 
-    def deleteUpTo(id: ConvId, upTo: Instant)(implicit db: DB) = db.delete(table.name, s"${Conv.name} = '${id.str}' AND ${Time.name} <= ${Time(upTo)}", null)
+    def deleteUpTo(conv: ConvId, upTo: Instant)(implicit db: DB) = db.delete(table.name, s"${Conv.name} = '${Conv(conv)}' AND ${Time.name} <= ${Time(upTo)}", null)
 
-    def first(conv: ConvId)(implicit db: DB) = single(db.query(table.name, null, s"${Conv.name} = '$conv'", null, null, null, s"${Time.name} ASC", "1"))
+    def first(conv: ConvId)(implicit db: DB) = single(db.query(table.name, null, s"${Conv.name} = '${Conv(conv)}'", null, null, null, s"${Time.name} ASC", "1"))
 
-    def last(conv: ConvId)(implicit db: DB) = single(db.query(table.name, null, s"${Conv.name} = '$conv'", null, null, null, s"${Time.name} DESC", "1"))
+    def last(conv: ConvId)(implicit db: DB) = single(db.query(table.name, null, s"${Conv.name} = '${Conv(conv)}'", null, null, null, s"${Time.name} DESC", "1"))
 
-    def lastSent(conv: ConvId)(implicit db: DB) = single(db.query(table.name, null, s"${Conv.name} = '$conv' AND ${State.name} IN ('${Message.Status.SENT.name}', '${Message.Status.DELIVERED.name}')", null, null, null, s"${Time.name} DESC", "1"))
+    def lastSent(conv: ConvId)(implicit db: DB) = single(db.query(table.name, null, s"${Conv.name} = '${Conv(conv)}' AND ${State.name} IN ('${Message.Status.SENT.name}', '${Message.Status.DELIVERED.name}')", null, null, null, s"${Time.name} DESC", "1"))
 
     def lastFromSelf(conv: ConvId, selfUserId: UserId)(implicit db: DB) = single(db.query(table.name, null, s"${Conv.name} = '${Conv(conv)}' AND ${User.name} = '${User(selfUserId)}' AND $userContentPredicate", null, null, null, s"${Time.name} DESC", "1"))
 
@@ -333,12 +333,12 @@ object MessageData {
 
     private val userContentPredicate = isUserContent.map(t => s"${Type.name} = '${Type(t)}'").mkString("(", " OR ", ")")
 
-    def lastIncomingKnock(convId: ConvId, selfUser: UserId)(implicit db: DB): Option[MessageData] = single(
-      db.query(table.name, null, s"${Conv.name} = ? AND ${Type.name} = ? AND ${User.name} <> ?", Array(convId.toString, Type(Message.Type.KNOCK), selfUser.str), null, null, s"${Time.name} DESC", "1")
+    def lastIncomingKnock(conv: ConvId, selfUser: UserId)(implicit db: DB): Option[MessageData] = single(
+      db.query(table.name, null, s"${Conv.name} = ? AND ${Type.name} = ? AND ${User.name} <> ?", Array(Conv(conv), Type(Message.Type.KNOCK), User(selfUser)), null, null, s"${Time.name} DESC", "1")
     )
 
-    def lastMissedCall(convId: ConvId)(implicit db: DB): Option[MessageData] = single(
-      db.query(table.name, null, s"${Conv.name} = ? AND ${Type.name} = ?", Array(convId.toString, Type(Message.Type.MISSED_CALL)), null, null, s"${Time.name} DESC", "1")
+    def lastMissedCall(conv: ConvId)(implicit db: DB): Option[MessageData] = single(
+      db.query(table.name, null, s"${Conv.name} = ? AND ${Type.name} = ?", Array(Conv(conv), Type(Message.Type.MISSED_CALL)), null, null, s"${Time.name} DESC", "1")
     )
 
     private val MessageEntryColumns = Array(Id.name, User.name, Type.name, State.name, ContentSize.name)
@@ -346,41 +346,41 @@ object MessageData {
       override def apply(implicit c: DBCursor): MessageEntry = MessageEntry(Id, User, Type, State, ContentSize)
     }
 
-    def countMessages(convId: ConvId, p: MessageEntry => Boolean)(implicit db: DB): Int =
-      iteratingWithReader(MessageEntryReader)(db.query(table.name, MessageEntryColumns, s"${Conv.name} = ?", Array(convId.toString), null, null, null)).acquire(_ count p)
+    def countMessages(conv: ConvId, p: MessageEntry => Boolean)(implicit db: DB): Int =
+      iteratingWithReader(MessageEntryReader)(db.query(table.name, MessageEntryColumns, s"${Conv.name} = ?", Array(Conv(conv)), null, null, null)).acquire(_ count p)
 
-    def countNewer(convId: ConvId, time: Instant)(implicit db: DB) =
-      queryNumEntries(db, table.name, s"${Conv.name} = '${convId.str}' AND ${Time.name} > ${time.toEpochMilli}")
+    def countNewer(conv: ConvId, time: Instant)(implicit db: DB) =
+      queryNumEntries(db, table.name, s"${Conv.name} = '${Conv(conv)}' AND ${Time.name} > ${Time(time)}")
 
-    def countFailed(convId: ConvId)(implicit db: DB) = queryNumEntries(db, table.name, s"${Conv.name} = '${convId.str}' AND ${State.name} = '${Message.Status.FAILED}'")
+    def countFailed(conv: ConvId)(implicit db: DB) = queryNumEntries(db, table.name, s"${Conv.name} = '${Conv(conv)}' AND ${State.name} = '${Message.Status.FAILED}'")
 
-    def listLocalMessages(convId: ConvId)(implicit db: DB) = list(db.query(table.name, null, s"${Conv.name} = '$convId' AND ${State.name} in ('${Message.Status.DEFAULT}', '${Message.Status.PENDING}', '${Message.Status.FAILED}')", null, null, null, s"${Time.name} ASC"))
+    def listLocalMessages(conv: ConvId)(implicit db: DB) = list(db.query(table.name, null, s"${Conv.name} = '${Conv(conv)}' AND ${State.name} in ('${Message.Status.DEFAULT}', '${Message.Status.PENDING}', '${Message.Status.FAILED}')", null, null, null, s"${Time.name} ASC"))
 
-    def findLocalFrom(convId: ConvId, time: Instant)(implicit db: DB) =
-      iterating(db.query(table.name, null, s"${Conv.name} = '$convId' AND ${State.name} in ('${Message.Status.DEFAULT}', '${Message.Status.PENDING}', '${Message.Status.FAILED}') AND ${Time.name} >= ${time.toEpochMilli}", null, null, null, s"${Time.name} ASC"))
+    def findLocalFrom(conv: ConvId, time: Instant)(implicit db: DB) =
+      iterating(db.query(table.name, null, s"${Conv.name} = '${Conv(conv)}' AND ${State.name} in ('${Message.Status.DEFAULT}', '${Message.Status.PENDING}', '${Message.Status.FAILED}') AND ${Time.name} >= ${Time(time)}", null, null, null, s"${Time.name} ASC"))
 
-    def findLatestUpTo(convId: ConvId, time: Instant)(implicit db: DB) =
-      single(db.query(table.name, null, s"${Conv.name} = '$convId' AND ${Time.name} < ${time.toEpochMilli}", null, null, null, s"${Time.name} DESC", "1"))
+    def findLatestUpTo(conv: ConvId, time: Instant)(implicit db: DB) =
+      single(db.query(table.name, null, s"${Conv.name} = '${Conv(conv)}' AND ${Time.name} < ${Time(time)}", null, null, null, s"${Time.name} DESC", "1"))
 
-    def findMessages(conv: ConvId)(implicit db: DB) = db.query(table.name, null, s"${Conv.name} = '$conv'", null, null, null, s"${Time.name} ASC")
+    def findMessages(conv: ConvId)(implicit db: DB) = db.query(table.name, null, s"${Conv.name} = '${Conv(conv)}'", null, null, null, s"${Time.name} ASC")
 
     def findMessagesFrom(conv: ConvId, time: Instant)(implicit db: DB) =
-      iterating(db.query(table.name, null, s"${Conv.name} = '$conv' and ${Time.name} >= ${time.toEpochMilli}", null, null, null, s"${Time.name} ASC"))
+      iterating(db.query(table.name, null, s"${Conv.name} = '${Conv(conv)}' and ${Time.name} >= ${Time(time)}", null, null, null, s"${Time.name} ASC"))
 
     def findExpired(time: Instant = now(clock))(implicit db: DB) =
-      iterating(db.query(table.name, null, s"${ExpiryTime.name} IS NOT NULL and ${ExpiryTime.name} <= ${time.toEpochMilli}", null, null, null, s"${ExpiryTime.name} ASC"))
+      iterating(db.query(table.name, null, s"${ExpiryTime.name} IS NOT NULL and ${ExpiryTime.name} <= ${Time(time)}", null, null, null, s"${ExpiryTime.name} ASC"))
 
     def findExpiring()(implicit db: DB) =
       iterating(db.query(table.name, null, s"${ExpiryTime.name} IS NOT NULL AND ${Expired.name} = 0", null, null, null, s"${ExpiryTime.name} ASC"))
 
     def findEphemeral(conv: ConvId)(implicit db: DB) =
-      iterating(db.query(table.name, null, s"${Conv.name} = '${conv.str}' and ${Ephemeral.name} IS NOT NULL and ${ExpiryTime.name} IS NULL", null, null, null, s"${Time.name} ASC"))
+      iterating(db.query(table.name, null, s"${Conv.name} = '${Conv(conv)}' and ${Ephemeral.name} IS NOT NULL and ${ExpiryTime.name} IS NULL", null, null, null, s"${Time.name} ASC"))
 
     def findSystemMessage(conv: ConvId, serverTime: Instant, tpe: Message.Type, sender: UserId)(implicit db: DB) =
-      iterating(db.query(table.name, null, s"${Conv.name} = '${conv.str}' and ${Time.name} = ${Time(serverTime)} and ${Type.name} = '${Type(tpe)}' and ${User.name} = '${User(sender)}'", null, null, null, s"${Time.name} DESC"))
+      iterating(db.query(table.name, null, s"${Conv.name} = '${Conv(conv)}' and ${Time.name} = ${Time(serverTime)} and ${Type.name} = '${Type(tpe)}' and ${User.name} = '${User(sender)}'", null, null, null, s"${Time.name} DESC"))
 
     private val IndexColumns = Array(Id.name, Time.name)
-    def msgIndexCursor(conv: ConvId)(implicit db: DB) = db.query(table.name, IndexColumns, s"${Conv.name} = '$conv'", null, null, null, s"${Time.name} ASC")
+    def msgIndexCursor(conv: ConvId)(implicit db: DB) = db.query(table.name, IndexColumns, s"${Conv.name} = '${Conv(conv)}'", null, null, null, s"${Time.name} ASC")
 
     def countAtLeastAsOld(conv: ConvId, time: Instant)(implicit db: DB) =
       queryNumEntries(db, table.name, s"""${Conv.name} = '${Conv(conv)}' AND ${Time.name} <= ${Time(time)}""")
@@ -392,14 +392,14 @@ object MessageData {
 
 
     def findByType(conv: ConvId, tpe: Message.Type)(implicit db: DB) =
-      iterating(db.query(table.name, null, s"${Conv.name} = '$conv' AND ${Type.name} = '${Type(tpe)}'", null, null, null, s"${Time.name} ASC"))
+      iterating(db.query(table.name, null, s"${Conv.name} = '${Conv(conv)}' AND ${Type.name} = '${Type(tpe)}'", null, null, null, s"${Time.name} ASC"))
 
     def msgIndexCursorFiltered(conv: ConvId, types: Seq[TypeFilter], limit: Option[Int] = None)(implicit db: DB): DBCursor = {
       val builder = new SQLiteQueryBuilder()
       val q = builder.buildUnionQuery(
         types.map(mt =>
           s"SELECT * FROM (" +
-            SQLiteQueryBuilder.buildQueryString(false, table.name, IndexColumns, s"${Conv.name} = '$conv' AND ${Type.name} = '${Type(mt.msgType)}' AND ${Expired.name} = 0", null, null, s"${Time.name} DESC", mt.limit.fold[String](null)(_.toString)) +
+            SQLiteQueryBuilder.buildQueryString(false, table.name, IndexColumns, s"${Conv.name} = '${Conv(conv)}' AND ${Type.name} = '${Type(mt.msgType)}' AND ${Expired.name} = 0", null, null, s"${Time.name} DESC", mt.limit.fold[String](null)(_.toString)) +
             s")").toArray,
         null, limit.fold[String](null)(_.toString))
       db.rawQuery(q, null)
@@ -415,7 +415,7 @@ object MessageData {
          | WHERE msg.${Conv.name} = conv.${ConversationDataDao.Id.name} AND conv.${ConversationDataDao.Muted.name} = 0
          | AND msg.${LocalTime.name} > ? AND msg.${User.name} != ?
          | ORDER BY msg.${LocalTime.name} DESC
-         | LIMIT $limit""".stripMargin, Array(since.toString, selfUserId.str)
+         | LIMIT $limit""".stripMargin, Array(since.toString, User(selfUserId))
     ))
   }
 

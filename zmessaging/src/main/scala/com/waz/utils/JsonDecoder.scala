@@ -196,9 +196,9 @@ object JsonDecoder {
   implicit def decodeInvitationId(s: Symbol)(implicit js: JSONObject): InvitationId = InvitationId(js.getString(s.name))
   implicit def decodeMessage(s: Symbol)(implicit js: JSONObject): GenericMessage = GenericMessage(Base64.decode(decodeString(s), Base64.NO_WRAP))
 
-  implicit def decodeId[A](s: Symbol)(implicit js: JSONObject, id: Id[A]): A = id.decode(js.getString(s.name))
+  implicit def decodeId[A <: Id](s: Symbol)(implicit js: JSONObject, id: IdCodec[A]): A = id.decode(js.getString(s.name))
 
-  implicit def decodeOptId[A](s: Symbol)(implicit js: JSONObject, id: Id[A]): Option[A] = if (js.has(s.name) && !js.isNull(s.name)) Some(id.decode(js.getString(s.name))) else None
+  implicit def decodeOptId[A <: Id](s: Symbol)(implicit js: JSONObject, id: IdCodec[A]): Option[A] = if (js.has(s.name) && !js.isNull(s.name)) Some(id.decode(js.getString(s.name))) else None
 
   implicit def decodeAccessRole(s: Symbol)(implicit js: JSONObject): AccessRole = AccessRole.valueOf(js.getString(s.name).toUpperCase())
   implicit def decodeOptAccessRole(s: Symbol)(implicit js: JSONObject): Option[AccessRole] = opt(s, js => AccessRole.valueOf(js.getString(s.name).toUpperCase()))

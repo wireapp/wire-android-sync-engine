@@ -105,7 +105,7 @@ object Preferences {
       implicit lazy val LongCodec    = apply[Long]   (String.valueOf, java.lang.Long.parseLong,   0)
       implicit lazy val BooleanCodec = apply[Boolean](String.valueOf, java.lang.Boolean.parseBoolean, false)
 
-      implicit def idCodec[A: Id]: PrefCodec[A] = apply[A](implicitly[Id[A]].encode, implicitly[Id[A]].decode, implicitly[Id[A]].empty)
+      implicit def idCodec[A <: Id: IdCodec]: PrefCodec[A] = apply[A](implicitly[IdCodec[A]].encode, implicitly[IdCodec[A]].decode, implicitly[IdCodec[A]].empty)
       implicit def optCodec[A: PrefCodec]: PrefCodec[Option[A]] = apply[Option[A]](_.fold("")(implicitly[PrefCodec[A]].encode), { str => if (str == "") None else Some(implicitly[PrefCodec[A]].decode(str)) }, None)
 
       implicit lazy val InstantCodec = apply[Instant](d => String.valueOf(d.toEpochMilli), s => Instant.ofEpochMilli(java.lang.Long.parseLong(s)), Instant.EPOCH)

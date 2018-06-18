@@ -399,7 +399,7 @@ object SyncRequest {
     import JsonEncoder._
 
     override def apply(req: SyncRequest): JSONObject = JsonEncoder { o =>
-      def putId[A: Id](name: String, id: A) = o.put(name, implicitly[Id[A]].encode(id))
+      def putId[A <: Id: IdCodec](name: String, id: A) = o.put(name, implicitly[IdCodec[A]].encode(id))
 
       o.put("cmd", req.cmd.name)
 
@@ -410,8 +410,8 @@ object SyncRequest {
       }
 
       req match {
-        case SyncUser(users)                  => o.put("users", arrString(users.toSeq map (_.str)))
-        case SyncConversation(convs)          => o.put("convs", arrString(convs.toSeq map (_.str)))
+        case SyncUser(users)                  => o.put("users", arrString(users.toSeq.map(_.str)))
+        case SyncConversation(convs)          => o.put("convs", arrString(convs.toSeq.map(_.str)))
         case SyncConvLink(conv)               => o.put("conv", conv.str)
         case SyncSearchQuery(queryCacheKey)   => o.put("queryCacheKey", queryCacheKey.cacheKey)
         case SyncIntegrations(startWith)      => o.put("startWith", startWith)
@@ -428,32 +428,32 @@ object SyncRequest {
           o.put("botId", botId.str)
         case ExactMatchHandle(handle)         => o.put("handle", handle.string)
         case SyncTeamMember(userId)           => o.put("user", userId.str)
-        case DeletePushToken(token)           => putId("token", token)
-        case RegisterPushToken(token)         => putId("token", token)
-        case SyncRichMedia(messageId)         => putId("message", messageId)
-        case PostSelfPicture(assetId)         => assetId.foreach(putId("asset", _))
+        case DeletePushToken(token)           => putId("token", token.str)
+        case RegisterPushToken(token)         => putId("token", token.str)
+        case SyncRichMedia(messageId)         => putId("message", messageId.str)
+        case PostSelfPicture(assetId)         => assetId.map(_.str).foreach(putId("asset", _))
         case PostSelfName(name)               => o.put("name", name.str)
         case PostSelfAccentColor(color)       => o.put("color", color.id)
         case PostAvailability(availability)   => o.put("availability", availability.id)
         case PostMessage(_, messageId, time)  =>
-          putId("message", messageId)
+          putId("message", messageId.str)
           o.put("time", time.toEpochMilli)
 
-        case PostDeleted(_, messageId)        => putId("message", messageId)
+        case PostDeleted(_, messageId)        => putId("message", messageId.str)
         case PostRecalled(_, msg, recalled)   =>
-          putId("message", msg)
-          putId("recalled", recalled)
+          putId("message", msg.str)
+          putId("recalled", recalled.str)
 
-        case PostConnectionStatus(_, status)  => status foreach { status => o.put("status", status.code) }
-        case PostConvJoin(_, users)           => o.put("users", arrString(users.toSeq map (_.str)))
-        case PostConvLeave(_, user)           => putId("user", user)
+        case PostConnectionStatus(_, status)  => status.foreach(status => o.put("status", status.code))
+        case PostConvJoin(_, users)           => o.put("users", arrString(users.toSeq.map(_.str)))
+        case PostConvLeave(_, user)           => putId("user", user.str)
         case PostOpenGraphMeta(_, messageId, time) =>
-          putId("message", messageId)
+          putId("message", messageId.str)
           o.put("time", time.toEpochMilli)
 
         case PostReceipt(_, messageId, userId, tpe) =>
-          putId("message", messageId)
-          putId("user", userId)
+          putId("message", messageId.str)
+          putId("user", userId.str)
           o.put("type", tpe)
 
         case PostConnection(_, name, message) =>
@@ -467,7 +467,7 @@ object SyncRequest {
           o.put("time", time.toEpochMilli)
 
         case PostAssetStatus(_, mid, exp, status) =>
-          putId("message", mid)
+          putId("message", mid.str)
           o.put("ephemeral", exp.map(_.toMillis))
           o.put("status", JsonEncoder.encode(status))
 
@@ -478,7 +478,7 @@ object SyncRequest {
         case PostConv(_, users, name, team, access, accessRole) =>
           o.put("users", arrString(users.map(_.str).toSeq))
           name.foreach(v => o.put("name", v.str))
-          team.foreach(o.put("team", _))
+          team.map(_.str).foreach(o.put("team", _))
           o.put("access", JsonEncoder.encodeAccess(access))
           o.put("access_role", JsonEncoder.encodeAccessRole(accessRole))
         case PostAddressBook(ab) => o.put("addressBook", JsonEncoder.encode(ab))
@@ -489,11 +489,11 @@ object SyncRequest {
           o.put("label", label)
         case PostSessionReset(_, user, client) =>
           o.put("client", client.str)
-          o.put("user", user)
+          o.put("user", user.str)
         case SyncClients(user) => o.put("user", user.str)
         case SyncPreKeys(user, clients) =>
           o.put("user", user.str)
-          o.put("clients", arrString(clients.toSeq map (_.str)))
+          o.put("clients", arrString(clients.toSeq.map(_.str)))
         case SyncSelf | SyncTeam | DeleteAccount | SyncConversations | SyncConnections | SyncConnectedUsers | SyncSelfClients | SyncSelfPermissions | SyncClientsLocation | Unknown => () // nothing to do
       }
     }

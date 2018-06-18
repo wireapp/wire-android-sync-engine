@@ -22,35 +22,11 @@ import java.util.UUID
 
 import com.waz.api.NotificationsHandler.NotificationType
 import com.waz.api.NotificationsHandler.NotificationType._
-import com.waz.utils.crypto.ZSecureRandom
+import com.waz.log.InternalLog.ProductionLoggable
 import com.waz.utils.wrappers.URI
-import com.waz.utils.{JsonDecoder, JsonEncoder}
-import org.json.JSONObject
 
-trait Id[A] extends Ordering[A] {
-  def random(): A
-  def decode(str: String): A
-  def encode(id: A): String = id.toString
-  def empty: A = decode("")
+trait Id extends ProductionLoggable {
 
-  override def compare(x: A, y: A): Int = Ordering.String.compare(encode(x), encode(y))
-}
-
-case class Uid(str: String) {
-  override def toString: String = str
-}
-
-object Uid {
-  def apply(): Uid = Uid(UUID.randomUUID().toString)
-  def apply(mostSigBits: Long, leastSigBits: Long): Uid = Uid(new UUID(mostSigBits, leastSigBits).toString)
-
-  implicit object UidId extends Id[Uid] {
-    override def random(): Uid = Uid()
-    override def decode(str: String): Uid = Uid(str)
-  }
-}
-
-case class UserId(str: String) {
   def bytes = {
     val uuid = UUID.fromString(str)
     val bytes = Array.ofDim[Byte](16)
@@ -59,268 +35,96 @@ case class UserId(str: String) {
     bb.put(uuid.getLeastSignificantBits)
     bytes
   }
-  override def toString: String = str
+
+  def uid = Uid(str)
+
 }
 
-object UserId extends (String => UserId) {
-  val Zero = UserId(new UUID(0, 0).toString)
-
-  def apply(): UserId = Id.random()
-
-  implicit object Id extends Id[UserId] {
-    override def random(): UserId = UserId(Uid().toString)
-    override def decode(str: String): UserId = UserId(str)
-  }
-
-  implicit lazy val UserIdDecoder: JsonDecoder[UserId] = new JsonDecoder[UserId] {
-    override def apply(implicit o: JSONObject): UserId = UserId(o.getString("userId"))
-  }
-
-  implicit lazy val UserIdEncoder: JsonEncoder[UserId] = new JsonEncoder[UserId] {
-    override def apply(id: UserId): JSONObject = JsonEncoder { _.put("userId", id.str) }
-  }
+trait IdCodec[A <: Id] {
+  def decode(str: String): A
+  def encode(id: A): String = id.str
+  def empty(): A = decode("")
 }
 
-case class TeamId(str: String) {
-  override def toString = str
-}
+trait IdGen[A <: Id] {
+  def apply(str: String) : A
 
-object TeamId extends (String => TeamId) {
+  def apply(): A = apply(UUID.randomUUID().toString)
 
-  val Empty = TeamId("")
+  def apply(mostSigBits: Long, leastSigBits: Long): A = apply(new UUID(mostSigBits, leastSigBits).toString)
 
-  def apply(): TeamId = Id.random()
+  val Zero = apply(new UUID(0, 0).toString)
+  val Empty: A = apply("")
 
-  implicit object Id extends Id[TeamId] {
-    override def random(): TeamId = TeamId(Uid().toString)
-    override def decode(str: String): TeamId = TeamId(str)
+  implicit object Codec extends IdCodec[A] {
+    def decode(str: String): A = apply(str)
+  }
+
+  implicit object IdOrdering extends Ordering[A] {
+    override def compare(x: A, y: A): Int = Ordering.String.compare(x.str, y.str)
   }
 }
 
-case class AccountId(str: String) {
-  override def toString: String = str
-}
+case class Uid(str: String) extends Id
+object Uid extends (String => Uid) with IdGen[Uid]
 
-object AccountId extends (String => AccountId) {
-  def apply(): AccountId = Id.random()
+case class UserId(str: String) extends Id
+object UserId extends (String => UserId) with IdGen[UserId]
 
-  implicit object Id extends Id[AccountId] {
-    override def random(): AccountId = AccountId(Uid().toString)
-    override def decode(str: String): AccountId = AccountId(str)
-  }
-}
+case class TeamId(str: String) extends Id
+object TeamId extends (String => TeamId) with IdGen[TeamId]
 
-case class AssetId(str: String) {
-  override def toString: String = str
-}
+case class AccountId(str: String) extends Id
+object AccountId extends (String => AccountId) with IdGen[AccountId]
 
-object AssetId extends (String => AssetId) {
-  def apply(): AssetId = Id.random()
+case class AssetId(str: String) extends Id
+object AssetId extends (String => AssetId) with IdGen[AssetId]
 
-  implicit object Id extends Id[AssetId] {
-    override def random() = AssetId(Uid().toString)
-    override def decode(str: String) = AssetId(str)
-  }
-}
-
-case class CacheKey(str: String) {
-  override def toString: String = str
-}
-
-object CacheKey extends (String => CacheKey) {
-  def apply(): CacheKey = Id.random()
-
+case class CacheKey(str: String) extends Id
+object CacheKey extends (String => CacheKey) with IdGen[CacheKey] {
   //any appended strings should be url friendly
   def decrypted(key: CacheKey) = CacheKey(s"${key.str}_decr_")
   def fromAssetId(id: AssetId) = CacheKey(s"${id.str}")
   def fromUri(uri: URI) = CacheKey(uri.toString)
-
-  implicit object Id extends Id[CacheKey] {
-    override def random() = CacheKey(Uid().toString)
-    override def decode(str: String) = CacheKey(str)
-  }
 }
 
-case class RAssetId(str: String) {
-  override def toString: String = str
-}
+case class RAssetId(str: String) extends Id
+object RAssetId extends (String => RAssetId) with IdGen[RAssetId]
 
-object RAssetId extends (String => RAssetId) {
-  val Empty = RAssetId("empty")
-  def apply(): RAssetId = Id.random()
+case class MessageId(str: String) extends Id
+object MessageId extends (String => MessageId) with IdGen[MessageId]
 
-  implicit object Id extends Id[RAssetId] {
-    override def random() = RAssetId(Uid().toString)
-    override def decode(str: String) = RAssetId(str)
-  }
-}
+case class ConvId(str: String) extends Id
+object ConvId extends (String => ConvId) with IdGen[ConvId]
 
-case class MessageId(str: String) {
-  def uid = Uid(str)
-  override def toString: String = str
-}
+case class RConvId(str: String) extends Id
+object RConvId extends (String => RConvId) with IdGen[RConvId]
 
-object MessageId {
-  val Empty = MessageId("")
+case class SyncId(str: String) extends Id
+object SyncId extends (String => SyncId) with IdGen[SyncId]
 
-  def apply(): MessageId = Id.random()
-  def fromUid(uid: Uid): MessageId = MessageId(uid.str)
+case class PushToken(str: String) extends Id
+object PushToken extends (String => PushToken) with IdGen[PushToken]
 
-  implicit object Id extends Id[MessageId] {
-    override def random() = MessageId(Uid().str)
-    override def decode(str: String) = MessageId(str)
-  }
-}
+case class TrackingId(str: String) extends Id
+object TrackingId extends (String => TrackingId) with IdGen[TrackingId]
 
-case class ConvId(str: String) {
-  override def toString: String = str
-}
+case class ContactId(str: String) extends Id
+object ContactId extends (String => ContactId) with IdGen[ContactId]
 
-object ConvId extends (String => ConvId) {
-  def apply(): ConvId = Id.random()
-
-  implicit object Id extends Id[ConvId] {
-    override def random(): ConvId = ConvId(Uid().str)
-    override def decode(str: String): ConvId = ConvId(str)
-  }
-}
-
-case class RConvId(str: String) {
-  override def toString: String = str
-}
-
-object RConvId {
-  val Empty = RConvId("")
-  def apply(): RConvId = Id.random()
-
-  implicit object Id extends Id[RConvId] {
-    override def random(): RConvId = RConvId(Uid().str)
-    override def decode(str: String): RConvId = RConvId(str)
-  }
-}
-
-case class SyncId(str: String) {
-  override def toString: String = str
-}
-
-object SyncId {
-  def apply(): SyncId = Id.random()
-
-  implicit object Id extends Id[SyncId] {
-    override def random(): SyncId = SyncId(Uid().str)
-    override def decode(str: String): SyncId = SyncId(str)
-  }
-}
-
-case class PushToken(str: String) {
-  override def toString: String = str
-}
-
-object PushToken {
-  def apply(): PushToken = Id.random()
-
-  implicit object Id extends Id[PushToken] {
-    override def random(): PushToken = PushToken(Uid().str)
-    override def decode(str: String): PushToken = PushToken(str)
-  }
-}
-
-case class TrackingId(str: String) {
-  override def toString: String = str
-}
-
-object TrackingId {
-  def apply(): TrackingId = Id.random()
-
-  implicit object Id extends Id[TrackingId] {
-    override def random(): TrackingId = TrackingId(Uid().str)
-    override def decode(str: String): TrackingId = TrackingId(str)
-  }
-}
-
-case class CallSessionId(str: String) {
-  override def toString: String = str
-}
-
-object CallSessionId extends (String => CallSessionId) {
-  def apply(): CallSessionId = Id.random()
-
-  implicit object Id extends Id[CallSessionId] {
-    override def random(): CallSessionId = CallSessionId(Uid().str)
-    override def decode(str: String): CallSessionId = CallSessionId(str)
-  }
-
-  implicit object DefaultOrdering extends Ordering[CallSessionId] {
-    def compare(a: CallSessionId, b: CallSessionId): Int = Ordering.String.compare(a.str, b.str)
-  }
-}
-
-case class ContactId(str: String) {
-  override def toString: String = str
-}
-
-object ContactId extends (String => ContactId) {
-  def apply(): ContactId = Id.random()
-
-  implicit object Id extends Id[ContactId] {
-    override def random(): ContactId = ContactId(Uid().str)
-    override def decode(str: String): ContactId = ContactId(str)
-  }
-}
-
-case class InvitationId(str: String) {
-  override def toString: String = str
-}
-
-object InvitationId extends (String => InvitationId) {
-  def apply(): InvitationId = Id.random()
-
-  implicit object Id extends Id[InvitationId] {
-    override def random(): InvitationId = InvitationId(Uid().str)
-    override def decode(str: String): InvitationId = InvitationId(str)
-  }
-}
+case class InvitationId(str: String) extends Id
+object InvitationId extends (String => InvitationId) with IdGen[InvitationId]
 
 //NotificationId
-case class NotId(str: String) {
-  override def toString: String = str
-}
-
-object NotId {
-
-  implicit val id: Id[NotId] = new Id[NotId] {
-    override def random(): NotId = NotId(ZSecureRandom.nextLong().toHexString)
-    override def decode(str: String): NotId = NotId(str)
-  }
-
-  def apply(): NotId = id.random()
+case class NotId(str: String) extends Id
+object NotId extends (String => NotId) with IdGen[NotId] {
   def apply(tpe: NotificationType, userId: UserId): NotId = NotId(s"$tpe-${userId.str}")
   def apply(id: (MessageId, UserId)): NotId = NotId(s"$LIKE-${id._1.str}-${id._2.str}")
   def apply(msgId: MessageId): NotId = NotId(msgId.str)
 }
 
-case class ProviderId(str: String) {
-  override def toString: String = str
-}
+case class ProviderId(str: String) extends Id
+object ProviderId extends (String => ProviderId) with IdGen[ProviderId]
 
-object ProviderId extends (String => ProviderId) {
-  def apply(): ProviderId = Id.random()
-
-  implicit object Id extends Id[ProviderId] {
-    override def random(): ProviderId = ProviderId(Uid().str)
-    override def decode(str: String): ProviderId = ProviderId(str)
-  }
-}
-
-case class IntegrationId(str: String) {
-  override def toString: String = str
-}
-
-object IntegrationId extends (String => IntegrationId) {
-  def apply(): IntegrationId = Id.random()
-
-  implicit object Id extends Id[IntegrationId] {
-    override def random(): IntegrationId = IntegrationId(Uid().str)
-    override def decode(str: String): IntegrationId = IntegrationId(str)
-  }
-}
+case class IntegrationId(str: String) extends Id
+object IntegrationId extends (String => IntegrationId) with IdGen[IntegrationId]
