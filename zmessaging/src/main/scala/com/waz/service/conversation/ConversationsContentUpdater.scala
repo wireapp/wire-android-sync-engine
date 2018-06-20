@@ -112,7 +112,9 @@ class ConversationsContentUpdaterImpl(val storage:     ConversationStorage,
 
   override def updateConversationCleared(id: ConvId, time: Instant) = storage.update(id, { conv =>
     verbose(s"updateConversationCleared($id, $time)")
-    conv.withCleared(time).withLastRead(time)
+    //TODO: This is to distinguish initial values from initial sync from actual clearing. Ideally cleared time should be an Option[Instant]
+    val adjustedTime = if (time == Instant.EPOCH) time.plusMillis(1) else time
+    conv.withCleared(adjustedTime).withLastRead(adjustedTime)
   })
 
   override def updateConversationState(id: ConvId, state: ConversationState) = storage.update(id, { conv =>
