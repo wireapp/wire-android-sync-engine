@@ -80,7 +80,7 @@ class ConversationsContentUpdaterImpl(val storage:     ConversationStorage,
   storage.convUpdated { case (prev, conv) =>
     if (prev.cleared != conv.cleared) {
       verbose(s"cleared updated will clear messages, prev: $prev, updated: $conv")
-      messagesStorage.clear(conv.id, conv.cleared).recoverWithLog()
+      conv.cleared.foreach(messagesStorage.clear(conv.id, _).recoverWithLog())
     }
   }
 
@@ -112,9 +112,7 @@ class ConversationsContentUpdaterImpl(val storage:     ConversationStorage,
 
   override def updateConversationCleared(id: ConvId, time: Instant) = storage.update(id, { conv =>
     verbose(s"updateConversationCleared($id, $time)")
-    //TODO: This is to distinguish initial values from initial sync from actual clearing. Ideally cleared time should be an Option[Instant]
-    val adjustedTime = if (time == Instant.EPOCH) time.plusMillis(1) else time
-    conv.withCleared(adjustedTime).withLastRead(adjustedTime)
+    conv.withCleared(time).withLastRead(time)
   })
 
   override def updateConversationState(id: ConvId, state: ConversationState) = storage.update(id, { conv =>
