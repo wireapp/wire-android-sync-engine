@@ -24,9 +24,10 @@ import com.waz.ZLog._
 import com.waz.api.impl.ErrorResponse
 import com.waz.api._
 import com.waz.content.GlobalPreferences._
-import com.waz.content.UserPreferences
+import com.waz.content.{AssetsStorage, UserPreferences}
 import com.waz.model.AccountData.Password
 import com.waz.model._
+import com.waz.service.images.ImageLoader
 import com.waz.service.tracking.LoggedOutEvent
 import com.waz.threading.Threading
 import com.waz.utils.events.{EventContext, Signal}
@@ -80,11 +81,13 @@ trait AccountsService {
 
   def logout(userId: UserId): Future[Unit]
 
-
   def accountManagers: Signal[Set[AccountManager]]
   def accountsWithManagers: Signal[Set[UserId]] = accountManagers.map(_.map(_.userId))
   def zmsInstances: Signal[Set[ZMessaging]]
   def getZms(userId: UserId): Future[Option[ZMessaging]]
+
+  def getImageLoader(userId: UserId): Future[Option[ImageLoader]]
+  def getAssetsStorage(userId: UserId): Future[Option[AssetsStorage]]
 
   def accountState(userId: UserId): Signal[AccountState]
 
@@ -335,6 +338,9 @@ class AccountsServiceImpl(val global: GlobalModule) extends AccountsService {
     verbose(s"getZms: $userId")
     zmsInstances.head.map(_.find(_.selfUserId == userId))
   }
+
+  override def getImageLoader(userId: UserId): Future[Option[ImageLoader]] = getZms(userId).map(_.map(_.imageLoader))
+  override def getAssetsStorage(userId: UserId): Future[Option[AssetsStorage]] = getZms(userId).map(_.map(_.assetsStorage))
 
   //TODO optional delete history (https://github.com/wireapp/android-project/issues/51)
   def logout(userId: UserId) = {
