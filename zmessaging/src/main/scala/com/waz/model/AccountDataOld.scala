@@ -27,7 +27,6 @@ import com.waz.model.AccountDataOld.{PermissionsMasks, TriTeamId}
 import com.waz.model.otr.ClientId
 import com.waz.sync.client.AuthenticationManager
 import com.waz.sync.client.AuthenticationManager.{AccessToken, Cookie}
-import com.waz.utils.Locales.currentLocaleOrdering
 import com.waz.utils.scrypt.SCrypt
 import com.waz.utils.wrappers.{DB, DBContentValues, DBCursor, DBProgram}
 import com.waz.utils.{JsonDecoder, JsonEncoder}
@@ -193,15 +192,6 @@ case class AccountDataOld(id:              AccountId                       = Acc
   def isTeamAccount: Boolean =
     teamId.fold(_ => false, _.isDefined)
 
-}
-
-case class PhoneNumber(str: String) extends AnyVal {
-  override def toString: String = str
-}
-object PhoneNumber extends (String => PhoneNumber) {
-  implicit def IsOrdered: Ordering[PhoneNumber] = currentLocaleOrdering.on(_.str)
-  implicit val Encoder: JsonEncoder[PhoneNumber] = JsonEncoder.build(p => js => js.put("phone", p.str))
-  implicit val Decoder: JsonDecoder[PhoneNumber] = JsonDecoder.lift(implicit js => PhoneNumber(JsonDecoder.decodeString('phone)))
 }
 
 case class ConfirmationCode(str: String) extends AnyVal {
