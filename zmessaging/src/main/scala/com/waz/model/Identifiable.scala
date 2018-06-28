@@ -24,7 +24,7 @@ import java.util.regex.Pattern.compile
 
 import com.waz.api.NotificationsHandler.NotificationType
 import com.waz.api.NotificationsHandler.NotificationType._
-import com.waz.log.InternalLog.ProductionLoggable
+import com.waz.api.ZmsVersion
 import com.waz.utils.Locales.currentLocaleOrdering
 import com.waz.utils.{JsonDecoder, JsonEncoder, Locales, sha2}
 import com.waz.utils.wrappers.URI
@@ -32,7 +32,12 @@ import com.waz.utils.wrappers.URI
 import scala.math.Ordering
 import scala.language.implicitConversions
 
-trait Id extends ProductionLoggable {
+trait Identifiable {
+  def str: String
+  override def toString = s"${getClass.getSimpleName}(${if (ZmsVersion.DEBUG) str else sha2(str)})"
+}
+
+trait Id extends Identifiable {
 
   def bytes = {
     val uuid = UUID.fromString(str)
@@ -136,7 +141,7 @@ object ProviderId extends (String => ProviderId) with IdGen[ProviderId]
 case class IntegrationId(str: String) extends Id
 object IntegrationId extends (String => IntegrationId) with IdGen[IntegrationId]
 
-case class Name(str: String) extends ProductionLoggable {
+case class Name(str: String) extends Identifiable {
   def isEmpty  = str.isEmpty
   def length   = str.length
   def nonEmpty = str.nonEmpty
