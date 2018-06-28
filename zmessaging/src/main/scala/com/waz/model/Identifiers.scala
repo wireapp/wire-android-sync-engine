@@ -30,6 +30,7 @@ import com.waz.utils.{JsonDecoder, JsonEncoder, Locales, sha2}
 import com.waz.utils.wrappers.URI
 
 import scala.math.Ordering
+import scala.language.implicitConversions
 
 trait Id extends ProductionLoggable {
 
@@ -161,40 +162,6 @@ object Name extends (String => Name) {
   }
 
   val Empty = Name("")
-}
-
-//Always obfuscates content, even in debug builds
-case class SensitiveString(str: String) extends AnyVal {
-
-  def isEmpty  = str.isEmpty
-  def length   = str.length
-  def nonEmpty = str.nonEmpty
-
-  def trim = SensitiveString(str.trim)
-  def take(x: Int) = SensitiveString(str.take(x))
-
-  def apply(i: Int): Char = str(i)
-
-  def contains(substr: String): Boolean = str.contains(substr)
-  def compareTo(other: SensitiveString): Int = str.compareTo(other.str)
-
-  def split(regex: String): Array[String] = str.split(regex)
-
-  def substring(begin: Int, end: Int): SensitiveString = SensitiveString(str.substring(begin, end))
-  def substring(beginIndex: Int): SensitiveString = SensitiveString(str.substring(beginIndex))
-
-  def indexWhere(p: Char => Boolean, from: Int): Int = str.indexWhere(p, from)
-
-  override def toString = s"SensitiveString(${sha2(str)})"
-}
-
-object SensitiveString extends (String => SensitiveString) {
-
-  implicit def fromContentString(cs: SensitiveString): String = cs.str
-
-  implicit def toContentString(str: String): SensitiveString = SensitiveString(str)
-
-  val Empty = SensitiveString("")
 }
 
 case class Handle(string: String) extends AnyVal {
