@@ -169,21 +169,18 @@ object Name extends (String => Name) {
   val Empty = Name("")
 }
 
-case class Handle(string: String) extends AnyVal {
-  override def toString : String = string
+case class Handle(str: String) extends Identifiable {
 
-  def startsWithQuery(query: String): Boolean = {
-    string.startsWith(Handle.stripSymbol(query).toLowerCase)
-  }
+  def startsWithQuery(query: String): Boolean =
+    str.startsWith(Handle.stripSymbol(query).toLowerCase)
 
-  def exactMatchQuery(query: String): Boolean = {
-    string == Handle.stripSymbol(query).toLowerCase
-  }
+  def exactMatchQuery(query: String): Boolean =
+    str == Handle.stripSymbol(query).toLowerCase
 
-  def withSymbol: String = if (string.startsWith("@")) string else s"@$string"
+  def withSymbol: String = if (str.startsWith("@")) str else s"@$str"
 }
 
-object Handle extends (String => Handle){
+object Handle extends (String => Handle) {
   def apply(): Handle = Handle("")
   def random: Handle = Handle(UUID.randomUUID().toString)
   val handlePattern = """@(.+)""".r
@@ -195,12 +192,10 @@ object Handle extends (String => Handle){
     case Handle.handlePattern(handle) => handle
     case _ => input
   }
-
 }
 
-case class EmailAddress(str: String) extends AnyVal {
+case class EmailAddress(str: String) extends Identifiable {
   def normalized: Option[EmailAddress] = EmailAddress.parse(str)
-  override def toString: String = str
 }
 
 object EmailAddress extends (String => EmailAddress) {
@@ -244,9 +239,7 @@ object EmailAddress extends (String => EmailAddress) {
   private def letter = "[a-zA-Z]"
 }
 
-case class PhoneNumber(str: String) extends AnyVal {
-  override def toString: String = str
-}
+case class PhoneNumber(str: String) extends Identifiable
 
 object PhoneNumber extends (String => PhoneNumber) {
   implicit def IsOrdered: Ordering[PhoneNumber] = currentLocaleOrdering.on(_.str)

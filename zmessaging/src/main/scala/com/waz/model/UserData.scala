@@ -241,7 +241,7 @@ object UserData {
       o.put("verified", v.verified.name)
       o.put("deleted", v.deleted)
       o.put("availability", v.availability.id)
-      v.handle.foreach(u => o.put("handle", u.string))
+      v.handle.foreach(u => o.put("handle", u.str))
       v.providerId.foreach { pId => o.put("providerId", pId.str) }
       v.integrationId.foreach { iId => o.put("integrationId", iId.str) }
       v.expiresAt.foreach(v => o.put("expires_at", v))

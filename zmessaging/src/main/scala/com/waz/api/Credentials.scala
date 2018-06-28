@@ -65,7 +65,7 @@ case class HandleCredentials(handle: Handle, password: String) extends Credentia
   override val autoLogin = false
 
   override def addToRegistrationJson(o: JSONObject): Unit = {
-    o.put("email", handle.string)
+    o.put("email", handle.str)
     o.put("password", password)
   }
 

@@ -170,7 +170,7 @@ case class AccountDataOld(id:              AccountId                       = Acc
         o.put("password", p)
 
       case (_, Some(h), _, Some(p), _) =>
-        o.put("handle", h.string)
+        o.put("handle", h.str)
         o.put("password", p)
 
       case (_, _, Some(p), _, Some(c)) =>

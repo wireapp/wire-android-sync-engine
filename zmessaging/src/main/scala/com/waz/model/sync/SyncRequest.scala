@@ -426,7 +426,7 @@ object SyncRequest {
         case PostRemoveBot(cId, botId)        =>
           o.put("convId", cId.str)
           o.put("botId", botId.str)
-        case ExactMatchHandle(handle)         => o.put("handle", handle.string)
+        case ExactMatchHandle(handle)         => o.put("handle", handle.str)
         case SyncTeamMember(userId)           => o.put("user", userId.str)
         case DeletePushToken(token)           => putId("token", token.str)
         case RegisterPushToken(token)         => putId("token", token.str)

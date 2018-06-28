@@ -102,7 +102,7 @@ class TeamsServiceImpl(selfUser:           UserId,
 
       def userMatches(data: UserData) = data.teamId == teamId && (query match {
         case Some(q) =>
-          if (handleOnly) data.handle.map(_.string).contains(q.asciiRepresentation)
+          if (handleOnly) data.handle.map(_.str).contains(q.asciiRepresentation)
           else q.isAtTheStartOfAnyWordIn(data.searchKey)
         case _ => true
       })

@@ -262,7 +262,7 @@ class AccountManager(val userId:   UserId,
     _       <- db.flushWALToDatabase()
     backup  = BackupManager.exportDatabase(
       userId,
-      userHandle  = user.handle.map(_.string).getOrElse(""),
+      userHandle  = user.handle.map(_.str).getOrElse(""),
       databaseDir = context.getDatabasePath(userId.str).getParentFile,
       targetDir   = context.getExternalCacheDir
     )
