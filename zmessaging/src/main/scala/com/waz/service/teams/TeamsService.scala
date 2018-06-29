@@ -21,7 +21,7 @@ import com.waz.ZLog.ImplicitTag._
 import com.waz.ZLog._
 import com.waz.content.ContentChange.{Added, Removed, Updated}
 import com.waz.content._
-import com.waz.model.AccountDataOld.PermissionsMasks
+import com.waz.model.AccountData.PermissionsMasks
 import com.waz.model.ConversationData.ConversationDataDao
 import com.waz.model._
 import com.waz.service.EventScheduler.Stage
@@ -34,7 +34,6 @@ import com.waz.utils.events.{AggregatingSignal, EventStream, RefreshingSignal, S
 
 import scala.collection.Seq
 import scala.concurrent.Future
-import scala.util.Right
 
 //TODO - return Signals of the search results for UI??
 trait TeamsService {

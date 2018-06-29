@@ -216,8 +216,8 @@ class AccountsServiceImpl(val global: GlobalModule) extends AccountsService {
             _ <- acc.cookie.fold(Future.successful(()))(cookie => global.accountsStorage.insert(AccountData(acc.userId.get, teamId, cookie, acc.accessToken, acc.registeredPush, Some(Password("")))).map(_ => ()))
             _ <- prefs.preference(UserPreferences.SelfClient) := state
             _ <- prefs.preference(UserPreferences.PrivateMode) := acc.privateMode
-            _ <- prefs.preference(UserPreferences.SelfPermissions) := AccountDataOld.encodeBitmask(acc.selfPermissions)
-            _ <- prefs.preference(UserPreferences.CopyPermissions) := AccountDataOld.encodeBitmask(acc.copyPermissions)
+            _ <- prefs.preference(UserPreferences.SelfPermissions) := AccountData.encodeBitmask(acc.selfPermissions)
+            _ <- prefs.preference(UserPreferences.CopyPermissions) := AccountData.encodeBitmask(acc.copyPermissions)
           } yield {
             stor.db.close()
           }

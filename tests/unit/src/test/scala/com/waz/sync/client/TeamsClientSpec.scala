@@ -17,8 +17,8 @@
  */
 package com.waz.sync.client
 
-import com.waz.model.AccountDataOld._
-import com.waz.model.AccountDataOld.Permission._
+import com.waz.model.AccountData._
+import com.waz.model.AccountData.Permission._
 import com.waz.specs.AndroidFreeSpec
 
 class TeamsClientSpec extends AndroidFreeSpec {
