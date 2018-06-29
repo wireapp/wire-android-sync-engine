@@ -22,7 +22,7 @@ import com.waz.ZLog.ImplicitTag._
 import com.waz.ZLog._
 import com.waz.db.Col._
 import com.waz.db.{Col, Dao, DbTranslator}
-import com.waz.model.AccountData.Password
+import com.waz.model.AccountData.{ConfirmationCode, Password}
 import com.waz.model.AccountDataOld.{PermissionsMasks, TriTeamId}
 import com.waz.model.otr.ClientId
 import com.waz.sync.client.AuthenticationManager
@@ -62,6 +62,10 @@ object AccountData {
 
   case class Password(str: String) {
     override def toString = "********"
+  }
+
+  case class ConfirmationCode(str: String) extends AnyVal {
+    override def toString: String = "******"
   }
 
   //Labels can be used to revoke all cookies for a given client
@@ -192,10 +196,6 @@ case class AccountDataOld(id:              AccountId                       = Acc
   def isTeamAccount: Boolean =
     teamId.fold(_ => false, _.isDefined)
 
-}
-
-case class ConfirmationCode(str: String) extends AnyVal {
-  override def toString: String = str
 }
 
 object AccountDataOld {

@@ -25,7 +25,7 @@ import com.waz.api.impl.ErrorResponse
 import com.waz.api._
 import com.waz.content.GlobalPreferences._
 import com.waz.content.UserPreferences
-import com.waz.model.AccountData.Password
+import com.waz.model.AccountData.{ConfirmationCode, Password}
 import com.waz.model._
 import com.waz.service.tracking.LoggedOutEvent
 import com.waz.sync.client.LoginClient

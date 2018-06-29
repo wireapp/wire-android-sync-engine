@@ -17,8 +17,8 @@
  */
 package com.waz.api
 
-import com.waz.model.AccountData.Password
-import com.waz.model.{ConfirmationCode, EmailAddress, Handle, PhoneNumber}
+import com.waz.model.AccountData.{ConfirmationCode, Password}
+import com.waz.model.{EmailAddress, Handle, PhoneNumber}
 import org.json.JSONObject
 
 sealed trait Credentials {

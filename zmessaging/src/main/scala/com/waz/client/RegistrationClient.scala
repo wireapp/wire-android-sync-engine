@@ -19,7 +19,7 @@ package com.waz.client
 
 import com.waz.api._
 import com.waz.api.impl.ErrorResponse
-import com.waz.model.AccountData.Label
+import com.waz.model.AccountData.{ConfirmationCode, Label}
 import com.waz.model._
 import com.waz.service.BackendConfig
 import com.waz.sync.client.AuthenticationManager.Cookie
