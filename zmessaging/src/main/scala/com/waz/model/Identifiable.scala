@@ -26,11 +26,11 @@ import com.waz.api.NotificationsHandler.NotificationType
 import com.waz.api.NotificationsHandler.NotificationType._
 import com.waz.api.ZmsVersion
 import com.waz.utils.Locales.currentLocaleOrdering
-import com.waz.utils.{JsonDecoder, JsonEncoder, Locales, sha2}
 import com.waz.utils.wrappers.URI
+import com.waz.utils.{Locales, sha2}
 
-import scala.math.Ordering
 import scala.language.implicitConversions
+import scala.math.Ordering
 
 trait Identifiable {
   def str: String
@@ -200,10 +200,7 @@ case class EmailAddress(str: String) extends Identifiable {
 
 object EmailAddress extends (String => EmailAddress) {
   implicit def IsOrdered: Ordering[EmailAddress] = currentLocaleOrdering.on(_.str)
-
-  implicit val Encoder: JsonEncoder[EmailAddress] = JsonEncoder.build(p => js => js.put("email", p.str))
-  implicit val Decoder: JsonDecoder[EmailAddress] = JsonDecoder.lift(implicit js => EmailAddress(JsonDecoder.decodeString('email)))
-
+  
   val pattern = compile(address)
 
   def parse(input: String): Option[EmailAddress] = {
@@ -243,6 +240,4 @@ case class PhoneNumber(str: String) extends Identifiable
 
 object PhoneNumber extends (String => PhoneNumber) {
   implicit def IsOrdered: Ordering[PhoneNumber] = currentLocaleOrdering.on(_.str)
-  implicit val Encoder: JsonEncoder[PhoneNumber] = JsonEncoder.build(p => js => js.put("phone", p.str))
-  implicit val Decoder: JsonDecoder[PhoneNumber] = JsonDecoder.lift(implicit js => PhoneNumber(JsonDecoder.decodeString('phone)))
 }
