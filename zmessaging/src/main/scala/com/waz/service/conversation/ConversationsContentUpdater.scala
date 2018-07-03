@@ -44,7 +44,7 @@ trait ConversationsContentUpdater {
   def processConvWithRemoteId[A](remoteId: RConvId, retryAsync: Boolean, retryCount: Int = 0)(processor: ConversationData => Future[A])(implicit tag: LogTag, ec: ExecutionContext): Future[A]
   def updateConversationLastRead(id: ConvId, time: Instant): Future[Option[(ConversationData, ConversationData)]]
   def updateConversationMuted(conv: ConvId, muted: Boolean): Future[Option[(ConversationData, ConversationData)]]
-  def updateConversationName(id: ConvId, name: String): Future[Option[(ConversationData, ConversationData)]]
+  def updateConversationName(id: ConvId, name: Name): Future[Option[(ConversationData, ConversationData)]]
   def setConvActive(id: ConvId, active: Boolean): Future[Unit]
   def updateConversationArchived(id: ConvId, archived: Boolean): Future[Option[(ConversationData, ConversationData)]]
   def updateConversationCleared(id: ConvId, time: Instant): Future[Option[(ConversationData, ConversationData)]]
@@ -57,7 +57,7 @@ trait ConversationsContentUpdater {
                                     convType:   ConversationType,
                                     creator:    UserId,
                                     members:    Set[UserId],
-                                    name:       Option[String] = None,
+                                    name:       Option[Name] = None,
                                     hidden:     Boolean = false,
                                     access:     Set[Access] = Set(Access.PRIVATE),
                                     accessRole: AccessRole = AccessRole.PRIVATE): Future[ConversationData]
@@ -88,7 +88,7 @@ class ConversationsContentUpdaterImpl(val storage:     ConversationStorage,
 
   override def convByRemoteId(id: RConvId): Future[Option[ConversationData]] = storage.getByRemoteId(id)
 
-  override def updateConversationName(id: ConvId, name: String) = storage.update(id, { conv =>
+  override def updateConversationName(id: ConvId, name: Name) = storage.update(id, { conv =>
       if (conv.convType == ConversationType.Group)
         conv.copy(name = if (name.isEmpty) None else Some(name))
       else
@@ -136,7 +136,7 @@ class ConversationsContentUpdaterImpl(val storage:     ConversationStorage,
 
     if (conv.lastEventTime.isAfter(time)) conv
     else {
-      debug(s"updating: $conv, lastEventTime: $time")
+      verbose(s"updating: $conv, lastEventTime: $time")
       conv.copy(lastEventTime = conv.lastEventTime max time)
     }
   })
@@ -154,7 +154,7 @@ class ConversationsContentUpdaterImpl(val storage:     ConversationStorage,
                                              convType:   ConversationType,
                                              creator:    UserId,
                                              members:    Set[UserId],
-                                             name:       Option[String] = None,
+                                             name:       Option[Name] = None,
                                              hidden:     Boolean = false,
                                              access:     Set[Access] = Set(Access.PRIVATE),
                                              accessRole: AccessRole = AccessRole.PRIVATE) = {

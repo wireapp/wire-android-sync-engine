@@ -22,7 +22,7 @@ import java.math.BigInteger
 import com.waz.api.{OtrClientType, Verification}
 import com.waz.db.Col._
 import com.waz.db.Dao
-import com.waz.model.{Id, UserId}
+import com.waz.model.{Id, IdGen, UserId}
 import com.waz.utils.crypto.ZSecureRandom
 import com.waz.utils.wrappers.{DB, DBCursor}
 import com.waz.utils.{JsonDecoder, JsonEncoder}
@@ -31,20 +31,12 @@ import org.threeten.bp.Instant
 
 import scala.collection.breakOut
 
-case class ClientId(str: String) {
+case class ClientId(str: String) extends Id {
   def longId = new BigInteger(str, 16).longValue()
-  override def toString: String = str
 }
+object ClientId extends (String => ClientId) with IdGen[ClientId] {
 
-object ClientId {
-
-  implicit val id: Id[ClientId] = new Id[ClientId] {
-    override def random(): ClientId = ClientId(ZSecureRandom.nextLong().toHexString)
-    override def decode(str: String): ClientId = ClientId(str)
-    override def encode(id: ClientId): String = id.str
-  }
-
-  def apply() = id.random()
+  override def apply() = ClientId(ZSecureRandom.nextLong().toHexString)
 
   def opt(id: String) = Option(id).filter(_.nonEmpty).map(ClientId(_))
 }

@@ -78,7 +78,7 @@ class IntegrationsClientImpl(implicit
   }
 
   def addBot(rConvId: RConvId, pId: ProviderId, iId: IntegrationId): ErrorOrResponse[ConversationEvent] = {
-    debug(s"addBot: rConvId: $rConvId, providerId: $pId, integrationId: $iId")
+    verbose(s"addBot: rConvId: $rConvId, providerId: $pId, integrationId: $iId")
     Request
       .Post(
         url = backendUrl(s"$ConversationsPath/${rConvId.str}/bots"),
@@ -90,7 +90,7 @@ class IntegrationsClientImpl(implicit
   }
 
   def removeBot(rConvId: RConvId, botId: UserId): ErrorOrResponse[ConversationEvent] = {
-    debug(s"removeBot: convId: $rConvId, botId: $botId")
+    verbose(s"removeBot: convId: $rConvId, botId: $botId")
     Request.Delete(url = backendUrl(s"$ConversationsPath/${rConvId.str}/bots/$botId"))
       .withResultType[ConversationEvent]
       .withErrorType[ErrorResponse]

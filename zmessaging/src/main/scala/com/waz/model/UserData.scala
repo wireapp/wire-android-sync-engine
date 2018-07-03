@@ -23,6 +23,7 @@ import com.waz.api.Verification
 import com.waz.api.impl.AccentColor
 import com.waz.db.Col._
 import com.waz.db.Dao
+import com.waz.model
 import com.waz.model.UserData.ConnectionStatus
 import com.waz.service.SearchKey
 import com.waz.sync.client.UserSearchClient.UserSearchEntry
@@ -33,7 +34,7 @@ import org.threeten.bp.Instant
 
 case class UserData(id:                    UserId,
                     teamId:                Option[TeamId]        = None,
-                    name:                  String,
+                    name:                  Name,
                     email:                 Option[EmailAddress]  = None,
                     phone:                 Option[PhoneNumber]   = None,
                     trackingId:            Option[TrackingId]    = None,
@@ -42,11 +43,11 @@ case class UserData(id:                    UserId,
                     searchKey:             SearchKey,
                     connection:            ConnectionStatus      = ConnectionStatus.Unconnected,
                     connectionLastUpdated: Date                  = new Date(0), // server side timestamp of last connection update
-                    connectionMessage:     Option[String]        = None, // incoming connection request message
+                    connectionMessage:     Option[SensitiveString] = None, // incoming connection request message
                     conversation:          Option[RConvId]       = None, // remote conversation id with this contact (one-to-one)
                     relation:              Relation              = Relation.Other, //unused - remove in future migration
                     syncTimestamp:         Long                  = 0,
-                    displayName:           String                = "",
+                    displayName:           Name                  = "",
                     verified:              Verification          = Verification.UNKNOWN, // user is verified if he has any otr client, and all his clients are verified
                     deleted:               Boolean               = false,
                     availability:          Availability          = Availability.None,
@@ -54,6 +55,34 @@ case class UserData(id:                    UserId,
                     providerId:            Option[ProviderId]    = None,
                     integrationId:         Option[IntegrationId] = None,
                     expiresAt:             Option[Instant]       = None) {
+
+  override def toString: String =
+    s"""
+       |UserData:
+       |   id:                    $id
+       |   teamId:                $teamId
+       |   name:                  $name
+       |   email:                 $email
+       |   phone:                 $phone
+       |   trackingId:            $trackingId
+       |   picture:               $picture
+       |   accent:                $accent
+       |   searchKey:             $searchKey
+       |   connection:            $connection
+       |   connectionLastUpdated: $connectionLastUpdated
+       |   connectionMessage:     $connectionMessage
+       |   conversation:          $conversation
+       |   relation:              $relation
+       |   syncTimestamp:         $syncTimestamp
+       |   displayName:           $displayName
+       |   verified:              $verified
+       |   deleted:               $deleted
+       |   availability:          $availability
+       |   handle:                $handle
+       |   providerId:            $providerId
+       |   integrationId:         $integrationId
+       |   expiresAt:             $expiresAt
+    """.stripMargin
 
   def isConnected = ConnectionStatus.isConnected(connection)
   def hasEmailOrPhone = email.isDefined || phone.isDefined
@@ -63,7 +92,7 @@ case class UserData(id:                    UserId,
   def isAutoConnect = isConnected && ! isSelf && connectionMessage.isEmpty
   lazy val isWireBot = integrationId.nonEmpty
 
-  def getDisplayName = if (displayName.isEmpty) name else displayName
+  def getDisplayName = if (displayName.str.isEmpty) name else displayName
 
   def updated(user: UserInfo): UserData = updated(user, withSearchKey = true)
   def updated(user: UserInfo, withSearchKey: Boolean): UserData = copy(
@@ -72,7 +101,7 @@ case class UserData(id:                    UserId,
     phone = user.phone.orElse(phone),
     accent = user.accentId.getOrElse(accent),
     trackingId = user.trackingId.orElse(trackingId),
-    searchKey = SearchKey(if (withSearchKey) user.name.getOrElse(name) else ""),
+    searchKey = SearchKey(if (withSearchKey) user.name.getOrElse(name).str else ""),
     picture = user.mediumPicture.map(_.id).orElse(picture),
     deleted = user.deleted,
     handle = user.handle match {
@@ -94,7 +123,7 @@ case class UserData(id:                    UserId,
 
   def updated(teamId: Option[TeamId]): UserData = copy(teamId = teamId)
 
-  def updateConnectionStatus(status: UserData.ConnectionStatus, time: Option[Date] = None, message: Option[String] = None): UserData = {
+  def updateConnectionStatus(status: UserData.ConnectionStatus, time: Option[Date] = None, message: Option[SensitiveString] = None): UserData = {
     if (time.exists(_.before(this.connectionLastUpdated))) this
     else if (this.connection == status) time.fold(this) { time => this.copy(connectionLastUpdated = time) }
     else {
@@ -142,9 +171,9 @@ object UserData {
   }
 
   // used for testing only
-  def apply(name: String): UserData = UserData(UserId(), name = name, searchKey = SearchKey.simple(name))
+  def apply(name: String): UserData = UserData(UserId(), name = Name(name), searchKey = SearchKey.simple(name))
 
-  def apply(id: UserId, name: String): UserData = UserData(id, None, name, None, None, searchKey = SearchKey(name), handle = None)
+  def apply(id: UserId, name: String): UserData = UserData(id, None, Name(name), None, None, searchKey = SearchKey(name), handle = None)
 
   def apply(entry: UserSearchEntry): UserData =
     UserData(
@@ -152,52 +181,67 @@ object UserData {
       teamId    = None,
       name      = entry.name,
       accent    = entry.colorId.getOrElse(0),
-      searchKey = SearchKey(entry.name),
+      searchKey = SearchKey(entry.name.str),
       handle    = Some(entry.handle)
     ) // TODO: improve connection, relation, search level stuff
 
   def apply(user: UserInfo): UserData = apply(user, withSearchKey = true)
 
   def apply(user: UserInfo, withSearchKey: Boolean): UserData =
-    UserData(user.id, None, user.name.getOrElse(""), user.email, user.phone, user.trackingId, user.mediumPicture.map(_.id),
-      user.accentId.getOrElse(AccentColor().id), SearchKey(if (withSearchKey) user.name.getOrElse("") else ""), deleted = user.deleted,
+    UserData(user.id, None, user.name.getOrElse(Name.Empty), user.email, user.phone, user.trackingId, user.mediumPicture.map(_.id),
+      user.accentId.getOrElse(AccentColor().id), SearchKey(if (withSearchKey) user.name.map(_.str).getOrElse("") else ""), deleted = user.deleted,
       handle = user.handle, providerId = user.service.map(_.provider), integrationId = user.service.map(_.id))
 
   implicit lazy val Decoder: JsonDecoder[UserData] = new JsonDecoder[UserData] {
     import JsonDecoder._
     override def apply(implicit js: JSONObject): UserData = UserData(
-      id = 'id, teamId = decodeOptTeamId('teamId), name = 'name, email = decodeOptEmailAddress('email), phone = decodeOptPhoneNumber('phone),
-      trackingId = decodeOptId[TrackingId]('trackingId), picture = decodeOptAssetId('assetId), accent = decodeInt('accent), searchKey = SearchKey('name),
-      connection = ConnectionStatus('connection), connectionLastUpdated = new Date(decodeLong('connectionLastUpdated)), connectionMessage = decodeOptString('connectionMessage),
-      conversation = decodeOptRConvId('rconvId), relation = Relation.withId('relation),
-      syncTimestamp = decodeLong('syncTimestamp), 'displayName, Verification.valueOf('verified), deleted = 'deleted,
-      availability = Availability(decodeInt('activityStatus)), handle = decodeOptHandle('handle),
-      providerId = decodeOptId[ProviderId]('providerId), integrationId = decodeOptId[IntegrationId]('integrationId),
-      expiresAt = decodeOptISOInstant('expires_at)
+      id                    = 'id,
+      teamId                = 'teamId,
+      name                  = 'name,
+      email                 = 'email,
+      phone                 = 'phone,
+      trackingId            = decodeOptId[TrackingId]('trackingId),
+      picture               = 'assetId,
+      accent                = 'accent,
+      searchKey             = SearchKey(decodeName('name)),
+      connection            = ConnectionStatus('connection),
+      connectionLastUpdated = new Date(decodeLong('connectionLastUpdated)),
+      connectionMessage     = 'connectionMessage,
+      conversation          = 'rconvId,
+      relation              = Relation.withId('relation),
+      syncTimestamp         = 'syncTimestamp,
+      displayName           = 'displayName,
+      verified              = Verification.valueOf('verified),
+      deleted               = 'deleted,
+      availability          = Availability('activityStatus),
+      handle                = 'handle,
+      providerId            = decodeOptId[ProviderId]('providerId),
+      integrationId         = decodeOptId[IntegrationId]('integrationId),
+      expiresAt             = 'expires_at
     )
   }
 
   implicit lazy val Encoder: JsonEncoder[UserData] = new JsonEncoder[UserData] {
     override def apply(v: UserData): JSONObject = JsonEncoder { o =>
       o.put("id", v.id.str)
-      v.teamId foreach (id => o.put("teamId", id.str))
-      o.put("name", v.name)
-      v.email foreach (o.put("email", _))
-      v.phone foreach (o.put("phone", _))
-      v.trackingId foreach (id => o.put("trackingId", id.str))
-      v.picture foreach (id => o.put("assetId", id.str))
+      v.teamId.foreach(id => o.put("teamId", id.str))
+      o.put("name", v.name.str)
+      v.email.foreach(v => o.put("email", v.str))
+      v.phone.foreach(v => o.put("phone", v.str))
+      v.trackingId.foreach(id => o.put("trackingId", id.str))
+      v.picture.foreach(id => o.put("assetId", id.str))
       o.put("accent", v.accent)
       o.put("connection", v.connection.code)
       o.put("connectionLastUpdated", v.connectionLastUpdated.getTime)
-      v.connectionMessage foreach (o.put("connectionMessage", _))
-      v.conversation foreach (id => o.put("rconvId", id.str))
+      v.connectionMessage.foreach(v => o.put("connectionMessage", v.str))
+      v.conversation.foreach(id => o.put("rconvId", id.str))
       o.put("relation", v.relation.id)
       o.put("syncTimestamp", v.syncTimestamp)
       o.put("displayName", v.displayName)
       o.put("verified", v.verified.name)
       o.put("deleted", v.deleted)
       o.put("availability", v.availability.id)
-      v.handle foreach(u => o.put("handle", u.string))
+      v.handle.foreach(u => o.put("handle", u.str))
       v.providerId.foreach { pId => o.put("providerId", pId.str) }
       v.integrationId.foreach { iId => o.put("integrationId", iId.str) }
       v.expiresAt.foreach(v => o.put("expires_at", v))
@@ -207,7 +251,7 @@ object UserData {
   implicit object UserDataDao extends Dao[UserData, UserId] {
     val Id = id[UserId]('_id, "PRIMARY KEY").apply(_.id)
     val TeamId = opt(id[TeamId]('teamId))(_.teamId)
-    val Name = text('name)(_.name)
+    val Name = text[model.Name]('name, _.str, model.Name)(_.name)
     val Email = opt(emailAddress('email))(_.email)
     val Phone = opt(phoneNumber('phone))(_.phone)
     val TrackingId = opt(id[TrackingId]('tracking_id))(_.trackingId)
@@ -216,11 +260,11 @@ object UserData {
     val SKey = text[SearchKey]('skey, _.asciiRepresentation, SearchKey.unsafeRestore)(_.searchKey)
     val Conn = text[ConnectionStatus]('connection, _.code, ConnectionStatus(_))(_.connection)
     val ConnTime = date('conn_timestamp)(_.connectionLastUpdated)
-    val ConnMessage = opt(text('conn_msg))(_.connectionMessage)
+    val ConnMessage = opt(text[SensitiveString]('conn_msg, _.str, SensitiveString))(_.connectionMessage)
     val Conversation = opt(id[RConvId]('conversation))(_.conversation)
     val Rel = text[Relation]('relation, _.name, Relation.valueOf)(_.relation)
     val Timestamp = long('timestamp)(_.syncTimestamp)
-    val DisplayName = text('display_name)(_.displayName)
+    val DisplayName = text[model.Name]('display_name, _.str, model.Name)(_.displayName)
     val Verified = text[Verification]('verified, _.name, Verification.valueOf)(_.verified)
     val Deleted = bool('deleted)(_.deleted)
     val AvailabilityStatus = int[Availability]('availability, _.id, Availability.apply)(_.availability)

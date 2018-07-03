@@ -33,7 +33,6 @@ import com.waz.model.otr.ClientId
 import com.waz.model.sync.SyncRequest._
 import com.waz.model.sync.{SyncJob, SyncRequest}
 import com.waz.service.SearchKey
-import com.waz.service.messages.MessageAndLikes
 import com.waz.sync.client.OpenGraphClient.OpenGraphData
 import com.waz.testutils.knownMimeTypes
 import com.waz.utils.Locales.bcp47
@@ -73,7 +72,7 @@ object Generators {
   implicit lazy val arbConversationData: Arbitrary[ConversationData] = Arbitrary(for {
     id <- arbitrary[ConvId]
     remoteId <- arbitrary[RConvId]
-    name <- arbitrary[Option[String]]
+    name <- arbitrary[Option[Name]]
     creator <- arbitrary[UserId]
     convType <- arbitrary[ConversationType]
     lastEventTime <- arbitrary[Instant]
@@ -84,8 +83,8 @@ object Generators {
     archived <- arbitrary[Boolean]
     archiveTime <- arbitrary[Instant]
     cleared <- arbitrary[Option[Instant]]
-    generatedName <- arbitrary[String]
-    searchKey = name map SearchKey
+    generatedName <- arbitrary[Name]
+    searchKey = name.map(SearchKey(_))
     unreadCount <- arbitrary[UnreadCount]
     failedCount <- posNum[Int]
     missedCall <- arbitrary[Option[MessageId]]
@@ -96,7 +95,7 @@ object Generators {
   implicit lazy val arbUserData: Arbitrary[UserData] = Arbitrary(for {
     id <- arbitrary[UserId]
     teamId <- arbitrary[Option[TeamId]]
-    name <- arbitrary[String]
+    name <- arbitrary[Name]
     email <- arbitrary[Option[EmailAddress]]
     phone <- arbitrary[Option[PhoneNumber]]
     trackingId <- arbitrary[Option[TrackingId]]
@@ -105,7 +104,7 @@ object Generators {
     searchKey = SearchKey(name)
     connection <- arbitrary[ConnectionStatus]
     connectionLastUpdated <- arbitrary[Date]
-    connectionMessage <- arbitrary[Option[String]]
+    connectionMessage <- arbitrary[Option[SensitiveString]]
     conversation <- arbitrary[Option[RConvId]]
     relation <- arbitrary[Relation]
     syncTimestamp <- posNum[Long]
@@ -120,8 +119,6 @@ object Generators {
     id <- arbitrary[Uid]
     content = Text("test", Map.empty, Nil) // TODO: implement actual generator
   } yield GenericMessage(id, content))
-
-  implicit lazy val arbMessageData: Arbitrary[MessageData] = Arbitrary(resultOf(MessageData))
 
   implicit lazy val arbAssetData: Arbitrary[AssetData] = Arbitrary(for {
     id            <- arbitrary[AssetId]
@@ -224,6 +221,9 @@ object Generators {
     implicit lazy val arbPostReceipt: Arbitrary[PostReceipt] = Arbitrary(resultOf(PostReceipt))
   }
 
+  implicit lazy val arbSafeString: Arbitrary[Name] = Arbitrary(alphaNumStr.map(Name))
+  implicit lazy val arbContentString: Arbitrary[SensitiveString] = Arbitrary(alphaNumStr.map(SensitiveString))
+
   implicit lazy val arbUid: Arbitrary[Uid]               = Arbitrary(sideEffect(Uid()))
   implicit lazy val arbConvId: Arbitrary[ConvId]         = Arbitrary(sideEffect(ConvId()))
   implicit lazy val arbRConvId: Arbitrary[RConvId]       = Arbitrary(sideEffect(RConvId()))
@@ -236,7 +236,6 @@ object Generators {
   implicit lazy val arbMessageId: Arbitrary[MessageId]   = Arbitrary(sideEffect(MessageId()))
   implicit lazy val arbTrackingId: Arbitrary[TrackingId] = Arbitrary(sideEffect(TrackingId()))
   implicit lazy val arbContactId: Arbitrary[ContactId]   = Arbitrary(sideEffect(ContactId()))
-  implicit lazy val arbCallSessionId: Arbitrary[CallSessionId] = Arbitrary(sideEffect(CallSessionId()))
   implicit lazy val arbClientId: Arbitrary[ClientId] = Arbitrary(sideEffect(ClientId()))
 
   implicit lazy val arbDate: Arbitrary[Date] = Arbitrary(choose(0L, 999999L).map(i => new Date(currentTimeMillis - 1000000000L + i * 1000L)))
@@ -246,13 +245,6 @@ object Generators {
 
   implicit lazy val arbLiking: Arbitrary[Liking] = Arbitrary(resultOf(Liking.apply _))
   implicit lazy val arbLikingAction: Arbitrary[Liking.Action] = Arbitrary(oneOf(Liking.Action.values.toSeq))
-  implicit lazy val arbMessageAndLikes: Arbitrary[MessageAndLikes] = Arbitrary(for {
-    msg <- arbitrary[MessageData]
-    self <- arbitrary[UserId]
-    others <- listOf(arbitrary[UserId])
-    includeSelf <- frequency((4, false), (1, true))
-    ids = if (includeSelf) self :: others else others
-  } yield MessageAndLikes(msg, ids.toVector, includeSelf))
 
   implicit lazy val arbMetaData: Arbitrary[AssetMetaData] = Arbitrary(oneOf(arbImageMetaData.arbitrary, arbVideoMetaData.arbitrary, arbAudioMetaData.arbitrary))
   implicit lazy val arbImageMetaData: Arbitrary[AssetMetaData.Image] = Arbitrary(for (d <- arbitrary[Dim2]; t <- oneOf(Medium, Preview)) yield AssetMetaData.Image(d, t))
@@ -266,7 +258,7 @@ object Generators {
 
   implicit lazy val arbUserInfo: Arbitrary[UserInfo] = Arbitrary(for {
     userId <- arbitrary[UserId]
-    name <- optGen(alphaNumStr)
+    name <- optGen(alphaNumStr).map(_.map(Name))
     email <- arbitrary[Option[EmailAddress]]
     phone <- arbitrary[Option[PhoneNumber]]
     picture <- arbitrary[Option[AssetData]]

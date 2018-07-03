@@ -27,8 +27,8 @@ import android.os.Parcel
 import android.provider.ContactsContract
 import android.provider.ContactsContract.DisplayNameSources
 import com.google.protobuf.nano.MessageNano
+import com.waz.api.CoreList
 import com.waz.api.impl._
-import com.waz.api.{CoreList, IConversation}
 import com.waz.cache.CacheEntryData
 import com.waz.content.MsgCursor
 import com.waz.model.GenericContent.Text
@@ -54,9 +54,6 @@ package object testutils {
   private implicit lazy val ec = Threading.Background
 
   object Implicits {
-    implicit def iconv_to_conv(conv: IConversation): Conversation = conv.asInstanceOf[Conversation]
-    implicit def apimsg_to_msg(msg: com.waz.api.Message): Message = msg.asInstanceOf[Message]
-    implicit def apiuser_to_user(user: com.waz.api.User): User = user.asInstanceOf[User]
     implicit def apiim_to_im(im: com.waz.api.ImageAsset): ImageAsset = im.asInstanceOf[ImageAsset]
 
     implicit lazy val CursorEmptiness: Emptiness[Cursor] = new Emptiness[Cursor] {

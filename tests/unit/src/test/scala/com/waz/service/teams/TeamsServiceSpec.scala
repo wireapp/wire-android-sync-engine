@@ -94,7 +94,7 @@ class TeamsServiceSpec extends AndroidFreeSpec {
 
     val service = createService
 
-    val res = service.searchTeamMembers(Option(SearchKey.simple("user")), false).disableAutowiring() //disable autowiring to prevent multiple loads
+    val res = service.searchTeamMembers(Option(SearchKey.simple("user")), handleOnly = false).disableAutowiring() //disable autowiring to prevent multiple loads
     result(res.filter(_ == Set(member1)).head)
 
     userStorageOnUpdated ! Seq(member2 -> member2Updated)

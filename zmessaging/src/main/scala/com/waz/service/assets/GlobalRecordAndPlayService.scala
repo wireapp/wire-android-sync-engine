@@ -157,7 +157,7 @@ class GlobalRecordAndPlayService(cache: CacheService, context: Context) {
   def setPlayhead(key: MediaKey, content: Content, playhead: bp.Duration): Future[State] = {
     def seek(maybePlayer: Option[Player] = None) =
       maybePlayer.fold2(Player(content, Observe(key)), successful).flatMap { player =>
-        player.repositionPlayhead(playhead).map(_ => returning(player)(_ => verbose(s"repositioned playhead: $playhead"))).andThenFuture {
+        player.repositionPlayhead(playhead).map(_ => returning(player)(_ => info(s"repositioned playhead: $playhead"))).andThenFuture {
           case Failure(cause) => if (maybePlayer.isEmpty) player.release() else successful(())
        }
       }
@@ -349,20 +349,20 @@ class GlobalRecordAndPlayService(cache: CacheService, context: Context) {
   object AudioFocusListener extends AudioManager.OnAudioFocusChangeListener {
     override def onAudioFocusChange(focusChange: Int): Unit = focusChange match {
       case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT =>
-        verbose("audio focus lost (transient)")
+        info("audio focus lost (transient)")
         transitionF {
           case Playing(player, key)             => pauseTransition(key, player, true)
           case rec @ Recording(_, key, _, _, _) => cancelOngoingRecording(rec).map(_ => Next(Idle))
           case other                            => successful(KeepCurrent())
         }(s"error while handling transient audio focus loss")
       case AudioManager.AUDIOFOCUS_GAIN =>
-        verbose("audio focus gained")
+        info("audio focus gained")
         transitionF {
           case Paused(player, key, _, true) => playOrResumeTransition(key, Right(player))
           case other                        => successful(KeepCurrent())
         }(s"error while handling audio focus gain")
       case AudioManager.AUDIOFOCUS_LOSS =>
-        verbose("audio focus lost")
+        info("audio focus lost")
         abandonAudioFocus()
         transitionF {
           case Playing(player, key)             => pauseTransition(key, player, false)
@@ -405,7 +405,7 @@ class GlobalRecordAndPlayService(cache: CacheService, context: Context) {
   private def applyState: Transition => State = { t =>
     t.changedState.foreach { next =>
       stateSource.mutate { current =>
-        verbose(s"transition: $current -> $next")
+        info(s"transition: $current -> $next")
         next
       }
     }

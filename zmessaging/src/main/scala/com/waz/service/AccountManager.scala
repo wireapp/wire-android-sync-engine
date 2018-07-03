@@ -144,7 +144,7 @@ class AccountManager(val userId:   UserId,
   private var hasClient = false
   otrCurrentClient.map(_.isDefined) { exists =>
     if (hasClient && !exists) {
-      info(s"client has been removed on backend, logging out")
+      verbose(s"client has been removed on backend, logging out")
       global.trackingService.loggedOut(LoggedOutEvent.RemovedClient, userId)
       logoutAndResetClient()
     }
@@ -262,7 +262,7 @@ class AccountManager(val userId:   UserId,
     _       <- db.flushWALToDatabase()
     backup  = BackupManager.exportDatabase(
       userId,
-      userHandle  = user.handle.map(_.string).getOrElse(""),
+      userHandle  = user.handle.map(_.str).getOrElse(""),
       databaseDir = context.getDatabasePath(userId.str).getParentFile,
       targetDir   = context.getExternalCacheDir
     )

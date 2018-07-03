@@ -301,7 +301,7 @@ class MessagesSyncHandler(selfUserId: UserId,
   }
 
   private[waz] def messageSent(convId: ConvId, msg: MessageData, time: Instant) = {
-    debug(s"otrMessageSent($convId. $msg, $time)")
+    verbose(s"otrMessageSent($convId. $msg, $time)")
 
     def updateLocalTimes(conv: ConvId, prevTime: Instant, time: Instant) =
       msgContent.updateLocalMessageTimes(conv, prevTime, time) flatMap { updated =>

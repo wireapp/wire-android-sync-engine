@@ -110,7 +110,7 @@ object DbTranslator {
     override def load(cursor: DBCursor, index: Int): Handle = Handle(cursor.getString(index))
     override def save(value: Handle, name: String, values: DBContentValues): Unit = values.put(name, literal(value))
     override def bind(value: Handle, index: Int, stmt: DBProgram): Unit = stmt.bindString(index, literal(value))
-    override def literal(value: Handle): String = value.string
+    override def literal(value: Handle): String = value.str
   }
   implicit def optionTranslator[A](implicit trans: DbTranslator[A]): DbTranslator[Option[A]] = new DbTranslator[Option[A]] {
     override def load(cursor: DBCursor, index: Int): Option[A] = if (cursor.isNull(index)) None else Some(trans.load(cursor, index))
@@ -136,11 +136,11 @@ object DbTranslator {
     override def bind(value: File, index: Int, stmt: DBProgram): Unit = stmt.bindString(index, literal(value))
     override def literal(value: File): String = value.getCanonicalPath
   }
-  implicit def idTranslator[A: Id](): DbTranslator[A] = new DbTranslator[A] {
+  implicit def idTranslator[A <: Id: IdCodec](): DbTranslator[A] = new DbTranslator[A] {
     override def save(value: A, name: String, values: DBContentValues): Unit = values.put(name, literal(value))
     override def bind(value: A, index: Int, stmt: DBProgram): Unit = stmt.bindString(index, literal(value))
-    override def load(cursor: DBCursor, index: Int): A = implicitly[Id[A]].decode(cursor.getString(index))
-    override def literal(value: A): String = implicitly[Id[A]].encode(value)
+    override def load(cursor: DBCursor, index: Int): A = implicitly[IdCodec[A]].decode(cursor.getString(index))
+    override def literal(value: A): String = implicitly[IdCodec[A]].encode(value)
   }
   implicit def jsonTranslator[A: JsonDecoder : JsonEncoder](): DbTranslator[A] = new DbTranslator[A] {
     override def save(value: A, name: String, values: DBContentValues): Unit = values.put(name, literal(value))

@@ -109,9 +109,9 @@ case class AudioLevels(context: Context) {
   }
 
   private def extractAudioTrackInfo(extractor: MediaExtractor, content: URI): TrackInfo = {
-    debug(s"data source: $content")
+    verbose(s"data source: $content")
     extractor.setDataSource(context, URI.unwrap(content), null)
-    debug(s"track count: ${extractor.getTrackCount}")
+    info(s"track count: ${extractor.getTrackCount}")
 
     val audioTrack = Iterator.range(0, extractor.getTrackCount).map { n =>
       val fmt = extractor.getTrackFormat(n)
@@ -132,7 +132,7 @@ case class AudioLevels(context: Context) {
     val duration = get(MediaFormat.KEY_DURATION, _.getLong)
     val samples = duration.toDouble * 1E-6d * samplingRate.toDouble
 
-    returning(TrackInfo(trackNum, format, mime, samplingRate, channels, duration.micros, samples))(ti => debug(s"audio track: $ti"))
+    returning(TrackInfo(trackNum, format, mime, samplingRate, channels, duration.micros, samples))(ti => verbose(s"audio track: $ti"))
   }
 
   private def audioDecoder(info: TrackInfo): MediaCodec = returning(MediaCodec.createDecoderByType(info.mime)) { mc =>

@@ -40,10 +40,10 @@ class CallWakeService extends FutureService with ZMessagingService {
   implicit val ec = EventContext.Global
 
   override protected def onIntent(intent: AIntent, id: Int): Future[Any] = onZmsIntent(intent) { zms =>
-    debug(s"onIntent $intent")
+    verbose(s"onIntent $intent")
     if (intent != null && intent.hasExtra(ConvIdExtra)) {
       val convId = ConvId(intent.getStringExtra(ConvIdExtra))
-      debug(s"convId: $convId")
+      verbose(s"convId: $convId")
 
       intent.getAction match {
         case ActionJoin => join(zms, convId, withVideo = false)

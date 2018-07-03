@@ -21,7 +21,7 @@ import com.waz.ZLog.ImplicitTag._
 import com.waz.ZLog._
 import com.waz.content.ContentChange.{Added, Removed, Updated}
 import com.waz.content._
-import com.waz.model.AccountDataOld.PermissionsMasks
+import com.waz.model.AccountData.PermissionsMasks
 import com.waz.model.ConversationData.ConversationDataDao
 import com.waz.model._
 import com.waz.service.EventScheduler.Stage
@@ -34,7 +34,6 @@ import com.waz.utils.events.{AggregatingSignal, EventStream, RefreshingSignal, S
 
 import scala.collection.Seq
 import scala.concurrent.Future
-import scala.util.Right
 
 //TODO - return Signals of the search results for UI??
 trait TeamsService {
@@ -102,7 +101,7 @@ class TeamsServiceImpl(selfUser:           UserId,
 
       def userMatches(data: UserData) = data.teamId == teamId && (query match {
         case Some(q) =>
-          if (handleOnly) data.handle.map(_.string).contains(q.asciiRepresentation)
+          if (handleOnly) data.handle.map(_.str).contains(q.asciiRepresentation)
           else q.isAtTheStartOfAnyWordIn(data.searchKey)
         case _ => true
       })
@@ -176,7 +175,7 @@ class TeamsServiceImpl(selfUser:           UserId,
     else Future.successful({})
   }
 
-  private def onTeamUpdated(id: TeamId, name: Option[String], icon: Option[RAssetId], iconKey: Option[AESKey]) = {
+  private def onTeamUpdated(id: TeamId, name: Option[Name], icon: Option[RAssetId], iconKey: Option[AESKey]) = {
     verbose(s"onTeamUpdated: $id, name: $name, icon: $icon, iconKey: $iconKey")
     teamStorage.update(id, team => team.copy (
       name    = name.getOrElse(team.name),

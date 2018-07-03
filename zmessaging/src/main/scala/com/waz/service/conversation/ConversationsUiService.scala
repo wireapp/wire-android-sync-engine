@@ -22,7 +22,6 @@ import com.waz.ZLog._
 import com.waz.api
 import com.waz.api.IConversation.{Access, AccessRole}
 import com.waz.api.MessageContent.Asset.ErrorHandler
-import com.waz.api.MessageContent.Text
 import com.waz.api.NetworkMode.{OFFLINE, WIFI}
 import com.waz.api.impl._
 import com.waz.api.{ImageAssetFactory, Message, NetworkMode}
@@ -53,27 +52,22 @@ import scala.language.implicitConversions
 import scala.util.control.NonFatal
 
 trait ConversationsUiService {
-  @Deprecated
-  def sendMessage(convId: ConvId, content: api.MessageContent): Future[Option[MessageData]] // TODO: remove when all calls are migrated to respective specialized methods
 
   def sendMessage(convId: ConvId, uri: URI, errorHandler: ErrorHandler): Future[Option[MessageData]]
   def sendMessage(convId: ConvId, audioAsset: AssetForUpload, errorHandler: ErrorHandler): Future[Option[MessageData]]
-  def sendMessage(convId: ConvId, text: String): Future[Option[MessageData]]
-  def sendMessage(convId: ConvId, text: String, mentions: Set[UserId]): Future[Option[MessageData]]
+  def sendMessage(convId: ConvId, m: SensitiveString, mentions: Map[UserId, Name] = Map.empty): Future[Option[MessageData]]
   def sendMessage(convId: ConvId, jpegData: Array[Byte]): Future[Option[MessageData]]
   def sendMessage(convId: ConvId, imageAsset: ImageAsset): Future[Option[MessageData]]
-  def sendMessage(convId: ConvId, location: api.MessageContent.Location): Future[Option[MessageData]]
+  def sendMessage(convId: ConvId, location: Location): Future[Option[MessageData]]
 
-  @Deprecated
-  def updateMessage(convId: ConvId, id: MessageId, text: Text): Future[Option[MessageData]]
-
-  def updateMessage(convId: ConvId, id: MessageId, text: String): Future[Option[MessageData]]
+  def updateMessage(convId: ConvId, id: MessageId, text: SensitiveString): Future[Option[MessageData]]
 
   def deleteMessage(convId: ConvId, id: MessageId): Future[Unit]
   def recallMessage(convId: ConvId, id: MessageId): Future[Option[MessageData]]
+
   def setConversationArchived(id: ConvId, archived: Boolean): Future[Option[ConversationData]]
   def setConversationMuted(id: ConvId, muted: Boolean): Future[Option[ConversationData]]
-  def setConversationName(id: ConvId, name: String): Future[Option[ConversationData]]
+  def setConversationName(id: ConvId, name: Name): Future[Option[ConversationData]]
 
   def addConversationMembers(conv: ConvId, users: Set[UserId]): Future[Option[SyncId]]
   def removeConversationMember(conv: ConvId, user: UserId): Future[Option[SyncId]]
@@ -89,7 +83,7 @@ trait ConversationsUiService {
 
   //conversation creation methods
   def getOrCreateOneToOneConversation(toUser: UserId): Future[ConversationData]
-  def createGroupConversation(name: Option[String] = None, members: Set[UserId] = Set.empty, teamOnly: Boolean = false): Future[(ConversationData, SyncId)]
+  def createGroupConversation(name: Option[Name] = None, members: Set[UserId] = Set.empty, teamOnly: Boolean = false): Future[(ConversationData, SyncId)]
 
   def assetUploadCancelled : EventStream[Mime]
   def assetUploadFailed    : EventStream[ErrorResponse]
@@ -120,92 +114,57 @@ class ConversationsUiServiceImpl(selfUserId:      UserId,
   override val assetUploadCancelled = EventStream[Mime]() //size, mime
   override val assetUploadFailed    = EventStream[ErrorResponse]()
 
-  @Deprecated
-  override def sendMessage(convId: ConvId, content: api.MessageContent): Future[Option[MessageData]] = content match {
-    case m: api.MessageContent.Text =>
-      debug(s"send text message ${m.getContent.take(4)}...")
-      sendTextMessage(convId, m.getContent)
+  override def sendMessage(convId: ConvId, m: SensitiveString, mentions: Map[UserId, Name] = Map.empty) =
+    for {
+      msg <- messages.addTextMessage(convId, m, mentions)
+      _   <- updateLastRead(msg)
+      _   <- sync.postMessage(msg.id, convId, msg.editTime)
+    } yield Some(msg)
 
-    case m: api.MessageContent.Location =>
-      sendLocationMessage(convId, Location(m.getLongitude, m.getLatitude, m.getName, m.getZoom))
+  override def sendMessage(convId: ConvId, location: Location) =
+    for {
+      msg <- messages.addLocationMessage(convId, location)
+      _   <- updateLastRead(msg)
+      _   <- sync.postMessage(msg.id, convId, msg.editTime)
+    } yield Some(msg)
 
-    case m: api.MessageContent.Image =>
-      convsContent.convById(convId) flatMap {
-        case Some(conv) => sendImageMessage(m.getContent, conv)
-        case None => Future.failed(new IllegalArgumentException(s"No conversation found for $convId"))
-      }
-
-    case m: api.MessageContent.Asset =>
-      convsContent.convById(convId) flatMap {
-        case Some(conv) =>
-          debug(s"send asset message ${m.getContent}")
-          m.getContent match {
-            case a@ContentUriAssetForUpload(_, uri) =>
-              a.mimeType.flatMap {
-                case m@Mime.Image() =>
-                  sendImageMessage(ImageAssetFactory.getImageAsset(uri), conv) // XXX: this has to run on UI thread, so we can't make if part of the for-expression
-                case _ =>
-                  sendAssetMessage(a, conv, m.getErrorHandler)
-              }(Threading.Ui)
-            case a: AssetForUpload => sendAssetMessage(a, conv, m.getErrorHandler)
-          }
-        case None =>
-          Future.failed(new IllegalArgumentException(s"No conversation found for $convId"))
-      }
-
-    case _ =>
-      error(s"sendMessage($content) not supported yet")
-      Future.failed(new IllegalArgumentException(s"MessageContent: $content is not supported yet"))
-  }
-
-  override def sendMessage(convId: ConvId, uri: URI, errorHandler: ErrorHandler): Future[Option[MessageData]] = withConv(convId) { conv =>
+  override def sendMessage(convId: ConvId, uri: URI, errorHandler: ErrorHandler) = {
     val asset = ContentUriAssetForUpload(AssetId(), uri)
     asset.mimeType.flatMap {
-      case Mime.Image() => sendImageMessage(ImageAssetFactory.getImageAsset(uri), conv)
-      case _ => sendAssetMessage(asset, conv, errorHandler)
-    }(Threading.Ui)
+      case Mime.Image() => sendImageMessage(convId, ImageAssetFactory.getImageAsset(uri))
+      case _            => sendMessage(convId, asset, errorHandler)
+    }
   }
 
-  override def sendMessage(convId: ConvId, audioAsset: AssetForUpload, errorHandler: ErrorHandler): Future[Option[MessageData]] =
-    withConv(convId){ conv => sendAssetMessage(audioAsset, conv, errorHandler) } // audio and video assets
-
-  override def sendMessage(convId: ConvId, text: String): Future[Option[MessageData]] = withConv(convId){ _ => sendTextMessage(convId, text) }
-
-  override def sendMessage(convId: ConvId, text: String, mentions: Set[UserId]): Future[Option[MessageData]] = withConv(convId){ _ =>
-    mentionsMap(mentions) flatMap { ms => sendTextMessage(convId, text, ms) }
+  override def sendMessage(convId: ConvId, in: AssetForUpload, handler: ErrorHandler) = {
+    for {
+      mime           <- in.mimeType
+      Some(remoteId) <- convsContent.convById(convId).map(_.map(_.remoteId))
+      asset          <- assets.addAsset(in, remoteId)
+      message        <- messages.addAssetMessage(convId, asset)
+      _              <- updateLastRead(message)
+      size           <- in.sizeInBytes
+      _              <- Future.successful(tracking.assetContribution(asset.id, selfUserId))
+      shouldSend     <- checkSize(convId, size, mime, message, handler)
+      _ <- if (shouldSend) sync.postMessage(message.id, convId, message.editTime) else Future.successful(())
+    } yield Option(message)
   }
 
-  override def sendMessage(convId: ConvId, jpegData: Array[Byte]): Future[Option[MessageData]] = withConv(convId) { conv =>
-    sendImageMessage(ImageAssetFactory.getImageAsset(jpegData), conv)
-  }
+  override def sendMessage(convId: ConvId, jpegData: Array[Byte]) =
+    sendImageMessage(convId, ImageAssetFactory.getImageAsset(jpegData))
 
-  override def sendMessage(convId: ConvId, imageAsset: ImageAsset): Future[Option[MessageData]] = withConv(convId) { conv =>
-    sendImageMessage(imageAsset, conv)
-  }
+  override def sendMessage(convId: ConvId, imageAsset: ImageAsset) =
+    sendImageMessage(convId, imageAsset)
 
-  override def sendMessage(convId: ConvId, location: api.MessageContent.Location): Future[Option[MessageData]] = withConv(convId) { _ =>
-    sendLocationMessage(convId, location) // TODO: maybe simply use GenericContent.Location
-  }
-
-  private def withConv(convId: ConvId)(use: (ConversationData) => Future[Option[MessageData]]) = convsContent.convById(convId).flatMap {
-    case Some(conv) => use(conv)
-    case None => Future.failed(new IllegalArgumentException(s"No conversation found for $convId"))
-  }
-
-  implicit private def toLocation(l: api.MessageContent.Location): GenericContent.Location = Location(l.getLongitude, l.getLatitude, l.getName, l.getZoom)
-
-  @Deprecated
-  override def updateMessage(convId: ConvId, id: MessageId, text: Text): Future[Option[MessageData]] = updateMessage(convId, id, text.getContent)
-
-  override def updateMessage(convId: ConvId, id: MessageId, text: String): Future[Option[MessageData]] = {
+  override def updateMessage(convId: ConvId, id: MessageId, text: SensitiveString) = {
     verbose(s"updateMessage($convId, $id, $text")
     messagesContent.updateMessage(id) {
       case m if m.convId == convId && m.userId == selfUserId =>
         val (tpe, ct) = MessageData.messageContent(text, weblinkEnabled = true)
-        verbose(s"updated content: ${(tpe, ct)}")
+        info(s"updated content: ${(tpe, ct)}")
         m.copy(msgType = tpe, content = ct, protos = Seq(GenericMessage(Uid(), MsgEdit(id, GenericContent.Text(text)))), state = Message.Status.PENDING, editTime = (m.time max m.editTime).plus(1.millis) max Instant.now)
       case m =>
-        warn(s"Can not update msg: $m")
+//        warn(s"Can not update msg: $m") //TODO reintroduce when ids can be obfuscated
         m
     } flatMap {
       case Some(m) => sync.postMessage(m.id, m.convId, m.editTime) map { _ => Some(m) } // using PostMessage sync request to use the same logic for failures and retrying
@@ -223,7 +182,7 @@ class ConversationsUiServiceImpl(selfUserId:      UserId,
       case Some(msg) =>
         sync.postRecalled(convId, msg.id, id) map { _ => Some(msg) }
       case None =>
-        warn(s"could not recall message $convId, $id")
+//        warn(s"could not recall message $convId, $id") //TODO reintroduce when ids can be obfuscated
         Future successful None
     }
 
@@ -237,14 +196,14 @@ class ConversationsUiServiceImpl(selfUserId:      UserId,
       case None => None
     }
 
-  override def setConversationName(id: ConvId, name: String): Future[Option[ConversationData]] = {
+  override def setConversationName(id: ConvId, name: Name): Future[Option[ConversationData]] = {
     verbose(s"setConversationName($id, $name)")
     convsContent.updateConversationName(id, name) flatMap {
       case Some((_, conv)) if conv.name.contains(name) =>
         sync.postConversationName(id, conv.name.getOrElse(""))
         messages.addRenameConversationMessage(id, selfUserId, name) map (_ => Some(conv))
       case conv =>
-        warn(s"Conversation name could not be changed for: $id, conv: $conv")
+//        warn(s"Conversation name could not be changed for: $id, conv: $conv") //TODO reintroduce when ids can be obfuscated
         CancellableFuture.successful(None)
     }
   }
@@ -258,7 +217,7 @@ class ConversationsUiServiceImpl(selfUserId:      UserId,
     } yield Option(syncId))
       .recover {
         case NonFatal(e) =>
-          warn(s"Failed to add members: $users to conv: $conv", e)
+//          warn(s"Failed to add members: $users to conv: $conv", e) TODO reintroduce when ids can be obfuscated
           Option.empty[SyncId]
       }
   }
@@ -272,7 +231,7 @@ class ConversationsUiServiceImpl(selfUserId:      UserId,
     } yield Some(syncId))
       .recover {
         case NonFatal(e) =>
-          warn(s"Failed to remove member: $user from conv: $conv", e)
+//          warn(s"Failed to remove member: $user from conv: $conv", e)
           Option.empty[SyncId]
       }
   }
@@ -313,14 +272,14 @@ class ConversationsUiServiceImpl(selfUserId:      UserId,
             _ <- c.cleared.fold(Future.successful({}))(sync.postCleared(c.id, _).map(_ => ()))
           } yield Some(c)
         case None =>
-          verbose("updateConversationCleared did nothing - already cleared")
+          info("updateConversationCleared did nothing - already cleared")
           Future successful None
       }
     case Some(conv) =>
       warn(s"conversation of type ${conv.convType} can not be cleared")
       Future successful None
     case None =>
-      warn(s"conversation to be cleared not found: $id")
+//      warn(s"conversation to be cleared not found: $id") TODO reintroduce when ids can be obfuscated
       Future successful None
   }
 
@@ -374,10 +333,10 @@ class ConversationsUiServiceImpl(selfUserId:      UserId,
     }
   }
 
-  override def createGroupConversation(name: Option[String] = None, members: Set[UserId] = Set.empty, teamOnly: Boolean = false) =
+  override def createGroupConversation(name: Option[Name] = None, members: Set[UserId] = Set.empty, teamOnly: Boolean = false) =
     createAndPostConversation(ConvId(), name, members, teamOnly)
 
-  private def createAndPostConversation(id: ConvId, name: Option[String], members: Set[UserId], teamOnly: Boolean = false) = {
+  private def createAndPostConversation(id: ConvId, name: Option[Name], members: Set[UserId], teamOnly: Boolean = false) = {
     val (ac, ar) = getAccessAndRoleForGroupConv(teamOnly, teamId)
     for {
       conv <- convsContent.createConversationWithMembers(id, generateTempConversationId(members + selfUserId), ConversationType.Group, selfUserId, members, name, access = ac, accessRole = ar)
@@ -388,7 +347,7 @@ class ConversationsUiServiceImpl(selfUserId:      UserId,
   }
 
   override def findGroupConversations(prefix: SearchKey, limit: Int, handleOnly: Boolean): Future[Seq[ConversationData]] =
-    convStorage.search(prefix, selfUserId, handleOnly).map(_.sortBy(_.displayName)(currentLocaleOrdering).take(limit))
+    convStorage.search(prefix, selfUserId, handleOnly).map(_.sortBy(_.displayName.str)(currentLocaleOrdering).take(limit))
 
   override def knock(id: ConvId): Future[Option[MessageData]] = for {
     msg <- messages.addKnockMessage(id, selfUserId)
@@ -415,33 +374,19 @@ class ConversationsUiServiceImpl(selfUserId:      UserId,
       _          <- resp.mapFuture(_ => messages.addTimerChangedMessage(id, selfUserId, expiration))
     } yield resp
 
-  private def mentionsMap(us: Set[UserId]): Future[Map[UserId, String]] =
+  private def mentionsMap(us: Set[UserId]): Future[Map[UserId, Name]] =
     users.getUsers(us.toSeq) map { uss =>
       uss.map(u => u.id -> u.getDisplayName)(breakOut)
     }
 
-  private def sendTextMessage(convId: ConvId, m: String, mentions: Map[UserId, String] = Map.empty) =
-    for {
-      msg <- messages.addTextMessage(convId, m, mentions)
-      _ <- updateLastRead(msg)
-      _ <- sync.postMessage(msg.id, convId, msg.editTime)
-    } yield Some(msg)
-
-  private def sendLocationMessage(convId: ConvId, loc: Location) =
-    for {
-      msg <- messages.addLocationMessage(convId, loc)
-      _ <- updateLastRead(msg)
-      _ <- sync.postMessage(msg.id, convId, msg.editTime)
-    } yield Some(msg)
-
-  private def sendImageMessage(img: api.ImageAsset, conv: ConversationData) = {
+  private def sendImageMessage(conv: ConvId, img: api.ImageAsset) = {
     verbose(s"sendImageMessage($img, $conv)")
     for {
       data <- assets.addImageAsset(img)
-      msg <- messages.addAssetMessage(conv.id, data)
+      msg <- messages.addAssetMessage(conv, data)
       _ <- updateLastRead(msg)
       _ <- Future.successful(tracking.assetContribution(data.id, selfUserId))
-      _ <- sync.postMessage(msg.id, conv.id, msg.editTime)
+      _ <- sync.postMessage(msg.id, conv, msg.editTime)
     } yield Some(msg)
   }
 
@@ -475,7 +420,7 @@ class ConversationsUiServiceImpl(selfUserId:      UserId,
       }
     }
 
-  private def showLargeFileWarning(convId: ConvId, size: Long, mime: Mime, net: NetworkMode, message: MessageData, handler: ErrorHandler) = {
+  private def showLargeFileWarning(convId: ConvId, size: Long, mime: Mime, net: NetworkMode, message: MessageData, handler: ErrorHandler): Unit = {
     Threading.assertUiThread()
 
     handler.noWifiAndFileIsLarge(size, net, new api.MessageContent.Asset.Answer {

@@ -35,7 +35,7 @@ import scala.collection.Map
 import scala.concurrent.duration._
 import scala.concurrent.{Future, duration}
 
-class NotificationsServiceSpec2 extends AndroidFreeSpec {
+class NotificationsServiceSpec extends AndroidFreeSpec {
 
 
   val self      = UserId()

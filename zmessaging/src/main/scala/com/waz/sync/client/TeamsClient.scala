@@ -20,7 +20,7 @@ package com.waz.sync.client
 import com.waz.ZLog.ImplicitTag._
 import com.waz.ZLog.warn
 import com.waz.api.impl.ErrorResponse
-import com.waz.model.AccountDataOld.PermissionsMasks
+import com.waz.model.AccountData.PermissionsMasks
 import com.waz.model._
 import com.waz.service.BackendConfig
 import com.waz.utils.JsonDecoder

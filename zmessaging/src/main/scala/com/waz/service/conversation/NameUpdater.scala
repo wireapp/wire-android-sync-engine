@@ -21,7 +21,7 @@ import com.waz.ZLog._
 import com.waz.content._
 import com.waz.model.ConversationData.ConversationType
 import com.waz.model.UserData.ConnectionStatus
-import com.waz.model.{ConvId, UserData, UserId}
+import com.waz.model.{ConvId, Name, UserData, UserId}
 import com.waz.threading.SerialDispatchQueue
 import com.waz.utils.events.EventContext
 import com.waz.utils.{BiRelation, ThrottledProcessingQueue}
@@ -37,6 +37,8 @@ class NameUpdater(selfUserId:     UserId,
                   usersStorage:   UsersStorage,
                   convs:          ConversationStorage,
                   membersStorage: MembersStorage) {
+
+  import NameUpdater._
 
   private implicit val tag: LogTag = logTagFor[NameUpdater]
   private implicit val ev = EventContext.Global
@@ -149,7 +151,7 @@ class NameUpdater(selfUserId:     UserId,
     def updateGroups() = queue.enqueue(users.map(_.id))
 
     def updateOneToOnes() = {
-      val names: Map[ConvId, String] = users.collect {
+      val names: Map[ConvId, Name] = users.collect {
         case u if u.connection != ConnectionStatus.Unconnected => ConvId(u.id.str) -> u.name // one to one use full name
       } (breakOut)
 
@@ -173,21 +175,21 @@ class NameUpdater(selfUserId:     UserId,
     val users = members.flatMap(_._2).toSeq.distinct.filter(_ != selfUserId)
 
     usersStorage.getAll(users) flatMap { uds =>
-      val names: Map[UserId, Option[String]] = users.zip(uds.map(_.map(_.getDisplayName)))(breakOut)
+      val names: Map[UserId, Option[Name]] = users.zip(uds.map(_.map(_.getDisplayName)))(breakOut)
       val convNames = members.mapValues { us => generatedName(us.filter(_ != selfUserId) map { names.get(_).flatten }) }
       convs.updateAll2(convIds, { c => convNames.get(c.id).fold(c) { name => c.copy(generatedName = name) } })
     }
   }
-
-  private def generatedName(userNames: GenTraversable[Option[String]]): String = {
-    userNames.flatten.filter(_.nonEmpty).mkString(", ")
-  }
 }
 
 object NameUpdater {
-  def generatedName(convType: ConversationType)(users: GenTraversable[UserData]): String = {
+  private def generatedName(userNames: GenTraversable[Option[Name]]): Name = {
+    Name(userNames.flatten.filter(_.nonEmpty).mkString(", "))
+  }
+
+  def generatedName(convType: ConversationType)(users: GenTraversable[UserData]): Name = {
     val us = users.filter(_.connection != ConnectionStatus.Self)
-    if (convType == ConversationType.Group) us.map(user => user.getDisplayName).filter(_.nonEmpty).mkString(", ")
-    else us.headOption.fold("")(_.name)
+    if (convType == ConversationType.Group) Name(us.map(user => user.getDisplayName).filter(_.nonEmpty).mkString(", "))
+    else us.headOption.fold(Name.Empty)(_.name)
   }
 }

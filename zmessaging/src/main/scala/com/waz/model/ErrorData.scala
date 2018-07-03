@@ -50,8 +50,8 @@ object ErrorData {
   implicit object ErrorDataDao extends Dao[ErrorData, Uid] {
     val Id = uid('_id, "PRIMARY KEY")(_.id)
     val Type = text[ErrorType]('err_type, _.name(), ErrorType.valueOf)(_.errType)
-    val Users = text[Seq[UserId]]('users, _.mkString(","), { str => if(str.isEmpty) Nil else str.split(',').map(str => UserId(str)) })(_.users)
-    val Messages = text[Seq[MessageId]]('messages, _.mkString(","), { str => if(str.isEmpty) Nil else str.split(',').map(str => MessageId(str)) })(_.messages)
+    val Users = text[Seq[UserId]]('users, _.map(_.str).mkString(","), { str => if(str.isEmpty) Nil else str.split(',').map(str => UserId(str)) })(_.users)
+    val Messages = text[Seq[MessageId]]('messages, _.map(_.str).mkString(","), { str => if(str.isEmpty) Nil else str.split(',').map(str => MessageId(str)) })(_.messages)
     val ConvId = opt(id[ConvId]('conv_id))(_.convId)
     val ResCode = int('res_code)(_.responseCode)
     val ResMessage = text('res_msg)(_.responseMessage)

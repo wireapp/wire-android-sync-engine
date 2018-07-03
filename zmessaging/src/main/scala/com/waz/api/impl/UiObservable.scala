@@ -36,7 +36,7 @@ trait UiObservable extends com.waz.api.UiObservable {
 
   protected def notifyChanged(): Unit = {
     Threading.assertUiThread()
-    debug(s"notifyChanged, $this")
+    info(s"notifyChanged, $this")
     updateListeners.notify(_.updated())
   }
 }

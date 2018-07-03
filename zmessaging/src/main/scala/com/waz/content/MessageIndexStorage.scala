@@ -45,7 +45,7 @@ class MessageIndexStorage(context: Context, storage: ZmsDatabase, messagesStorag
   private implicit val dispatcher = new SerialDispatchQueue(name = "MessageIndexStorage")
 
   private def entry(m: MessageData) =
-    MessageContentIndexEntry(m.id, m.convId, ContentSearchQuery.transliterated(m.contentString), m.time)
+    MessageContentIndexEntry(m.id, m.convId, ContentSearchQuery.transliterated(m.contentString.str), m.time)
 
   messagesStorage.onAdded { added =>
     insertAll(added.filter(m => TextMessageTypes.contains(m.msgType) && !m.isEphemeral).map(entry))

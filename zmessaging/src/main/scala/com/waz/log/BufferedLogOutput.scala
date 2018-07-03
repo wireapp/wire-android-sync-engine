@@ -20,9 +20,9 @@ package com.waz.log
 import java.io.{BufferedWriter, File, FileWriter, IOException}
 
 import com.waz.ZLog.LogTag
-import com.waz.log.BufferedLogOutput.ProductionLogTags
+import com.waz.log.BufferedLogOutput.ProductionLogLevels
+import com.waz.log.InternalLog.LogLevel._
 import com.waz.log.InternalLog.{LogLevel, dateTag, stackTrace}
-import com.waz.service.call.Avs
 import com.waz.threading.{SerialDispatchQueue, Threading}
 import com.waz.utils.crypto.ZSecureRandom
 import com.waz.utils.returning
@@ -126,12 +126,12 @@ class ProductionBufferedOutput(baseDir: String,
                                maxRollFiles: Int = BufferedLogOutput.DefMaxRollFiles) extends BufferedLogOutput(baseDir, maxBufferSize, maxFileSize, maxRollFiles) {
 
   override def log(str: String, level: LogLevel, tag: LogTag, ex: Option[Throwable] = None): Unit =
-    if (ProductionLogTags.contains(tag)) super.log(str, level, tag, ex)
+    if (ProductionLogLevels.contains(level)) super.log(str, level, tag, ex)
 }
 
 object BufferedLogOutput {
 
-  val ProductionLogTags = Set(Avs.AvsLogTag)
+  val ProductionLogLevels = Set(Error, Warn, Info)
 
   val DefMaxBufferSize = 256L * 1024L
   val DefMaxFileSize = 4L * DefMaxBufferSize

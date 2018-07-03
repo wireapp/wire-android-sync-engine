@@ -88,16 +88,40 @@ package object model {
       case _                              => Unknown
     }
 
+    def safeLog(msg: GenericMessage): String = {
+      val tpe = msg.getContentCase match {
+        case GM.ASSET_FIELD_NUMBER          => "Asset"
+        case GM.CALLING_FIELD_NUMBER        => "Calling"
+        case GM.CLEARED_FIELD_NUMBER        => "Cleared"
+        case GM.CLIENTACTION_FIELD_NUMBER   => "ClientAction"
+        case GM.DELETED_FIELD_NUMBER        => "Deletion"
+        case GM.EDITED_FIELD_NUMBER         => "Edited"
+        case GM.EXTERNAL_FIELD_NUMBER       => "External"
+        case GM.HIDDEN_FIELD_NUMBER         => "Hidden"
+        case GM.IMAGE_FIELD_NUMBER          => "Image"
+        case GM.KNOCK_FIELD_NUMBER          => "Knock"
+        case GM.LASTREAD_FIELD_NUMBER       => "LastRead"
+        case GM.REACTION_FIELD_NUMBER       => "Reaction"
+        case GM.TEXT_FIELD_NUMBER           => "Text"
+        case GM.LOCATION_FIELD_NUMBER       => "Location"
+        case GM.CONFIRMATION_FIELD_NUMBER   => "Confirmation"
+        case GM.EPHEMERAL_FIELD_NUMBER      => "Ephemeral"
+        case GM.AVAILABILITY_FIELD_NUMBER   => "Availability"
+        case _                              => "Unknown"
+      }
+      s"$tpe(${msg.messageId})"
+    }
+
     object TextMessage {
       import scala.concurrent.duration.DurationInt
 
-      def apply(text: String, mentions: Map[UserId, String]): GenericMessage = GenericMessage(Uid(), Text(text, mentions, Nil))
+      def apply(text: SensitiveString, mentions: Map[UserId, Name]): GenericMessage = GenericMessage(Uid(), Text(text, mentions, Nil))
 
-      def apply(text: String, mentions: Map[UserId, String], links: Seq[LinkPreview]): GenericMessage = GenericMessage(Uid(), Text(text, mentions, links))
+      def apply(text: SensitiveString, mentions: Map[UserId, Name], links: Seq[LinkPreview]): GenericMessage = GenericMessage(Uid(), Text(text, mentions, links))
 
       def apply(msg: MessageData): GenericMessage = GenericMessage(msg.id.uid, msg.ephemeral, Text(msg.contentString, msg.content.flatMap(_.mentions).toMap, Nil))
 
-      def unapply(msg: GenericMessage): Option[(String, Map[UserId, String], Seq[LinkPreview])] = msg match {
+      def unapply(msg: GenericMessage): Option[(SensitiveString, Map[UserId, Name], Seq[LinkPreview])] = msg match {
         case GenericMessage(_, Text(content, mentions, links)) =>
           Some((content, mentions, links))
         case GenericMessage(_, Ephemeral(_, Text(content, mentions, links))) =>

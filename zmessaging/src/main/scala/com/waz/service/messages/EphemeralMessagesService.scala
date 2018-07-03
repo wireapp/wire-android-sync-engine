@@ -102,9 +102,9 @@ class EphemeralMessagesService(selfUserId: UserId,
     import Message.Type._
     verbose(s"obfuscate($msg)")
 
-    def obfuscate(text: String) = text.map { c =>
+    def obfuscate(text: SensitiveString) = SensitiveString(text.str.map { c =>
       if (c.isWhitespace) c else randomChars.next
-    }
+    })
 
     msg.msgType match {
       case TEXT | TEXT_EMOJI_ONLY =>
@@ -120,7 +120,7 @@ class EphemeralMessagesService(selfUserId: UserId,
       case ASSET | ANY_ASSET => // other assets are removed in removeExpired
         msg.copy(expired = true)
       case LOCATION =>
-        val (name, zoom) = msg.location.fold(("", 14)) { l => (obfuscate(l.getName), l.getZoom) }
+        val (name, zoom) = msg.location.fold(("", 14)) { l => (obfuscate(SensitiveString(l.getName)).str, l.getZoom) }
         msg.copy(expired = true, content = Nil, protos = Seq(GenericMessage(msg.id.uid, Location(0, 0, name, zoom))))
       case _ =>
         msg.copy(expired = true)

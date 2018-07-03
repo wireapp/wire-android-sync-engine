@@ -38,7 +38,7 @@ abstract class FutureService extends Service {
   override def onBind(intent: Intent): IBinder = null
 
   override def onStartCommand(intent: Intent, flags: Int, startId: Int): Int = wakeLock {
-    debug(s"onStartCommand: $startId, intent: $intent")
+    verbose(s"onStartCommand: $startId, intent: $intent")
     Option(intent) foreach WakefulBroadcastReceiver.completeWakefulIntent
 
     val future =
@@ -54,7 +54,7 @@ abstract class FutureService extends Service {
   protected def onIntent(intent: Intent, id: Int): Future[Any]
 
   protected def onComplete(startId: Int): Unit = {
-    debug(s"onCompleted: $startId")
+    verbose(s"onCompleted: $startId")
     stopSelf(startId)
   }
 }

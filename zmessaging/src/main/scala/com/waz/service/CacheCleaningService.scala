@@ -40,7 +40,7 @@ class CacheCleaningService(cache: CacheService, prefs: GlobalPreferences) {
   def requestDeletionOfExpiredCacheEntries(): Future[Unit] = {
     prefs.preference(LastCacheCleanup).mutate { lastSync =>
       if ((currentTimeMillis() - lastSync).millis > CleanupInterval) {
-        debug("at least one week expired since last cache cleaning, cleaning now...")
+        verbose("at least one week expired since last cache cleaning, cleaning now...")
         cache.deleteExpired()
         currentTimeMillis()
       } else {

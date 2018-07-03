@@ -207,11 +207,11 @@ class CallingService(val accountId:       UserId,
           if (reason != AnsweredElsewhere) call.state match {
             case Some(SelfCalling) =>
               //TODO do we want a small timeout before placing a "You called" message, in case of accidental calls? maybe 5 secs
-              verbose("Call timed out out the other didn't answer - add a \"you called\" message")
+              info("Call timed out out the other didn't answer - add a \"you called\" message")
               messagesService.addMissedCallMessage(conv.id, accountId, clock.instant)
             case Some(OtherCalling) | Some(SelfJoining) if reason == StillOngoing => // do nothing - call is still ongoing in the background
             case Some(OtherCalling) | Some(SelfJoining) | Some(Ongoing) =>
-              verbose("Call timed out out and we didn't answer - mark as missed call")
+              info("Call timed out out and we didn't answer - mark as missed call")
               messagesService.addMissedCallMessage(conv.id, call.caller, clock.instant)
             case Some(SelfConnected) =>
               verbose("Had a call, save duration as a message")
@@ -224,12 +224,12 @@ class CallingService(val accountId:       UserId,
           //Switch to any available calls that are still incoming and should ring
           p.nonActiveCalls.filter(_.state.contains(OtherCalling)).sortBy(_.startTime).headOption.map(_.convId)
         case Some(call) =>
-          verbose("A call other than the current one was closed - likely missed another incoming call.")
+          info("A call other than the current one was closed - likely missed another incoming call.")
           messagesService.addMissedCallMessage(conv.id, userId, clock.instant)
           //don't change the active call, since the close callback was for a different conv/call
           Some(call.convId)
         case None =>
-          verbose("No active call to update")
+          info("No active call to update")
           None
       }
 
@@ -252,7 +252,7 @@ class CallingService(val accountId:       UserId,
   }
 
   def onBitRateStateChanged(enabled: Boolean): Unit = {
-    verbose(s"onBitRateStateChanged enabled=$enabled")
+    info(s"onBitRateStateChanged enabled=$enabled")
     updateActiveCall { c =>
       c.copy(isCbrEnabled = enabled)
     }("onBitRateStateChanged")
@@ -260,7 +260,7 @@ class CallingService(val accountId:       UserId,
 
   def onVideoStateChanged(userId: String, videoReceiveState: VideoState) = Serialized.apply(self) {
     CancellableFuture {
-      verbose(s"video state changed: $videoReceiveState")
+      info(s"video state changed: $videoReceiveState")
       updateActiveCall(_.updateVideoState(UserId(userId), videoReceiveState))("onVideoStateChanged")
     }
   }
@@ -280,7 +280,7 @@ class CallingService(val accountId:       UserId,
   network.networkMode.onChanged { _ =>
     callProfile.head.flatMap {
       case CallProfile(Some(_), _) =>
-        verbose("network mode changed during call - informing AVS")
+        info("network mode changed during call - informing AVS")
         wCall.map(avs.onNetworkChanged)
       case _ => Future.successful({})
     }
@@ -318,7 +318,7 @@ class CallingService(val accountId:       UserId,
         case Some(call) if call.convId == convId =>
           call.state match {
             case Some(OtherCalling) =>
-              verbose(s"Answering call")
+              info(s"Answering call")
               avs.answerCall(w, conv.remoteId, callType, !vbr)
               updateActiveCall(_.updateCallState(SelfJoining))("startCall/OtherCalling")
               if (forceOption)
@@ -331,7 +331,7 @@ class CallingService(val accountId:       UserId,
         case None =>
           profile.availableCalls.get(convId) match {
             case Some(call) =>
-              verbose("Joining an ongoing background call")
+              info("Joining an ongoing background call")
               avs.answerCall(w, conv.remoteId, callType, !vbr)
               val active = call.updateCallState(SelfJoining).copy(joinedTime = None, estabTime = None) // reset previous call state if exists
               callProfile.mutate(_.copy(activeId = Some(call.convId), availableCalls = profile.availableCalls + (convId -> active)))
@@ -339,7 +339,7 @@ class CallingService(val accountId:       UserId,
               if (forceOption)
                 setVideoSendState(convId, if (isVideo)  Avs.VideoState.Started else Avs.VideoState.Stopped)
             case None =>
-              verbose("No active call, starting new call")
+              info("No active call, starting new call")
               avs.startCall(w, conv.remoteId, callType, convType, !vbr).map {
                 case 0 =>
                   //Assume that when a video call starts, sendingVideo will be true. From here on, we can then listen to state handler
@@ -402,7 +402,7 @@ class CallingService(val accountId:       UserId,
 
   //Drop the current call in case of incoming GSM interruption
   def onInterrupted(): Unit = {
-    verbose("onInterrupted - gsm call received")
+    info("onInterrupted - gsm call received")
     currentCall.collect { case Some(info) => info.convId }.currentValue.foreach { convId =>
       //Ensure that conversation state is only performed INSIDE withConv
       withConv(convId)((w, conv) => avs.endCall(w, conv.remoteId))
@@ -410,7 +410,7 @@ class CallingService(val accountId:       UserId,
   }
 
   def setCallMuted(muted: Boolean): Unit = fm.foreach { f =>
-    verbose(s"setCallMuted: $muted")
+    info(s"setCallMuted: $muted")
     updateActiveCall { c =>
       f.setMute(muted)
       c.copy(muted = muted)
@@ -442,7 +442,7 @@ class CallingService(val accountId:       UserId,
     })
   }
 
-  private def receiveCallEvent(msg: String, msgTime: Instant, convId: RConvId, from: UserId, sender: ClientId): Unit =
+  private def receiveCallEvent(msg: Name, msgTime: Instant, convId: RConvId, from: UserId, sender: ClientId): Unit =
     wCall.map { w =>
       val drift = pushService.beDrift.currentValue.getOrElse(Duration.ZERO)
       val curTime = clock.instant + drift

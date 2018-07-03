@@ -250,7 +250,7 @@ import org.threeten.bp.Instant
 
     msgs.zip(index) foreach { case (msg, idx) =>
       idx.time shouldEqual msg.time
-      idx.content shouldEqual ContentSearchQuery.transliterated(msg.contentString)
+      idx.content shouldEqual ContentSearchQuery.transliterated(msg.contentString.str)
     }
   }
 

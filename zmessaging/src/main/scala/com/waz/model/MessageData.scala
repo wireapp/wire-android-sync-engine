@@ -19,9 +19,7 @@ package com.waz.model
 
 import android.database.DatabaseUtils.queryNumEntries
 import android.database.sqlite.SQLiteQueryBuilder
-import com.waz.ZLog.ImplicitTag._
-import com.waz.ZLog._
-import com.waz.api
+import com.waz.{api, model}
 import com.waz.api.Message.Type._
 import com.waz.api.{Message, TypeFilter}
 import com.waz.db.Col._
@@ -37,8 +35,8 @@ import com.waz.sync.client.OpenGraphClient.OpenGraphData
 import com.waz.utils.wrappers.{DB, DBCursor, URI}
 import com.waz.utils.{EnumCodec, JsonDecoder, JsonEncoder, returning}
 import org.json.JSONObject
-import org.threeten.bp.Instant.now
 import org.threeten.bp.Instant
+import org.threeten.bp.Instant.now
 
 import scala.collection.breakOut
 import scala.concurrent.duration._
@@ -53,7 +51,7 @@ case class MessageData(id:            MessageId              = MessageId(),
                        members:       Set[UserId]            = Set.empty[UserId],
                        recipient:     Option[UserId]         = None,
                        email:         Option[String]         = None,
-                       name:          Option[String]         = None,
+                       name:          Option[Name]           = None,
                        state:         MessageState           = Message.Status.SENT,
                        time:          Instant                = now(clock),
                        localTime:     Instant                = MessageData.UnknownInstant,
@@ -67,17 +65,25 @@ case class MessageData(id:            MessageId              = MessageId(),
   override def toString: String =
     s"""
        |MessageData:
-       | id:            $id
-       | convId:        $convId
-       | msgType:       $msgType
-       | userId:        $userId
-       | protos:        ${protos.toString().replace("\n", "")}
-       | state:         $state
-       | time:          $time
-       | localTime:     $localTime
-       | editTime:      $editTime
-       | members:       $members
-       | other fields:  $content, $firstMessage, , $recipient, $email, $name, $ephemeral, $expiryTime, $expired, $duration
+       |   id:             $id
+       |   convId:         $convId
+       |   msgType:        $msgType
+       |   userId:         $userId
+       |   content (size): ${content.size}
+       |   protos (size):  ${protos.size}
+       |   firstMessage:   $firstMessage
+       |   members:        $members
+       |   recipient:      $recipient
+       |   email:          $email
+       |   name:           $name
+       |   state:          $state
+       |   time:           $time
+       |   localTime:      $localTime
+       |   editTime:       $editTime
+       |   ephemeral:      $ephemeral
+       |   expiryTime:     $expiryTime
+       |   expired:        $expired
+       |   duration:       $duration
     """.stripMargin
 
 
@@ -86,7 +92,7 @@ case class MessageData(id:            MessageId              = MessageId(),
     else content.drop(index).headOption.getOrElse(MessageContent.Empty)
   }
 
-  lazy val contentString = protos.lastOption match {
+  lazy val contentString: SensitiveString = protos.lastOption match {
     case Some(TextMessage(ct, _, _)) => ct
     case _ if msgType == api.Message.Type.RICH_MEDIA => content.map(_.content).mkString(" ")
     case _ => content.headOption.fold("")(_.content)
@@ -110,7 +116,6 @@ case class MessageData(id:            MessageId              = MessageId(),
     } orElse content.headOption.collect {
       case MessageContent(_, _, _, _, Some(_), w, h, _, _) => Dim2(w, h)
     }
-    verbose(s"dims $dims from protos: $protos")
     dims
   }
 
@@ -141,34 +146,45 @@ case class MessageData(id:            MessageId              = MessageId(),
   }
 }
 
-case class MessageContent(
-                           tpe: Message.Part.Type,
-                           content: String,
-                           richMedia: Option[MediaAssetData],
-                           openGraph: Option[OpenGraphData],
-                           asset: Option[AssetId],
-                           width: Int,
-                           height: Int,
-                           syncNeeded: Boolean,
-                           mentions: Map[UserId, String]
-                         ) {
+case class MessageContent(tpe:        Message.Part.Type,
+                          content:    SensitiveString,
+                          richMedia:  Option[MediaAssetData],
+                          openGraph:  Option[OpenGraphData],
+                          asset:      Option[AssetId],
+                          width:      Int,
+                          height:     Int,
+                          syncNeeded: Boolean,
+                          mentions:   Map[UserId, Name]) {
+  def contentAsUri: URI = RichMediaContentParser.parseUriWithScheme(content.str)
 
-  def contentAsUri: URI = RichMediaContentParser.parseUriWithScheme(content)
-  override def toString: String = s"MessageContent($tpe, ${content.take(4)}..., $richMedia, $openGraph, $asset, $width, $height, $syncNeeded, $mentions)"
+  override def toString: String =
+    s"""
+       |MessageContent:
+       | tpe:            $tpe
+       | content:        $content
+       | richMedia:      $richMedia
+       | openGraph:      $openGraph
+       | asset:          $asset
+       | width:          $width
+       | height:         $height
+       | syncNeeded:     $syncNeeded
+       | mentions:       $mentions
+    """.stripMargin
 }
 
-object MessageContent extends ((Message.Part.Type, String, Option[MediaAssetData], Option[OpenGraphData], Option[AssetId], Int, Int, Boolean, Map[UserId, String]) => MessageContent) {
+object MessageContent extends ((Message.Part.Type, SensitiveString, Option[MediaAssetData], Option[OpenGraphData], Option[AssetId], Int, Int, Boolean, Map[UserId, Name]) => MessageContent) {
   import MediaAssetDataProtocol._
 
-  val Empty = apply(Message.Part.Type.TEXT, "")
+  val Empty = apply(Message.Part.Type.TEXT, SensitiveString.Empty)
 
-  def apply(tpe: Message.Part.Type,
-            content: String,
-            openGraph: Option[OpenGraphData] = None,
-            asset: Option[AssetId] = None,
-            width: Int = 0, height: Int = 0,
-            syncNeeded: Boolean = false,
-            mentions: Map[UserId, String] = Map.empty): MessageContent = {
+  def apply(tpe:        Message.Part.Type,
+            content:    SensitiveString,
+            openGraph:  Option[OpenGraphData]   = None,
+            asset:      Option[AssetId]         = None,
+            width:      Int                     = 0,
+            height:     Int                     = 0,
+            syncNeeded: Boolean                 = false,
+            mentions:   Map[UserId, Name] = Map.empty): MessageContent = {
     MessageContent(tpe, content, emptyMediaAsset(tpe), openGraph, asset, width, height, syncNeeded, mentions)
   }
 
@@ -180,24 +196,24 @@ object MessageContent extends ((Message.Part.Type, String, Option[MediaAssetData
 
     import scala.collection.JavaConverters._
 
-    def mentionsMap(js: JSONObject): Map[UserId, String] =
-      js.keys().asScala.map(key => UserId(key) -> js.getString(key)).toMap
+    def mentionsMap(js: JSONObject): Map[UserId, Name] =
+      js.keys().asScala.map(key => UserId(key) -> Name(js.getString(key))).toMap
 
     override def apply(implicit js: JSONObject): MessageContent = {
       val tpe = ContentTypeCodec.decode('type)
-      val mentions = if (js.has("mentions") && !js.isNull("mentions")) mentionsMap(js.getJSONObject("mentions")) else Map.empty[UserId, String]
+      val mentions = if (js.has("mentions") && !js.isNull("mentions")) mentionsMap(js.getJSONObject("mentions")) else Map.empty[UserId, Name]
       val richMedia = opt[MediaAssetData]('richMedia) orElse { // if there's no media asset for rich media message contents, we create an expired empty one
         if (tpe == Message.Part.Type.SPOTIFY || tpe == Message.Part.Type.SOUNDCLOUD || tpe == Message.Part.Type.YOUTUBE) Some(MediaAssetData.empty(tpe)) else None
       }
 
-      MessageContent(tpe, 'content, richMedia, opt[OpenGraphData]('openGraph), decodeOptId[AssetId]('asset), 'width, 'height, 'syncNeeded, mentions)
+      MessageContent(tpe, SensitiveString('content), richMedia, opt[OpenGraphData]('openGraph), decodeOptId[AssetId]('asset), 'width, 'height, 'syncNeeded, mentions)
     }
   }
 
   implicit lazy val Encoder: JsonEncoder[MessageContent] = new JsonEncoder[MessageContent] {
     override def apply(v: MessageContent): JSONObject = JsonEncoder { o =>
       o.put("type", ContentTypeCodec.encode(v.tpe))
-      if (v.content != "") o.put("content", v.content)
+      if (v.content.str != "") o.put("content", v.content.str)
       v.richMedia foreach (m => o.put("richMedia", MediaAssetEncoder(m)))
       v.asset.foreach { id => o.put("asset", id.str) }
       v.openGraph foreach { og => o.put("openGraph", OpenGraphData.Encoder(og)) }
@@ -205,7 +221,7 @@ object MessageContent extends ((Message.Part.Type, String, Option[MediaAssetData
       if (v.height != 0) o.put("height", v.height)
       if (v.syncNeeded) o.put("syncNeeded", v.syncNeeded)
       if (v.mentions.nonEmpty) o.put("mentions", JsonEncoder { o =>
-        v.mentions foreach { case (user, name) => o.put(user.str, name) }
+        v.mentions foreach { case (user, name) => o.put(user.str, name.str) }
       })
     }
   }
@@ -224,7 +240,7 @@ object MessageContent extends ((Message.Part.Type, String, Option[MediaAssetData
   }
 }
 
-object MessageData extends ((MessageId, ConvId, Message.Type, UserId, Seq[MessageContent], Seq[GenericMessage], Boolean, Set[UserId], Option[UserId], Option[String], Option[String], Message.Status, Instant, Instant, Instant, Option[FiniteDuration], Option[Instant], Boolean, Option[FiniteDuration]) => MessageData) {
+object MessageData {
   val Empty = new MessageData(MessageId(""), ConvId(""), Message.Type.UNKNOWN, UserId(""))
   val Deleted = new MessageData(MessageId(""), ConvId(""), Message.Type.UNKNOWN, UserId(""), state = Message.Status.DELETED)
   val UnknownInstant = Instant.EPOCH
@@ -279,7 +295,7 @@ object MessageData extends ((MessageId, ConvId, Message.Type, UserId, Seq[Messag
     val Members = set[UserId]('members, _.mkString(","), _.split(",").filter(!_.isEmpty).map(UserId(_))(breakOut))(_.members)
     val Recipient = opt(id[UserId]('recipient))(_.recipient)
     val Email = opt(text('email))(_.email)
-    val Name = opt(text('name))(_.name)
+    val Name = opt(text[model.Name]('name, _.str, model.Name))(_.name)
     val State = text[MessageState]('msg_state, _.name, Message.Status.valueOf)(_.state)
     val Time = timestamp('time)(_.time)
     val LocalTime = timestamp('local_time)(_.localTime)
@@ -301,15 +317,15 @@ object MessageData extends ((MessageId, ConvId, Message.Type, UserId, Seq[Messag
     override def apply(implicit cursor: DBCursor): MessageData =
       MessageData(Id, Conv, Type, User, Content, Protos, FirstMessage, Members, Recipient, Email, Name, State, Time, LocalTime, EditTime, Ephemeral, ExpiryTime, Expired, Duration)
 
-    def deleteForConv(id: ConvId)(implicit db: DB) = delete(Conv, id)
+    def deleteForConv(conv: ConvId)(implicit db: DB) = delete(Conv, conv)
 
-    def deleteUpTo(id: ConvId, upTo: Instant)(implicit db: DB) = db.delete(table.name, s"${Conv.name} = '${id.str}' AND ${Time.name} <= ${Time(upTo)}", null)
+    def deleteUpTo(conv: ConvId, upTo: Instant)(implicit db: DB) = db.delete(table.name, s"${Conv.name} = '${Conv(conv)}' AND ${Time.name} <= ${Time(upTo)}", null)
 
-    def first(conv: ConvId)(implicit db: DB) = single(db.query(table.name, null, s"${Conv.name} = '$conv'", null, null, null, s"${Time.name} ASC", "1"))
+    def first(conv: ConvId)(implicit db: DB) = single(db.query(table.name, null, s"${Conv.name} = '${Conv(conv)}'", null, null, null, s"${Time.name} ASC", "1"))
 
-    def last(conv: ConvId)(implicit db: DB) = single(db.query(table.name, null, s"${Conv.name} = '$conv'", null, null, null, s"${Time.name} DESC", "1"))
+    def last(conv: ConvId)(implicit db: DB) = single(db.query(table.name, null, s"${Conv.name} = '${Conv(conv)}'", null, null, null, s"${Time.name} DESC", "1"))
 
-    def lastSent(conv: ConvId)(implicit db: DB) = single(db.query(table.name, null, s"${Conv.name} = '$conv' AND ${State.name} IN ('${Message.Status.SENT.name}', '${Message.Status.DELIVERED.name}')", null, null, null, s"${Time.name} DESC", "1"))
+    def lastSent(conv: ConvId)(implicit db: DB) = single(db.query(table.name, null, s"${Conv.name} = '${Conv(conv)}' AND ${State.name} IN ('${Message.Status.SENT.name}', '${Message.Status.DELIVERED.name}')", null, null, null, s"${Time.name} DESC", "1"))
 
     def lastFromSelf(conv: ConvId, selfUserId: UserId)(implicit db: DB) = single(db.query(table.name, null, s"${Conv.name} = '${Conv(conv)}' AND ${User.name} = '${User(selfUserId)}' AND $userContentPredicate", null, null, null, s"${Time.name} DESC", "1"))
 
@@ -317,12 +333,12 @@ object MessageData extends ((MessageId, ConvId, Message.Type, UserId, Seq[Messag
 
     private val userContentPredicate = isUserContent.map(t => s"${Type.name} = '${Type(t)}'").mkString("(", " OR ", ")")
 
-    def lastIncomingKnock(convId: ConvId, selfUser: UserId)(implicit db: DB): Option[MessageData] = single(
-      db.query(table.name, null, s"${Conv.name} = ? AND ${Type.name} = ? AND ${User.name} <> ?", Array(convId.toString, Type(Message.Type.KNOCK), selfUser.str), null, null, s"${Time.name} DESC", "1")
+    def lastIncomingKnock(conv: ConvId, selfUser: UserId)(implicit db: DB): Option[MessageData] = single(
+      db.query(table.name, null, s"${Conv.name} = ? AND ${Type.name} = ? AND ${User.name} <> ?", Array(Conv(conv), Type(Message.Type.KNOCK), User(selfUser)), null, null, s"${Time.name} DESC", "1")
     )
 
-    def lastMissedCall(convId: ConvId)(implicit db: DB): Option[MessageData] = single(
-      db.query(table.name, null, s"${Conv.name} = ? AND ${Type.name} = ?", Array(convId.toString, Type(Message.Type.MISSED_CALL)), null, null, s"${Time.name} DESC", "1")
+    def lastMissedCall(conv: ConvId)(implicit db: DB): Option[MessageData] = single(
+      db.query(table.name, null, s"${Conv.name} = ? AND ${Type.name} = ?", Array(Conv(conv), Type(Message.Type.MISSED_CALL)), null, null, s"${Time.name} DESC", "1")
     )
 
     private val MessageEntryColumns = Array(Id.name, User.name, Type.name, State.name, ContentSize.name)
@@ -330,41 +346,41 @@ object MessageData extends ((MessageId, ConvId, Message.Type, UserId, Seq[Messag
       override def apply(implicit c: DBCursor): MessageEntry = MessageEntry(Id, User, Type, State, ContentSize)
     }
 
-    def countMessages(convId: ConvId, p: MessageEntry => Boolean)(implicit db: DB): Int =
-      iteratingWithReader(MessageEntryReader)(db.query(table.name, MessageEntryColumns, s"${Conv.name} = ?", Array(convId.toString), null, null, null)).acquire(_ count p)
+    def countMessages(conv: ConvId, p: MessageEntry => Boolean)(implicit db: DB): Int =
+      iteratingWithReader(MessageEntryReader)(db.query(table.name, MessageEntryColumns, s"${Conv.name} = ?", Array(Conv(conv)), null, null, null)).acquire(_ count p)
 
-    def countNewer(convId: ConvId, time: Instant)(implicit db: DB) =
-      queryNumEntries(db, table.name, s"${Conv.name} = '${convId.str}' AND ${Time.name} > ${time.toEpochMilli}")
+    def countNewer(conv: ConvId, time: Instant)(implicit db: DB) =
+      queryNumEntries(db, table.name, s"${Conv.name} = '${Conv(conv)}' AND ${Time.name} > ${Time(time)}")
 
-    def countFailed(convId: ConvId)(implicit db: DB) = queryNumEntries(db, table.name, s"${Conv.name} = '${convId.str}' AND ${State.name} = '${Message.Status.FAILED}'")
+    def countFailed(conv: ConvId)(implicit db: DB) = queryNumEntries(db, table.name, s"${Conv.name} = '${Conv(conv)}' AND ${State.name} = '${Message.Status.FAILED}'")
 
-    def listLocalMessages(convId: ConvId)(implicit db: DB) = list(db.query(table.name, null, s"${Conv.name} = '$convId' AND ${State.name} in ('${Message.Status.DEFAULT}', '${Message.Status.PENDING}', '${Message.Status.FAILED}')", null, null, null, s"${Time.name} ASC"))
+    def listLocalMessages(conv: ConvId)(implicit db: DB) = list(db.query(table.name, null, s"${Conv.name} = '${Conv(conv)}' AND ${State.name} in ('${Message.Status.DEFAULT}', '${Message.Status.PENDING}', '${Message.Status.FAILED}')", null, null, null, s"${Time.name} ASC"))
 
-    def findLocalFrom(convId: ConvId, time: Instant)(implicit db: DB) =
-      iterating(db.query(table.name, null, s"${Conv.name} = '$convId' AND ${State.name} in ('${Message.Status.DEFAULT}', '${Message.Status.PENDING}', '${Message.Status.FAILED}') AND ${Time.name} >= ${time.toEpochMilli}", null, null, null, s"${Time.name} ASC"))
+    def findLocalFrom(conv: ConvId, time: Instant)(implicit db: DB) =
+      iterating(db.query(table.name, null, s"${Conv.name} = '${Conv(conv)}' AND ${State.name} in ('${Message.Status.DEFAULT}', '${Message.Status.PENDING}', '${Message.Status.FAILED}') AND ${Time.name} >= ${Time(time)}", null, null, null, s"${Time.name} ASC"))
 
-    def findLatestUpTo(convId: ConvId, time: Instant)(implicit db: DB) =
-      single(db.query(table.name, null, s"${Conv.name} = '$convId' AND ${Time.name} < ${time.toEpochMilli}", null, null, null, s"${Time.name} DESC", "1"))
+    def findLatestUpTo(conv: ConvId, time: Instant)(implicit db: DB) =
+      single(db.query(table.name, null, s"${Conv.name} = '${Conv(conv)}' AND ${Time.name} < ${Time(time)}", null, null, null, s"${Time.name} DESC", "1"))
 
-    def findMessages(conv: ConvId)(implicit db: DB) = db.query(table.name, null, s"${Conv.name} = '$conv'", null, null, null, s"${Time.name} ASC")
+    def findMessages(conv: ConvId)(implicit db: DB) = db.query(table.name, null, s"${Conv.name} = '${Conv(conv)}'", null, null, null, s"${Time.name} ASC")
 
     def findMessagesFrom(conv: ConvId, time: Instant)(implicit db: DB) =
-      iterating(db.query(table.name, null, s"${Conv.name} = '$conv' and ${Time.name} >= ${time.toEpochMilli}", null, null, null, s"${Time.name} ASC"))
+      iterating(db.query(table.name, null, s"${Conv.name} = '${Conv(conv)}' and ${Time.name} >= ${Time(time)}", null, null, null, s"${Time.name} ASC"))
 
     def findExpired(time: Instant = now(clock))(implicit db: DB) =
-      iterating(db.query(table.name, null, s"${ExpiryTime.name} IS NOT NULL and ${ExpiryTime.name} <= ${time.toEpochMilli}", null, null, null, s"${ExpiryTime.name} ASC"))
+      iterating(db.query(table.name, null, s"${ExpiryTime.name} IS NOT NULL and ${ExpiryTime.name} <= ${Time(time)}", null, null, null, s"${ExpiryTime.name} ASC"))
 
     def findExpiring()(implicit db: DB) =
       iterating(db.query(table.name, null, s"${ExpiryTime.name} IS NOT NULL AND ${Expired.name} = 0", null, null, null, s"${ExpiryTime.name} ASC"))
 
     def findEphemeral(conv: ConvId)(implicit db: DB) =
-      iterating(db.query(table.name, null, s"${Conv.name} = '${conv.str}' and ${Ephemeral.name} IS NOT NULL and ${ExpiryTime.name} IS NULL", null, null, null, s"${Time.name} ASC"))
+      iterating(db.query(table.name, null, s"${Conv.name} = '${Conv(conv)}' and ${Ephemeral.name} IS NOT NULL and ${ExpiryTime.name} IS NULL", null, null, null, s"${Time.name} ASC"))
 
     def findSystemMessage(conv: ConvId, serverTime: Instant, tpe: Message.Type, sender: UserId)(implicit db: DB) =
-      iterating(db.query(table.name, null, s"${Conv.name} = '${conv.str}' and ${Time.name} = ${Time(serverTime)} and ${Type.name} = '${Type(tpe)}' and ${User.name} = '${User(sender)}'", null, null, null, s"${Time.name} DESC"))
+      iterating(db.query(table.name, null, s"${Conv.name} = '${Conv(conv)}' and ${Time.name} = ${Time(serverTime)} and ${Type.name} = '${Type(tpe)}' and ${User.name} = '${User(sender)}'", null, null, null, s"${Time.name} DESC"))
 
     private val IndexColumns = Array(Id.name, Time.name)
-    def msgIndexCursor(conv: ConvId)(implicit db: DB) = db.query(table.name, IndexColumns, s"${Conv.name} = '$conv'", null, null, null, s"${Time.name} ASC")
+    def msgIndexCursor(conv: ConvId)(implicit db: DB) = db.query(table.name, IndexColumns, s"${Conv.name} = '${Conv(conv)}'", null, null, null, s"${Time.name} ASC")
 
     def countAtLeastAsOld(conv: ConvId, time: Instant)(implicit db: DB) =
       queryNumEntries(db, table.name, s"""${Conv.name} = '${Conv(conv)}' AND ${Time.name} <= ${Time(time)}""")
@@ -376,14 +392,14 @@ object MessageData extends ((MessageId, ConvId, Message.Type, UserId, Seq[Messag
 
 
     def findByType(conv: ConvId, tpe: Message.Type)(implicit db: DB) =
-      iterating(db.query(table.name, null, s"${Conv.name} = '$conv' AND ${Type.name} = '${Type(tpe)}'", null, null, null, s"${Time.name} ASC"))
+      iterating(db.query(table.name, null, s"${Conv.name} = '${Conv(conv)}' AND ${Type.name} = '${Type(tpe)}'", null, null, null, s"${Time.name} ASC"))
 
     def msgIndexCursorFiltered(conv: ConvId, types: Seq[TypeFilter], limit: Option[Int] = None)(implicit db: DB): DBCursor = {
       val builder = new SQLiteQueryBuilder()
       val q = builder.buildUnionQuery(
         types.map(mt =>
           s"SELECT * FROM (" +
-            SQLiteQueryBuilder.buildQueryString(false, table.name, IndexColumns, s"${Conv.name} = '$conv' AND ${Type.name} = '${Type(mt.msgType)}' AND ${Expired.name} = 0", null, null, s"${Time.name} DESC", mt.limit.fold[String](null)(_.toString)) +
+            SQLiteQueryBuilder.buildQueryString(false, table.name, IndexColumns, s"${Conv.name} = '${Conv(conv)}' AND ${Type.name} = '${Type(mt.msgType)}' AND ${Expired.name} = 0", null, null, s"${Time.name} DESC", mt.limit.fold[String](null)(_.toString)) +
             s")").toArray,
         null, limit.fold[String](null)(_.toString))
       db.rawQuery(q, null)
@@ -399,13 +415,13 @@ object MessageData extends ((MessageId, ConvId, Message.Type, UserId, Seq[Messag
          | WHERE msg.${Conv.name} = conv.${ConversationDataDao.Id.name} AND conv.${ConversationDataDao.Muted.name} = 0
          | AND msg.${LocalTime.name} > ? AND msg.${User.name} != ?
          | ORDER BY msg.${LocalTime.name} DESC
-         | LIMIT $limit""".stripMargin, Array(since.toString, selfUserId.str)
+         | LIMIT $limit""".stripMargin, Array(since.toString, User(selfUserId))
     ))
   }
 
   case class MessageEntry(id: MessageId, user: UserId, tpe: Message.Type = Message.Type.TEXT, state: Message.Status = Message.Status.DEFAULT, contentSize: Int = 1)
 
-  def messageContent(message: String, mentions: Map[UserId, String] = Map.empty, links: Seq[LinkPreview] = Nil, weblinkEnabled: Boolean = false): (Message.Type, Seq[MessageContent]) =
+  def messageContent(message: SensitiveString, mentions: Map[UserId, Name] = Map.empty, links: Seq[LinkPreview] = Nil, weblinkEnabled: Boolean = false): (Message.Type, Seq[MessageContent]) =
     if (message.trim.isEmpty) (Message.Type.TEXT, textContent(message))
     else if (links.isEmpty) {
       val ct = RichMediaContentParser.splitContent(message, weblinkEnabled)
@@ -441,7 +457,7 @@ object MessageData extends ((MessageId, ConvId, Message.Type, UserId, Seq[Messag
     }
 
 
-  def textContent(message: String): Seq[MessageContent] = Seq(RichMediaContentParser.textMessageContent(message))
+  def textContent(message: SensitiveString): Seq[MessageContent] = Seq(RichMediaContentParser.textMessageContent(message))
 
   object IsAsset {
     def apply(tpe: Message.Type): Boolean = unapply(tpe)
@@ -451,7 +467,7 @@ object MessageData extends ((MessageId, ConvId, Message.Type, UserId, Seq[Messag
     }
   }
 
-  private def applyMentions(content: Seq[MessageContent], mentions: Map[UserId, String]) =
+  private def applyMentions(content: Seq[MessageContent], mentions: Map[UserId, Name]) =
     if (mentions.isEmpty) content
     else if (content.size == 1) content.map(_.copy(mentions = mentions))
     else content map { ct =>

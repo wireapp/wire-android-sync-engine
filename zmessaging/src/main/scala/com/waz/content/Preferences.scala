@@ -105,7 +105,7 @@ object Preferences {
       implicit lazy val LongCodec    = apply[Long]   (String.valueOf, java.lang.Long.parseLong,   0)
       implicit lazy val BooleanCodec = apply[Boolean](String.valueOf, java.lang.Boolean.parseBoolean, false)
 
-      implicit def idCodec[A: Id]: PrefCodec[A] = apply[A](implicitly[Id[A]].encode, implicitly[Id[A]].decode, implicitly[Id[A]].empty)
+      implicit def idCodec[A <: Id: IdCodec]: PrefCodec[A] = apply[A](implicitly[IdCodec[A]].encode, implicitly[IdCodec[A]].decode, implicitly[IdCodec[A]].empty)
       implicit def optCodec[A: PrefCodec]: PrefCodec[Option[A]] = apply[Option[A]](_.fold("")(implicitly[PrefCodec[A]].encode), { str => if (str == "") None else Some(implicitly[PrefCodec[A]].decode(str)) }, None)
 
       implicit lazy val InstantCodec = apply[Instant](d => String.valueOf(d.toEpochMilli), s => Instant.ofEpochMilli(java.lang.Long.parseLong(s)), Instant.EPOCH)
@@ -183,10 +183,10 @@ class GlobalPreferences(context: Context, prefs: SharedPreferences) extends Pref
       .foreach {
         case (key, value) =>
           value match {
-            case v: String  => debug(s"Migrating String:  $key: $value"); editor.putString(key, v)
-            case v: Boolean => debug(s"Migrating Boolean: $key: $value"); editor.putBoolean(key, v)
-            case v: Int     => debug(s"Migrating Int:     $key: $value"); editor.putInt(key, v)
-            case v: Long    => debug(s"Migrating Long:    $key: $value"); editor.putLong(key, v)
+            case v: String  => verbose(s"Migrating String:  $key: $value"); editor.putString(key, v)
+            case v: Boolean => verbose(s"Migrating Boolean: $key: $value"); editor.putBoolean(key, v)
+            case v: Int     => verbose(s"Migrating Int:     $key: $value"); editor.putInt(key, v)
+            case v: Long    => verbose(s"Migrating Long:    $key: $value"); editor.putLong(key, v)
             case v => warn(s"Preference $key: $v has unexpected type. Leaving out of migration")
           }
       }

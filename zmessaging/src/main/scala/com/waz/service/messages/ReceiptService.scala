@@ -52,7 +52,7 @@ class ReceiptService(messages: MessagesStorage, convsStorage: ConversationStorag
 
   def processReceipts(receipts: Seq[MessageId]) =
     if (receipts.nonEmpty) {
-      debug(s"received receipts: $receipts")
+      verbose(s"received receipts: $receipts")
       messages.updateAll2(receipts, _.copy(state = DELIVERED))
     } else successful(Seq.empty)
 }

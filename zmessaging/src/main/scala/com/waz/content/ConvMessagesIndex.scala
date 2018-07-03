@@ -70,7 +70,7 @@ class ConvMessagesIndex(conv: ConvId, messages: MessagesStorageImpl, selfUserId:
     val lastMessageFromOther: Signal[Option[MessageData]] = returning(sources.lastMessageFromOther)(_.disableAutowiring())
 
     lastMessageFromSelf { msg =>
-      info(s"last message from self is now $msg")
+      verbose(s"last message from self is now $msg")
     }
 
     val unreadCount = for {
@@ -122,7 +122,7 @@ class ConvMessagesIndex(conv: ConvId, messages: MessagesStorageImpl, selfUserId:
       }
       val time = lastReadTime.currentValue.getOrElse(Instant.EPOCH)
       val readMessagesCount = MessageDataDao.countAtLeastAsOld(conv, time).toInt
-      verbose(s"index of $time = $readMessagesCount")
+      info(s"index of $time = $readMessagesCount")
       (cursor, order, time, math.max(0, readMessagesCount - 1))
     }.map { case (cursor, order, time, lastReadIndex) =>
       new MessagesCursor(cursor, lastReadIndex, time, msgAndLikes, tracking)(order)
@@ -167,7 +167,7 @@ class ConvMessagesIndex(conv: ConvId, messages: MessagesStorageImpl, selfUserId:
     val lastFromOtherRemoved = lastMessageFromOther.mutate(_ filterNot f)
 
     if (lastRemoved || lastSentRemoved || lastFromSelfRemoved) {
-      verbose("last message was removed, need to fetch it from db")
+      info("last message was removed, need to fetch it from db")
       storage.read { implicit db =>
         MessageDataDao.last(conv) foreach updateSignal(lastMessage)
         MessageDataDao.lastSent(conv) foreach updateSignal(lastSentMessage)
@@ -215,7 +215,7 @@ class ConvMessagesIndex(conv: ConvId, messages: MessagesStorageImpl, selfUserId:
       if (msg.isLocal && !updated.isLocal && lastLocalMessageByType.get(msg.msgType).exists(_.id == msg.id))
         lastLocalMessageByType.remove(msg.msgType)
       else if (updated.isLocal && !msg.isLocal)
-        debug(s"non-local message was updated to local: $msg -> $updated")
+        verbose(s"non-local message was updated to local: $msg -> $updated")
     }
 
     if (updates.nonEmpty) {

@@ -69,7 +69,7 @@ class DefaultFlowManagerService(context:      Context,
 
   private val flowListener = new FlowManagerListener {
     override def cameraFailed(): Unit = {
-      debug(s"cameraFailed")
+      info(s"cameraFailed")
       cameraFailedSig ! true
     }
 
@@ -87,19 +87,19 @@ class DefaultFlowManagerService(context:      Context,
   }
 
   def getVideoCaptureDevices: Future[Vector[VideoCaptureDevice]] = scheduleOr[Array[CaptureDevice]]({ fm =>
-    debug("getVideoCaptureDevices")
+    info("getVideoCaptureDevices")
     safeguardAgainstOldAvs(fm.getVideoCaptureDevices, fallback = Array.empty)
   }, Array.empty).map(_.map(d => VideoCaptureDevice(d.devId, d.devName))(breakOut))
 
   def setVideoCaptureDevice(id: RConvId, deviceId: String): Future[Unit] = schedule { fm =>
-    debug(s"setVideoCaptureDevice($id, $deviceId)")
+    verbose(s"setVideoCaptureDevice($id, $deviceId)")
     fm.setVideoCaptureDevice(id.str, deviceId)
   }
 
   // This is the preview of the outgoing video stream.
   // Call this from the callback telling us to.
   def setVideoPreview(view: View): Future[Unit] = schedule { fm =>
-    debug(s"setVideoPreview($view)")
+    info(s"setVideoPreview($view)")
     cameraFailedSig ! false //reset this signal since we are trying to start the capture again
     fm.setVideoPreview(null, view)
   }
@@ -108,7 +108,7 @@ class DefaultFlowManagerService(context:      Context,
   // partId is the participant id (for group calls, can be null for now).
   // Call this from the callback telling us to.
   def setVideoView(id: RConvId, partId: Option[UserId], view: View): Future[Unit] = schedule { fm =>
-    debug(s"setVideoView($id, $partId, $view")
+    verbose(s"setVideoView($id, $partId, $view")
     fm.setVideoView(id.str, partId.map(_.str).orNull, view)
   }
 

@@ -18,11 +18,9 @@
 package com.waz.log
 
 import java.io._
-import java.util.Calendar
 
 import com.waz.ZLog.LogTag
 import com.waz.api.ZmsVersion
-import com.waz.service.ZMessaging
 import com.waz.service.ZMessaging.clock
 
 import scala.collection.mutable
@@ -36,7 +34,6 @@ object InternalLog {
     case object Debug   extends LogLevel { override def toString = "D" }
     case object Verbose extends LogLevel { override def toString = "V" }
   }
-
 
   private val outputs = mutable.HashMap[String, LogOutput]()
 

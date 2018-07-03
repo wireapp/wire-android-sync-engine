@@ -107,7 +107,7 @@ class ConversationsServiceImpl(teamId:          Option[TeamId],
   }
 
   push.onHistoryLost { req =>
-    verbose(s"onSlowSyncNeeded($req)")
+    info(s"onSlowSyncNeeded($req)")
     // TODO: this is just very basic implementation creating empty message
     // This should be updated to include information about possibly missed changes
     // this message will be shown rarely (when notifications stream skips data)
@@ -173,7 +173,7 @@ class ConversationsServiceImpl(teamId:          Option[TeamId],
     case MemberUpdateEvent(_, _, _, state) => content.updateConversationState(conv.id, state)
 
     case ConnectRequestEvent(_, _, from, _, recipient, _, _) =>
-      debug(s"ConnectRequestEvent(from = $from, recipient = $recipient")
+      verbose(s"ConnectRequestEvent(from = $from, recipient = $recipient")
       membersStorage.add(conv.id, Set(from, recipient)).flatMap { added =>
         val userIdsAdded = added map (_.userId)
         usersStorage.listAll(userIdsAdded) map { localUsers =>

@@ -147,10 +147,10 @@ class AssetLoaderService {
     def onFail(ex: Throwable, attempts: Int = 1) = {
       ex match {
         case _: CancelException =>
-          error(s"Loading cancelled for $id after $attempts attempts", ex)
+//          error(s"Loading cancelled for $id after $attempts attempts", ex) TODO revert when ids can be obfuscated
           requests.get(id).foreach(_.state ! ProgressData(0, 0, State.CANCELLED))
         case NonFatal(_) =>
-          error(s"Loading failed for $id after $attempts attempts", ex)
+//          error(s"Loading failed for $id after $attempts attempts", ex) TODO revert when ids can be obfuscated
           requests.get(id).foreach(_.state ! ProgressData(0, 0, State.FAILED))
       }
       Future.failed(ex)

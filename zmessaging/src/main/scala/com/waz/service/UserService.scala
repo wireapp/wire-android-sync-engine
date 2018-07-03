@@ -56,7 +56,7 @@ trait UserService {
   def getSelfUser: Future[Option[UserData]]
   def getOrCreateUser(id: UserId): Future[UserData]
   def updateUserData(id: UserId, updater: UserData => UserData): Future[Option[(UserData, UserData)]]
-  def updateConnectionStatus(id: UserId, status: UserData.ConnectionStatus, time: Option[Date] = None, message: Option[String] = None): Future[Option[UserData]]
+  def updateConnectionStatus(id: UserId, status: UserData.ConnectionStatus, time: Option[Date] = None, message: Option[SensitiveString] = None): Future[Option[UserData]]
   def getUsers(ids: Seq[UserId]): Future[Seq[UserData]]
   def getUser(id: UserId): Future[Option[UserData]]
   def syncIfNeeded(users: UserData*): Future[Option[SyncId]]
@@ -80,7 +80,7 @@ trait UserService {
   def updateHandle(handle: Handle): ErrorOr[Unit]
 
   //These self user properties should always succeed given no fatal errors, so we update locally and create sync jobs
-  def updateName(name: String): Future[Unit]
+  def updateName(name: Name): Future[Unit]
   def updateAccentColor(color: AccentColor): Future[Unit]
   def updateAvailability(availability: Availability): Future[Unit]
 
@@ -183,10 +183,10 @@ class UserServiceImpl(selfUserId:        UserId,
 
   override def getOrCreateUser(id: UserId) = usersStorage.getOrElseUpdate(id, {
     sync.syncUsers(id)
-    UserData(id, None, DefaultUserName, None, None, connection = ConnectionStatus.Unconnected, searchKey = SearchKey(DefaultUserName), handle = None)
+    UserData(id, None, "", None, None, connection = ConnectionStatus.Unconnected, searchKey = SearchKey(Name.Empty), handle = None)
   })
 
-  override def updateConnectionStatus(id: UserId, status: UserData.ConnectionStatus, time: Option[Date] = None, message: Option[String] = None) =
+  override def updateConnectionStatus(id: UserId, status: UserData.ConnectionStatus, time: Option[Date] = None, message: Option[SensitiveString] = None) =
     usersStorage.update(id, { user => returning(user.updateConnectionStatus(status, time, message))(u => verbose(s"updateConnectionStatus($u)")) }) map {
       case Some((prev, updated)) if prev != updated => Some(updated)
       case _ => None
@@ -200,7 +200,7 @@ class UserServiceImpl(selfUserId:        UserId,
   }
 
   override def getUser(id: UserId) = {
-    debug(s"getUser($id)")
+    verbose(s"getUser($id)")
 
     usersStorage.get(id) map {
       case Some(data) =>
@@ -336,7 +336,7 @@ class UserServiceImpl(selfUserId:        UserId,
     }
   }
 
-  override def updateName(name: String) = {
+  override def updateName(name: Name) = {
     verbose(s"updateName: $name")
     updateAndSync(_.copy(name = name), _ => sync.postSelfName(name))
   }
@@ -395,8 +395,6 @@ class UserServiceImpl(selfUserId:        UserId,
 }
 
 object UserService {
-  val DefaultUserName: String = ""
-
   val UnsplashUrl = AndroidURIUtil.parse("https://source.unsplash.com/800x800/?landscape")
 
   lazy val AcceptedOrBlocked = Set(ConnectionStatus.Accepted, ConnectionStatus.Blocked)

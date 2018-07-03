@@ -29,7 +29,7 @@ class SyncService extends FutureService with ZMessagingService {
 
   override protected def onIntent(intent: Intent, id: Int): Future[Any] =
     onZmsIntent(intent) { zms =>
-      debug(s"onIntent $intent")
+      verbose(s"onIntent $intent")
       zms.syncRequests.scheduler.awaitRunning
     }
 }

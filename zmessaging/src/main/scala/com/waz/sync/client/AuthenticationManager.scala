@@ -91,7 +91,7 @@ class AuthenticationManager(id: UserId, accStorage: AccountStorage, client: Logi
         verbose(s"Non expired token: $token")
         Future.successful(Right(token))
       case token => cookie.flatMap { cookie =>
-        debug(s"Non existent or potentially expired token: $token, will attempt to refresh with cookie: $cookie")
+        verbose(s"Non existent or potentially expired token: $token, will attempt to refresh with cookie: $cookie")
         dispatchRequest(client.access(cookie, token)) {
           case Left(resp @ ErrorResponse(ResponseCode.Forbidden | ResponseCode.Unauthorized, message, label)) =>
             verbose(s"access request failed (label: $label, message: $message), will try login request. currToken: $token, cookie: $cookie, access resp: $resp")
@@ -110,7 +110,7 @@ class AuthenticationManager(id: UserId, accStorage: AccountStorage, client: Logi
     Serialized.future("login-client") {
       verbose(s"onPasswordReset: $emailCredentials")
       cookie.flatMap { cookie =>
-        debug(s"Attempting access request to see if cookie is still valid: $cookie")
+        verbose(s"Attempting access request to see if cookie is still valid: $cookie")
         dispatchRequest(client.access(cookie, None)) {
           case Left(resp @ ErrorResponse(ResponseCode.Forbidden | ResponseCode.Unauthorized, _, _)) =>
             emailCredentials match {
@@ -131,20 +131,19 @@ class AuthenticationManager(id: UserId, accStorage: AccountStorage, client: Logi
   private def dispatchRequest(request: => ErrorOr[LoginResult], retryCount: Int = 0)(handler: ResponseHandler): ErrorOr[AccessToken] =
     request.flatMap(handler.orElse {
       case Right(LoginResult(token, cookie, _)) =>
-        debug(s"receivedAccessToken: '$token'")
+        verbose(s"receivedAccessToken: '$token'")
         updateCredentials(Some(token), cookie).map(_ => Right(token))
 
       case Left(err @ ErrorResponse(Cancelled.code, msg, label)) =>
-        debug(s"request has been cancelled")
+        verbose(s"request has been cancelled")
         Future.successful(Left(err))
 
       case Left(err) if retryCount < MaxRetryCount =>
-        info(s"Received error from request: $err, will retry")
+        verbose(s"Received error from request: $err, will retry")
         dispatchRequest(request, retryCount + 1)(handler)
 
       case Left(err) =>
-        val msg = s"Login request failed after $retryCount retries, last status: $err"
-        error(msg)
+        error(s"Login request failed after $retryCount retries, last status: $err")
         Future.successful(Left(err))
     })
 }

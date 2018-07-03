@@ -51,7 +51,7 @@ class UserSearchClientImpl(implicit
     RawBodyDeserializer[JSONObject].map(json => UserSearchResponse.unapply(JsonObjectResponse(json)).get)
 
   override def getContacts(query: SearchQuery, limit: Int = DefaultLimit): ErrorOrResponse[Seq[UserSearchEntry]] = {
-    debug(s"graphSearch('$query', $limit)")
+    verbose(s"graphSearch('$query', $limit)")
 
     //TODO Get rid of this
     if (query.isInstanceOf[TopPeople.type]) {
@@ -97,9 +97,9 @@ object UserSearchClient {
   val DefaultLimit = 10
 
   def handlesQuery(handle: Handle): String =
-    UserSearchClient.HandlesPath + "/" + Handle.stripSymbol(handle.string)
+    UserSearchClient.HandlesPath + "/" + Handle.stripSymbol(handle.str)
 
-  case class UserSearchEntry(id: UserId, name: String, colorId: Option[Int], handle: Handle)
+  case class UserSearchEntry(id: UserId, name: Name, colorId: Option[Int], handle: Handle)
 
   object UserSearchEntry {
     import JsonDecoder._

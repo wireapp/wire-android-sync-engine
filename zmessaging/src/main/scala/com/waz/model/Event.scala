@@ -25,6 +25,7 @@ import com.waz.ZLog._
 import com.waz.api.IConversation.{Access, AccessRole}
 import com.waz.model.ConversationEvent.ConversationEventDecoder
 import com.waz.model.Event.EventDecoder
+import com.waz.model.GenericMessage.safeLog
 import com.waz.model.UserData.ConnectionStatus
 import com.waz.model.otr.{Client, ClientId}
 import com.waz.service.ZMessaging.clock
@@ -71,12 +72,12 @@ object RConvEvent extends (Event => RConvId) {
 }
 case class UserUpdateEvent(user: UserInfo, removeIdentity: Boolean = false) extends UserEvent
 case class UserPropertiesSetEvent(key: String, value: String) extends UserEvent // value is always json string, so maybe we should parse it already (or maybe not)
-case class UserConnectionEvent(convId: RConvId, from: UserId, to: UserId, message: Option[String], status: ConnectionStatus, lastUpdated: Date, fromUserName: Option[String] = None) extends UserEvent with RConvEvent
+case class UserConnectionEvent(convId: RConvId, from: UserId, to: UserId, message: Option[SensitiveString], status: ConnectionStatus, lastUpdated: Date, fromUserName: Option[Name] = None) extends UserEvent with RConvEvent
 case class UserDeleteEvent(user: UserId) extends UserEvent
 case class OtrClientAddEvent(client: Client) extends OtrClientEvent
 case class OtrClientRemoveEvent(client: ClientId) extends OtrClientEvent
 
-case class ContactJoinEvent(user: UserId, name: String) extends Event
+case class ContactJoinEvent(user: UserId, name: Name) extends Event
 
 case class PushTokenRemoveEvent(token: PushToken, senderId: String, client: Option[String]) extends Event
 
@@ -102,11 +103,13 @@ case class CreateConversationEvent(convId: RConvId, time: Instant, from: UserId,
 
 case class MessageTimerEvent(convId: RConvId, time: Instant, from: UserId, duration: Option[FiniteDuration]) extends ConversationStateEvent
 
-case class RenameConversationEvent(convId: RConvId, time: Instant, from: UserId, name: String) extends MessageEvent with ConversationStateEvent
+case class RenameConversationEvent(convId: RConvId, time: Instant, from: UserId, name: Name) extends MessageEvent with ConversationStateEvent
 
-case class GenericMessageEvent(convId: RConvId, time: Instant, from: UserId, content: GenericMessage) extends MessageEvent
+case class GenericMessageEvent(convId: RConvId, time: Instant, from: UserId, content: GenericMessage) extends MessageEvent {
+  override def toString = s"GenericMessageEvent($convId, $time, $from, ${safeLog(content)})"
+}
 
-case class CallMessageEvent(convId: RConvId, time: Instant, from: UserId, sender: ClientId, content: String) extends MessageEvent
+case class CallMessageEvent(convId: RConvId, time: Instant, from: UserId, sender: ClientId, content: Name) extends MessageEvent
 
 sealed trait OtrError
 case object Duplicate extends OtrError
@@ -124,7 +127,7 @@ case class MemberJoinEvent(convId: RConvId, time: Instant, from: UserId, userIds
 case class MemberLeaveEvent(convId: RConvId, time: Instant, from: UserId, userIds: Seq[UserId]) extends MessageEvent with ConversationStateEvent
 case class MemberUpdateEvent(convId: RConvId, time: Instant, from: UserId, state: ConversationState) extends ConversationStateEvent
 
-case class ConnectRequestEvent(convId: RConvId, time: Instant, from: UserId, message: String, recipient: UserId, name: String, email: Option[String]) extends MessageEvent with ConversationStateEvent
+case class ConnectRequestEvent(convId: RConvId, time: Instant, from: UserId, message: SensitiveString, recipient: UserId, name: Name, email: Option[String]) extends MessageEvent with ConversationStateEvent
 
 case class ConversationAccessEvent(convId: RConvId, time: Instant, from: UserId, access: Set[Access], accessRole: AccessRole) extends ConversationStateEvent
 case class ConversationCodeUpdateEvent(convId: RConvId, time: Instant, from: UserId, link: ConversationData.Link) extends ConversationStateEvent
@@ -184,7 +187,7 @@ object Event {
 
     import com.waz.utils.JsonDecoder._
 
-    def connectionEvent(implicit js: JSONObject, name: Option[String]) = UserConnectionEvent('conversation, 'from, 'to, 'message, ConnectionStatus('status), 'last_update, fromUserName = name)
+    def connectionEvent(implicit js: JSONObject, name: Option[Name]) = UserConnectionEvent('conversation, 'from, 'to, 'message, ConnectionStatus('status), 'last_update, fromUserName = name)
 
     def contactJoinEvent(implicit js: JSONObject) = ContactJoinEvent('id, 'name)
 
@@ -198,8 +201,8 @@ object Event {
         case tpe if tpe.startsWith("conversation") => ConversationEventDecoder(js)
         case tpe if tpe.startsWith("team")         => TeamEvent.TeamEventDecoder(js)
         case "user.update" => UserUpdateEvent(JsonDecoder[UserInfo]('user))
-        case "user.identity-remove" => UserUpdateEvent(JsonDecoder[UserInfo]('user), true)
-        case "user.connection" => connectionEvent(js.getJSONObject("connection"), JsonDecoder.opt('user, _.getJSONObject("user")) flatMap (JsonDecoder.decodeOptString('name)(_)))
+        case "user.identity-remove" => UserUpdateEvent(JsonDecoder[UserInfo]('user), removeIdentity = true)
+        case "user.connection" => connectionEvent(js.getJSONObject("connection"), JsonDecoder.opt('user, _.getJSONObject("user")).flatMap(JsonDecoder.decodeOptName('name)(_)))
         case "user.contact-join" => contactJoinEvent(js.getJSONObject("user"))
         case "user.push-remove" => gcmTokenRemoveEvent(js.getJSONObject("token"))
         case "user.properties-set" => UserPropertiesSetEvent('key, 'value)
@@ -236,11 +239,11 @@ object ConversationEvent {
 
       decodeString('type) match {
         case "conversation.create"               => CreateConversationEvent('conversation, time, 'from, JsonDecoder[ConversationResponse]('data))
-        case "conversation.rename"               => RenameConversationEvent('conversation, time, 'from, decodeString('name)(d.get))
+        case "conversation.rename"               => RenameConversationEvent('conversation, time, 'from, decodeName('name)(d.get))
         case "conversation.member-join"          => MemberJoinEvent('conversation, time, 'from, decodeUserIdSeq('user_ids)(d.get), decodeString('id).startsWith("1."))
         case "conversation.member-leave"         => MemberLeaveEvent('conversation, time, 'from, decodeUserIdSeq('user_ids)(d.get))
         case "conversation.member-update"        => MemberUpdateEvent('conversation, time, 'from, ConversationState.Decoder(d.get))
-        case "conversation.connect-request"      => ConnectRequestEvent('conversation, time, 'from, decodeString('message)(d.get), decodeUserId('recipient)(d.get), decodeString('name)(d.get), decodeOptString('email)(d.get))
+        case "conversation.connect-request"      => ConnectRequestEvent('conversation, time, 'from, decodeSensitiveString('message)(d.get), decodeUserId('recipient)(d.get), decodeName('name)(d.get), decodeOptString('email)(d.get))
         case "conversation.typing"               => TypingEvent('conversation, time, 'from, isTyping = d.fold(false)(data => decodeString('status)(data) == "started"))
         case "conversation.otr-message-add"      => OtrMessageEvent('conversation, time, 'from, decodeClientId('sender)(d.get), decodeClientId('recipient)(d.get), decodeByteString('text)(d.get), decodeOptByteString('data)(d.get))
         case "conversation.access-update"        => ConversationAccessEvent('conversation, time, 'from, decodeAccess('access)(d.get), decodeAccessRole('access_role)(d.get))
@@ -360,7 +363,7 @@ object TeamEvent {
 
   case class Create(teamId: TeamId) extends TeamEvent
   case class Delete(teamId: TeamId) extends TeamEvent
-  case class Update(teamId: TeamId, name: Option[String], icon: Option[RAssetId], iconKey: Option[AESKey]) extends TeamEvent
+  case class Update(teamId: TeamId, name: Option[Name], icon: Option[RAssetId], iconKey: Option[AESKey]) extends TeamEvent
 
   sealed trait MemberEvent extends TeamEvent {
     val userId: UserId
@@ -384,7 +387,7 @@ object TeamEvent {
       decodeString('type) match {
         case "team.create"              => Create('team)
         case "team.delete"              => Delete('team)
-        case "team.update"              => Update('team, decodeOptString('name)('data), decodeOptString('icon)('data).map(RAssetId), decodeOptString('icon_key)('data).map(AESKey))
+        case "team.update"              => Update('team, decodeOptName('name)('data), decodeOptString('icon)('data).map(RAssetId), decodeOptString('icon_key)('data).map(AESKey))
         case "team.member-join"         => MemberJoin ('team, UserId(decodeString('user)('data)))
         case "team.member-leave"        => MemberLeave('team, UserId(decodeString('user)('data)))
         case "team.member-update"       => MemberUpdate('team, UserId(decodeString('user)('data)))
@@ -403,7 +406,7 @@ object OtrClientRemoveEvent {
     new JsonEncoder[OtrClientRemoveEvent] {
       override def apply(error: OtrClientRemoveEvent): JSONObject = JsonEncoder { json =>
         json.setType("user.client-remove")
-        json.put("client", new JSONObject().put("id", error.client.toString))
+        json.put("client", new JSONObject().put("id", error.client.str))
       }
     }
 }

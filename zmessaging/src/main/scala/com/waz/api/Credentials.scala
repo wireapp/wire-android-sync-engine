@@ -17,8 +17,8 @@
  */
 package com.waz.api
 
-import com.waz.model.AccountData.Password
-import com.waz.model.{ConfirmationCode, EmailAddress, Handle, PhoneNumber}
+import com.waz.model.AccountData.{ConfirmationCode, Password}
+import com.waz.model.{EmailAddress, Handle, PhoneNumber}
 import org.json.JSONObject
 
 sealed trait Credentials {
@@ -58,15 +58,15 @@ case class PhoneCredentials(phone: PhoneNumber, code: ConfirmationCode) extends 
     o.put(codeName, code.str)
   }
 
-  override def toString: String = s"PhoneCredentials($phone, ConfirmationCode(******))"
+  override def toString: String = s"PhoneCredentials($phone, $code)"
 }
 
-case class HandleCredentials(handle: Handle, password: String) extends Credentials {
+case class HandleCredentials(handle: Handle, password: Password) extends Credentials {
   override val autoLogin = false
 
   override def addToRegistrationJson(o: JSONObject): Unit = {
-    o.put("email", handle.string)
-    o.put("password", password)
+    o.put("email", handle.str)
+    o.put("password", password.str)
   }
 
   override def addToLoginJson(o: JSONObject): Unit = addToRegistrationJson(o)

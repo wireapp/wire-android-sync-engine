@@ -32,10 +32,10 @@ class UserSearchSyncHandler(userSearch: UserSearchService, client: UserSearchCli
   import Threading.Implicits.Background
 
   def syncSearchQuery(query: SearchQuery): Future[SyncResult] = {
-    debug(s"starting sync for: $query")
+    verbose(s"starting sync for: $query")
     client.getContacts(query).future flatMap {
       case Right(results) =>
-        debug(s"searchSync, got: $results")
+        verbose(s"searchSync, got: $results")
         userSearch.updateSearchResults(query, results).map(_ => SyncResult.Success)
       case Left(error) =>
         warn("graphSearch request failed")
@@ -45,10 +45,10 @@ class UserSearchSyncHandler(userSearch: UserSearchService, client: UserSearchCli
 
   def exactMatchHandle(handle: Handle): Future[SyncResult] = client.exactMatchHandle(handle).future.flatMap {
     case Right(Some(userId)) =>
-      debug(s"exactMatchHandle, got: $userId for the handle $handle")
+      verbose(s"exactMatchHandle, got: $userId for the handle $handle")
       for {
         _ <- usersSyncHandler.syncUsers(userId)
-        _ = debug(s"user with the handle $handle synced")
+        _ = verbose(s"user with the handle $handle synced")
         _ <- userSearch.updateExactMatch(handle, userId)
       } yield SyncResult.Success
     case Right(None)         => successful(SyncResult.Success)

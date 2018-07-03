@@ -68,7 +68,7 @@ class ConversationsSyncHandler(selfUserId:          UserId,
 
       conversationsClient.loadConversations(remoteIds).future flatMap {
         case Right(resps) =>
-          debug(s"syncConversations received ${resps.size}")
+          verbose(s"syncConversations received ${resps.size}")
           convService.updateConversationsWithDeviceStartMessage(resps).map(_ => SyncResult.Success)
         case Left(error) =>
           warn(s"ConversationsClient.syncConversations($ids) failed with error: $error")
@@ -79,7 +79,7 @@ class ConversationsSyncHandler(selfUserId:          UserId,
   def syncConversations(start: Option[RConvId] = None): Future[SyncResult] =
     conversationsClient.loadConversations(start).future flatMap {
       case Right(ConversationsResult(convs, hasMore)) =>
-        debug(s"syncConversations received ${convs.size}")
+        verbose(s"syncConversations received ${convs.size}")
         val future = convService.updateConversationsWithDeviceStartMessage(convs)
         if (hasMore) syncConversations(convs.lastOption.map(_.id)).flatMap(res => future.map(_ => res))
         else future.map(_ => SyncResult.Success)
@@ -88,7 +88,7 @@ class ConversationsSyncHandler(selfUserId:          UserId,
         CancellableFuture.successful(SyncResult(error))
     }
 
-  def postConversationName(id: ConvId, name: String): Future[SyncResult] =
+  def postConversationName(id: ConvId, name: Name): Future[SyncResult] =
     postConv(id) { conv => conversationsClient.postName(conv.remoteId, name).future }
 
   def postConversationMemberJoin(id: ConvId, members: Set[UserId]): Future[SyncResult] = withConversation(id) { conv =>
@@ -122,7 +122,7 @@ class ConversationsSyncHandler(selfUserId:          UserId,
               Future.successful(SyncResult(error))
           }
         case Right(None) =>
-          debug(s"member $user already left, just updating the conversation state")
+          verbose(s"member $user already left, just updating the conversation state")
           conversationsClient.postConversationState(conv.remoteId, ConversationState(archived = Some(true), archiveTime = Some(conv.lastEventTime))).future map { _ => SyncResult.Success }
 
         case Left(error) =>
@@ -134,8 +134,8 @@ class ConversationsSyncHandler(selfUserId:          UserId,
     conversationsClient.postConversationState(conv.remoteId, state).future map (_.fold(SyncResult(_), SyncResult(_)))
   }
 
-  def postConversation(convId: ConvId, users: Set[UserId], name: Option[String], team: Option[TeamId], access: Set[Access], accessRole: AccessRole): Future[SyncResult] = {
-    debug(s"postConversation($convId, $users, $name)")
+  def postConversation(convId: ConvId, users: Set[UserId], name: Option[Name], team: Option[TeamId], access: Set[Access], accessRole: AccessRole): Future[SyncResult] = {
+    verbose(s"postConversation($convId, $users, $name)")
     val (toCreate, toAdd) = users.splitAt(PostMembersLimit)
     conversationsClient.postConversation(toCreate, name, team, access, accessRole).future.flatMap {
       case Right(response) =>
@@ -176,7 +176,7 @@ class ConversationsSyncHandler(selfUserId:          UserId,
       event.localTime = new Date
       convEvents.handlePostConversationEvent(event) map { _ => SyncResult.Success }
     case Right(None) =>
-      debug(s"postConv got success response, but no event")
+      verbose(s"postConv got success response, but no event")
       Future successful SyncResult.Success
     case Left(error) => Future successful SyncResult(error)
   }

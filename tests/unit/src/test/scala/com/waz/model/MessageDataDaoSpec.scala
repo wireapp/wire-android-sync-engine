@@ -96,7 +96,7 @@ import org.threeten.bp.Instant
       ) -> MessageContent(
             Message.Part.Type.YOUTUBE, "youtube link",
             richMedia = Option[MediaAssetData](TrackData(MediaProvider.YOUTUBE, "title", None, "link-url", None, Some(bp.Duration.ofMillis(123L)), streamable = true, None, Some("preview-url"), now)),
-            openGraph = Some(OpenGraphData("wire", "descr", Some(URI.parse("http://www.wire.com")), "website", None)), Some(assetId), 100, 80, syncNeeded = true, mentions = Map.empty[UserId, String])
+            openGraph = Some(OpenGraphData("wire", "descr", Some(URI.parse("http://www.wire.com")), "website", None)), Some(assetId), 100, 80, syncNeeded = true, mentions = Map.empty[UserId, Name])
     )
 
     scenario("Decode message content") {
