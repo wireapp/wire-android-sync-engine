@@ -26,8 +26,10 @@ import com.waz.utils._
 import com.waz.utils.events.Events.Subscriber
 
 import scala.concurrent.duration.FiniteDuration
-import scala.concurrent.{ExecutionContext, Future, Promise}
+import scala.concurrent.duration._
+import scala.concurrent.{Await, ExecutionContext, Future, Promise}
 import scala.ref.WeakReference
+import scala.util.{Success, Try}
 
 object Signal {
   def apply[A]() = new SourceSignal[A] with NoAutowiring
@@ -146,6 +148,9 @@ class Signal[A](@volatile protected[events] var value: Option[A] = None) extends
       value foreach p.trySuccess
       p.future
   }
+
+  def headSync(timeout: FiniteDuration = 3.seconds)(implicit logTag: LogTag): Option[A] =
+    Try(Await.result(head, timeout)).toOption
 
   def zip[B](s: Signal[B]): Signal[(A, B)] = new Zip2Signal[A, B](this, s)
   def map[B](f: A => B): Signal[B] = new MapSignal[A, B](this, f)
