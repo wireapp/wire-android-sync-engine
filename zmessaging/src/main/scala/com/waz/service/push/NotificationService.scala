@@ -34,7 +34,7 @@ import com.waz.service._
 import com.waz.service.conversation.ConversationsListStateService
 import com.waz.service.push.NotificationService.NotificationInfo
 import com.waz.threading.SerialDispatchQueue
-import com.waz.utils.events.{AggregatingSignal, EventStream, Signal}
+import com.waz.utils.events.{AggregatingSignal, EventContext, EventStream, Signal}
 import com.waz.utils.{RichInstant, _}
 import com.waz.zms.NotificationsAndroidService
 import com.waz.zms.NotificationsAndroidService.{checkNotificationsIntent, checkNotificationsTimeout}
@@ -52,6 +52,8 @@ trait GlobalNotificationsService {
   def groupedNotifications: Signal[Map[UserId, (Boolean, Seq[NotificationInfo])]]
 
   def markAsDisplayed(userId: UserId, nots: Seq[NotId]): Future[Any]
+
+  val notificationEventsMissed = EventStream[Unit]()
 }
 
 class GlobalNotificationsServiceImpl extends GlobalNotificationsService {

@@ -92,6 +92,7 @@ class PushServiceImpl(selfUserId:           UserId,
                       lifeCycle:            UiLifeCycle,
                       tracking:             TrackingService,
                       sync:                 SyncServiceHandle,
+                      notifications:        GlobalNotificationsService,
                       timeouts:             Timeouts)
                      (implicit ev: AccountContext) extends PushService { self =>
   import PushService._
@@ -293,8 +294,10 @@ class PushServiceImpl(selfUserId:           UserId,
 
         val eventFrequency = TrackingEvents.map(e => (e, allEvents.count(_ == e))).toMap
 
-        if (missedEvents.nonEmpty) //we didn't get pushes for some returned notifications
+        if (missedEvents.nonEmpty) { //we didn't get pushes for some returned notifications
           tracking.track(MissedPushEvent(now, missedEvents.size, inBackground, nw, network.getNetworkOperatorName, eventFrequency, missedEvents.last._1.str))
+          notifications.notificationEventsMissed ! {}
+        }
 
         if (pushes.nonEmpty)
           pushes.map(p => p.copy(toFetch = Some(p.receivedAt.until(now)))).foreach(p => tracking.track(ReceivedPushEvent(p)))

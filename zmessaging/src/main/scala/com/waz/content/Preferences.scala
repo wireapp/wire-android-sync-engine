@@ -376,6 +376,8 @@ object GlobalPreferences {
 
   lazy val ShouldCreateFullConversation = PrefKey[Boolean]("should_create_full_conv", customDefault = false)
 
+  lazy val MissedEventsWarningDialog = PrefKey[Boolean]("missed_events_warning_dialog", customDefault = true) // 'false' means "don't show even if there are missed events again"
+
   //DEPRECATED!!! Use the UserPreferences instead!!
   lazy val _ShareContacts          = PrefKey[Boolean]("PREF_KEY_PRIVACY_CONTACTS")
   lazy val _DarkTheme              = PrefKey[Boolean]("DarkTheme")
