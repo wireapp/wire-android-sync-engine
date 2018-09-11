@@ -209,6 +209,18 @@ class UserSearchServiceSpec extends AndroidFreeSpec {
     }
   }
 
+  scenario("search conversation people") {
+
+    val convMembers = Set(id('a), id('b))
+
+    (queryCacheStorage.deleteBefore _).expects(*).anyNumberOfTimes().returning(Future.successful[Unit]({}))
+    (membersStorage.activeMembers _).expects(*).anyNumberOfTimes().returning(Signal.const(convMembers))
+    (userService.acceptedOrBlockedUsers _).expects().once().returning(Signal.const(users))
+
+    val res = getService.searchUsersInConversation(ConvId("123"),"1")
+    result(res.filter(_.size == 1).head)
+  }
+
   def getService = {
     new UserSearchService(selfId, queryCacheStorage, teamId, userService, usersStorage, teamsService, membersStorage, timeouts, sync, messagesStorage, convsStorage, convsUi, convs)
   }

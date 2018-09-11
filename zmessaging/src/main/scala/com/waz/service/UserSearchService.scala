@@ -78,6 +78,12 @@ class UserSearchService(selfUserId:           UserId,
       res  <- searchLocal(filter, curr)
     } yield res.filter(conv.isUserAllowed)
 
+  def searchUsersInConversation(convId: ConvId, filter: Filter, includeSelf: Boolean = false): Signal[IndexedSeq[UserData]] =
+    for {
+      curr <- membersStorage.activeMembers(convId)
+      res  <- searchLocal(filter)
+    } yield res.filter(u => curr.contains(u.id))
+
   private def searchLocal(filter: Filter, excluded: Set[UserId] = Set.empty, showBlockedUsers: Boolean = false): Signal[IndexedSeq[UserData]] = {
     val isHandle = Handle.isHandle(filter)
     val symbolStripped = if (isHandle) Handle.stripSymbol(filter) else filter
