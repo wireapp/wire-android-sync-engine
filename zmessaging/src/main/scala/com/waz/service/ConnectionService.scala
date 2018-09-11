@@ -31,7 +31,7 @@ import com.waz.service.push.PushService
 import com.waz.sync.SyncServiceHandle
 import com.waz.threading.Threading
 import com.waz.utils.events.EventContext
-import com.waz.utils.{RichFuture, RichWireInstant, Serialized}
+import com.waz.utils.{RichFuture, RichWireInstant, Serialized, RichIterable}
 
 import scala.collection.breakOut
 import scala.concurrent.Future
@@ -67,77 +67,72 @@ class ConnectionServiceImpl(selfUserId:      UserId,
     }
   }
 
-  def handleUserConnectionEvents(events: Seq[UserConnectionEvent]) = {
-    verbose(s"handleUserConnectionEvents: $events")
-    def updateOrCreate(event: UserConnectionEvent)(user: Option[UserData]): UserData =
-      user.fold {
-        UserData(event.to, None, UserService.DefaultUserName, None, None, connection = event.status, conversation = Some(event.convId), connectionMessage = event.message, searchKey = SearchKey(UserService.DefaultUserName), connectionLastUpdated = event.lastUpdated,
-          handle = None)
-      } {
-        _.copy(conversation = Some(event.convId)).updateConnectionStatus(event.status, Some(event.lastUpdated), event.message)
-      }
+  override def handleUserConnectionEvents(events: Seq[UserConnectionEvent]) = {
+    verbose(s"handleUserConnectionEvents: ${events.log}")
+
+    import ConnectionStatus._
 
     val lastEvents = events.groupBy(_.to).map { case (to, es) => to -> es.maxBy(_.lastUpdated) }
     val fromSync: Set[UserId] = lastEvents.filter(_._2.localTime == LocalInstant.Epoch).map(_._2.to)(breakOut)
-
     verbose(s"lastEvents: $lastEvents, fromSync: $fromSync")
 
-    usersStorage.updateOrCreateAll2(lastEvents.map(_._2.to), { case (uId, user) => updateOrCreate(lastEvents(uId))(user) })
-      .map { users => (users.map(u => (u, lastEvents(u.id).lastUpdated)), fromSync) }
-  }.flatMap { case (users, fromSync) =>
-    verbose(s"syncing $users and fromSync: $fromSync")
-    val toSync = users filter { case (user, _) => user.connection == ConnectionStatus.Accepted || user.connection == ConnectionStatus.PendingFromOther || user.connection == ConnectionStatus.PendingFromUser }
-    sync.syncUsers(toSync.map(_._1.id)(breakOut)) flatMap { _ =>
-      updateConversationsForConnections(users.map(u => ConnectionEventInfo(u._1, fromSync(u._1.id), u._2))).map(_ => ())
-    }
-  }
-
-  private def updateConversationsForConnections(eventInfos: Set[ConnectionEventInfo]): Future[Seq[ConversationData]] = {
-    verbose(s"updateConversationForConnections: ${eventInfos.size}")
-
-    val oneToOneConvData = eventInfos.map { case ConnectionEventInfo(user , _ , _) =>
-      val convType = user.connection match {
-        case ConnectionStatus.PendingFromUser | ConnectionStatus.Cancelled => ConversationType.WaitForConnection
-        case ConnectionStatus.PendingFromOther | ConnectionStatus.Ignored => ConversationType.Incoming
-        case _ => ConversationType.OneToOne
+    def updateOrCreate(id: UserId, user: Option[UserData]): UserData = {
+      val event = lastEvents(id)
+      user match {
+        case Some(old) =>
+          old.copy(conversation = Some(event.convId)).updateConnectionStatus(event.status, Some(event.lastUpdated), event.message)
+        case _ =>
+          UserData(
+            id                    = event.to,
+            name                  = UserService.DefaultUserName,
+            connection            = event.status,
+            conversation          = Some(event.convId),
+            connectionMessage     = event.message,
+            searchKey             = SearchKey(UserService.DefaultUserName),
+            connectionLastUpdated = event.lastUpdated)
       }
-      OneToOneConvData(user.id, user.conversation, convType)
     }
-
-    val eventMap = eventInfos.map(eventInfo => eventInfo.user.id -> eventInfo).toMap
-    val userIds = eventInfos.map(_.user.id)
 
     for {
+      users  <- usersStorage.updateOrCreateAll2(lastEvents.map(_._2.to), { case (uId, user) => updateOrCreate(uId, user) })
+      toSync = users.collect { case user if Set(Accepted, PendingFromOther, PendingFromUser).contains(user.connection) => user.id }
+      _      <- sync.syncUsers(toSync)
+      oneToOneConvData = users.map { user =>
+        val convType = user.connection match {
+          case PendingFromUser | Cancelled => ConversationType.WaitForConnection
+          case PendingFromOther | Ignored  => ConversationType.Incoming
+          case _ => ConversationType.OneToOne
+        }
+        OneToOneConvData(user.id, user.conversation, convType)
+      }
       otoConvs   <- getOrCreateOneToOneConversations(oneToOneConvData.toSeq)
-      convToUser = userIds.flatMap(e => otoConvs.get(e).map(c => c.id -> e)).toMap
+      _ = verbose(s"otoConvs: ${otoConvs.log}")
+      convToUser = users.map(_.id).flatMap(id => otoConvs.get(id).map(c => c.id -> id)).toMap
       _          <- members.addAll(convToUser.mapValues(u => Set(u, selfUserId)))
       updatedConvs <- convsStorage.updateAll2(convToUser.keys, { conv =>
+        val userId = convToUser(conv.id)
+        val user   = users.find(_.id == userId).get
+        conv.copy(
+          convType      = otoConvs(userId).convType,
+          hidden        = Set(Ignored, Blocked, Cancelled)(user.connection),
+          lastEventTime = conv.lastEventTime max lastEvents(userId).lastUpdated
+        )
+      }).map(_.map(_._2))
+      _ <- Future.sequence(updatedConvs.map { conv =>
 
         val userId = convToUser(conv.id)
-        val user   = eventMap(userId).user
-        val hidden = user.connection == ConnectionStatus.Ignored || user.connection == ConnectionStatus.Blocked || user.connection == ConnectionStatus.Cancelled
+        val user = users.find(_.id == userId).get
 
-        conv.copy(convType = otoConvs(userId).convType, hidden = hidden, lastEventTime = conv.lastEventTime max eventMap(userId).lastEventTime)
-      })
-      result <- Future.sequence(updatedConvs.map { case (_, conv) =>
-        messagesStorage.getLastMessage(conv.id) flatMap {
+        messagesStorage.getLastMessage(conv.id).flatMap {
           case None if conv.convType == ConversationType.Incoming =>
-            val userId = convToUser(conv.id)
-            val user = eventMap(userId).user
-            messages.addConnectRequestMessage(conv.id, user.id, selfUserId, user.connectionMessage.getOrElse(""), user.getDisplayName, fromSync = eventMap(userId).fromSync)
+            messages.addConnectRequestMessage(conv.id, user.id, selfUserId, user.connectionMessage.getOrElse(""), user.getDisplayName, fromSync = fromSync(userId))
           case None if conv.convType == ConversationType.OneToOne =>
             messages.addDeviceStartMessages(Seq(conv), selfUserId)
           case _ =>
             Future.successful(())
-        } map { _ =>
-          val userId = convToUser(conv.id)
-          val user = eventMap(userId).user
-          val hidden = user.connection == ConnectionStatus.Ignored || user.connection == ConnectionStatus.Blocked || user.connection == ConnectionStatus.Cancelled
-          if (conv.hidden && !hidden) sync.syncConversations(Set(conv.id))
-          conv
         }
       })
-    } yield result
+    } yield {}
   }
 
   /**
@@ -244,7 +239,7 @@ class ConnectionServiceImpl(selfUserId:      UserId,
 
   private def getOrCreateOneToOneConversations(convsInfo: Seq[OneToOneConvData]): Future[Map[UserId, ConversationData]] =
     Serialized.future('getOrCreateOneToOneConversations) {
-      verbose(s"getOrCreateOneToOneConversations: convs: ${convsInfo.size}")
+      verbose(s"getOrCreateOneToOneConversations: convs: ${convsInfo.log}")
 
       def convIdForUser(userId: UserId) = ConvId(userId.str)
       def userIdForConv(convId: ConvId) = UserId(convId.str)
@@ -289,7 +284,6 @@ class ConnectionServiceImpl(selfUserId:      UserId,
 }
 
 object ConnectionService {
-  case class ConnectionEventInfo(user: UserData, fromSync: Boolean, lastEventTime: RemoteInstant)
 
-  case class OneToOneConvData(toUser:   UserId, remoteId: Option[RConvId] = None, convType: ConversationType = ConversationType.OneToOne)
+  case class OneToOneConvData(toUser: UserId, remoteId: Option[RConvId] = None, convType: ConversationType = ConversationType.OneToOne)
 }
