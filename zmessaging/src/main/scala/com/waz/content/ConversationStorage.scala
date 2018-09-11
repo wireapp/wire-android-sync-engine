@@ -72,7 +72,7 @@ class ConversationStorageImpl(storage: ZmsDatabase) extends CachedStorageImpl[Co
   val convUpdated = EventStream[(ConversationData, ConversationData)]() // (prev, updated)
 
   onAdded.on(dispatcher) { cs =>
-    verbose(s"${cs.size} convs added")
+    verbose(s"onAdded: ${cs.map(_.id).log}")
     cs foreach { c =>
       conversationsById.put(c.id, c)
       remoteMap.put(c.remoteId, c.id)
@@ -88,7 +88,7 @@ class ConversationStorageImpl(storage: ZmsDatabase) extends CachedStorageImpl[Co
   def setUnknownVerification(convId: ConvId) = update(convId, { c => c.copy(verified = if (c.verified == Verification.UNVERIFIED) UNKNOWN else c.verified) })
 
   onDeleted.on(dispatcher) { cs =>
-    verbose(s"${cs.size} convs deleted")
+    verbose(s"onDeleted: ${cs.log}")
     cs foreach { c =>
       conversationsById.remove(c) foreach { cd =>
         convDeleted ! cd
@@ -100,7 +100,7 @@ class ConversationStorageImpl(storage: ZmsDatabase) extends CachedStorageImpl[Co
   }
 
   onUpdated.on(dispatcher) { cs =>
-    verbose(s"${cs.size} convs updated")
+    verbose(s"onUpdated: ${cs.map(_._1.id).size}")
     cs foreach { case (prev, conv) =>
       conversationsById.put(conv.id, conv)
       if (prev.remoteId != conv.remoteId) {
@@ -122,7 +122,7 @@ class ConversationStorageImpl(storage: ZmsDatabase) extends CachedStorageImpl[Co
     _       <- updateAll2(convs.map(_.id), updater)
   } yield {
     val updated = convs.map(updater)
-    verbose(s"Caching ${updated.size} conversations")
+    verbose(s"Caching conversations ${updated.log}")
     updated foreach { c =>
       conversationsById(c.id) = c
       remoteMap(c.remoteId) = c.id

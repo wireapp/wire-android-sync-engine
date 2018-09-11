@@ -263,7 +263,7 @@ class CachedStorageImpl[K, V](cache: LruCache[K, Option[V]], db: Database)(impli
   def updateOrCreateAll2(keys: Iterable[K], updater: ((K, Option[V]) => V)): Future[Set[V]] =
     if (keys.isEmpty) Future successful Set.empty[V]
     else {
-      verbose(s"updateOrCreateAll: ${keys.size} keys: ${keys.take(5)}...")
+      verbose(s"updateOrCreateAll: keys: ${keys.log}")
       getAll(keys) flatMap { values =>
         val loaded: Map[K, Option[V]] = keys.iterator.zip(values.iterator).map { case (k, v) => k -> Option(cache.get(k)).flatten.orElse(v) }.toMap
         val toSave = Vector.newBuilder[V]

@@ -26,7 +26,6 @@ import android.util.Base64
 import com.waz.ZLog.LogTag
 import com.waz.api.UpdateListener
 import com.waz.model.{LocalInstant, WireInstant}
-import com.waz.service.ZMessaging.clock
 import com.waz.threading.{CancellableFuture, Threading}
 import com.waz.utils.wrappers.{URI, URIBuilder}
 import org.json.{JSONArray, JSONObject}
@@ -44,7 +43,6 @@ import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.language.{higherKinds, implicitConversions}
 import scala.math.{Ordering, abs}
-import scala.util.control.NonFatal
 import scala.util.{Failure, Success, Try}
 import scala.{PartialFunction => =/>}
 
@@ -115,6 +113,10 @@ package object utils {
       val (c, ds) = ev(a)
       ds.map(d => (c, d))
     }
+  }
+
+  implicit class RichIterable[A](val items: Iterable[A]) extends AnyVal {
+    def log: String = s"${if (items.size > 3) s"${items.size} items: " else "" }${items.take(3)}${if (items.size > 3) "...(truncated)" else "" }"
   }
 
   implicit class RichIndexedSeq[A](val items: IndexedSeq[A]) extends AnyVal {

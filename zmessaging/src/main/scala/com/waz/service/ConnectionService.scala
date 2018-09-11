@@ -244,7 +244,7 @@ class ConnectionServiceImpl(selfUserId:      UserId,
 
   private def getOrCreateOneToOneConversations(convsInfo: Seq[OneToOneConvData]): Future[Map[UserId, ConversationData]] =
     Serialized.future('getOrCreateOneToOneConversations) {
-      verbose(s"getOrCreateOneToOneConversations(self: $selfUserId, convs:${convsInfo.size})")
+      verbose(s"getOrCreateOneToOneConversations: convs: ${convsInfo.size}")
 
       def convIdForUser(userId: UserId) = ConvId(userId.str)
       def userIdForConv(convId: ConvId) = UserId(convId.str)
