@@ -38,9 +38,9 @@ trait ConversationStorage extends CachedStorage[ConvId, ConversationData] {
 
   def conversations: IndexedSeq[ConversationData]
 
-  val convAdded: EventStream[ConversationData]
-  val convDeleted: EventStream[ConversationData]
-  val convUpdated: EventStream[(ConversationData, ConversationData)]
+  def convAdded: EventStream[ConversationData]
+  def convDeleted: EventStream[ConversationData]
+  def convUpdated: EventStream[(ConversationData, ConversationData)]
 
   def setUnknownVerification(convId: ConvId): Future[Option[(ConversationData, ConversationData)]]
   def search(prefix: SearchKey, self: UserId, handleOnly: Boolean, teamId: Option[TeamId] = None): Future[Vector[ConversationData]]
@@ -55,7 +55,7 @@ trait ConversationStorage extends CachedStorage[ConvId, ConversationData] {
 
   def apply[A](f: (GenMap[ConvId, ConversationData], GenMap[RConvId, ConvId]) => A): Future[A]
 
-  def refreshRemoteMap(): Unit
+  def refreshRemoteMap(): Future[Unit]
 }
 
 class ConversationStorageImpl(storage: ZmsDatabase) extends CachedStorageImpl[ConvId, ConversationData](new UnlimitedLruCache(), storage)(ConversationDataDao, "ConversationStorage_Cached") with ConversationStorage {
@@ -93,8 +93,10 @@ class ConversationStorageImpl(storage: ZmsDatabase) extends CachedStorageImpl[Co
     verbose(s"onDeleted: ${cs.log}")
     cs foreach { c =>
       conversationsById.remove(c) foreach { cd =>
-        convDeleted ! cd
-        remoteMap.remove(cd.remoteId)
+        if (remoteMap(cd.remoteId) == c) {
+          convDeleted ! cd
+          remoteMap.remove(cd.remoteId)
+        }
       }
     }
 
@@ -118,7 +120,7 @@ class ConversationStorageImpl(storage: ZmsDatabase) extends CachedStorageImpl[Co
     updateSearchKey(cs collect { case (p, c) if p.name != c.name || (p.convType == Group) != (c.convType == Group) || (c.name.nonEmpty && c.searchKey.isEmpty) => c })
   }
 
-  def refreshRemoteMap(): Unit = {
+  override def refreshRemoteMap(): Future[Unit] = Future {
     remoteMap.clear()
     conversationsById.values.foreach(conv => remoteMap += conv.remoteId -> conv.id)
   }

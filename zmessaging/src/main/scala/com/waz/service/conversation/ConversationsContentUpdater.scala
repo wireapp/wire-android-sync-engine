@@ -223,6 +223,7 @@ class ConversationsContentUpdaterImpl(val storage:     ConversationStorage,
   override def updateAccessMode(id: ConvId, access: Set[Access], accessRole: Option[AccessRole], link: Option[ConversationData.Link] = None) =
     storage.update(id, conv => conv.copy(access = access, accessRole = accessRole, link = if (!access.contains(Access.CODE)) None else link.orElse(conv.link)))
 
+  // TODO: This method removes duplicates in the conversations table, introduced by a bug in an older release. Remove after a few months
   def fixDuplicatedConversations(): Future[Unit] = {
 
     def moveMessages(from: ConvId, to: ConvId): Future[Unit] =
@@ -246,8 +247,8 @@ class ConversationsContentUpdaterImpl(val storage:     ConversationStorage,
           case _ => None
         }
       }.toMap
-      _ = verbose(s"fixDuplicatedConversations: (original, updates) pairs: $pairs")
-      _ <- Future.sequence(pairs.map { case (origId, updates) =>
+      _          =  verbose(s"fixDuplicatedConversations: (original, updates) pairs: $pairs")
+      _          <- Future.sequence(pairs.map { case (origId, updates) =>
         for {
           _ <- Future.sequence(updates.map(updId => moveMessages(updId, origId)))
           _ <- if (updates.tail.nonEmpty) storage.removeAll(updates.tail) else Future.successful({})
@@ -257,7 +258,8 @@ class ConversationsContentUpdaterImpl(val storage:     ConversationStorage,
           _ <- membersStorage.add(origId, Seq(selfUserId, UserId(origId.str)))
         } yield ()
       })
-    } yield storage.refreshRemoteMap()
+      _          <- storage.refreshRemoteMap()
+    } yield ()
   }
 
 }
