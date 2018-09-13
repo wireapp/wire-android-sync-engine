@@ -81,8 +81,17 @@ class UserSearchService(selfUserId:           UserId,
   def searchUsersInConversation(convId: ConvId, filter: Filter, includeSelf: Boolean = false): Signal[IndexedSeq[UserData]] =
     for {
       curr <- membersStorage.activeMembers(convId)
-      res  <- searchLocal(filter)
-    } yield res.filter(u => curr.contains(u.id))
+      currData <- usersStorage.listSignal(curr)
+    } yield {
+      val included = currData.filter { user =>
+          (includeSelf || selfUserId != user.id) &&
+          !user.isWireBot &&
+          user.expiresAt.isEmpty &&
+          user.matchesFilter(filter) &&
+          user.connection != ConnectionStatus.Blocked
+      }
+      sortUsers(included, filter, isHandle = false, filter)
+    }
 
   private def searchLocal(filter: Filter, excluded: Set[UserId] = Set.empty, showBlockedUsers: Boolean = false): Signal[IndexedSeq[UserData]] = {
     val isHandle = Handle.isHandle(filter)
