@@ -38,9 +38,9 @@ trait ConversationStorage extends CachedStorage[ConvId, ConversationData] {
 
   def conversations: IndexedSeq[ConversationData]
 
-  val convAdded: EventStream[ConversationData]
-  val convDeleted: EventStream[ConversationData]
-  val convUpdated: EventStream[(ConversationData, ConversationData)]
+  def convAdded: EventStream[ConversationData]
+  def convDeleted: EventStream[ConversationData]
+  def convUpdated: EventStream[(ConversationData, ConversationData)]
 
   def setUnknownVerification(convId: ConvId): Future[Option[(ConversationData, ConversationData)]]
   def search(prefix: SearchKey, self: UserId, handleOnly: Boolean, teamId: Option[TeamId] = None): Future[Vector[ConversationData]]
@@ -54,6 +54,8 @@ trait ConversationStorage extends CachedStorage[ConvId, ConversationData] {
   def updateLocalIds(update: Map[ConvId, ConvId]): Future[Set[ConversationData]]
 
   def apply[A](f: (GenMap[ConvId, ConversationData], GenMap[RConvId, ConvId]) => A): Future[A]
+
+  def refreshRemoteMap(): Future[Unit]
 }
 
 class ConversationStorageImpl(storage: ZmsDatabase) extends CachedStorageImpl[ConvId, ConversationData](new UnlimitedLruCache(), storage)(ConversationDataDao, "ConversationStorage_Cached") with ConversationStorage {
@@ -72,7 +74,7 @@ class ConversationStorageImpl(storage: ZmsDatabase) extends CachedStorageImpl[Co
   val convUpdated = EventStream[(ConversationData, ConversationData)]() // (prev, updated)
 
   onAdded.on(dispatcher) { cs =>
-    verbose(s"${cs.size} convs added")
+    verbose(s"onAdded: ${cs.map(_.id).log}")
     cs foreach { c =>
       conversationsById.put(c.id, c)
       remoteMap.put(c.remoteId, c.id)
@@ -88,11 +90,13 @@ class ConversationStorageImpl(storage: ZmsDatabase) extends CachedStorageImpl[Co
   def setUnknownVerification(convId: ConvId) = update(convId, { c => c.copy(verified = if (c.verified == Verification.UNVERIFIED) UNKNOWN else c.verified) })
 
   onDeleted.on(dispatcher) { cs =>
-    verbose(s"${cs.size} convs deleted")
+    verbose(s"onDeleted: ${cs.log}")
     cs foreach { c =>
       conversationsById.remove(c) foreach { cd =>
-        convDeleted ! cd
-        remoteMap.remove(cd.remoteId)
+        if (remoteMap(cd.remoteId) == c) {
+          convDeleted ! cd
+          remoteMap.remove(cd.remoteId)
+        }
       }
     }
 
@@ -100,7 +104,7 @@ class ConversationStorageImpl(storage: ZmsDatabase) extends CachedStorageImpl[Co
   }
 
   onUpdated.on(dispatcher) { cs =>
-    verbose(s"${cs.size} convs updated")
+    verbose(s"onUpdated: ${cs.map(_._1.id).size}")
     cs foreach { case (prev, conv) =>
       conversationsById.put(conv.id, conv)
       if (prev.remoteId != conv.remoteId) {
@@ -116,13 +120,18 @@ class ConversationStorageImpl(storage: ZmsDatabase) extends CachedStorageImpl[Co
     updateSearchKey(cs collect { case (p, c) if p.name != c.name || (p.convType == Group) != (c.convType == Group) || (c.name.nonEmpty && c.searchKey.isEmpty) => c })
   }
 
+  override def refreshRemoteMap(): Future[Unit] = Future {
+    remoteMap.clear()
+    conversationsById.values.foreach(conv => remoteMap += conv.remoteId -> conv.id)
+  }
+
   private val init = for {
     convs   <- super.list()
     updater = (c: ConversationData) => c.copy(searchKey = c.savedOrFreshSearchKey)
     _       <- updateAll2(convs.map(_.id), updater)
   } yield {
     val updated = convs.map(updater)
-    verbose(s"Caching ${updated.size} conversations")
+    verbose(s"Caching conversations ${updated.log}")
     updated foreach { c =>
       conversationsById(c.id) = c
       remoteMap(c.remoteId) = c.id
