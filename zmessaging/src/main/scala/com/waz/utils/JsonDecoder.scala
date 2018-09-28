@@ -159,6 +159,7 @@ object JsonDecoder {
   implicit def decodeOptFiniteDuration(s: Symbol)(implicit js: JSONObject): Option[FiniteDuration] = opt(s, decodeFiniteDuration(s)(_))
   implicit def decodeOptLoudness(s: Symbol)(implicit js: JSONObject): Option[Loudness] = opt(s, decodeLoudness(s)(_))
   implicit def decodeUri(s: Symbol)(implicit js: JSONObject): URI = URI.parse(js.getString(s.name))
+  implicit def decodeOptUserId(s: Symbol)(implicit js: JSONObject): Option[UserId] = opt(s, js => UserId(js.getString(s.name)))
 
   implicit def decodeSeq[A](s: Symbol)(implicit js: JSONObject, dec: JsonDecoder[A]): Vector[A] = decodeColl[A, Vector](s)
   implicit def decodeSet[A](s: Symbol)(implicit js: JSONObject, dec: JsonDecoder[A]): Set[A] = decodeColl[A, Set](s)
