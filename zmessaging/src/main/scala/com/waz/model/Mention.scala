@@ -17,4 +17,23 @@
  */
 package com.waz.model
 
+import com.waz.utils.{JsonDecoder, JsonEncoder}
+import org.json.JSONObject
+
 case class Mention(userId: Option[UserId], start: Int, length: Int)
+
+object Mention{
+  implicit lazy val Decoder: JsonDecoder[Mention] = new JsonDecoder[Mention] {
+    import JsonDecoder._
+
+    override def apply(implicit js: JSONObject): Mention = Mention('userId, 'start, 'length)
+  }
+
+  implicit lazy val Encoder: JsonEncoder[Mention] = new JsonEncoder[Mention] {
+    override def apply(v: Mention): JSONObject = JsonEncoder { o =>
+      v.userId.foreach(id => o.put("userId", id.str))
+      o.put("start", v.start)
+      o.put("length", v.length)
+    }
+  }
+}

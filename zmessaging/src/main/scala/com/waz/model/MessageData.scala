@@ -214,34 +214,18 @@ object MessageContent extends ((Message.Part.Type, String, Option[MediaAssetData
   implicit lazy val Decoder: JsonDecoder[MessageContent] = new JsonDecoder[MessageContent] {
     import com.waz.utils.JsonDecoder._
 
-    private def decodeMentions(arr: JSONArray) =
-      Seq.tabulate(arr.length())(arr.getJSONObject).map { implicit obj =>
-        Mention(decodeOptId[UserId]('user_id), decodeInt('start), decodeInt('length))
-      }
-
     override def apply(implicit js: JSONObject): MessageContent = {
       val tpe = ContentTypeCodec.decode('type)
       if (js.has("connections")) array[UserConnectionEvent](js.getJSONArray("connections")).toList else Nil
-      val mentions = if (js.has("mentions") && !js.isNull("mentions")) decodeMentions(js.getJSONArray("mentions")) else Nil
       val richMedia = opt[MediaAssetData]('richMedia) orElse { // if there's no media asset for rich media message contents, we create an expired empty one
         if (tpe == Message.Part.Type.SPOTIFY || tpe == Message.Part.Type.SOUNDCLOUD || tpe == Message.Part.Type.YOUTUBE) Some(MediaAssetData.empty(tpe)) else None
       }
 
-      MessageContent(tpe, 'content, richMedia, opt[OpenGraphData]('openGraph), decodeOptId[AssetId]('asset), 'width, 'height, 'syncNeeded, mentions)
+      MessageContent(tpe, 'content, richMedia, opt[OpenGraphData]('openGraph), decodeOptId[AssetId]('asset), 'width, 'height, 'syncNeeded, decodeSeq[Mention]('mentions))
     }
   }
 
   implicit lazy val Encoder: JsonEncoder[MessageContent] = new JsonEncoder[MessageContent] {
-    private def encodeMentions(mentions: Seq[Mention]): JSONArray = returning(new JSONArray()){ arr =>
-      mentions.map { case Mention(userId, start, length) =>
-        JsonEncoder { o =>
-          userId.map(id => o.put("user_id", id))
-          o.put("start", start)
-          o.put("length", length)
-        }
-      }.foreach(arr.put)
-    }
-
     override def apply(v: MessageContent): JSONObject = JsonEncoder { o =>
       o.put("type", ContentTypeCodec.encode(v.tpe))
       if (v.content != "") o.put("content", v.content)
@@ -251,7 +235,7 @@ object MessageContent extends ((Message.Part.Type, String, Option[MediaAssetData
       if (v.width != 0) o.put("width", v.width)
       if (v.height != 0) o.put("height", v.height)
       if (v.syncNeeded) o.put("syncNeeded", v.syncNeeded)
-      if (v.mentions.nonEmpty) o.put("mentions", encodeMentions(v.mentions))
+      if (v.mentions.nonEmpty) o.put("mentions", JsonEncoder.arr(v.mentions))
     }
   }
 

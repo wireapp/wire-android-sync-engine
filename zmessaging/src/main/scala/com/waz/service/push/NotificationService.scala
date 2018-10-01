@@ -307,7 +307,7 @@ class NotificationService(context:         Context,
                 userPicture = userPicture,
                 isEphemeral = data.ephemeral,
                 isGroupConv = groupConv,
-                isUserMentioned = data.mentions.contains(userId),
+                userMentions = data.mentions.filter(_.userId.forall(_ == userId)),
                 likedContent = maybeLikedContent,
                 hasBeenDisplayed = data.hasBeenDisplayed)
             }
@@ -331,7 +331,7 @@ object NotificationService {
                               userName: Option[String] = None,
                               userPicture: Option[AssetId] = None,
                               isGroupConv: Boolean = false,
-                              isUserMentioned: Boolean = false,
+                              userMentions: Seq[Mention] = Nil,
                               isEphemeral: Boolean = false,
                               likedContent: Option[LikedContent] = None,
                               hasBeenDisplayed: Boolean = false
@@ -365,7 +365,7 @@ object NotificationService {
         msg.userId, tp,
         if (msg.time == RemoteInstant.Epoch) msg.localTime.toRemote(drift) else msg.time,
         ephemeral = msg.isEphemeral,
-        mentions = msg.mentions.flatMap(_.userId)
+        mentions = msg.mentions
       )
     }
   }
