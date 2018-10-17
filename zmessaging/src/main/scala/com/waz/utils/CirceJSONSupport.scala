@@ -18,10 +18,11 @@
 package com.waz.utils
 import java.net.URL
 
-import com.waz.model.{RAssetId, UserId}
+import com.waz.model.UserId
+import com.waz.model.{AssetToken, RAssetId}
 import io.circe.generic.AutoDerivation
 import io.circe.{Decoder, Encoder}
-import org.threeten.bp.Duration
+import org.threeten.bp.{Duration, Instant}
 
 trait CirceJSONSupport extends AutoDerivation {
 
@@ -31,7 +32,10 @@ trait CirceJSONSupport extends AutoDerivation {
   implicit def DurationDecoder: Decoder[Duration] = Decoder[Long].map(Duration.ofMillis)
   implicit def DurationEncoder: Encoder[Duration] = Encoder[Long].contramap(_.toMillis)
 
+  implicit def InstantDecoder: Decoder[Instant] = Decoder[String].map(Instant.parse)
+
   implicit def RAssetIdDecoder: Decoder[RAssetId] = Decoder[String].map(RAssetId.apply)
   implicit def UserIdDecoder: Decoder[UserId] = Decoder[String].map(UserId.apply)
+  implicit def AssetTokenDecoder: Decoder[AssetToken] = Decoder[String].map(AssetToken.apply)
 
 }

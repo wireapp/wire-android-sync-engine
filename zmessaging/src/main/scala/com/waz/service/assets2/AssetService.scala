@@ -123,7 +123,7 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
 
     assetClient.uploadAsset(metadata, content, callback).flatMap {
       case Right(response) =>
-        val asset = Asset(AssetId(response.rId.str), response.token, rawAsset)
+        val asset = Asset(AssetId(response.key.str), response.token, rawAsset)
         assetsStorage.save(asset).map(_ => asset).toCancellable
       case Left(err) =>
         verbose(s"Error while uploading asset: $err")

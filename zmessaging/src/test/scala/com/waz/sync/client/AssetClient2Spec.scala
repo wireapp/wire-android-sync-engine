@@ -27,7 +27,7 @@ import com.waz.cache2.CacheService.NoEncryption
 import com.waz.model.{AssetId, Mime, Sha256}
 import com.waz.service.assets2.{Asset, BlobDetails}
 import com.waz.sync.client.AssetClient.FileWithSha
-import com.waz.sync.client.AssetClient2.{AssetContent, Metadata, Retention, UploadResponse}
+import com.waz.sync.client.AssetClient2.{AssetContent, Metadata, Retention, UploadResponse2}
 import com.waz.utils.returning
 
 import scala.util.Random
@@ -41,9 +41,9 @@ class AssetClient2Spec extends ZIntegrationSpec with AuthenticationConfig {
   private val testAssetMime = Mime.Default
   private val testRawAsset = AssetContent(testAssetMime, () => new ByteArrayInputStream(testAssetContent), Some(testAssetContent.length))
 
-  private def createBlobAsset(response: UploadResponse): Asset[BlobDetails.type] = {
+  private def createBlobAsset(response: UploadResponse2): Asset[BlobDetails.type] = {
     Asset(
-      id = AssetId(response.rId.str),
+      id = AssetId(response.key.str),
       token = response.token,
       sha = Sha256.calculate(testAssetContent),
       encryption = NoEncryption,
@@ -60,7 +60,7 @@ class AssetClient2Spec extends ZIntegrationSpec with AuthenticationConfig {
       for {
         result <- assetClient.uploadAsset(testAssetMetadata, testRawAsset, callback = None)
         _ = verbose(s"Uploading asset result: $result")
-      } yield result shouldBe an[Right[ErrorResponse, UploadResponse]]
+      } yield result shouldBe an[Right[ErrorResponse, UploadResponse2]]
     }
 
     scenario("upload and load asset") {

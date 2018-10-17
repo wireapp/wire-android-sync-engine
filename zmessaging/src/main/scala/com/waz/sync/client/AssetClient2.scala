@@ -27,14 +27,14 @@ import com.waz.model._
 import com.waz.service.assets2.Asset
 import com.waz.service.assets2.Asset.General
 import com.waz.utils.crypto.AESUtils
-import com.waz.utils.{IoUtils, JsonDecoder, JsonEncoder}
+import com.waz.utils.{CirceJSONSupport, IoUtils}
 import com.waz.znet2.http.HttpClient.AutoDerivation._
 import com.waz.znet2.http.HttpClient.ProgressCallback
 import com.waz.znet2.http.HttpClient.dsl._
 import com.waz.znet2.http.MultipartBodyMixed.Part
 import com.waz.znet2.http.Request.UrlCreator
 import com.waz.znet2.http._
-import org.json.JSONObject
+import io.circe.Encoder
 import org.threeten.bp.Instant
 
 import scala.concurrent.duration._
@@ -43,7 +43,7 @@ trait AssetClient2 {
   import com.waz.sync.client.AssetClient2._
 
   def loadAssetContent(asset: Asset[General], callback: Option[ProgressCallback]): ErrorOrResponse[FileWithSha]
-  def uploadAsset(metadata: Metadata, asset: AssetContent, callback: Option[ProgressCallback]): ErrorOrResponse[UploadResponse]
+  def uploadAsset(metadata: Metadata, asset: AssetContent, callback: Option[ProgressCallback]): ErrorOrResponse[UploadResponse2]
   def deleteAsset(assetId: AssetId): ErrorOrResponse[Boolean]
 }
 
@@ -51,10 +51,15 @@ class AssetClient2Impl(implicit
                        urlCreator: UrlCreator,
                        client: HttpClient,
                        authRequestInterceptor: RequestInterceptor = RequestInterceptor.identity)
-  extends AssetClient2 {
+  extends AssetClient2 with CirceJSONSupport {
 
   import AssetClient2._
   import com.waz.threading.Threading.Implicits.Background
+
+  //TODO Temporary fix for "ambiguous implicit" error while deriving BodyDeserializer instance for ErrorResponse.
+  //Can be removed when we will completely switch to circe JSON
+  private implicit val errorResponseDecoder: RawBodyDeserializer[ErrorResponse] =
+    objectFromCirceJsonRawBodyDeserializer
 
   private implicit def fileWithShaBodyDeserializer: RawBodyDeserializer[FileWithSha] =
     RawBodyDeserializer.create { body =>
@@ -88,14 +93,14 @@ class AssetClient2Impl(implicit
       RawBody(mediaType = Some(asset.mime.str), asset.data, dataLength = asset.dataLength)
     }
 
-  override def uploadAsset(metadata: Metadata, content: AssetContent, callback: Option[ProgressCallback]): ErrorOrResponse[UploadResponse] = {
+  override def uploadAsset(metadata: Metadata, content: AssetContent, callback: Option[ProgressCallback]): ErrorOrResponse[UploadResponse2] = {
     Request
       .Post(
         relativePath = AssetsV3Path,
         body = MultipartBodyMixed(Part(metadata), Part(content, Headers("Content-MD5" -> md5(content.data()))))
       )
       .withUploadCallback(callback)
-      .withResultType[UploadResponse]
+      .withResultType[UploadResponse2]
       .withErrorType[ErrorResponse]
       .executeSafe
   }
@@ -115,37 +120,30 @@ object AssetClient2 {
 
   case class AssetContent(mime: Mime, data: () => InputStream, dataLength: Option[Long])
 
+  case class UploadResponse2(key: RAssetId, expires: Option[Instant], token: Option[AssetToken])
+
   implicit val DefaultExpiryTime: Expiration = 1.hour
 
   val AssetsV3Path = "/assets/v3"
 
-  sealed abstract class Retention(val value: String)
+  sealed trait Retention
   object Retention {
-    case object Eternal                 extends Retention("eternal") //Only used for profile pics currently
-    case object EternalInfrequentAccess extends Retention("eternal-infrequent_access")
-    case object Persistent              extends Retention("persistent")
-    case object Expiring                extends Retention("expiring")
-    case object Volatile                extends Retention("volatile")
+    case object Eternal                 extends Retention //Only used for profile pics currently
+    case object EternalInfrequentAccess extends Retention
+    case object Persistent              extends Retention
+    case object Expiring                extends Retention
+    case object Volatile                extends Retention
+  }
+
+  implicit def retentionEncoder: Encoder[Retention] = Encoder[String].contramap {
+    case Retention.Eternal => "eternal"
+    case Retention.EternalInfrequentAccess => "eternal-infrequent_access"
+    case Retention.Persistent => "persistent"
+    case Retention.Expiring => "expiring"
+    case Retention.Volatile => "volatile"
   }
 
   case class Metadata(public: Boolean = false, retention: Retention = Retention.Persistent)
-
-  object Metadata {
-    implicit val jsonEncoder: JsonEncoder[Metadata] = JsonEncoder.build[Metadata] { metadata => o =>
-      o.put("public", metadata.public)
-      o.put("retention", metadata.retention.value)
-    }
-  }
-
-  case class UploadResponse(rId: RAssetId, expires: Option[Instant], token: Option[AssetToken])
-
-  case object UploadResponse {
-    implicit val jsonDecoder: JsonDecoder[UploadResponse] = new JsonDecoder[UploadResponse] {
-      import JsonDecoder._
-      override def apply(implicit js: JSONObject): UploadResponse =
-        UploadResponse(RAssetId('key), decodeOptISOInstant('expires), decodeOptString('token).map(AssetToken))
-    }
-  }
 
   def getAssetPath(rId: RAssetId, otrKey: Option[AESKey], conv: Option[RConvId]): String =
     (conv, otrKey) match {
