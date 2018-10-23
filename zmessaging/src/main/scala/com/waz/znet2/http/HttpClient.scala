@@ -157,7 +157,10 @@ object HttpClient {
 
   }
 
-  object AutoDerivation extends AutoDerivationRulesForDeserializers with AutoDerivationRulesForSerializers
+  @deprecated("After circe integration we should use 'AutoDerivation'")
+  object AutoDerivationOld extends AutoDerivationRulesForSerializersOld with AutoDerivationRulesForDeserializersOld
+
+  object AutoDerivation extends AutoDerivationRulesForSerializers with AutoDerivationRulesForDeserializers
 
 }
 

@@ -19,9 +19,7 @@ package com.waz.znet2.http
 
 import java.io.{File, FileOutputStream}
 
-import com.waz.utils.{IoUtils, JsonDecoder, returning}
-import io.circe.{Decoder, Json}
-import org.json.{JSONArray, JSONObject}
+import com.waz.utils.{IoUtils, returning}
 
 trait ResponseDeserializer[T] {
   def deserialize(response: Response[Body]): T
@@ -77,7 +75,7 @@ object RawBodyDeserializer {
     }
 }
 
-trait AutoDerivationRulesForDeserializers {
+trait BasicAutoDerivationRulesForDeserializers {
 
   implicit val identity: RawBodyDeserializer[RawBody] = RawBodyDeserializer.create(body => body)
 
@@ -87,14 +85,11 @@ trait AutoDerivationRulesForDeserializers {
   implicit val StringRawBodyDeserializer: RawBodyDeserializer[String] =
     BytesRawBodyDeserializer.map(new String(_))
 
-  implicit val JsonRawBodyDeserializer: RawBodyDeserializer[JSONObject] =
-    StringRawBodyDeserializer.map(new JSONObject(_))
+  implicit val IntRawBodyDeserializer: RawBodyDeserializer[Int] =
+    BytesRawBodyDeserializer.map(new String(_).toInt)
 
-  implicit val JsonArrayRawBodyDeserializer: RawBodyDeserializer[JSONArray] =
-    StringRawBodyDeserializer.map(new JSONArray(_))
-
-  implicit def objectFromJsonRawBodyDeserializer[T](implicit d: JsonDecoder[T]): RawBodyDeserializer[T] =
-    JsonRawBodyDeserializer.map(d(_))
+  implicit val BooleanRawBodyDeserializer: RawBodyDeserializer[Boolean] =
+    BytesRawBodyDeserializer.map(new String(_).toBoolean)
 
   implicit val Unit: BodyDeserializer[Unit] = BodyDeserializer.create(_ => ())
 
@@ -111,18 +106,6 @@ trait AutoDerivationRulesForDeserializers {
         throw new IllegalArgumentException(s"Can not decode ${obj.getClass.getSimpleName}")
     }
 
-  implicit val CirceJsonRawBodyDeserializer: RawBodyDeserializer[Json] =
-    StringRawBodyDeserializer.map(str => io.circe.parser.parse(str) match {
-      case Right(json) => json
-      case Left(error) => throw new IllegalArgumentException(error.message)
-    })
-
-  implicit def objectFromCirceJsonRawBodyDeserializer[T](implicit d: Decoder[T]): RawBodyDeserializer[T] =
-    CirceJsonRawBodyDeserializer.map(json => d.decodeJson(json) match {
-      case Right(result) => result
-      case Left(error) => throw new IllegalArgumentException(s"${error.message} ${error.history}")
-    })
-
   implicit def optionBodyDeserializerFrom[T](implicit d: RawBodyDeserializer[T]): BodyDeserializer[Option[T]] =
     BodyDeserializer.create {
       case body: RawBody => Some(d.deserialize(body))
@@ -136,5 +119,37 @@ trait AutoDerivationRulesForDeserializers {
 
   implicit def responseDeserializerFrom2[T](implicit bd: BodyDeserializer[T]): ResponseDeserializer[Response[T]] =
     ResponseDeserializer.create(response => response.copy(body = bd.deserialize(response.body)))
+
+}
+
+trait AutoDerivationRulesForDeserializersOld extends BasicAutoDerivationRulesForDeserializers {
+  import org.json.{JSONArray, JSONObject}
+  import com.waz.utils.JsonDecoder
+
+  implicit val JsonRawBodyDeserializer: RawBodyDeserializer[JSONObject] =
+    StringRawBodyDeserializer.map(new JSONObject(_))
+
+  implicit val JsonArrayRawBodyDeserializer: RawBodyDeserializer[JSONArray] =
+    StringRawBodyDeserializer.map(new JSONArray(_))
+
+  implicit def objectFromJsonRawBodyDeserializer[T](implicit d: JsonDecoder[T]): RawBodyDeserializer[T] =
+    JsonRawBodyDeserializer.map(d(_))
+
+}
+
+trait AutoDerivationRulesForDeserializers extends BasicAutoDerivationRulesForDeserializers {
+  import io.circe.{Decoder, Json}
+
+  implicit val CirceJsonRawBodyDeserializer: RawBodyDeserializer[Json] =
+    StringRawBodyDeserializer.map(str => io.circe.parser.parse(str) match {
+      case Right(json) => json
+      case Left(error) => throw new IllegalArgumentException(error.message)
+    })
+
+  implicit def objectFromCirceJsonRawBodyDeserializer[T](implicit d: Decoder[T]): RawBodyDeserializer[T] =
+    CirceJsonRawBodyDeserializer.map(json => d.decodeJson(json) match {
+      case Right(result) => result
+      case Left(error) => throw new IllegalArgumentException(error.message)
+    })
 
 }

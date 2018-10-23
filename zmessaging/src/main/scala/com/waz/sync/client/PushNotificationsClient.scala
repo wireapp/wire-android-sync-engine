@@ -46,7 +46,7 @@ class PushNotificationsClientImpl(pageSize: Int = PushNotificationsClient.PageSi
                                   authRequestInterceptor: AuthRequestInterceptor) extends PushNotificationsClient {
 
   import HttpClient.dsl._
-  import HttpClient.AutoDerivation._
+  import HttpClient.AutoDerivationOld._
   import PushNotificationsClient._
   import com.waz.threading.Threading.Implicits.Background
 

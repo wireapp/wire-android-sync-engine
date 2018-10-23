@@ -56,7 +56,7 @@ class CredentialsUpdateClientImpl(implicit
 
   import CredentialsUpdateClientImpl._
   import HttpClient.dsl._
-  import HttpClient.AutoDerivation._
+  import HttpClient.AutoDerivationOld._
   import Threading.Implicits.Background
 
   private implicit val logTag: LogTag = logTagFor[CredentialsUpdateClientImpl]

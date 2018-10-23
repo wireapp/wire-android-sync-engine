@@ -56,11 +56,6 @@ class AssetClient2Impl(implicit
   import AssetClient2._
   import com.waz.threading.Threading.Implicits.Background
 
-  //TODO Temporary fix for "ambiguous implicit" error while deriving BodyDeserializer instance for ErrorResponse.
-  //Can be removed when we will completely switch to circe JSON
-  private implicit val errorResponseDecoder: RawBodyDeserializer[ErrorResponse] =
-    objectFromCirceJsonRawBodyDeserializer
-
   private implicit def fileWithShaBodyDeserializer: RawBodyDeserializer[FileWithSha] =
     RawBodyDeserializer.create { body =>
       val tempFile = File.createTempFile("http_client_download", null)

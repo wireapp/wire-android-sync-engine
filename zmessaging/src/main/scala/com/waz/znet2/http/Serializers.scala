@@ -19,10 +19,6 @@ package com.waz.znet2.http
 
 import java.io.{ByteArrayInputStream, File, FileInputStream}
 
-import com.waz.utils.JsonEncoder
-import io.circe.{Encoder, Json}
-import org.json.JSONObject
-
 trait RequestSerializer[T] {
   def serialize(request: Request[T]): Request[Body]
   def contramap[B](f: B => T): RequestSerializer[B] =
@@ -73,11 +69,23 @@ object RawBodySerializer {
 
 }
 
-trait AutoDerivationRulesForSerializers {
+trait BasicAutoDerivationRulesForSerializers {
 
   implicit val StringBodySerializer: RawBodySerializer[String] =
     RawBodySerializer.create(str => {
       val bytes = str.getBytes("utf-8")
+      RawBody(Some(MediaType.PlainText), () => new ByteArrayInputStream(bytes), Some(bytes.length))
+    })
+
+  implicit val IntBodySerializer: RawBodySerializer[Int] =
+    RawBodySerializer.create(value => {
+      val bytes = value.toString.getBytes("utf-8")
+      RawBody(Some(MediaType.PlainText), () => new ByteArrayInputStream(bytes), Some(bytes.length))
+    })
+
+  implicit val BooleanBodySerializer: RawBodySerializer[Boolean] =
+    RawBodySerializer.create(value=> {
+      val bytes = value.toString.getBytes("utf-8")
       RawBody(Some(MediaType.PlainText), () => new ByteArrayInputStream(bytes), Some(bytes.length))
     })
 
@@ -86,15 +94,6 @@ trait AutoDerivationRulesForSerializers {
 
   implicit val FileBodySerializer: RawBodySerializer[File] =
     RawBodySerializer.create(file => RawBody(None, () => new FileInputStream(file), Some(file.length())))
-
-  implicit val JsonBodySerializer: RawBodySerializer[JSONObject] =
-    RawBodySerializer.create(json => {
-      val bytes = json.toString.getBytes("utf8")
-      RawBody(Some(MediaType.Json), () => new ByteArrayInputStream(bytes), Some(bytes.length))
-    })
-
-  implicit def objectToJsonBodySerializer[T](implicit e: JsonEncoder[T]): RawBodySerializer[T] =
-    JsonBodySerializer.contramap(e.apply)
 
   implicit val MultipartMixedBodySerializer: BodySerializer[MultipartBodyMixed] =
     BodySerializer.create { body =>
@@ -106,14 +105,6 @@ trait AutoDerivationRulesForSerializers {
       RawMultipartBodyFormData(body.parts.map(p => RawMultipartBodyFormData.Part(p.serialize, p.name, p.fileName)))
     }
 
-  implicit val CirceJsonBodySerializer: RawBodySerializer[Json] = RawBodySerializer.create(json => {
-    val bytes = json.noSpaces.getBytes("utf8")
-    RawBody(Some(MediaType.Json), () => new ByteArrayInputStream(bytes), Some(bytes.length))
-  })
-
-  implicit def objectToCirceJsonBodySerializer[T](implicit e: Encoder[T]): RawBodySerializer[T] =
-    CirceJsonBodySerializer.contramap(e.apply)
-
   implicit def bodySerializerFromRawBodySerializer[T](implicit rbs: RawBodySerializer[T]): BodySerializer[T] =
     BodySerializer.create(rbs.serialize)
 
@@ -122,5 +113,33 @@ trait AutoDerivationRulesForSerializers {
 
   implicit def serializerFromBodySerializer[T](implicit bs: BodySerializer[T]): RequestSerializer[T] =
     RequestSerializer.create(request => request.copy(body = bs.serialize(request.body)))
+
+}
+
+trait AutoDerivationRulesForSerializersOld extends BasicAutoDerivationRulesForSerializers {
+  import org.json.JSONObject
+  import com.waz.utils.JsonEncoder
+
+  implicit val JsonBodySerializer: RawBodySerializer[JSONObject] =
+    RawBodySerializer.create(json => {
+      val bytes = json.toString.getBytes("utf8")
+      RawBody(Some(MediaType.Json), () => new ByteArrayInputStream(bytes), Some(bytes.length))
+    })
+
+  implicit def objectToJsonBodySerializer[T](implicit e: JsonEncoder[T]): RawBodySerializer[T] =
+    JsonBodySerializer.contramap(e.apply)
+
+}
+
+trait AutoDerivationRulesForSerializers extends BasicAutoDerivationRulesForSerializers {
+  import io.circe.{Encoder, Json}
+
+  implicit val CirceJsonBodySerializer: RawBodySerializer[Json] = RawBodySerializer.create(json => {
+    val bytes = json.noSpaces.getBytes("utf8")
+    RawBody(Some(MediaType.Json), () => new ByteArrayInputStream(bytes), Some(bytes.length))
+  })
+
+  implicit def objectToCirceJsonBodySerializer[T](implicit e: Encoder[T]): RawBodySerializer[T] =
+    CirceJsonBodySerializer.contramap(e.apply)
 
 }

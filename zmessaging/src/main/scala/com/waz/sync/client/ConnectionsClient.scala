@@ -48,7 +48,7 @@ class ConnectionsClientImpl(implicit
                             authRequestInterceptor: AuthRequestInterceptor) extends ConnectionsClient {
 
   import HttpClient.dsl._
-  import HttpClient.AutoDerivation._
+  import HttpClient.AutoDerivationOld._
   import Threading.Implicits.Background
   import com.waz.sync.client.ConnectionsClient._
 

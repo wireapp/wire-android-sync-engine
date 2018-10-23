@@ -48,7 +48,7 @@ class IntegrationsClientImpl(implicit
                              authRequestInterceptor: AuthRequestInterceptor) extends IntegrationsClient {
 
   import HttpClient.dsl._
-  import HttpClient.AutoDerivation._
+  import HttpClient.AutoDerivationOld._
   import IntegrationsClient._
 
   private implicit val integrationSearchDeserializer: RawBodyDeserializer[Map[IntegrationData, Option[AssetData]]] =

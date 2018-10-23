@@ -46,7 +46,7 @@ class UsersClientImpl(implicit
                       authRequestInterceptor: AuthRequestInterceptor) extends UsersClient {
 
   import HttpClient.dsl._
-  import HttpClient.AutoDerivation._
+  import HttpClient.AutoDerivationOld._
   import Threading.Implicits.Background
   import com.waz.sync.client.UsersClient._
 

@@ -40,7 +40,7 @@ class PropertiesClientImpl(implicit
                             httpClient: HttpClient,
                             authRequestInterceptor: AuthRequestInterceptor) extends PropertiesClient {
 
-  import HttpClient.AutoDerivation._
+  import HttpClient.AutoDerivationOld._
   import HttpClient.dsl._
   import com.waz.threading.Threading.Implicits.Background
 

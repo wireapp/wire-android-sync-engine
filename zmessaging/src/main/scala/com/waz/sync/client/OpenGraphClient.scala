@@ -37,7 +37,7 @@ trait OpenGraphClient {
 class OpenGraphClientImpl(implicit httpClient: HttpClient) extends OpenGraphClient {
   import OpenGraphClient._
   import HttpClient.dsl._
-  import HttpClient.AutoDerivation._
+  import HttpClient.AutoDerivationOld._
   import Threading.Implicits.Background
 
   implicit val OpenGraphDataDeserializer: RawBodyDeserializer[OpenGraphDataResponse] =

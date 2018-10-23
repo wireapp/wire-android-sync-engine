@@ -59,7 +59,7 @@ class ConversationsClientImpl(implicit
                               authRequestInterceptor: AuthRequestInterceptor) extends ConversationsClient {
 
   import ConversationsClient._
-  import HttpClient.AutoDerivation._
+  import HttpClient.AutoDerivationOld._
   import HttpClient.dsl._
   import com.waz.threading.Threading.Implicits.Background
 

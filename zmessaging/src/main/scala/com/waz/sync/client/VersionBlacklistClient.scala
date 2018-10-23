@@ -33,7 +33,7 @@ class VersionBlacklistClientImpl(backendConfig: BackendConfig)
                                 (implicit httpClient: HttpClient) extends VersionBlacklistClient {
 
   import HttpClient.dsl._
-  import HttpClient.AutoDerivation._
+  import HttpClient.AutoDerivationOld._
   import VersionBlacklistClientImpl._
 
   def loadVersionBlacklist(): ErrorOrResponse[VersionBlacklist] = {

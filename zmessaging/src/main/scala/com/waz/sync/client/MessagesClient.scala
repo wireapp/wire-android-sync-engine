@@ -46,7 +46,7 @@ class MessagesClientImpl(implicit
                          authRequestInterceptor: AuthRequestInterceptor) extends MessagesClient {
 
   import HttpClient.dsl._
-  import HttpClient.AutoDerivation._
+  import HttpClient.AutoDerivationOld._
   import MessagesClient._
   import com.waz.threading.Threading.Implicits.Background
 
