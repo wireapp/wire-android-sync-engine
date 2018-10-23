@@ -23,7 +23,7 @@ import java.util.Date
 import com.google.protobuf.nano.MessageNano
 import com.waz.db.Col.{blob, text}
 import com.waz.model._
-import com.waz.service.assets2.AssetStorageImpl.Codec
+import com.waz.service.assets2.Codec
 import com.waz.utils.wrappers.{DBContentValues, DBCursor, DBProgram}
 import com.waz.utils.{JsonDecoder, JsonEncoder}
 import org.threeten.bp.Instant
@@ -128,6 +128,9 @@ object Col {
 
 trait ColumnBuilders[T] {
 
+  def asInt[A](extractor: T => A)(name: Symbol)(implicit codec: Codec[A, Int]): ColBinder[A, T] =
+    ColBinder(Col.int[A](name, codec.serialize, codec.deserialize), extractor)
+
   def asText[A](extractor: T => A)(name: Symbol, modifiers: String = "")(implicit codec: Codec[A, String]): ColBinder[A, T] =
     ColBinder(Col.text[A](name, codec.serialize, codec.deserialize, modifiers), extractor)
 
@@ -136,6 +139,12 @@ trait ColumnBuilders[T] {
 
   def asTextOpt[A](extractor: T => Option[A])(name: Symbol, modifiers: String = "")(implicit codec: Codec[A, String]): ColBinder[Option[A], T] =
     ColBinder(Col.opt(Col.text[A](name, codec.serialize, codec.deserialize, modifiers)), extractor)
+
+  def long(extractor: T => Long)(name: Symbol, modifiers: String = ""): ColBinder[Long, T] =
+    ColBinder(Col.long(name, modifiers), extractor)
+
+  def bool(extractor: T => Boolean)(name: Symbol, modifiers: String = ""): ColBinder[Boolean, T] =
+    ColBinder(Col.bool(name, modifiers), extractor)
 
   def asBlob[A](extractor: T => A)(name: Symbol, modifiers: String = "")(implicit codec: Codec[A, Array[Byte]]): ColBinder[A, T] =
     ColBinder(Col(name.name, "BLOB")(new DbTranslator[A] {

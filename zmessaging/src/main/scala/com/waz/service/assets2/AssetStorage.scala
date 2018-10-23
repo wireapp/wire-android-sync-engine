@@ -17,20 +17,14 @@
  */
 package com.waz.service.assets2
 
-import java.net.URI
-
 import android.content.Context
-import com.waz.cache2.CacheService.{AES_CBC_Encryption, Encryption, NoEncryption}
 import com.waz.db.{ColumnBuilders, Dao}
 import com.waz.model._
 import com.waz.service.assets2.Asset._
-import com.waz.service.assets2.AssetStorageImpl.{AssetDao, Codec}
+import com.waz.service.assets2.AssetStorageImpl.AssetDao
 import com.waz.utils.TrimmingLruCache.Fixed
 import com.waz.utils.wrappers.{DB, DBCursor}
-import com.waz.utils.{CachedStorage2, CirceJSONSupport, DbStorage2, InMemoryStorage2, ReactiveStorage2, ReactiveStorageImpl2, Storage2, TrimmingLruCache}
-import io.circe.parser.decode
-import io.circe.syntax._
-import io.circe.{Decoder, Encoder}
+import com.waz.utils.{CachedStorage2, CirceJSONSupport, DbStorage2, InMemoryStorage2, ReactiveStorage2, ReactiveStorageImpl2, TrimmingLruCache}
 
 import scala.concurrent.ExecutionContext
 
@@ -44,19 +38,6 @@ class AssetStorageImpl(context: Context, db: DB, ec: ExecutionContext) extends R
 ) with AssetStorage
 
 object AssetStorageImpl {
-
-  trait Codec[From, To] {
-    def serialize(value: From): To
-    def deserialize(value: To): From
-  }
-
-  object Codec {
-    def create[From, To](to: From => To, from: To => From): Codec[From, To] =
-      new Codec[From, To] {
-        override def serialize(value: From): To   = to(value)
-        override def deserialize(value: To): From = from(value)
-      }
-  }
 
   object AssetDao extends Dao[Asset[General], AssetId] with ColumnBuilders[Asset[General]] with StorageCodecs with CirceJSONSupport {
 
@@ -90,37 +71,5 @@ object AssetStorageImpl {
     }
 
   }
-
-}
-
-trait StorageCodecs {
-
-  implicit val EncryptionCodec: Codec[Encryption, String] = new Codec[Encryption, String] {
-    val Unencrypted    = ""
-    val AES_CBC_Prefix = "AES_CBS__"
-    val AES_GCM_Prefix = "AES_GCM__"
-
-    override def serialize(value: Encryption): String = value match {
-      case NoEncryption => Unencrypted
-      case AES_CBC_Encryption(key) => AES_CBC_Prefix + key.str
-    }
-
-    override def deserialize(value: String): Encryption = value match {
-      case Unencrypted => NoEncryption
-      case str if str.startsWith(AES_CBC_Prefix) =>
-        AES_CBC_Encryption(AESKey(str.substring(AES_CBC_Prefix.length)))
-    }
-  }
-
-  implicit val AssetIdCodec: Codec[AssetId, String] = Codec.create(_.str, AssetId.apply)
-
-  implicit val Sha256Codec: Codec[Sha256, Array[Byte]] = Codec.create(_.bytes, Sha256.apply)
-
-  implicit val AssetTokenCodec: Codec[AssetToken, String] = Codec.create(_.str, AssetToken.apply)
-
-  implicit val URICodec: Codec[URI, String] = Codec.create(_.toString, new URI(_))
-
-  implicit def JsonCodec[T: Encoder: Decoder]: Codec[T, String] =
-    Codec.create(_.asJson.noSpaces, str => decode[T](str).right.get)
 
 }

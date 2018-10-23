@@ -118,7 +118,7 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
 
   //TODO We should do something with asset source. In some cases we can delete it.
   override def uploadAsset(rawAsset: RawAsset[General], callback: Option[ProgressCallback]): CancellableFuture[Asset[General]] = {
-    val content = AssetContent(rawAsset.mime, () => uriHelper.openInputStream(rawAsset.uri).get, Some(rawAsset.size))
+    val content = AssetContent(rawAsset.mime, () => uriHelper.openInputStream(rawAsset.source).get, Some(rawAsset.size))
     val metadata = Metadata(public = rawAsset.public, retention = rawAsset.retention)
 
     assetClient.uploadAsset(metadata, content, callback).flatMap {
