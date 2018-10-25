@@ -19,16 +19,18 @@ package com.waz.service.assets2
 
 import java.io.InputStream
 import java.net.URI
+import java.security.{DigestInputStream, MessageDigest}
 
 import com.waz.ZLog.ImplicitTag._
 import com.waz.ZLog._
 import com.waz.cache2.CacheService
 import com.waz.model.errors._
-import com.waz.model.{AssetId, Mime}
+import com.waz.model.{AssetId, Mime, Sha256}
 import com.waz.service.assets2.Asset.General
 import com.waz.sync.client.AssetClient2
 import com.waz.sync.client.AssetClient2.{AssetContent, Metadata}
 import com.waz.threading.CancellableFuture
+import com.waz.utils.IoUtils
 import com.waz.znet2.http.HttpClient._
 import com.waz.znet2.http.ResponseCode
 
@@ -61,21 +63,26 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
 
   private def loadFromBackend(asset: Asset[General], callback: Option[ProgressCallback]): CancellableFuture[InputStream] = {
     verbose(s"Load asset content from backend. $asset")
-    assetClient.loadAssetContent(asset, callback).flatMap {
-      case Left(err) if err.code == ResponseCode.NotFound =>
-        cache
-          .remove(cacheKey(asset))
-          .flatMap(_ => CancellableFuture.failed(NotFoundRemote(s"Asset '$asset'")))
-          .toCancellable
-      case Left(err) =>
-        CancellableFuture.failed(NetworkError(err))
-      case Right(fileWithSha) if fileWithSha.sha256 != asset.sha =>
-        CancellableFuture.failed(ValidationError(s"SHA256 is not equal. Asset: $asset"))
-      case Right(fileWithSha) =>
-        cache.putEncrypted(cacheKey(asset), fileWithSha.file)
-          .flatMap(_ => cache.get(cacheKey(asset))(asset.encryption))
-          .toCancellable
-    }
+    assetClient.loadAssetContent(asset, callback)
+      .flatMap {
+        case Left(err) if err.code == ResponseCode.NotFound =>
+          cache
+            .remove(cacheKey(asset))
+            .flatMap(_ => CancellableFuture.failed(NotFoundRemote(s"Asset '$asset'")))
+            .toCancellable
+        case Left(err) =>
+          CancellableFuture.failed(NetworkError(err))
+        case Right(fileWithSha) if fileWithSha.sha256 != asset.sha =>
+          CancellableFuture.failed(ValidationError(s"SHA256 is not equal. Asset: $asset"))
+        case Right(fileWithSha) =>
+          cache.putEncrypted(cacheKey(asset), fileWithSha.file)
+            .flatMap(_ => cache.get(cacheKey(asset))(asset.encryption))
+            .toCancellable
+      }
+      .recoverWith { case err =>
+        verbose(s"Can not load asset content from backend. ${err.getMessage}")
+        CancellableFuture.failed(err)
+      }
   }
 
   private def loadFromCache(asset: Asset[General], callback: Option[ProgressCallback]): CancellableFuture[InputStream] = {
@@ -91,10 +98,21 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
   private def loadFromFileSystem(asset: Asset[General], callback: Option[ProgressCallback]): CancellableFuture[InputStream] = {
     verbose(s"Load asset content from file system. $asset")
     lazy val emptyUriError = new NoSuchElementException("Asset does not have local source property.")
-    Future { asset.localSource.map(uriHelper.openInputStream).getOrElse(Failure(throw emptyUriError)) }
-      .flatMap(Future.fromTry)
+    val openInputStream = () => asset.localSource.map(uriHelper.openInputStream).getOrElse(Failure(throw emptyUriError))
+    Future.fromTry(openInputStream())
+      .flatMap { is =>
+        val digestInputStream = new DigestInputStream(is, MessageDigest.getInstance("SHA-256"))
+        IoUtils.withResource(digestInputStream) { stream =>
+          val buffer = Array.ofDim[Byte](4096)
+          Stream.continually(stream.read(buffer)).takeWhile(_ > -1)
+        }
+
+        val sha = Sha256(digestInputStream.getMessageDigest.digest())
+        if (asset.sha == sha) Future.fromTry(openInputStream())
+        else Future.failed(ValidationError(s"SHA256 is not equal. Asset: $asset"))
+      }
       .recoverWith { case err =>
-        debug(s"Can not load content from file system. $err")
+        debug(s"Can not load content from file system. ${err.getMessage}")
         verbose(s"Clearing local source asset property. $asset")
         assetsStorage.save(asset.copy(localSource = None)).flatMap(_ => Future.failed(err))
       }
