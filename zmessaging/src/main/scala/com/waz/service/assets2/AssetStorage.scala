@@ -25,6 +25,7 @@ import com.waz.service.assets2.AssetStorageImpl.AssetDao
 import com.waz.utils.TrimmingLruCache.Fixed
 import com.waz.utils.wrappers.{DB, DBCursor}
 import com.waz.utils.{CachedStorage2, CirceJSONSupport, DbStorage2, InMemoryStorage2, ReactiveStorage2, ReactiveStorageImpl2, TrimmingLruCache}
+import io.circe.Decoder
 
 import scala.concurrent.ExecutionContext
 
@@ -41,6 +42,8 @@ object AssetStorageImpl {
 
   object AssetDao extends Dao[Asset[General], AssetId] with ColumnBuilders[Asset[General]] with StorageCodecs with CirceJSONSupport {
 
+    val dec = Decoder[LocalSource]
+
     val Id         = asText(_.id)('_id, "PRIMARY KEY")
     val Token      = asTextOpt(_.token)('token)
     val Type       = text(getAssetTypeString)('type)
@@ -49,10 +52,11 @@ object AssetStorageImpl {
     val Source     = asTextOpt(_.localSource)('source)
     val Preview    = asTextOpt(_.preview)('preview)
     val Details    = asText(_.details)('details)
+    val MessageId  = asText(_.messageId)('message_id)
     val ConvId     = asTextOpt(_.convId)('conversation_id)
 
     override val idCol = Id
-    override val table = Table("Assets", Id, Token, Type, Encryption, Sha, Source, Details, ConvId)
+    override val table = Table("Assets", Id, Token, Type, Encryption, Sha, Source, Details, MessageId, ConvId)
 
     private val Image = "image"
     private val Audio = "audio"
@@ -60,7 +64,7 @@ object AssetStorageImpl {
     private val Blob  = "blob"
 
     override def apply(implicit cursor: DBCursor): Asset[General] = {
-      Asset(Id, Token, Sha, Encryption, Source, Preview, Details, ConvId)
+      Asset(Id, Token, Sha, Encryption, Source, Preview, Details, MessageId, ConvId)
     }
 
     private def getAssetTypeString(asset: Asset[General]): String = asset.details match {

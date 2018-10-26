@@ -19,16 +19,20 @@ package com.waz.model
 
 
 import com.google.protobuf.nano.MessageNano
+import com.waz.cache2.CacheService.AES_CBC_Encryption
 import com.waz.model.AssetMetaData.Image.Tag
 import com.waz.model.AssetMetaData.Loudness
 import com.waz.model.AssetStatus.{DownloadFailed, UploadCancelled, UploadDone, UploadFailed, UploadInProgress, UploadNotStarted}
 import com.waz.model.nano.Messages
 import com.waz.model.nano.Messages.MessageEdit
+import com.waz.service.assets2
+import com.waz.service.assets2.Asset.{Audio, General, Image, Video}
+import com.waz.service.assets2.{RawAsset, UploadStatus, Asset => Asset2}
 import com.waz.utils._
 import com.waz.utils.crypto.AESUtils
 import com.waz.utils.wrappers.URI
 import org.json.JSONObject
-import org.threeten.bp.{Duration => Dur}
+import org.threeten.bp.{Instant, Duration => Dur}
 
 import scala.collection.breakOut
 import scala.concurrent.duration._
@@ -47,6 +51,8 @@ object GenericContent {
 
   implicit object Asset extends GenericContent[Asset] {
 
+    override def set(msg: GenericMessage) = msg.setAsset
+
     type Original = Messages.Asset.Original
     object Original {
 
@@ -62,6 +68,19 @@ object GenericContent {
             case _ =>
           }
           //TODO Dean giphy source and caption
+        }
+
+      def apply(asset: RawAsset[General]): Original =
+        returning(new Messages.Asset.Original) { o =>
+          o.mimeType = asset.mime.str
+          o.size = asset.size
+          o.name = asset.name
+          asset.details match {
+            case image: Image => o.setImage(ImageMetaData(image))
+            case video: Video => o.setVideo(VideoMetaData(video))
+            case audio: Audio => o.setAudio(AudioMetaData(audio))
+            case _ =>
+          }
         }
 
       def unapply(proto: Original): Option[(Mime, Long, Option[String], Option[AssetMetaData])] = Option(proto) map { orig =>
@@ -86,6 +105,12 @@ object GenericContent {
         p.height = md.dimensions.height
       }
 
+      def apply(details: Image): ImageMetaData = returning(new Messages.Asset.ImageMetaData) { p =>
+        p.tag = details.tag.toString
+        p.width = details.dimensions.width
+        p.height = details.dimensions.height
+      }
+
       def unapply(proto: ImageMetaData): Option[AssetMetaData.Image] =
         Some(AssetMetaData.Image(Dim2(proto.width, proto.height), Tag(proto.tag)))
     }
@@ -98,6 +123,12 @@ object GenericContent {
         p.durationInMillis = md.duration.toMillis
       }
 
+      def apply(details: Video): VideoMetaData = returning(new Messages.Asset.VideoMetaData) { p =>
+        p.width = details.dimensions.width
+        p.height = details.dimensions.height
+        p.durationInMillis = details.duration.toMillis
+      }
+
       def unapply(proto: VideoMetaData): Option[AssetMetaData.Video] =
         Some(AssetMetaData.Video(Dim2(proto.width, proto.height), Dur.ofMillis(proto.durationInMillis)))
     }
@@ -107,6 +138,11 @@ object GenericContent {
       def apply(md: AssetMetaData.Audio): AudioMetaData = returning(new Messages.Asset.AudioMetaData) { p =>
         p.durationInMillis = md.duration.toMillis
         md.loudness.foreach(l => p.normalizedLoudness = bytify(l.levels))
+      }
+
+      def apply(details: Audio): AudioMetaData = returning(new Messages.Asset.AudioMetaData) { p =>
+        p.durationInMillis = details.duration.toMillis
+        p.normalizedLoudness = bytify(details.loudness.levels)
       }
 
       def unapply(p: AudioMetaData): Option[AssetMetaData.Audio] =
@@ -129,6 +165,30 @@ object GenericContent {
         preview.metaData.foreach {
           case meta@AssetMetaData.Image(_, _) => p.setImage(ImageMetaData(meta))
           case _ => //other meta data types not supported
+        }
+      }
+
+      def apply(preview: Asset2[General]): Preview = returning(new Messages.Asset.Preview()) { p =>
+        //TODO Think about this fields
+//        p.mimeType = preview.mime.str
+//        p.size = preview.size
+        p.remote = RemoteData(preview)
+
+        //image meta
+        preview.details match {
+          case image: Image => p.setImage(ImageMetaData(image))
+          case _ =>
+        }
+      }
+
+      def apply(preview: RawAsset[General]): Preview = returning(new Messages.Asset.Preview()) { p =>
+        p.mimeType = preview.mime.str
+        p.size = preview.size
+
+        //image meta
+        preview.details match {
+          case image: Image => p.setImage(ImageMetaData(image))
+          case _ =>
         }
       }
 
@@ -158,6 +218,19 @@ object GenericContent {
           ak.encryption.foreach(v => rData.encryption = v.value)
         }
 
+      def apply(asset: Asset2[General]): RemoteData =
+        returning(new Messages.Asset.RemoteData) { rData =>
+          rData.assetId = asset.id.str
+          asset.token.foreach(token => rData.assetToken = token.str)
+          rData.sha256 = asset.sha.bytes
+          asset.encryption match {
+            case AES_CBC_Encryption(key) =>
+              rData.encryption = Messages.AES_CBC
+              rData.otrKey = key.bytes
+            case _ =>
+          }
+        }
+
       def unapply(remoteData: RemoteData): Option[AssetData.RemoteData] = Option(remoteData) map { rData =>
         AssetData.RemoteData(
           Option(rData.assetId).filter(_.nonEmpty).map(RAssetId),
@@ -168,9 +241,8 @@ object GenericContent {
       }
     }
 
-    override def set(msg: GenericMessage) = msg.setAsset
 
-    def apply(asset: AssetData, preview: Option[AssetData] = None, expectsReadConfirmation: Boolean): Asset = returning(new Messages.Asset) { proto =>
+    def apply(asset: AssetData, preview: Option[AssetData] = None, expectsReadConfirmation: Boolean): Messages.Asset = returning(new Messages.Asset) { proto =>
       proto.original = Original(asset)
       preview.foreach(p => proto.preview = Preview(p))
       (asset.status, asset.remoteData) match {
@@ -183,7 +255,20 @@ object GenericContent {
       proto.expectsReadConfirmation = expectsReadConfirmation
     }
 
-    def unapply(a: Asset): Option[(AssetData, Option[AssetData])] = {
+    def apply(asset: RawAsset[General], preview: Option[Asset2[General]], expectsReadConfirmation: Boolean): Messages.Asset = returning(new Messages.Asset) { proto =>
+      proto.original = Original(asset)
+      preview.foreach(p => proto.preview = Preview(p))
+      asset.uploadStatus match {
+        case UploadStatus.Cancelled => proto.setNotUploaded(Messages.Asset.CANCELLED)
+        case UploadStatus.Failed    => proto.setNotUploaded(Messages.Asset.FAILED)
+//        case (UploadDone, Some(data)) => proto.setUploaded(RemoteData(data))
+//        case (DownloadFailed, Some(data)) => proto.setUploaded(RemoteData(data))
+        case _ =>
+      }
+      proto.expectsReadConfirmation = expectsReadConfirmation
+    }
+
+    def unapply(a: Messages.Asset): Option[(AssetData, Option[AssetData])] = {
       //TODO Dean - think of better way to handle when only one part of asset proto appears without original
       val (mime, size, name, meta) = Original.unapply(a.original).getOrElse(Mime.Unknown, 0L, None, None)
       val preview = Preview.unapply(a.preview)
@@ -216,8 +301,8 @@ object GenericContent {
 
   }
 
-  implicit object EphemeralAsset extends EphemeralContent[Asset] {
-    override def set(eph: Ephemeral): Asset => Ephemeral = eph.setAsset
+  implicit object EphemeralAsset extends EphemeralContent[Messages.Asset] {
+    override def set(eph: Ephemeral): Messages.Asset => Ephemeral = eph.setAsset
   }
 
   type ImageAsset = Messages.ImageAsset
@@ -253,7 +338,7 @@ object GenericContent {
   }
 
   implicit object EphemeralImageAsset extends EphemeralContent[ImageAsset] {
-    override def set(eph: Ephemeral): (ImageAsset) => Ephemeral = eph.setImage
+    override def set(eph: Ephemeral): ImageAsset => Ephemeral = eph.setImage
   }
 
   type Mention = Messages.Mention
@@ -295,7 +380,7 @@ object GenericContent {
       p.urlOffset = offset
     }
 
-    def apply(uri: URI, offset: Int, title: String, summary: String, image: Option[Asset], permanentUrl: Option[URI]): LinkPreview =
+    def apply(uri: URI, offset: Int, title: String, summary: String, image: Option[Messages.Asset], permanentUrl: Option[URI]): LinkPreview =
       returning(new Messages.LinkPreview) { p =>
         p.url = uri.toString
         p.urlOffset = offset
@@ -308,7 +393,7 @@ object GenericContent {
         p.setArticle(article(title, summary, image, permanentUrl))
       }
 
-    def apply[Meta: PreviewMeta](uri: URI, offset: Int, title: String, summary: String, image: Option[Asset], permanentUrl: Option[URI], meta: Meta): LinkPreview =
+    def apply[Meta: PreviewMeta](uri: URI, offset: Int, title: String, summary: String, image: Option[Messages.Asset], permanentUrl: Option[URI], meta: Meta): LinkPreview =
       returning(apply(uri, offset, title, summary, image, permanentUrl)) { p =>
         implicitly[PreviewMeta[Meta]].apply(p, meta)
       }
@@ -319,7 +404,7 @@ object GenericContent {
 
     }
 
-    private def article(title: String, summary: String, image: Option[Asset], uri: Option[URI]) = returning(new Messages.Article) { p =>
+    private def article(title: String, summary: String, image: Option[Messages.Asset], uri: Option[URI]) = returning(new Messages.Article) { p =>
       p.title = title
       p.summary = summary
       uri foreach { u => p.permanentUrl = u.toString }
@@ -499,7 +584,7 @@ object GenericContent {
   type Location = Messages.Location
 
   implicit object Location extends GenericContent[Location] {
-    override def set(msg: GenericMessage): (Location) => GenericMessage = msg.setLocation
+    override def set(msg: GenericMessage): Location => GenericMessage = msg.setLocation
 
     def apply(lon: Float, lat: Float, name: String, zoom: Int, expectsReadConfirmation: Boolean) = returning(new Messages.Location) { p =>
       p.longitude = lon
@@ -514,7 +599,7 @@ object GenericContent {
   }
 
   implicit object EphemeralLocation extends EphemeralContent[Location] {
-    override def set(eph: Ephemeral): (Location) => Ephemeral = eph.setLocation
+    override def set(eph: Ephemeral): Location => Ephemeral = eph.setLocation
   }
 
   type Receipt = Messages.Confirmation
@@ -582,7 +667,7 @@ object GenericContent {
 
     import scala.concurrent.duration.DurationInt
 
-    override def set(msg: GenericMessage): (Ephemeral) => GenericMessage = msg.setEphemeral
+    override def set(msg: GenericMessage): Ephemeral => GenericMessage = msg.setEphemeral
 
     def apply[Content: EphemeralContent](expiry: Option[FiniteDuration], content: Content) = returning(new Messages.Ephemeral) { proto =>
       proto.expireAfterMillis = expiry.getOrElse(Duration.Zero).toMillis
@@ -609,7 +694,7 @@ object GenericContent {
   implicit object AvailabilityStatus extends GenericContent[AvailabilityStatus] {
     import Messages.Availability._
 
-    override def set(msg: GenericMessage): (AvailabilityStatus) => GenericMessage = msg.setAvailability
+    override def set(msg: GenericMessage): AvailabilityStatus => GenericMessage = msg.setAvailability
 
     def apply(activity: Availability): AvailabilityStatus = returning(new Messages.Availability) {
       _.`type` = activity match {
@@ -658,7 +743,7 @@ object GenericContent {
   type Calling = Messages.Calling
 
   implicit object Calling extends GenericContent[Calling] {
-    override def set(msg: GenericMessage): (Calling) => GenericMessage = msg.setCalling
+    override def set(msg: GenericMessage): Calling => GenericMessage = msg.setCalling
 
     def apply(content: String): Calling = returning(new Calling) { c =>
       c.content = content

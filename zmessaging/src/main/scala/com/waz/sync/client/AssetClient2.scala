@@ -115,7 +115,7 @@ object AssetClient2 {
 
   case class AssetContent(mime: Mime, data: () => InputStream, dataLength: Option[Long])
 
-  case class UploadResponse2(key: RAssetId, expires: Option[Instant], token: Option[AssetToken])
+  case class UploadResponse2(key: AssetId, expires: Option[Instant], token: Option[AssetToken])
 
   implicit val DefaultExpiryTime: Expiration = 1.hour
 

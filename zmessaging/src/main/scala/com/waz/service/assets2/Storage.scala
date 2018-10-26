@@ -17,7 +17,7 @@
  */
 package com.waz.service.assets2
 
-import com.waz.model.Mime
+import com.waz.model.{MessageId, Mime, RawAssetId}
 import com.waz.sync.client.AssetClient2.Retention
 
 trait Codec[From, To] {
@@ -83,7 +83,35 @@ trait StorageCodecs {
     }
   }
 
+  implicit val UploadStatusCodec: Codec[UploadStatus, Int] = new Codec[UploadStatus, Int] {
+    val NotStarted = 1
+    val InProgress = 2
+    val Done       = 3
+    val Cancelled  = 4
+    val Failed     = 5
+
+    override def serialize(value: UploadStatus): Int = value match {
+      case UploadStatus.NotStarted => NotStarted
+      case UploadStatus.InProgress => InProgress
+      case UploadStatus.Done       => Done
+      case UploadStatus.Cancelled  => Cancelled
+      case UploadStatus.Failed     => Failed
+    }
+
+    override def deserialize(value: Int): UploadStatus = value match {
+      case NotStarted => UploadStatus.NotStarted
+      case InProgress => UploadStatus.InProgress
+      case Done       => UploadStatus.Done
+      case Cancelled  => UploadStatus.Cancelled
+      case Failed     => UploadStatus.Failed
+    }
+  }
+
   implicit val AssetIdCodec: Codec[AssetId, String] = Codec.create(_.str, AssetId.apply)
+
+  implicit val MessageIdCodec: Codec[MessageId, String] = Codec.create(_.str, MessageId.apply)
+
+  implicit val RawAssetIdCodec: Codec[RawAssetId, String] = Codec.create(_.str, RawAssetId.apply)
 
   implicit val Sha256Codec: Codec[Sha256, Array[Byte]] = Codec.create(_.bytes, Sha256.apply)
 

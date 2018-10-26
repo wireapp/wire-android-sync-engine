@@ -18,10 +18,14 @@
 package com.waz.model
 
 import java.math.BigInteger
-import java.security.MessageDigest
+import java.io.InputStream
+import java.security.{DigestInputStream, MessageDigest}
 
+import com.waz.utils.IoUtils
 import com.waz.utils.crypto.AESUtils
 import javax.crypto.KeyGenerator
+
+import scala.util.Try
 
 //TODO Do we have any reasons to store key as String? Why not just an Array[Byte]?
 case class AESKey(str: String) {
@@ -55,8 +59,20 @@ object Sha256 {
   val Empty = Sha256("")
 
   def apply(bytes: Array[Byte]) = new Sha256(AESUtils.base64(bytes))
+
   def calculate(bytes: Array[Byte]): Sha256 = {
     val digest = MessageDigest.getInstance("SHA-256")
     Sha256(digest.digest(bytes))
   }
+
+  def calculate(is: InputStream): Try[Sha256] = Try {
+    val digestInputStream = new DigestInputStream(is, MessageDigest.getInstance("SHA-256"))
+    IoUtils.withResource(digestInputStream) { stream =>
+      val buffer = Array.ofDim[Byte](4096)
+      Stream.continually(stream.read(buffer)).takeWhile(_ > -1)
+
+      Sha256(digestInputStream.getMessageDigest.digest())
+    }
+  }
+
 }

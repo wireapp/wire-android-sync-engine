@@ -19,7 +19,7 @@ package com.waz.service.assets2
 
 import android.content.Context
 import com.waz.db.{ColumnBuilders, Dao}
-import com.waz.model.AssetId
+import com.waz.model.RawAssetId
 import com.waz.service.assets2.Asset._
 import com.waz.service.assets2.RawAssetStorage.RawAssetDao
 import com.waz.utils.TrimmingLruCache.Fixed
@@ -28,52 +28,61 @@ import com.waz.utils.{CachedStorage2, CirceJSONSupport, DbStorage2, InMemoryStor
 
 import scala.concurrent.ExecutionContext
 
-trait RawAssetStorage extends ReactiveStorage2[AssetId, RawAsset[General]]
+trait RawAssetStorage extends ReactiveStorage2[RawAssetId, RawAsset[RawGeneral]]
 
 class RawAssetStorageImpl(context: Context, db: DB, ec: ExecutionContext) extends ReactiveStorageImpl2(
-  new CachedStorage2[AssetId, RawAsset[General]](
+  new CachedStorage2(
     new DbStorage2(RawAssetDao)(ec, db),
-    new InMemoryStorage2[AssetId, RawAsset[General]](new TrimmingLruCache(context, Fixed(8)), RawAssetDao.idExtractor)(ec)
+    new InMemoryStorage2[RawAssetId, RawAsset[RawGeneral]](new TrimmingLruCache(context, Fixed(8)))(ec)
   )(ec)
 ) with RawAssetStorage
 
 object RawAssetStorage {
 
   //TODO Actually we do not need DAO classes. We can generate them using 'shapeless'.
-  object RawAssetDao extends Dao[RawAsset[General], AssetId]
-    with ColumnBuilders[RawAsset[General]]
+  object RawAssetDao extends Dao[RawAsset[RawGeneral], RawAssetId]
+    with ColumnBuilders[RawAsset[RawGeneral]]
     with StorageCodecs
     with CirceJSONSupport {
 
-    val Id         = asText(_.id)('_id, "PRIMARY KEY")
-    val Source     = asText(_.source)('source)
-    val Sha        = asBlob(_.sha)('sha)
-    val Mime       = asText(_.mime)('mime)
-    val Size       = long(_.size)('size)
-    val Retention  = asInt(_.retention)('retention)
-    val Public     = bool(_.public)('public)
-    val Encryption = asText(_.encryption)('encryption)
-    val Type       = text(getAssetTypeString)('type)
-    val Details    = asText(_.details)('details)
-    val ConvId     = asTextOpt(_.convId)('conversation_id)
+    val Id           = asText(_.id)('_id, "PRIMARY KEY")
+    val Source       = asText(_.localSource)('source)
+    val Name         = text(_.name)('name)
+    val Sha          = asBlob(_.sha)('sha)
+    val Mime         = asText(_.mime)('mime)
+    val Uploaded     = long(_.uploaded)('uploaded)
+    val Size         = long(_.size)('size)
+    val Retention    = asInt(_.retention)('retention)
+    val Public       = bool(_.public)('public)
+    val Encryption   = asText(_.encryption)('encryption)
+    val Type         = text(getAssetTypeString)('type)
+    val Details      = asText(_.details)('details)
+    val UploadStatus = asInt(_.uploadStatus)('upload_status)
+    val AssetId      = asTextOpt(_.assetId)('asset_id)
+    val MessageId    = asText(_.messageId)('message_id)
 
     override val idCol = Id
-    override val table = Table("RawAssets", Id, Source, Sha, Mime, Size, Retention, Public, Encryption, Type, Details, ConvId)
+    override val table = Table(
+      "RawAssets",
+      Id, Source, Sha, Mime, Uploaded, Size, Retention, Public, Encryption, Type, Details, AssetId
+    )
 
     private val Image = "image"
     private val Audio = "audio"
     private val Video = "video"
     private val Blob  = "blob"
+    private val NotReady = "not_ready"
 
-    override def apply(implicit cursor: DBCursor): RawAsset[General] = {
-      RawAsset(Id, Source, Sha, Mime, Size, Retention, Public, Encryption, Details, ConvId)
+    override def apply(implicit cursor: DBCursor): RawAsset[RawGeneral] = {
+      RawAsset(Id, Source, Name, Sha, Mime, Uploaded, Size, Retention, Public, Encryption, Details, UploadStatus, AssetId, MessageId)
     }
 
-    private def getAssetTypeString(asset: RawAsset[General]): String = asset.details match {
+    private def getAssetTypeString(asset: RawAsset[RawGeneral]): String = asset.details match {
       case _: Image => Image
       case _: Audio => Audio
       case _: Video => Video
-      case _: Blob  => Blob
+      case _: Blob => Blob
+      case _: NotReady => NotReady
     }
 
   }

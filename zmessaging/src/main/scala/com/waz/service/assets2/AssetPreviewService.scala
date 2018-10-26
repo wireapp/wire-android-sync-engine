@@ -17,13 +17,12 @@
  */
 package com.waz.service.assets2
 
-import java.net.URI
+import java.io.InputStream
+
+import com.waz.service.assets2.Asset.General
 
 import scala.concurrent.Future
 
-trait MetadataService {
-  def extract(uri: URI): Future[AssetDetails]
-  def extractForImage(uri: URI, tag: ImageTag): Future[ImageDetails]
-  def extractForVideo(uri: URI): Future[VideoDetails]
-  def extractForAudio(uri: URI, bars: Int = 100): Future[AudioDetails]
+trait AssetPreviewService {
+  def extractPreview(rawAsset: RawAsset[General], contentStream: => Future[InputStream]): Future[ContentForUpload]
 }

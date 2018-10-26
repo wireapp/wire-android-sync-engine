@@ -63,5 +63,10 @@ object errors {
       extends ZError(description, cause)
   case class ValidationError(override val description: String, override val cause: Option[Throwable] = None)
       extends LogicError(description, cause)
+  case class FailedExpectationsError(override val description: String, override val cause: Option[Throwable] = None)
+    extends LogicError(description, cause)
+
+  case class FileSystemError(override val description: String, override val cause: Option[Throwable] = None)
+    extends ZError(description, cause)
 
 }

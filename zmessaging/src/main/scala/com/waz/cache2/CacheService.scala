@@ -24,7 +24,7 @@ import com.waz.ZLog.ImplicitTag._
 import com.waz.ZLog.verbose
 import com.waz.cache2.CacheService.Encryption
 import com.waz.model.AESKey
-import com.waz.model.errors.NotFoundLocal
+import com.waz.model.errors.{FailedExpectationsError, FileSystemError, NotFoundLocal, ZError}
 import com.waz.utils.IoUtils
 import com.waz.utils.crypto.AESUtils
 import com.waz.utils.events._
@@ -40,6 +40,8 @@ trait CacheService {
 
   def putEncrypted(key: String, file: File): Future[Unit]
   def remove(key: String): Future[Unit]
+  def getCacheEntrySize(key: String): Future[Long]
+  def changeKey(oldKey: String, newKey: String): Future[Unit]
 
   def find(key: String)(encryption: Encryption): Future[Option[InputStream]] =
     Future(getInputStream(key).map(encryption.decrypt))
@@ -55,15 +57,20 @@ trait CacheService {
   def putBytes(key: String, bytes: Array[Byte])(encryption: Encryption): Future[Unit] =
     put(key, new ByteArrayInputStream(bytes))(encryption)
 
-  private def failedIfEmpty[T](key: String, value: Future[Option[T]]): Future[T] =
+  protected def failedIfEmpty[T](key: String, value: Future[Option[T]]): Future[T] =
     value.flatMap {
       case Some(is) => Future.successful(is)
-      case None => Future.failed(NotFoundLocal(s"Cache with key = '$key' not found."))
+      case None => Future.failed(CacheService.keyNotFoundError(key))
     }
 
 }
 
 object CacheService {
+
+  def keyNotFoundError(key: String): ZError =
+    NotFoundLocal(s"Cache with key = '$key' not found.")
+  def keyAlreadyExistError(key: String): ZError =
+    FailedExpectationsError(s"Cache with key = '$key' already exist.")
 
   trait Encryption {
     def decrypt(is: InputStream): InputStream
@@ -100,6 +107,8 @@ class LruFileCacheServiceImpl(
 )(implicit override val ec: ExecutionContext, ev: EventContext)
     extends CacheService {
 
+  import CacheService._
+
   private val directorySize: SourceSignal[Long] = Signal()
   directorySize
     .throttle(sizeCheckingInterval)
@@ -127,7 +136,7 @@ class LruFileCacheServiceImpl(
 
   updateDirectorySize()
 
-  def updateDirectorySize(): Unit =
+  private def updateDirectorySize(): Unit =
     Future(cacheDirectory.listFiles().foldLeft(0L)(_ + _.length())).foreach(size => directorySize ! size)
 
   private def getFile(key: String): File = new File(cacheDirectory, key)
@@ -149,15 +158,26 @@ class LruFileCacheServiceImpl(
   override def put(key: String, in: InputStream)(encryption: Encryption): Future[Unit] =
     super.put(key, in)(encryption).map(_ => updateDirectorySize())
 
-
   override def remove(key: String): Future[Unit] = Future { getFile(key).delete() }
 
-  def putEncrypted(key: String, file: File): Future[Unit] = Future {
+  override def getCacheEntrySize(key: String): Future[Long] = Future { getFile(key).length() }
+
+  override def putEncrypted(key: String, file: File): Future[Unit] = Future {
     val targetFile = new File(cacheDirectory, key)
     if (targetFile.exists()) targetFile.delete()
     file.setLastModified(System.currentTimeMillis())
     file.renameTo(targetFile)
     updateDirectorySize()
   }
+
+  override def changeKey(oldKey: String, newKey: String): Future[Unit] =
+    for {
+      oldFile <- Future(getFile(oldKey))
+      _ <- if (oldFile.exists()) Future.successful(()) else Future.failed(keyNotFoundError(oldKey))
+      newFile = getFile(newKey)
+      _ <- if (newFile.exists()) Future.failed(keyAlreadyExistError(newKey)) else Future.successful(())
+      renamingResult = oldFile.renameTo(newFile)
+      _ <- if (renamingResult) Future.successful(()) else Future.failed(FileSystemError(s"Can not rename $oldFile to $newFile"))
+    } yield ()
 
 }

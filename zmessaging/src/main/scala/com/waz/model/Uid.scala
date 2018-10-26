@@ -110,7 +110,36 @@ object AccountId extends (String => AccountId) {
   }
 }
 
-case class AssetId(str: String) {
+sealed trait AssetIdGeneral
+
+object AssetIdGeneral {
+  private val RawAssetPrefix = "raw_"
+
+  //TODO Use 'Codecs' concept instead of such methods
+  def encode(id: AssetIdGeneral): String = id match {
+    case AssetId(str) => str
+    case RawAssetId(str) => RawAssetPrefix + str
+  }
+
+  def decode(str: String): AssetIdGeneral = {
+    if (str.startsWith(RawAssetPrefix)) RawAssetId(str.substring(RawAssetPrefix.length))
+    else AssetId(str)
+  }
+
+}
+
+case class RawAssetId(str: String) extends AssetIdGeneral
+
+object RawAssetId extends (String => RawAssetId) {
+  def apply(): RawAssetId = Id.random()
+
+  implicit object Id extends Id[RawAssetId] {
+    override def random() = RawAssetId(Uid().toString)
+    override def decode(str: String) = RawAssetId(str)
+  }
+}
+
+case class AssetId(str: String) extends AssetIdGeneral {
   override def toString: String = str
 }
 

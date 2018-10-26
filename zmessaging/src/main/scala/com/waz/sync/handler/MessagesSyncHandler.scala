@@ -22,7 +22,8 @@ import com.waz.ZLog._
 import com.waz.api.Message
 import com.waz.api.impl.ErrorResponse
 import com.waz.api.impl.ErrorResponse.{Cancelled, internalError}
-import com.waz.content.MessagesStorage
+import com.waz.cache2.CacheService
+import com.waz.content.{MembersStorage, MessagesStorage}
 import com.waz.model.AssetData.{ProcessingTaskKey, UploadTaskKey}
 import com.waz.model.AssetStatus.{Syncable, UploadCancelled, UploadFailed}
 import com.waz.model.GenericContent.{Ephemeral, Knock, Location, MsgEdit}
@@ -32,12 +33,18 @@ import com.waz.model.sync.ReceiptType
 import com.waz.service._
 import com.waz.service.assets._
 import com.waz.service.conversation.ConversationsContentUpdater
+import com.waz.service.assets2.Asset.{General, Image}
+import com.waz.service.assets2.RawPreview.Ready
+import com.waz.service.assets2.{AssetService, _}
+import com.waz.service.conversation.{ConversationOrderEventsService, ConversationsContentUpdater}
 import com.waz.service.messages.{MessagesContentUpdater, MessagesService}
 import com.waz.service.otr.OtrClientsService
+import com.waz.service.tracking.TrackingService
 import com.waz.sync.SyncHandler.RequestInfo
 import com.waz.sync.SyncResult.Failure
 import com.waz.sync.client.{ErrorOr, ErrorOrResponse}
 import com.waz.sync.otr.OtrSyncHandler
+import com.waz.sync.queue.ConvLock
 import com.waz.sync.{SyncResult, SyncServiceHandle}
 import com.waz.threading.CancellableFuture
 import com.waz.utils.{RichFutureEither, _}
@@ -57,7 +64,12 @@ class MessagesSyncHandler(selfUserId: UserId,
                           assetSync:  AssetSyncHandler,
                           sync:       SyncServiceHandle,
                           assets:     AssetService,
-                          errors:     ErrorsService) {
+                          rawAssetStorage: RawAssetStorage,
+                          cache:      CacheService,
+                          members:    MembersStorage,
+                          tracking:   TrackingService,
+                          errors:     ErrorsService,
+                          timeouts: Timeouts) {
   import com.waz.threading.Threading.Implicits.Background
 
   def postDeleted(convId: ConvId, msgId: MessageId): Future[SyncResult] =
@@ -178,7 +190,7 @@ class MessagesSyncHandler(selfUserId: UserId,
     import Message.Type._
 
     msg.msgType match {
-      case MessageData.IsAsset() => Cancellable(UploadTaskKey(msg.assetId))(uploadAsset(conv, msg)).future
+      case _ if msg.isAssetMessage => Cancellable(UploadTaskKey(msg.assetId))(uploadAsset(conv, msg)).future
       case KNOCK => otrSync.postOtrMessage(conv.id, GenericMessage(msg.id.uid, msg.ephemeral, Proto.Knock(msg.expectsRead.getOrElse(false))))
       case TEXT | TEXT_EMOJI_ONLY => postTextMessage().map(_.map(_.time))
       case RICH_MEDIA =>
@@ -208,76 +220,100 @@ class MessagesSyncHandler(selfUserId: UserId,
     }
   }
 
-  private def uploadAsset(conv: ConversationData, msg: MessageData): ErrorOrResponse[RemoteInstant] = {
-    verbose(s"uploadAsset($conv, $msg)")
+  private def uploadAsset(conv: ConversationData, msg: MessageData)(implicit convLock: ConvLock): ErrorOrResponse[RemoteInstant] = {
+    import cats.data.EitherT
+    import cats.instances.future._
+    import cats.instances.either._
+    import cats.syntax.either._
 
-    def postAssetMessage(asset: AssetData, preview: Option[AssetData], origTime: Option[RemoteInstant] = None): ErrorOrResponse[RemoteInstant] = {
-      val proto = GenericMessage(msg.id.uid, msg.ephemeral, Proto.Asset(asset, preview, msg.expectsRead.getOrElse(false)))
-      CancellableFuture.lift(otrSync.postOtrMessage(conv.id, proto).flatMap {
-        case Right(time) =>
-          val updateTime = origTime.getOrElse(time)
-          verbose(s"posted asset message for: $asset, with update time: $updateTime (origTime: $origTime)")
-          msgContent.updateMessage(msg.id)(_.copy(protos = Seq(proto), time = updateTime)).map(_ => Right(updateTime))
-        case Left(err) =>
-          warn(s"posting asset message failed: $err")
-          Future.successful(Left(err))
-      })
+    verbose(s"uploadAsset($conv, $msg)")
+    type Result[T] = EitherT[Future, ErrorResponse, T]
+
+//    def postAssetMessage(asset: AssetData, preview: Option[AssetData]): ErrorOrResponse[RemoteInstant] = {
+//      val proto = GenericMessage(msg.id.uid, msg.ephemeral, Proto.Asset(asset, preview))
+//      CancellableFuture.lift(otrSync.postOtrMessage(conv.id, proto) flatMap {
+//        case Right(time) =>
+//          verbose(s"posted asset message for: $asset")
+//          msgContent.updateMessage(msg.id)(_.copy(protos = Seq(proto), time = time)) map { _ => Right(time) }
+//        case Left(err) =>
+//          warn(s"posting asset message failed: $err")
+//          Future successful Left(err)
+//      })
+//    }
+
+    def postAssetMessage(asset: RawAsset[General], preview: Option[Asset[General]]): Result[RemoteInstant] = {
+      val proto = GenericMessage(msg.id.uid, msg.ephemeral, Proto.Asset(asset, preview))
+      for {
+        time <- EitherT(otrSync.postOtrMessage(conv.id, proto))
+        _ <- EitherT.liftF(msgContent.updateMessage(msg.id)(_.copy(protos = Seq(proto), time = time)))
+      } yield time
     }
 
     //TODO Dean: Update asset status to UploadInProgress after posting original - what about images...?
-    def postOriginal(asset: AssetData): ErrorOrResponse[RemoteInstant] =
-      if (asset.status != AssetStatus.UploadNotStarted) CancellableFuture successful Right(msg.time)
-      else asset.mime match {
-        case Mime.Image() => CancellableFuture.successful(Right(msg.time))
-        case _ =>
-          verbose(s"send original")
-          postAssetMessage(asset, None)
+    def postOriginal(asset: RawAsset[General]): Result[RemoteInstant] =
+      if (asset.uploadStatus != UploadStatus.NotStarted) EitherT.fromEither(msg.time.asRight)
+      else asset.details match {
+        case _: Image => EitherT.fromEither(msg.time.asRight)
+        case _ => postAssetMessage(asset, None)
       }
 
-    def sendWithV3(asset: AssetData) = {
-      postOriginal(asset).flatMap {
-        case Left(err) => CancellableFuture successful Left(err)
-        case Right(origTime) =>
-          //send preview
-          CancellableFuture.lift(asset.previewId.map(assets.getAssetData).getOrElse(Future successful None)).flatMap {
-            case Some(prev) =>
-              verbose("send preview")
-              service.retentionPolicy(conv).flatMap { retention =>
-                assetSync.uploadAssetData(prev.id, retention = retention).flatMap {
-                  case Right(updated) =>
-                    postAssetMessage(asset, Some(updated), Some(origTime)).map {
-                      case (Right(_)) => Right(Some(updated))
-                      case (Left(err)) => Left(err)
-                    }
-                  case Left(err) => CancellableFuture successful Left(err)
-                }
-              }
-            case None => CancellableFuture successful Right(None)
-          }.flatMap { //send asset
-            case Right(prev) =>
-              service.retentionPolicy(conv).flatMap { retention =>
-                assetSync.uploadAssetData(asset.id, retention = retention).flatMap {
-                  case Right(updated) if asset.isImage =>
-                    verbose("send image asset")
-                    postAssetMessage(updated, prev).map(_.fold(Left(_), updateTime => Right(updateTime)))
-                  case Right(updated) =>
-                    verbose("send non-image asset")
-                    postAssetMessage(updated, prev, Some(origTime)).map(_.fold(Left(_), _ => Right(origTime)))
-                  case Left(err) if err.message.contains(AssetSyncHandler.AssetTooLarge) =>
-                    CancellableFuture.lift(errors.addAssetTooLargeError(conv.id, msg.id).map { _ => Left(err) })
-                  case Left(err) => CancellableFuture successful Left(err)
-                }
-              }
-            case Left(err) => CancellableFuture successful Left(err)
-          }
-      }
+//    def sendWithV3(asset: RawAsset[General]) = {
+//      postOriginal(asset).flatMap {
+//        case Left(err) => CancellableFuture successful Left(err)
+//        case Right(origTime) =>
+//          convLock.release()
+//          //send preview
+//          CancellableFuture.lift(asset.previewId.map(assets.getAssetData).getOrElse(Future successful None)).flatMap {
+//            case Some(prev) =>
+//              service.retentionPolicy(conv).flatMap { retention =>
+//                assetSync.uploadAssetData(prev.id, retention = retention).flatMap {
+//                  case Right(updated) =>
+//                    postAssetMessage(asset, Some(updated)).map {
+//                      case Right(_) => Right(Some(updated))
+//                      case Left(err) => Left(err)
+//                    }
+//                  case Left(err) => CancellableFuture successful Left(err)
+//                }
+//              }
+//            case None => CancellableFuture successful Right(None)
+//          }.flatMap { //send asset
+//            case Right(prev) =>
+//              service.retentionPolicy(conv).flatMap { retention =>
+//                assetSync.uploadAssetData(asset.id, retention = retention).flatMap {
+//                  case Right(updated) => postAssetMessage(updated, prev).map(_.fold(Left(_), _ => Right(origTime)))
+//                  case Left(err) if err.message.contains(AssetSyncHandler.AssetTooLarge) =>
+//                    CancellableFuture.lift(errors.addAssetTooLargeError(conv.id, msg.id).map { _ => Left(err) })
+//                  case Left(err) => CancellableFuture successful Left(err)
+//                }
+//              }
+//            case Left(err) => CancellableFuture successful Left(err)
+//          }
+//      }
+//    }
+
+    def sendWithV3(rawAsset: RawAsset[General]) = {
+      for {
+        time <- postOriginal(rawAsset)
+        _ = convLock.release()
+        updatedRawAsset <- rawAsset.preview match {
+          case RawPreview.NotReady => assets.createAndSavePreview(rawAsset)
+          case _ => Future.successful(rawAsset)
+        }
+        previewAsset <- updatedRawAsset.preview match {
+          case RawPreview.NotUploaded(rawAssetId) =>
+            assets.uploadAsset(rawAssetId).flatMap(asset => postAssetMessage(updatedRawAsset, Some(asset)).value)
+          case _ => CancellableFuture.successful(())
+        }
+        asset <- assets.uploadAsset(updatedRawAsset.id)
+        _ <- postAssetMessage(asset, previewAsset)
+      } yield time
     }
 
     //want to wait until asset meta and preview data is loaded before we send any messages
     AssetProcessing.get(ProcessingTaskKey(msg.assetId)).flatMap { _ =>
-      CancellableFuture lift assets.getAssetData(msg.assetId).flatMap {
+      CancellableFuture lift rawAssetStorage.find(RawAssetId(msg.id.str)).flatMap {
         case None => CancellableFuture successful Left(internalError(s"no asset found for msg: $msg"))
-        case Some(asset) if asset.status == AssetStatus.UploadCancelled => CancellableFuture successful Left(Cancelled)
+        case Some(asset) if asset.uploadStatus == UploadStatus.Cancelled => CancellableFuture successful Left(ErrorResponse.Cancelled)
         case Some(asset) =>
           verbose(s"Sending asset: $asset")
           sendWithV3(asset)

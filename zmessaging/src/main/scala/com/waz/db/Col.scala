@@ -137,6 +137,9 @@ trait ColumnBuilders[T] {
   def text(extractor: T => String)(name: Symbol, modifiers: String = ""): ColBinder[String, T] =
     ColBinder(Col.text(name, modifiers), extractor)
 
+  def textOpt(extractor: T => Option[String])(name: Symbol, modifiers: String = ""): ColBinder[Option[String], T] =
+    ColBinder(Col.opt(Col.text(name, modifiers)), extractor)
+
   def asTextOpt[A](extractor: T => Option[A])(name: Symbol, modifiers: String = "")(implicit codec: Codec[A, String]): ColBinder[Option[A], T] =
     ColBinder(Col.opt(Col.text[A](name, codec.serialize, codec.deserialize, modifiers)), extractor)
 

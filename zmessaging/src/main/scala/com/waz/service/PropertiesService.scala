@@ -23,7 +23,7 @@ import com.waz.content.{PropertiesStorage, PropertyValue, UserPreferences}
 import com.waz.log.ZLog2._
 import com.waz.model.{PropertyEvent, ReadReceiptEnabledPropertyEvent, UnknownPropertyEvent}
 import com.waz.service.EventScheduler.Stage
-import com.waz.service.assets2.AssetStorageImpl.Codec
+import com.waz.service.assets2.Codec
 import com.waz.service.push.PushService
 import com.waz.service.push.PushService.ForceSync
 import com.waz.sync.{SyncRequestService, SyncServiceHandle}
