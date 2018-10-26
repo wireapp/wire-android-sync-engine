@@ -32,7 +32,7 @@ import scala.collection.mutable
 import scala.concurrent.Future
 import scala.concurrent.duration._
 
-class ConvMessagesIndex(conv: ConvId, messages: MessagesStorageImpl, selfUserId: UserId, users: UsersStorage,
+class ConvMessagesIndex(conv: ConvId, messages: MessagesStorage, selfUserId: UserId, users: UsersStorage,
                         convs: ConversationStorage, msgAndLikes: MessageAndLikesStorage, storage: ZmsDatabase,
                         tracking: TrackingService, filter: Option[MessageFilter] = None) { self =>
 

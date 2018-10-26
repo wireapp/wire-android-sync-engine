@@ -86,6 +86,8 @@ class NotificationsServiceSpec extends AndroidFreeSpec {
 
       (users.get _).expects(user.id).twice.returning(Future.successful(Some(user)))
       (convs.get _).expects(conv.id).twice.returning(Future.successful(Some(conv)))
+      (messages.isQuoteOfSelf _).expects(msg1).once.returning(Future.successful(false))
+      (messages.isQuoteOfSelf _).expects(msg2).once.returning(Future.successful(false))
 
       val service = getService
 
@@ -108,6 +110,8 @@ class NotificationsServiceSpec extends AndroidFreeSpec {
 
       (users.get _).expects(user.id).twice.returning(Future.successful(Some(user)))
       (convs.get _).expects(conv.id).twice.returning(Future.successful(Some(conv)))
+      (messages.isQuoteOfSelf _).expects(msg1).once.returning(Future.successful(false))
+      (messages.isQuoteOfSelf _).expects(msg2).once.returning(Future.successful(false))
 
       val service = getService
 
@@ -145,6 +149,8 @@ class NotificationsServiceSpec extends AndroidFreeSpec {
 
       (users.get _).expects(user.id).twice.returning(Future.successful(Some(user)))
       (convs.get _).expects(conv.id).twice.returning(Future.successful(Some(conv)))
+      (messages.isQuoteOfSelf _).expects(msg1).once.returning(Future.successful(false))
+      (messages.isQuoteOfSelf _).expects(msg2).once.returning(Future.successful(false))
 
       msgsAdded ! Seq(msg1, msg2)
 
@@ -170,6 +176,8 @@ class NotificationsServiceSpec extends AndroidFreeSpec {
 
     (users.get _).expects(user.id).once.returning(Future.successful(Some(user)))
     (convs.get _).expects(conv.id).once.returning(Future.successful(Some(conv)))
+    (messages.isQuoteOfSelf _).expects(msg1).once.returning(Future.successful(false))
+    (messages.isQuoteOfSelf _).expects(msg2).once.returning(Future.successful(false))
 
     val service = getService
 
@@ -187,18 +195,15 @@ class NotificationsServiceSpec extends AndroidFreeSpec {
     inForeground ! false
     clock + 10.seconds //messages arrive some time after the account was last visible
 
-    val msgId1 = MessageId("msg1")
-    val msg1 = MessageData(msgId1, conv.id, Message.Type.TEXT, self)
-    val msgId2 = MessageId("msg2")
-    val msg2 = MessageData(msgId2, conv.id, Message.Type.TEXT, otherUserId, quote = Some(msgId1))
+    val msg = MessageData(MessageId("msg"), conv.id, Message.Type.TEXT, otherUserId, quote = Some(MessageId("other msg")))
 
     (users.get _).expects(otherUserId).anyNumberOfTimes.returning(Future.successful(Some(otherUser)))
     (convs.get _).expects(conv.id).anyNumberOfTimes.returning(Future.successful(Some(conv)))
-    (messages.getMessage _).expects(msgId1).once.returning(Future.successful(Some(msg1)))
+    (messages.isQuoteOfSelf _).expects(msg).once.returning(Future.successful(true))
 
     val service = getService
 
-    msgsAdded ! Seq(msg2)
+    msgsAdded ! Seq(msg)
 
     result(service.notifications.filter(nots => nots.size == 1 && nots.exists(n => n.convId == conv.id && n.isQuote)).head)
   }
