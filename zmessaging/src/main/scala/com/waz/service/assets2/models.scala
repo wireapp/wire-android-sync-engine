@@ -38,12 +38,10 @@ object ContentForUpload {
 case class LocalSource(uri: URI, sha: Sha256)
 
 sealed trait RawPreview
-object RawPreview {
-  case object NotReady                           extends RawPreview
-  case class Ready(assetId: AssetId)             extends RawPreview
-  case class NotUploaded(rawAssetId: RawAssetId) extends RawPreview
-  case object WithoutPreview                     extends RawPreview
-}
+case object RawPreviewNotReady                           extends RawPreview
+case object RawPreviewEmpty                              extends RawPreview
+case class RawPreviewNotUploaded(rawAssetId: RawAssetId) extends RawPreview
+case class RawPreviewUploaded(assetId: AssetId)          extends RawPreview
 
 case class RawAsset[+T <: RawAssetDetails](
     override val id: RawAssetId,
@@ -77,9 +75,12 @@ case class Asset[+T <: AssetDetails](
     override val id: AssetId,
     token: Option[AssetToken], //all not public assets should have an AssetToken
     sha: Sha256,
+    mime: Mime,
     encryption: Encryption,
     localSource: Option[LocalSource],
     preview: Option[AssetId],
+    name: String,
+    size: Long,
     details: T,
     @deprecated("This one to one relation should be removed", "")
     messageId: Option[MessageId],
@@ -88,20 +89,22 @@ case class Asset[+T <: AssetDetails](
 ) extends Identifiable[AssetId]
 
 object Asset {
-  type RawGeneral   = RawAssetDetails
-  type NotReady     = DetailsNotReady.type
-  type General      = AssetDetails
-  type PreviewImage = PreviewImageDetails
-  type Blob         = BlobDetails.type
-  type Image        = ImageDetails
-  type Audio        = AudioDetails
-  type Video        = VideoDetails
+  type RawGeneral = RawAssetDetails
+  type NotReady   = DetailsNotReady.type
+  type General    = AssetDetails
+  type Blob       = BlobDetails.type
+  type Image      = ImageDetails
+  type Audio      = AudioDetails
+  type Video      = VideoDetails
 
   def create(assetId: AssetId, token: Option[AssetToken], rawAsset: RawAsset[General]): Asset[General] =
     Asset(
       id = assetId,
       token = token,
+      mime = rawAsset.mime,
       sha = rawAsset.sha,
+      name = rawAsset.name,
+      size = rawAsset.size,
       encryption = rawAsset.encryption,
       localSource = rawAsset.localSource,
       preview = None,
@@ -120,7 +123,6 @@ case object BlobDetails                                         extends AssetDet
 case class ImageDetails(dimensions: Dim2, tag: ImageTag)        extends AssetDetails
 case class AudioDetails(duration: Duration, loudness: Loudness) extends AssetDetails
 case class VideoDetails(dimensions: Dim2, duration: Duration)   extends AssetDetails
-case class PreviewImageDetails(dimensions: Dim2, tag: ImageTag) extends AssetDetails
 
 sealed trait ImageTag
 case object Preview extends ImageTag

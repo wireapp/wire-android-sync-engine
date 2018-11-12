@@ -59,6 +59,29 @@ trait StorageCodecs {
     }
   }
 
+  implicit val RawPreviewCodec: Codec[RawPreview, String] = new Codec[RawPreview, String] {
+    val NotReady = "not_ready"
+    val WithoutPreview = ""
+    val NotUploadedPrefix = "not_uploaded__"
+    val UploadedPrefix = "uploaded__"
+
+    override def serialize(value: RawPreview): String = value match {
+      case RawPreviewNotReady => NotReady
+      case RawPreviewEmpty => WithoutPreview
+      case RawPreviewNotUploaded(rawAssetId) => NotUploadedPrefix + rawAssetId.str
+      case RawPreviewUploaded(assetId) => UploadedPrefix + assetId.str
+    }
+
+    override def deserialize(value: String): RawPreview = value match {
+      case NotReady => RawPreviewNotReady
+      case WithoutPreview => RawPreviewEmpty
+      case str if str.startsWith(NotUploadedPrefix) =>
+        RawPreviewNotUploaded(RawAssetId(str.substring(NotUploadedPrefix.length)))
+      case str if str.startsWith(UploadedPrefix) =>
+        RawPreviewUploaded(AssetId(str.substring(UploadedPrefix.length)))
+    }
+  }
+
   implicit val RetentionCodec: Codec[Retention, Int] = new Codec[Retention, Int] {
     val Volatile                = 1
     val Eternal                 = 2

@@ -83,6 +83,19 @@ object GenericContent {
           }
         }
 
+      def apply(asset: Asset2[General]): Original =
+        returning(new Messages.Asset.Original) { o =>
+          o.mimeType = asset.mime.str
+          o.size = asset.size
+          o.name = asset.name
+          asset.details match {
+            case image: Image => o.setImage(ImageMetaData(image))
+            case video: Video => o.setVideo(VideoMetaData(video))
+            case audio: Audio => o.setAudio(AudioMetaData(audio))
+            case _ =>
+          }
+        }
+
       def unapply(proto: Original): Option[(Mime, Long, Option[String], Option[AssetMetaData])] = Option(proto) map { orig =>
         (
           Option(orig.mimeType).filter(_.nonEmpty).map(Mime(_)).getOrElse(Mime.Unknown),
@@ -168,25 +181,13 @@ object GenericContent {
         }
       }
 
-      def apply(preview: Asset2[General]): Preview = returning(new Messages.Asset.Preview()) { p =>
-        //TODO Think about this fields
-//        p.mimeType = preview.mime.str
-//        p.size = preview.size
-        p.remote = RemoteData(preview)
+      def apply(asset: Asset2[General]): Preview = returning(new Messages.Asset.Preview()) { p =>
+        p.mimeType = asset.mime.str
+        p.size = asset.size
+        p.remote = RemoteData(asset)
 
         //image meta
-        preview.details match {
-          case image: Image => p.setImage(ImageMetaData(image))
-          case _ =>
-        }
-      }
-
-      def apply(preview: RawAsset[General]): Preview = returning(new Messages.Asset.Preview()) { p =>
-        p.mimeType = preview.mime.str
-        p.size = preview.size
-
-        //image meta
-        preview.details match {
+        asset.details match {
           case image: Image => p.setImage(ImageMetaData(image))
           case _ =>
         }
@@ -255,18 +256,25 @@ object GenericContent {
       proto.expectsReadConfirmation = expectsReadConfirmation
     }
 
-    def apply(asset: RawAsset[General], preview: Option[Asset2[General]], expectsReadConfirmation: Boolean): Messages.Asset = returning(new Messages.Asset) { proto =>
-      proto.original = Original(asset)
-      preview.foreach(p => proto.preview = Preview(p))
-      asset.uploadStatus match {
-        case UploadStatus.Cancelled => proto.setNotUploaded(Messages.Asset.CANCELLED)
-        case UploadStatus.Failed    => proto.setNotUploaded(Messages.Asset.FAILED)
-//        case (UploadDone, Some(data)) => proto.setUploaded(RemoteData(data))
-//        case (DownloadFailed, Some(data)) => proto.setUploaded(RemoteData(data))
-        case _ =>
+    def apply(asset: RawAsset[General], preview: Option[Asset2[General]], expectsReadConfirmation: Boolean): Messages.Asset =
+      returning(new Messages.Asset) { proto =>
+        proto.original = Original(asset)
+        preview.foreach(p => proto.preview = Preview(p))
+        asset.uploadStatus match {
+          case UploadStatus.Cancelled => proto.setNotUploaded(Messages.Asset.CANCELLED)
+          case UploadStatus.Failed    => proto.setNotUploaded(Messages.Asset.FAILED)
+          case _ =>
+        }
+        proto.expectsReadConfirmation = expectsReadConfirmation
       }
-      proto.expectsReadConfirmation = expectsReadConfirmation
-    }
+
+    def apply(asset: Asset2[General], preview: Option[Asset2[General]], expectsReadConfirmation: Boolean): Messages.Asset =
+      returning(new Messages.Asset) { proto =>
+        proto.original = Original(asset)
+        preview.foreach(p => proto.preview = Preview(p))
+        proto.setUploaded(RemoteData(asset))
+        proto.expectsReadConfirmation = expectsReadConfirmation
+      }
 
     def unapply(a: Messages.Asset): Option[(AssetData, Option[AssetData])] = {
       //TODO Dean - think of better way to handle when only one part of asset proto appears without original

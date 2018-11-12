@@ -18,37 +18,54 @@
 package com.waz.service.assets2
 
 import android.content.Context
-import com.waz.db.{ColumnBuilders, Dao}
+import com.waz.db.{ ColumnBuilders, Dao }
 import com.waz.model._
 import com.waz.service.assets2.Asset._
 import com.waz.service.assets2.AssetStorageImpl.AssetDao
 import com.waz.utils.TrimmingLruCache.Fixed
-import com.waz.utils.wrappers.{DB, DBCursor}
-import com.waz.utils.{CachedStorage2, CirceJSONSupport, DbStorage2, InMemoryStorage2, ReactiveStorage2, ReactiveStorageImpl2, TrimmingLruCache}
+import com.waz.utils.wrappers.{ DB, DBCursor }
+import com.waz.utils.{
+  CachedStorage2,
+  CirceJSONSupport,
+  DbStorage2,
+  InMemoryStorage2,
+  ReactiveStorage2,
+  ReactiveStorageImpl2,
+  TrimmingLruCache
+}
 import io.circe.Decoder
 
 import scala.concurrent.ExecutionContext
 
 trait AssetStorage extends ReactiveStorage2[AssetId, Asset[General]]
 
-class AssetStorageImpl(context: Context, db: DB, ec: ExecutionContext) extends ReactiveStorageImpl2(
-  new CachedStorage2[AssetId, Asset[General]](
-    new DbStorage2(AssetDao)(ec, db),
-    new InMemoryStorage2[AssetId, Asset[General]](new TrimmingLruCache(context, Fixed(8)))(ec)
-  )(ec)
-) with AssetStorage
+class AssetStorageImpl(context: Context, db: DB, ec: ExecutionContext)
+    extends ReactiveStorageImpl2(
+      new CachedStorage2[AssetId, Asset[General]](
+        new DbStorage2(AssetDao)(ec, db),
+        new InMemoryStorage2[AssetId, Asset[General]](new TrimmingLruCache(context, Fixed(8)))(ec)
+      )(ec)
+    )
+    with AssetStorage
 
 object AssetStorageImpl {
 
-  object AssetDao extends Dao[Asset[General], AssetId] with ColumnBuilders[Asset[General]] with StorageCodecs with CirceJSONSupport {
+  object AssetDao
+      extends Dao[Asset[General], AssetId]
+      with ColumnBuilders[Asset[General]]
+      with StorageCodecs
+      with CirceJSONSupport {
 
     val dec = Decoder[LocalSource]
 
     val Id         = asText(_.id)('_id, "PRIMARY KEY")
     val Token      = asTextOpt(_.token)('token)
     val Type       = text(getAssetTypeString)('type)
+    val Name       = text(_.name)('name)
     val Encryption = asText(_.encryption)('encryption)
+    val Mime       = asText(_.mime)('mime)
     val Sha        = asBlob(_.sha)('sha)
+    val Size       = long(_.size)('size)
     val Source     = asTextOpt(_.localSource)('source)
     val Preview    = asTextOpt(_.preview)('preview)
     val Details    = asText(_.details)('details)
@@ -56,16 +73,16 @@ object AssetStorageImpl {
     val ConvId     = asTextOpt(_.convId)('conversation_id)
 
     override val idCol = Id
-    override val table = Table("Assets", Id, Token, Type, Encryption, Sha, Source, Details, MessageId, ConvId)
+    override val table =
+      Table("Assets", Id, Token, Type, Name, Encryption, Mime, Sha, Size, Source, Preview, Details, MessageId, ConvId)
 
     private val Image = "image"
     private val Audio = "audio"
     private val Video = "video"
     private val Blob  = "blob"
 
-    override def apply(implicit cursor: DBCursor): Asset[General] = {
-      Asset(Id, Token, Sha, Encryption, Source, Preview, Details, MessageId, ConvId)
-    }
+    override def apply(implicit cursor: DBCursor): Asset[General] =
+      Asset(Id, Token, Sha, Mime, Encryption, Source, Preview, Name, Size, Details, MessageId, ConvId)
 
     private def getAssetTypeString(asset: Asset[General]): String = asset.details match {
       case _: Image => Image

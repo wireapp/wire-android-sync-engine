@@ -19,23 +19,29 @@ package com.waz.service.assets2
 
 import android.content.Context
 import com.waz.db.{ColumnBuilders, Dao}
-import com.waz.model.RawAssetId
+import com.waz.model.{MessageId, RawAssetId}
 import com.waz.service.assets2.Asset._
 import com.waz.service.assets2.RawAssetStorage.RawAssetDao
 import com.waz.utils.TrimmingLruCache.Fixed
 import com.waz.utils.wrappers.{DB, DBCursor}
-import com.waz.utils.{CachedStorage2, CirceJSONSupport, DbStorage2, InMemoryStorage2, ReactiveStorage2, ReactiveStorageImpl2, TrimmingLruCache}
+import com.waz.utils.{CachedStorage2, CirceJSONSupport, DbStorage2, InMemoryStorage2, Managed, ReactiveStorage2, ReactiveStorageImpl2, TrimmingLruCache}
 
-import scala.concurrent.ExecutionContext
+import scala.concurrent.{ExecutionContext, Future}
 
-trait RawAssetStorage extends ReactiveStorage2[RawAssetId, RawAsset[RawGeneral]]
+trait RawAssetStorage extends ReactiveStorage2[RawAssetId, RawAsset[RawGeneral]] {
+  def findBy(messageId: MessageId): Future[Option[RawAsset[RawGeneral]]]
+}
 
-class RawAssetStorageImpl(context: Context, db: DB, ec: ExecutionContext) extends ReactiveStorageImpl2(
+class RawAssetStorageImpl(context: Context, db: DB)(implicit ec: ExecutionContext) extends ReactiveStorageImpl2(
   new CachedStorage2(
     new DbStorage2(RawAssetDao)(ec, db),
     new InMemoryStorage2[RawAssetId, RawAsset[RawGeneral]](new TrimmingLruCache(context, Fixed(8)))(ec)
   )(ec)
-) with RawAssetStorage
+) with RawAssetStorage {
+  override def findBy(messageId: MessageId): Future[Option[RawAsset[RawGeneral]]] = Future {
+    RawAssetDao.assetByMessageId(messageId)(db).acquire(it => if (it.hasNext) Some(it.next()) else None)
+  }
+}
 
 object RawAssetStorage {
 
@@ -50,6 +56,7 @@ object RawAssetStorage {
     val Name         = text(_.name)('name)
     val Sha          = asBlob(_.sha)('sha)
     val Mime         = asText(_.mime)('mime)
+    val Preview      = asText(_.preview)('preview)
     val Uploaded     = long(_.uploaded)('uploaded)
     val Size         = long(_.size)('size)
     val Retention    = asInt(_.retention)('retention)
@@ -64,7 +71,7 @@ object RawAssetStorage {
     override val idCol = Id
     override val table = Table(
       "RawAssets",
-      Id, Source, Sha, Mime, Uploaded, Size, Retention, Public, Encryption, Type, Details, AssetId
+      Id, Source, Sha, Mime, Preview, Uploaded, Size, Retention, Public, Encryption, Type, Details, AssetId, MessageId
     )
 
     private val Image = "image"
@@ -74,7 +81,7 @@ object RawAssetStorage {
     private val NotReady = "not_ready"
 
     override def apply(implicit cursor: DBCursor): RawAsset[RawGeneral] = {
-      RawAsset(Id, Source, Name, Sha, Mime, Uploaded, Size, Retention, Public, Encryption, Details, UploadStatus, AssetId, MessageId)
+      RawAsset(Id, Source, Name, Sha, Mime, Preview, Uploaded, Size, Retention, Public, Encryption, Details, UploadStatus, AssetId, MessageId)
     }
 
     private def getAssetTypeString(asset: RawAsset[RawGeneral]): String = asset.details match {
@@ -84,6 +91,13 @@ object RawAssetStorage {
       case _: Blob => Blob
       case _: NotReady => NotReady
     }
+
+    def assetByMessageId(messageId: MessageId)(db: DB): Managed[Iterator[RawAsset[RawGeneral]]] =
+      iterating(db.rawQuery(
+        s"""SELECT *
+           |  FROM ${table.name}
+           | WHERE ${MessageId.name} = ${messageId.str}
+          """.stripMargin, null))
 
   }
 

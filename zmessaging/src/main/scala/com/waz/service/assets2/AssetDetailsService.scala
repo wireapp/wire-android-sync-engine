@@ -21,7 +21,7 @@ import java.net.URI
 
 import scala.concurrent.Future
 
-trait MetadataService {
+trait AssetDetailsService {
   def extract(uri: URI): Future[AssetDetails]
   def extractForImage(uri: URI, tag: ImageTag): Future[ImageDetails]
   def extractForVideo(uri: URI): Future[VideoDetails]
