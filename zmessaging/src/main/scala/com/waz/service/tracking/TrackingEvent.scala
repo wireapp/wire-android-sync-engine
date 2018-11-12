@@ -136,24 +136,6 @@ case class MissedPushEvent(time:            Instant,
     o.put("in_background", inBackground)
     o.put("network_mode", networkMode)
     eventTypes.foreach { case (e, f) => o.put(s"event.$e", f) }
-
-    //TODO: remove before going into Prod
-    o.put("last_not_id", lastEventId)
-  })
-}
-
-case class ReceivedPushEvent(p: ReceivedPushData) extends TrackingEvent {
-  override val name = "debug.push_received"
-
-  def secondsAndMillis(d: Duration): Double = max(d.toMillis.toDouble / 1000, 0)
-
-  override val props = Some(returning(new JSONObject()) { o =>
-    o.put("since_sent_seconds", secondsAndMillis(p.sinceSent))
-    o.put("received_at", p.receivedAt.toString)
-    o.put("network_mode", p.networkMode)
-    o.put("network_operator", p.networkOperator)
-    o.put("is_device_idle", p.isDeviceIdle)
-    p.toFetch.foreach(d => o.put("to_fetch_seconds", secondsAndMillis(d)))
   })
 }
 

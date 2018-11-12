@@ -32,7 +32,7 @@ import com.waz.service.call.CallInfo.CallState._
 import com.waz.service.call.CallingServiceSpec.CallStateCheckpoint
 import com.waz.service.conversation.{ConversationsContentUpdater, ConversationsService}
 import com.waz.service.messages.MessagesService
-import com.waz.service.push.PushService
+import com.waz.service.push.PushNotificationService
 import com.waz.service.{MediaManagerService, NetworkModeService}
 import com.waz.specs.AndroidFreeSpec
 import com.waz.testutils.{TestGlobalPreferences, TestUserPreferences}
@@ -60,7 +60,7 @@ class CallingServiceSpec extends AndroidFreeSpec {
   val convsService   = mock[ConversationsService]
   val messages       = mock[MessagesService]
   val permissions    = mock[PermissionsService]
-  val push           = mock[PushService]
+  val push           = mock[PushNotificationService]
   val globalPrefs    = new TestGlobalPreferences
 
   val selfUserId = UserId("self-user")

@@ -42,11 +42,11 @@ class ReceivedPushStorageImpl(context: Context, storage: Database)
   * @param toFetch time elapsed until we successfully fetched the notification
   */
 case class ReceivedPushData(id:              Uid, //for notifications where we don't get the id, we will generate a random one for storage's sake
-                            sinceSent:       Duration,
-                            receivedAt:      Instant,
-                            networkMode:     NetworkMode,
-                            networkOperator: String,
-                            isDeviceIdle:    Boolean,
+                            sinceSent:       Duration         = Duration.ZERO,
+                            receivedAt:      Instant          = Instant.EPOCH,
+                            networkMode:     NetworkMode      = NetworkMode.UNKNOWN,
+                            networkOperator: String           = "",
+                            isDeviceIdle:    Boolean          = false,
                             toFetch:         Option[Duration] = None)
 
 object ReceivedPushData {

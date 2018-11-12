@@ -26,7 +26,7 @@ import com.waz.model._
 import com.waz.ZLog.ImplicitTag._
 import com.waz.api.NotificationsHandler.NotificationType.LIKE
 import com.waz.model.ConversationData.ConversationType
-import com.waz.service.push.{NotificationService, NotificationUiController, PushService}
+import com.waz.service.push.{NotificationService, NotificationUiController, PushNotificationService}
 import com.waz.specs.AndroidFreeSpec
 import com.waz.sync.client.ConversationsClient.ConversationResponse
 import com.waz.threading.{SerialDispatchQueue, Threading}
@@ -43,7 +43,7 @@ class NotificationServiceSpec extends AndroidFreeSpec {
   val messages      = mock[MessagesStorage]
   val storage       = mock[NotificationStorage]
   val convs         = mock[ConversationStorage]
-  val pushService   = mock[PushService]
+  val pushService   = mock[PushNotificationService]
   val uiController  = mock[NotificationUiController]
 
   val beDrift = Signal(Duration.ZERO)

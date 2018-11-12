@@ -23,7 +23,7 @@ import com.waz.model.{ConvId, LocalInstant, UserId}
 import com.waz.service.call.Avs.AvsClosedReason._
 import com.waz.service.call.CallInfo.CallState._
 import com.waz.service.messages.MessagesService
-import com.waz.service.push.PushService
+import com.waz.service.push.PushNotificationService
 import com.waz.service.tracking.TrackingService
 import com.waz.utils.RichWireInstant
 import com.waz.utils.events.EventContext
@@ -32,7 +32,7 @@ import org.threeten.bp.Duration
 class CallLoggingService(selfUserId:  UserId,
                          calling:     CallingService,
                          messages:    MessagesService,
-                         pushService: PushService,
+                         pushService: PushNotificationService,
                          tracking:    TrackingService)(implicit eventContext: EventContext) {
 
   private var subscribedConvs = Set.empty[ConvId]

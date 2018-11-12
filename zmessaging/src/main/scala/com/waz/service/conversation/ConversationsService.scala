@@ -29,7 +29,7 @@ import com.waz.model.ConversationData.{ConversationType, Link, getAccessAndRoleF
 import com.waz.model._
 import com.waz.service._
 import com.waz.service.messages.{MessagesContentUpdater, MessagesService}
-import com.waz.service.push.PushService
+import com.waz.service.push.PushNotificationService
 import com.waz.service.tracking.{GuestsAllowedToggled, TrackingService}
 import com.waz.sync.client.ConversationsClient
 import com.waz.sync.client.ConversationsClient.ConversationResponse
@@ -71,7 +71,7 @@ trait ConversationsService {
 
 class ConversationsServiceImpl(teamId:          Option[TeamId],
                                selfUserId:      UserId,
-                               push:            PushService,
+                               push:            PushNotificationService,
                                users:           UserService,
                                usersStorage:    UsersStorage,
                                membersStorage:  MembersStorage,

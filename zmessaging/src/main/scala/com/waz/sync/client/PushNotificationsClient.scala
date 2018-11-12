@@ -132,7 +132,7 @@ object PushNotificationsClient {
   }
 }
 
-case class PushNotificationEncoded(id: Uid, events: JSONArray, transient: Boolean = false)
+case class PushNotificationEncoded(id: Uid, events: JSONArray = new JSONArray(), transient: Boolean = false)
 
 case class PushNotification(id: Uid, events: Seq[Event], transient: Boolean = false) {
 

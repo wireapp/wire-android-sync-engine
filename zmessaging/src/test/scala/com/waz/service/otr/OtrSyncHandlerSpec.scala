@@ -24,7 +24,7 @@ import com.waz.model.GenericMessage.TextMessage
 import com.waz.model.otr.ClientId
 import com.waz.model._
 import com.waz.service.conversation.ConversationsService
-import com.waz.service.push.PushService
+import com.waz.service.push.PushNotificationService
 import com.waz.service.{ErrorsService, UserService}
 import com.waz.specs.AndroidFreeSpec
 import com.waz.sync.client.OtrClient.{ClientMismatch, EncryptedContent, MessageResponse}
@@ -49,7 +49,7 @@ class OtrSyncHandlerSpec extends AndroidFreeSpec {
   val members            = mock[MembersStorage]
   val errors             = mock[ErrorsService]
   val clientsSyncHandler = mock[OtrClientsSyncHandler]
-  val push               = mock[PushService]
+  val push               = mock[PushNotificationService]
   val usersStorage       = mock[UsersStorage]
 
   scenario("Encrypt and send message with no errors") {

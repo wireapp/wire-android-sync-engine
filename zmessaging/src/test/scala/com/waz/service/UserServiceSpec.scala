@@ -22,7 +22,7 @@ import com.waz.model.UserData.ConnectionStatus
 import com.waz.model.{Availability, _}
 import com.waz.service.assets.AssetService
 import com.waz.service.conversation.SelectedConversationService
-import com.waz.service.push.PushService
+import com.waz.service.push.PushNotificationService
 import com.waz.specs.AndroidFreeSpec
 import com.waz.sync.SyncServiceHandle
 import com.waz.sync.client.{CredentialsUpdateClient, UsersClient}
@@ -45,7 +45,7 @@ class UserServiceSpec extends AndroidFreeSpec {
   val accountsStrg    = mock[AccountStorage]
   val usersStorage    = mock[UsersStorage]
   val membersStorage  = mock[MembersStorage]
-  val pushService     = mock[PushService]
+  val pushService     = mock[PushNotificationService]
   val assetService    = mock[AssetService]
   val usersClient     = mock[UsersClient]
   val sync            = mock[SyncServiceHandle]

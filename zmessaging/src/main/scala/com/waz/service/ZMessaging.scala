@@ -193,7 +193,7 @@ class ZMessaging(val teamId: Option[TeamId], val clientId: ClientId, account: Ac
   lazy val assetLoader: AssetLoader                   = new AssetLoaderImpl(context, Some(assetsStorage), network, assetClient, audioTranscader, videoTranscoder, cache, imageCache, bitmapDecoder, tracking)(urlCreator, authRequestInterceptor)
   lazy val imageLoader: ImageLoader                   = wire[ImageLoaderImpl]
 
-  lazy val push: PushService                          = wire[PushServiceImpl]
+  lazy val push: PushNotificationService                          = wire[PushNotificationServiceImpl]
   lazy val pushToken: PushTokenService                = wire[PushTokenService]
   lazy val errors                                     = wire[ErrorsServiceImpl]
   lazy val reporting                                  = new ZmsReportingService(selfUserId, global.reporting)
@@ -239,6 +239,7 @@ class ZMessaging(val teamId: Option[TeamId], val clientId: ClientId, account: Ac
   lazy val connectionsSync                            = wire[ConnectionsSyncHandler]
   lazy val addressbookSync                            = wire[AddressBookSyncHandler]
   lazy val gcmSync                                    = wire[PushTokenSyncHandler]
+  lazy val pushNotificationsSync                      = wire[PushNotificationSyncHandler]
   lazy val typingSync                                 = wire[TypingSyncHandler]
   lazy val richmediaSync                              = wire[RichMediaSyncHandler]
   lazy val messagesSync                               = wire[MessagesSyncHandler]

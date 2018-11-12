@@ -29,7 +29,7 @@ import com.waz.model._
 import com.waz.model.otr.ClientId
 import com.waz.service.conversation.ConversationsService
 import com.waz.service.otr.OtrService
-import com.waz.service.push.PushService
+import com.waz.service.push.PushNotificationService
 import com.waz.service.{ErrorsService, UserService}
 import com.waz.sync.SyncResult
 import com.waz.sync.SyncResult.Failure
@@ -62,7 +62,7 @@ class OtrSyncHandlerImpl(teamId:             Option[TeamId],
                          members:            MembersStorage,
                          errors:             ErrorsService,
                          clientsSyncHandler: OtrClientsSyncHandler,
-                         push:               PushService,
+                         push:               PushNotificationService,
                          usersStorage:       UsersStorage) extends OtrSyncHandler {
 
   import OtrSyncHandler._

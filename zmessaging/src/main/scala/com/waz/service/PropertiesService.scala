@@ -17,21 +17,20 @@
  */
 package com.waz.service
 
-import scala.language.implicitConversions
 import com.waz.ZLog.ImplicitTag.implicitLogTag
 import com.waz.content.{PropertiesStorage, PropertyValue, UserPreferences}
 import com.waz.log.ZLog2._
 import com.waz.model.{PropertyEvent, ReadReceiptEnabledPropertyEvent, UnknownPropertyEvent}
 import com.waz.service.EventScheduler.Stage
 import com.waz.service.assets2.AssetStorageImpl.Codec
-import com.waz.service.push.PushService
-import com.waz.service.push.PushService.ForceSync
+import com.waz.service.push.PushNotificationService
 import com.waz.sync.{SyncRequestService, SyncServiceHandle}
 import com.waz.utils.RichFuture
 import com.waz.utils.events.Signal
 import io.circe.{Decoder, Encoder}
 
 import scala.concurrent.Future
+import scala.language.implicitConversions
 
 trait PropertiesService {
   val eventProcessor: Stage.Atomic
@@ -42,7 +41,7 @@ trait PropertiesService {
   def readReceiptsEnabled: Signal[Boolean]
 }
 
-class PropertiesServiceImpl(prefs: UserPreferences, syncServiceHandle: SyncServiceHandle, storage: PropertiesStorage, requestService: SyncRequestService, pushService: PushService) extends PropertiesService {
+class PropertiesServiceImpl(prefs: UserPreferences, syncServiceHandle: SyncServiceHandle, storage: PropertiesStorage, requestService: SyncRequestService, pushService: PushNotificationService) extends PropertiesService {
   import com.waz.threading.Threading.Implicits.Background
 
   val eventProcessor: Stage.Atomic = EventScheduler.Stage[PropertyEvent]{ (_, events) =>
@@ -54,7 +53,7 @@ class PropertiesServiceImpl(prefs: UserPreferences, syncServiceHandle: SyncServi
     if readReceipts.isEmpty
     syncId <- syncServiceHandle.syncProperties()
     _ <- requestService.await(syncId)
-    _ <- pushService.syncHistory(ForceSync) // Force fetch to clear the sync event
+    _ <- syncServiceHandle.syncNotifications() // Force fetch to clear the sync event
   } ()
 
   private def processEvent(event: PropertyEvent): Future[Unit] = {

@@ -19,7 +19,7 @@ package com.waz.service
 
 import com.waz.content.{MembersStorage, UsersStorage}
 import com.waz.model._
-import com.waz.service.push.PushService
+import com.waz.service.push.PushNotificationService
 import com.waz.specs.AndroidFreeSpec
 import com.waz.sync.SyncServiceHandle
 import com.waz.threading.Threading
@@ -32,7 +32,7 @@ import scala.concurrent.duration._
 class ExpiredUsersServiceSpec extends AndroidFreeSpec {
 
   implicit val ec = Threading.Background
-  val push      = mock[PushService]
+  val push      = mock[PushNotificationService]
   val members   = mock[MembersStorage]
   val users     = mock[UserService]
   val usersStorage = mock[UsersStorage]

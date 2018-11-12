@@ -39,7 +39,7 @@ import com.waz.service.call.CallInfo.CallState._
 import com.waz.service.call.CallingService.GlobalCallProfile
 import com.waz.service.conversation.{ConversationsContentUpdater, ConversationsService}
 import com.waz.service.messages.MessagesService
-import com.waz.service.push.PushService
+import com.waz.service.push.PushNotificationService
 import com.waz.service.tracking.{AVSMetricsEvent, TrackingService}
 import com.waz.sync.client.CallingClient
 import com.waz.sync.otr.OtrSyncHandler
@@ -159,7 +159,7 @@ class CallingServiceImpl(val accountId:       UserId,
                          flowManagerService:  FlowManagerService,
                          messagesService:     MessagesService,
                          mediaManagerService: MediaManagerService,
-                         pushService:         PushService,
+                         pushService:         PushNotificationService,
                          network:             NetworkModeService,
                          errors:              ErrorsService,
                          userPrefs:           UserPreferences,

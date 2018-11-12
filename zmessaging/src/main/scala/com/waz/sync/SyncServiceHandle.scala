@@ -77,6 +77,11 @@ trait SyncServiceHandle {
   def postProperty(key: PropertyKey, value: Int): Future[SyncId]
   def postProperty(key: PropertyKey, value: String): Future[SyncId]
 
+  /**
+    * @param trigger a push notification id that was responsible for this call to syncNotifications
+    */
+  def syncNotifications(trigger: Option[Uid] = None): Future[SyncId]
+  def processNotifications(): Future[SyncId]
   def registerPush(token: PushToken): Future[SyncId]
   def deletePushToken(token: PushToken): Future[SyncId]
 
@@ -161,6 +166,9 @@ class AndroidSyncServiceHandle(account: UserId, service: SyncRequestService, tim
   def postProperty(key: PropertyKey, value: Int): Future[SyncId] = addRequest(PostIntProperty(key, value), forceRetry = true)
   def postProperty(key: PropertyKey, value: String): Future[SyncId] = addRequest(PostStringProperty(key, value), forceRetry = true)
 
+  def syncNotifications(trigger: Option[Uid]) = addRequest(req = SyncNotifications(trigger), priority = Priority.High)
+  def processNotifications() = addRequest(ProcessNotifications)
+
   def registerPush(token: PushToken)    = addRequest(RegisterPushToken(token), priority = Priority.High, forceRetry = true)
   def deletePushToken(token: PushToken) = addRequest(DeletePushToken(token), priority = Priority.Low)
 
@@ -232,6 +240,8 @@ class AccountSyncHandler(accounts: AccountsService) extends SyncHandler {
           case PostAvailability(availability)                      => zms.usersSync.postAvailability(availability)
           case PostAddressBook(ab)                                 => zms.addressbookSync.postAddressBook(ab)
           case RegisterPushToken(token)                            => zms.gcmSync.registerPushToken(token)
+          case SyncNotifications(trigger)                          => zms.pushNotificationsSync.syncNotifications(trigger)
+          case ProcessNotifications                                => zms.pushNotificationsSync.processNotifications()
           case PostLiking(convId, liking)                          => zms.reactionsSync.postReaction(convId, liking)
           case PostAddBot(cId, pId, iId)                           => zms.integrationsSync.addBot(cId, pId, iId)
           case PostRemoveBot(cId, botId)                           => zms.integrationsSync.removeBot(cId, botId)

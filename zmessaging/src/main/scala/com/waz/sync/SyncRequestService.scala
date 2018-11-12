@@ -35,15 +35,18 @@ trait SyncRequestService {
 
   def addRequest(account:    UserId,
                  req:        SyncRequest,
-                 priority:   Int            = Priority.Normal,
-                 dependsOn:  Seq[SyncId]    = Nil,
-                 forceRetry: Boolean        = false,
-                 delay:      FiniteDuration = Duration.Zero): Future[SyncId]
+                 priority:   Int              = Priority.Normal,
+                 dependsOn:  Seq[SyncId]      = Nil,
+                 forceRetry: Boolean          = false,
+                 delay:      FiniteDuration   = Duration.Zero): Future[SyncId]
 
   def await(ids: Set[SyncId]): Future[Set[SyncResult]]
   def await(id: SyncId): Future[SyncResult]
 
   def syncState(account: UserId, matchers: Seq[SyncCommand]): Signal[SyncState]
+
+  def isSyncing(account: UserId, matchers: Seq[SyncCommand]): Signal[Boolean] =
+    syncState(account, matchers).map(_ != SyncState.COMPLETED)
 }
 
 class SyncRequestServiceImpl(accountId: UserId,
@@ -74,10 +77,10 @@ class SyncRequestServiceImpl(accountId: UserId,
 
   override def addRequest(account:    UserId,
                           req:        SyncRequest,
-                          priority:   Int            = Priority.Normal,
-                          dependsOn:  Seq[SyncId]    = Nil,
-                          forceRetry: Boolean        = false,
-                          delay:      FiniteDuration = Duration.Zero) = {
+                          priority:   Int              = Priority.Normal,
+                          dependsOn:  Seq[SyncId]      = Nil,
+                          forceRetry: Boolean          = false,
+                          delay:      FiniteDuration   = Duration.Zero) = {
     val timestamp = SyncJob.timestamp
     val startTime = if (delay == Duration.Zero) 0 else timestamp + delay.toMillis
     content.addSyncJob(SyncJob(SyncId(), req, dependsOn.toSet, priority = priority, timestamp = timestamp, startTime = startTime), forceRetry).map(_.id)

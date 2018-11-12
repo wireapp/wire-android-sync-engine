@@ -17,15 +17,12 @@
  */
 package com.waz.model.sync
 
-import com.waz.ZLog.ImplicitTag._
 import com.waz.api.IConversation.{Access, AccessRole}
-import com.waz.log.ZLog2._
 import com.waz.model.AddressBook.AddressBookDecoder
 import com.waz.model.UserData.ConnectionStatus
 import com.waz.model.otr.ClientId
 import com.waz.model.{AccentColor, Availability, SearchQuery, _}
 import com.waz.service.PropertyKey
-import com.waz.service.tracking.TrackingService
 import com.waz.sync.client.{ConversationsClient, UsersClient}
 import com.waz.sync.queue.SyncJobMerger._
 import com.waz.utils._
@@ -70,6 +67,8 @@ object SyncRequest {
 
   sealed trait Serialized extends SyncRequest
 
+  sealed trait Offline extends SyncRequest
+
   import sync.{SyncCommand => Cmd}
 
   case object Unknown             extends BaseRequest(Cmd.Unknown)
@@ -82,6 +81,7 @@ object SyncRequest {
   case object SyncClientsLocation extends BaseRequest(Cmd.SyncClientLocation)
   case object SyncTeam            extends BaseRequest(Cmd.SyncTeam)
   case object SyncProperties      extends BaseRequest(Cmd.SyncProperties)
+  case object ProcessNotifications extends BaseRequest(Cmd.ProcessNotifications) with Offline with Serialized
 
   case class SyncTeamMember(userId: UserId) extends BaseRequest(Cmd.SyncTeam) {
     override val mergeKey: Any = (cmd, userId)
@@ -94,6 +94,12 @@ object SyncRequest {
 
   case class PostSelf(data: UserInfo) extends BaseRequest(Cmd.PostSelf) {
     override def merge(req: SyncRequest) = mergeHelper[PostSelf](req)(Merged(_))
+  }
+
+  case class SyncNotifications(trigger: Option[Uid]) extends BaseRequest(Cmd.SyncNotifications) with Serialized {
+    override def merge(req: SyncRequest) = mergeHelper[SyncNotifications](req) { other =>
+      Merged(this.copy(trigger = other.trigger.orElse(trigger)))
+    }
   }
 
   case class RegisterPushToken(token: PushToken) extends BaseRequest(Cmd.RegisterPushToken) {
@@ -373,6 +379,8 @@ object SyncRequest {
           case Cmd.SyncTeamMember            => SyncTeamMember(userId)
           case Cmd.SyncConnections           => SyncConnections
           case Cmd.RegisterPushToken         => RegisterPushToken(decodeId[PushToken]('token))
+          case Cmd.SyncNotifications         => SyncNotifications('trigger)
+          case Cmd.ProcessNotifications      => ProcessNotifications
           case Cmd.PostSelf                  => PostSelf(JsonDecoder[UserInfo]('user))
           case Cmd.PostAddressBook           => PostAddressBook(JsonDecoder.opt[AddressBook]('addressBook).getOrElse(AddressBook.Empty))
           case Cmd.SyncSelfClients           => SyncSelfClients
@@ -429,6 +437,9 @@ object SyncRequest {
         case SyncTeamMember(userId)           => o.put("user", userId.str)
         case DeletePushToken(token)           => putId("token", token)
         case RegisterPushToken(token)         => putId("token", token)
+        case SyncNotifications(trigger) =>
+          trigger.foreach(v => putId("trigger", v))
+
         case SyncRichMedia(messageId)         => putId("message", messageId)
         case PostSelfPicture(assetId)         => assetId.foreach(putId("asset", _))
         case PostSelfName(name)               => o.put("name", name)
@@ -505,7 +516,8 @@ object SyncRequest {
           o.put("key", key)
           o.put("value", value)
         case SyncSelf | SyncTeam | DeleteAccount | SyncConversations | SyncConnections |
-             SyncSelfClients | SyncSelfPermissions | SyncClientsLocation | SyncProperties | Unknown => () // nothing to do
+             SyncSelfClients | SyncSelfPermissions | SyncClientsLocation | SyncProperties |
+             ProcessNotifications | Unknown => () // nothing to do
       }
     }
   }

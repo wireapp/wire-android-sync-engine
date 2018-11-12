@@ -28,7 +28,7 @@ import com.waz.service.UserService._
 import com.waz.service.assets.AssetService
 import com.waz.service.assets.AssetService.RawAssetInput
 import com.waz.service.conversation.SelectedConversationService
-import com.waz.service.push.PushService
+import com.waz.service.push.PushNotificationService
 import com.waz.sync.SyncServiceHandle
 import com.waz.sync.client.UserSearchClient.UserSearchEntry
 import com.waz.sync.client.{CredentialsUpdateClient, ErrorOr, UsersClient}
@@ -88,7 +88,7 @@ class UserServiceImpl(selfUserId:        UserId,
                       usersStorage:      UsersStorage,
                       membersStorage:    MembersStorage,
                       userPrefs:         UserPreferences,
-                      push:              PushService,
+                      push:              PushNotificationService,
                       assets:            AssetService,
                       usersClient:       UsersClient,
                       sync:              SyncServiceHandle,
@@ -330,7 +330,7 @@ object UserService {
   * wireless guest user. It then starts a countdown timer for the remaining duration of the life of the user, and at the
   * end of that timer, fires a sync request to trigger a BE check
   */
-class ExpiredUsersService(push:         PushService,
+class ExpiredUsersService(push:         PushNotificationService,
                           members:      MembersStorage,
                           users:        UserService,
                           usersStorage: UsersStorage,

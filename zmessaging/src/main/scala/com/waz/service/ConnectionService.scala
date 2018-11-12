@@ -28,7 +28,7 @@ import com.waz.model._
 import com.waz.service.ConnectionService._
 import com.waz.service.conversation.{ConversationsContentUpdater, NameUpdater}
 import com.waz.service.messages.MessagesService
-import com.waz.service.push.PushService
+import com.waz.service.push.PushNotificationService
 import com.waz.sync.SyncServiceHandle
 import com.waz.threading.Threading
 import com.waz.utils.events.EventContext
@@ -44,7 +44,7 @@ trait ConnectionService {
 
 class ConnectionServiceImpl(selfUserId:      UserId,
                             teamId:          Option[TeamId],
-                            push:            PushService,
+                            push:            PushNotificationService,
                             convsContent:    ConversationsContentUpdater,
                             convsStorage:    ConversationStorage,
                             members:         MembersStorage,

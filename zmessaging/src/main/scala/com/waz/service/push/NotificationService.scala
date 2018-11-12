@@ -60,7 +60,7 @@ class NotificationService(selfUserId:      UserId,
                           messages:        MessagesStorage,
                           storage:         NotificationStorage,
                           convs:           ConversationStorage,
-                          pushService:     PushService,
+                          pushService:     PushNotificationService,
                           uiController:    NotificationUiController,
                           clock:           Clock) {
 

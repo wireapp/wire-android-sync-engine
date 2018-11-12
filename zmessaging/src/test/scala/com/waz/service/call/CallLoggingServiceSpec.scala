@@ -23,7 +23,7 @@ import com.waz.service.call.Avs.AvsClosedReason
 import com.waz.service.call.CallInfo.CallState
 import com.waz.service.call.CallInfo.CallState._
 import com.waz.service.messages.MessagesService
-import com.waz.service.push.PushService
+import com.waz.service.push.PushNotificationService
 import com.waz.specs.AndroidFreeSpec
 import com.waz.threading.Threading
 import com.waz.utils.events.Signal
@@ -41,7 +41,7 @@ class CallLoggingServiceSpec extends AndroidFreeSpec {
 
   val calling   = mock[CallingService]
   val messages  = mock[MessagesService]
-  val push      = mock[PushService]
+  val push      = mock[PushNotificationService]
 
   val calls = Signal(Map.empty[ConvId, CallInfo]).disableAutowiring()
 

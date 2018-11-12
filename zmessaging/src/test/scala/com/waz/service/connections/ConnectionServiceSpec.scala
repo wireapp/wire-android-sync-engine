@@ -26,7 +26,7 @@ import com.waz.model._
 import com.waz.service._
 import com.waz.service.conversation.ConversationsContentUpdater
 import com.waz.service.messages.MessagesService
-import com.waz.service.push.PushService
+import com.waz.service.push.PushNotificationService
 import com.waz.specs.AndroidFreeSpec
 import com.waz.sync.SyncServiceHandle
 import com.waz.threading.SerialDispatchQueue
@@ -39,7 +39,7 @@ class ConnectionServiceSpec extends AndroidFreeSpec with Inside {
 
   implicit val executionContext = new SerialDispatchQueue(name = "ConnectionServiceAndroidFreeSpec")
 
-  val push            = mock[PushService]
+  val push            = mock[PushNotificationService]
   val teamId          = Option.empty[TeamId]
   val convs           = mock[ConversationsContentUpdater]
   val members         = mock[MembersStorage]

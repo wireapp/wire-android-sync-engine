@@ -28,7 +28,7 @@ import com.waz.model._
 import com.waz.model.otr.ClientId
 import com.waz.model.sync.ReceiptType
 import com.waz.service.assets.AssetService
-import com.waz.service.push.PushService
+import com.waz.service.push.PushNotificationService
 import com.waz.sync.SyncServiceHandle
 import com.waz.threading.CancellableFuture
 import com.waz.utils.crypto.ZSecureRandom
@@ -46,7 +46,7 @@ class EphemeralMessagesService(selfUserId: UserId,
                                storage:    MessagesStorage,
                                db:         ZmsDatabase,
                                sync:       SyncServiceHandle,
-                               push:       PushService,
+                               push:       PushNotificationService,
                                assets:     AssetService) {
   import EphemeralMessagesService._
   import com.waz.threading.Threading.Implicits.Background
