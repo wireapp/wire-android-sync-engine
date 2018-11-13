@@ -17,42 +17,47 @@
  */
 package com.waz.service.assets2
 
-import java.io.{ByteArrayInputStream, File, FileOutputStream}
+import java.io.{ ByteArrayInputStream, File, FileOutputStream }
 import java.net.URI
 
 import com.waz.log.ZLog2._
 import com.waz.ZLog.ImplicitTag._
-import com.waz.cache2.CacheService
-import com.waz.cache2.CacheService.{Encryption, NoEncryption}
-import com.waz.model.errors.NotFoundLocal
 import com.waz.service.assets2.Asset.General
-import com.waz.model.{AssetId, Sha256}
+import com.waz.model.errors.NotFoundLocal
+import com.waz.model.{ AssetId, Mime, Sha256 }
 import com.waz.sync.client.AssetClient2
 import com.waz.sync.client.AssetClient2.FileWithSha
 import com.waz.threading.CancellableFuture
-import com.waz.utils.{IoUtils, returning}
-import com.waz.{FilesystemUtils, ZIntegrationMockSpec}
+import com.waz.utils.{ returning, IoUtils }
+import com.waz.{ FilesystemUtils, ZIntegrationMockSpec }
 
 import scala.concurrent.Future
-import scala.util.{Failure, Random, Success}
+import scala.util.{ Failure, Random, Success }
 
 class AssetServiceSpec extends ZIntegrationMockSpec {
 
-  private val storage   = mock[AssetStorage]
-  private val cache     = mock[CacheService]
-  private val client    = mock[AssetClient2]
-  private val uriHelper = mock[UriHelper]
+  private val assetStorage        = mock[AssetStorage]
+  private val rawAssetStorage     = mock[RawAssetStorage]
+  private val assetDetailsService = mock[AssetDetailsService]
+  private val previewService      = mock[AssetPreviewService]
+  private val cache               = mock[AssetCache]
+  private val client              = mock[AssetClient2]
+  private val uriHelper           = mock[UriHelper]
 
   private val testAssetContent = returning(Array.ofDim[Byte](1024))(Random.nextBytes)
 
-  private val testAsset = Asset[BlobDetails.type](
+  private val testAsset = Asset(
     id = AssetId(),
     token = None,
     sha = Sha256.calculate(testAssetContent),
+    mime = Mime.Default,
     encryption = NoEncryption,
     localSource = None,
     preview = None,
+    name = "test_content",
+    size = testAssetContent.length,
     details = BlobDetails,
+    messageId = None,
     convId = None
   )
 
@@ -63,7 +68,8 @@ class AssetServiceSpec extends ZIntegrationMockSpec {
 
   verbose(l"Test asset: $testAsset")
 
-  private val service: AssetService = new AssetServiceImpl(storage, uriHelper, cache, client)
+  private val service: AssetService =
+    new AssetServiceImpl(assetStorage, rawAssetStorage, assetDetailsService, previewService, uriHelper, cache, client)
 
   feature("Assets") {
 
@@ -75,11 +81,14 @@ class AssetServiceSpec extends ZIntegrationMockSpec {
         FileWithSha(file, Sha256.calculate(testAssetContent))
       }
 
-      (storage.find _).expects(*).once().returns(Future.successful(None))
-      (storage.save _).expects(testAsset).once().returns(Future.successful(()))
-      (client.loadAssetContent _).expects(testAsset, *).once().returns(CancellableFuture.successful(Right(downloadAssetResult)))
-      (cache.putEncrypted _).expects(*, *).once().returns(Future.successful(()))
-      (cache.get(_: String)(_: Encryption)).expects(*, *).once().returns(Future.successful(new ByteArrayInputStream(testAssetContent)))
+      (assetStorage.find _).expects(*).once().returns(Future.successful(None))
+      (assetStorage.save _).expects(testAsset).once().returns(Future.successful(()))
+      (client.loadAssetContent _)
+        .expects(testAsset, *)
+        .once()
+        .returns(CancellableFuture.successful(Right(downloadAssetResult)))
+      (cache.put _).expects(*, *, *).once().returns(Future.successful(()))
+      (cache.getStream _).expects(*).once().returns(Future.successful(new ByteArrayInputStream(testAssetContent)))
 
       for {
         result <- service.loadContent(testAsset, callback = None)
@@ -97,11 +106,14 @@ class AssetServiceSpec extends ZIntegrationMockSpec {
         FileWithSha(file, Sha256.calculate(testAssetContent))
       }
 
-      (storage.find _).expects(*).once().returns(Future.successful(Some(testAsset)))
-      (cache.get(_: String)(_: Encryption)).expects(*, *).once().returns(Future.failed(NotFoundLocal("not found")))
-      (client.loadAssetContent _).expects(testAsset, *).once().returns(CancellableFuture.successful(Right(downloadAssetResult)))
-      (cache.putEncrypted _).expects(*, *).once().returns(Future.successful(()))
-      (cache.get(_: String)(_: Encryption)).expects(*, *).once().returns(Future.successful(new ByteArrayInputStream(testAssetContent)))
+      (assetStorage.find _).expects(*).once().returns(Future.successful(Some(testAsset)))
+      (cache.getStream _).expects(*).once().returns(Future.failed(NotFoundLocal("not found")))
+      (client.loadAssetContent _)
+        .expects(testAsset, *)
+        .once()
+        .returns(CancellableFuture.successful(Right(downloadAssetResult)))
+      (cache.put _).expects(*, *, *).once().returns(Future.successful(()))
+      (cache.getStream _).expects(*).once().returns(Future.successful(new ByteArrayInputStream(testAssetContent)))
 
       for {
         result <- service.loadContent(testAsset, callback = None)
@@ -112,8 +124,8 @@ class AssetServiceSpec extends ZIntegrationMockSpec {
     }
 
     scenario("load asset content if it exists in cache") {
-      (storage.find _).expects(*).once().returns(Future.successful(Some(testAsset)))
-      (cache.get(_: String)(_: Encryption)).expects(*, *).once().returns(Future.successful(new ByteArrayInputStream(testAssetContent)))
+      (assetStorage.find _).expects(*).once().returns(Future.successful(Some(testAsset)))
+      (cache.getStream _).expects(*).once().returns(Future.successful(new ByteArrayInputStream(testAssetContent)))
 
       for {
         result <- service.loadContent(testAsset, callback = None)
@@ -124,10 +136,16 @@ class AssetServiceSpec extends ZIntegrationMockSpec {
     }
 
     scenario("load asset content if it has not empty local source") {
-      val asset = testAsset.copy(localSource = Some(new URI("www.test")))
+      val asset =
+        testAsset.copy(localSource = Some(LocalSource(new URI("www.test"), Sha256.calculate(testAssetContent))))
 
-      (storage.find _).expects(*).once().returns(Future.successful(Some(asset)))
-      (uriHelper.openInputStream _).expects(*).twice().onCall({_: URI => Success(new ByteArrayInputStream(testAssetContent))})
+      (assetStorage.find _).expects(*).once().returns(Future.successful(Some(asset)))
+      (uriHelper.openInputStream _)
+        .expects(*)
+        .twice()
+        .onCall({ _: URI =>
+          Success(new ByteArrayInputStream(testAssetContent))
+        })
 
       for {
         result <- service.loadContent(asset, callback = None)
@@ -138,7 +156,8 @@ class AssetServiceSpec extends ZIntegrationMockSpec {
     }
 
     scenario("load asset content if it has not empty local source and we can not load content") {
-      val asset = testAsset.copy(localSource = Some(new URI("www.test")))
+      val asset =
+        testAsset.copy(localSource = Some(LocalSource(new URI("www.test"), Sha256.calculate(testAssetContent))))
       val testDir = FilesystemUtils.createDirectoryForTest()
       val downloadAssetResult = {
         val file = new File(testDir, "asset_content")
@@ -146,12 +165,15 @@ class AssetServiceSpec extends ZIntegrationMockSpec {
         FileWithSha(file, Sha256.calculate(testAssetContent))
       }
 
-      (storage.find _).expects(*).once().returns(Future.successful(Some(asset)))
+      (assetStorage.find _).expects(*).once().returns(Future.successful(Some(asset)))
       (uriHelper.openInputStream _).expects(*).once().returns(Failure(new IllegalArgumentException))
-      (storage.save _).expects(asset.copy(localSource = None)).once().returns(Future.successful(()))
-      (client.loadAssetContent _).expects(asset, *).once().returns(CancellableFuture.successful(Right(downloadAssetResult)))
-      (cache.putEncrypted _).expects(*, *).once().returns(Future.successful(()))
-      (cache.get(_: String)(_: Encryption)).expects(*, *).once().returns(Future.successful(new ByteArrayInputStream(testAssetContent)))
+      (assetStorage.save _).expects(asset.copy(localSource = None)).once().returns(Future.successful(()))
+      (client.loadAssetContent _)
+        .expects(asset, *)
+        .once()
+        .returns(CancellableFuture.successful(Right(downloadAssetResult)))
+      (cache.put _).expects(*, *, *).once().returns(Future.successful(()))
+      (cache.getStream _).expects(*).once().returns(Future.successful(new ByteArrayInputStream(testAssetContent)))
 
       for {
         result <- service.loadContent(asset, callback = None)
@@ -163,21 +185,27 @@ class AssetServiceSpec extends ZIntegrationMockSpec {
 
     scenario("load asset content if it has not empty local source but local source content has changed") {
       val testContentSha = Sha256.calculate(testAssetContent)
-      val asset = testAsset.copy(localSource = Some(new URI("www.test")), sha = testContentSha)
-      val testDir = FilesystemUtils.createDirectoryForTest()
+      val asset          = testAsset.copy(localSource = Some(LocalSource(new URI("www.test"), testContentSha)))
+      val testDir        = FilesystemUtils.createDirectoryForTest()
       val downloadAssetResult = {
         val file = new File(testDir, "asset_content")
         IoUtils.write(new ByteArrayInputStream(testAssetContent), new FileOutputStream(file))
         FileWithSha(file, testContentSha)
       }
 
-      (storage.find _).expects(*).once().returns(Future.successful(Some(asset)))
+      (assetStorage.find _).expects(*).once().returns(Future.successful(Some(asset)))
       //emulating file changing
-      (uriHelper.openInputStream _).expects(*).once().returns(Success(new ByteArrayInputStream(testAssetContent :+ 1.toByte)))
-      (storage.save _).expects(asset.copy(localSource = None)).once().returns(Future.successful(()))
-      (client.loadAssetContent _).expects(asset, *).once().returns(CancellableFuture.successful(Right(downloadAssetResult)))
-      (cache.putEncrypted _).expects(*, *).once().returns(Future.successful(()))
-      (cache.get(_: String)(_: Encryption)).expects(*, *).once().returns(Future.successful(new ByteArrayInputStream(testAssetContent)))
+      (uriHelper.openInputStream _)
+        .expects(*)
+        .once()
+        .returns(Success(new ByteArrayInputStream(testAssetContent :+ 1.toByte)))
+      (assetStorage.save _).expects(asset.copy(localSource = None)).once().returns(Future.successful(()))
+      (client.loadAssetContent _)
+        .expects(asset, *)
+        .once()
+        .returns(CancellableFuture.successful(Right(downloadAssetResult)))
+      (cache.put _).expects(*, *, *).once().returns(Future.successful(()))
+      (cache.getStream _).expects(*).once().returns(Future.successful(new ByteArrayInputStream(testAssetContent)))
 
       for {
         result <- service.loadContent(asset, callback = None)

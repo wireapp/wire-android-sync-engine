@@ -17,6 +17,7 @@
  */
 package com.waz.service
 
+import java.io.File
 import java.util.concurrent.Executors
 
 import android.content.{Context => AContext}
@@ -29,6 +30,7 @@ import com.waz.client.{RegistrationClient, RegistrationClientImpl}
 import com.waz.content._
 import com.waz.permissions.PermissionsService
 import com.waz.service.assets.{AudioTranscoder, GlobalRecordAndPlayService}
+import com.waz.service.assets2.GeneralFileCacheImpl
 import com.waz.service.call._
 import com.waz.service.downloads._
 import com.waz.service.images.{ImageLoader, ImageLoaderImpl}
@@ -160,6 +162,9 @@ class GlobalModuleImpl(val context:                 AContext,
   lazy val cacheCleanup                                          = wire[CacheCleaningService]
 
   lazy val accountsStorage:     AccountStorage                   = wire[AccountStorageImpl]
+
+  lazy val generalFileCache =
+    new GeneralFileCacheImpl(new File(context.getExternalCacheDir, s"general_cache"))(Threading.BlockingIO)
 
   lazy val teamsStorage:        TeamsStorage                     = wire[TeamsStorageImpl]
   lazy val recordingAndPlayback                                  = wire[GlobalRecordAndPlayService]

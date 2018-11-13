@@ -17,6 +17,8 @@
  */
 package com.waz
 
+import java.text.DecimalFormat
+
 import scala.language.experimental.macros
 import scala.reflect.macros.blackbox.Context
 import scala.annotation.tailrec
@@ -47,6 +49,13 @@ object ZLog {
   def verbose(message: String)(implicit tag: LogTag): Unit = macro ZLogMacros.verbose
 
   def logTime[A](message: String)(body: A)(implicit tag: LogTag): A = macro ZLogMacros.logTime[A]
+
+  def formatSize(size: Long): String = {
+    if (size <= 0) return "0"
+    val units       = Array[String]("B", "kB", "MB", "GB", "TB")
+    val digitGroups = (Math.log10(size) / Math.log10(1024)).toInt
+    new DecimalFormat("#,##0.#").format(size / Math.pow(1024, digitGroups)) + " " + units(digitGroups)
+  }
 }
 
 private object ZLogMacros {

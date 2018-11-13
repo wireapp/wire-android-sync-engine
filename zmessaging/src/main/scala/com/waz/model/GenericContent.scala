@@ -19,20 +19,18 @@ package com.waz.model
 
 
 import com.google.protobuf.nano.MessageNano
-import com.waz.cache2.CacheService.AES_CBC_Encryption
 import com.waz.model.AssetMetaData.Image.Tag
 import com.waz.model.AssetMetaData.Loudness
 import com.waz.model.AssetStatus.{DownloadFailed, UploadCancelled, UploadDone, UploadFailed, UploadInProgress, UploadNotStarted}
 import com.waz.model.nano.Messages
 import com.waz.model.nano.Messages.MessageEdit
-import com.waz.service.assets2
 import com.waz.service.assets2.Asset.{Audio, General, Image, Video}
-import com.waz.service.assets2.{RawAsset, UploadStatus, Asset => Asset2}
+import com.waz.service.assets2.{AES_CBC_Encryption, RawAsset, UploadStatus, Asset => Asset2}
 import com.waz.utils._
 import com.waz.utils.crypto.AESUtils
 import com.waz.utils.wrappers.URI
 import org.json.JSONObject
-import org.threeten.bp.{Instant, Duration => Dur}
+import org.threeten.bp.{Duration => Dur}
 
 import scala.collection.breakOut
 import scala.concurrent.duration._
@@ -672,8 +670,6 @@ object GenericContent {
   type Ephemeral = Messages.Ephemeral
 
   implicit object Ephemeral extends GenericContent[Ephemeral] {
-
-    import scala.concurrent.duration.DurationInt
 
     override def set(msg: GenericMessage): Ephemeral => GenericMessage = msg.setEphemeral
 

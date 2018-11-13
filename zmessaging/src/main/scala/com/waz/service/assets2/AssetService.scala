@@ -17,16 +17,13 @@
  */
 package com.waz.service.assets2
 
-import java.io.{ByteArrayInputStream, InputStream}
-import java.net.URI
+import java.io.{ByteArrayInputStream, FileInputStream, InputStream}
 
 import com.waz.ZLog.ImplicitTag._
 import com.waz.ZLog._
-import com.waz.cache2.CacheService
-import com.waz.cache2.CacheService.{Encryption, NoEncryption}
 import com.waz.model._
 import com.waz.model.errors._
-import com.waz.service.assets2.Asset.{General, RawGeneral, Video}
+import com.waz.service.assets2.Asset.{General, Video}
 import com.waz.sync.client.AssetClient2
 import com.waz.sync.client.AssetClient2.{AssetContent, Metadata, Retention}
 import com.waz.threading.CancellableFuture
@@ -50,14 +47,12 @@ trait AssetService {
 
 class AssetServiceImpl(assetsStorage: AssetStorage,
                        rawAssetStorage: RawAssetStorage,
-                       metadataService: AssetDetailsService,
+                       assetDetailsService: AssetDetailsService,
                        previewService: AssetPreviewService,
                        uriHelper: UriHelper,
-                       cache: CacheService,
+                       cache: AssetCache,
                        assetClient: AssetClient2)
                       (implicit ec: ExecutionContext) extends AssetService {
-
-  import AssetServiceImpl._
 
   private def loadFromBackend(asset: Asset[General], callback: Option[ProgressCallback]): CancellableFuture[InputStream] = {
     verbose(s"Load asset content from backend. $asset")
@@ -65,7 +60,7 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
       .flatMap {
         case Left(err) if err.code == ResponseCode.NotFound =>
           cache
-            .remove(cacheKey(asset))
+            .remove(asset.id)
             .flatMap(_ => CancellableFuture.failed(NotFoundRemote(s"Asset '$asset'")))
             .toCancellable
         case Left(err) =>
@@ -73,8 +68,8 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
         case Right(fileWithSha) if fileWithSha.sha256 != asset.sha =>
           CancellableFuture.failed(ValidationError(s"SHA256 is not equal. Asset: $asset"))
         case Right(fileWithSha) =>
-          cache.putEncrypted(cacheKey(asset), fileWithSha.file)
-            .flatMap(_ => cache.get(cacheKey(asset))(asset.encryption))
+          cache.put(asset.id, fileWithSha.file, removeOriginal = true)
+            .flatMap(_ => cache.getStream(asset.id).map(asset.encryption.decrypt))
             .toCancellable
       }
       .recoverWith { case err =>
@@ -85,7 +80,7 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
 
   private def loadFromCache(asset: Asset[General], callback: Option[ProgressCallback]): CancellableFuture[InputStream] = {
     verbose(s"Load asset content from cache. $asset")
-    cache.get(cacheKey(asset))(asset.encryption)
+    cache.getStream(asset.id).map(asset.encryption.decrypt)
       .recoverWith { case err =>
         verbose(s"Can not load asset content from cache. $err")
         Future.failed(err)
@@ -142,7 +137,7 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
       })
       _ <- CancellableFuture.lift(rawAssetStorage.update(rawAsset.id, _.copy(uploaded = 0, uploadStatus = UploadStatus.InProgress)))
       metadata = Metadata(rawAsset.public, rawAsset.retention)
-      is <- cache.get(cacheKey(rawAsset))(NoEncryption).toCancellable
+      is <- cache.getStream(rawAsset.id).toCancellable
       content = AssetContent(rawAsset.mime, () => is, Some(rawAsset.size)) //TODO Maybe AssetContent should take Future[InputStream]
       uploadCallback: ProgressCallback = (p: Progress) => {
         rawAssetStorage.save(rawAsset.copy(uploaded = p.progress))
@@ -160,8 +155,8 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
           } yield asset
       }).toCancellable
       _ <- CancellableFuture.lift(
-        if (asset.localSource.nonEmpty) cache.remove(cacheKey(rawAsset))
-        else cache.changeKey(cacheKey(rawAsset), cacheKey(asset))
+        if (asset.localSource.nonEmpty) cache.remove(rawAsset.id)
+        else cache.changeKey(rawAsset.id, asset.id)
       )
     } yield asset
   }
@@ -172,16 +167,16 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
       case _ => false
     }
 
-    if (!shouldAssetContainPreview) {
+    if (shouldAssetContainPreview) {
       for {
-        updatedRawAsset <- Future.successful(rawAsset.copy(preview = RawPreviewEmpty))
+        content <- previewService.extractPreview(rawAsset, cache.getStream(rawAsset.id).map(rawAsset.encryption.decrypt))
+        previewRawAsset <- createRawAsset(content, rawAsset.encryption, rawAsset.public, rawAsset.retention)
+        updatedRawAsset = rawAsset.copy(preview = RawPreviewNotUploaded(previewRawAsset.id))
         _ <- rawAssetStorage.save(updatedRawAsset)
       } yield updatedRawAsset
     } else {
       for {
-        content <- previewService.extractPreview(rawAsset, cache.get(cacheKey(rawAsset.id))(rawAsset.encryption))
-        previewRawAsset <- createRawAsset(content, rawAsset.encryption, rawAsset.public, rawAsset.retention)
-        updatedRawAsset = rawAsset.copy(preview = RawPreviewNotUploaded(previewRawAsset.id))
+        updatedRawAsset <- Future.successful(rawAsset.copy(preview = RawPreviewEmpty))
         _ <- rawAssetStorage.save(updatedRawAsset)
       } yield updatedRawAsset
     }
@@ -204,23 +199,16 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
                              retention: Retention,
                              messageId: Option[MessageId] = None): Future[RawAsset[General]] = {
     val rawAssetId = RawAssetId()
-    def extractDetails: Future[General] = {
-      val contentUri = content match {
-        case ContentForUpload.Bytes(_, _, bytes) => URI.create("????")
-        case ContentForUpload.Uri(_, _, uri) => uri
-      }
-      metadataService.extract(contentUri)
-    }
     def putContentInCacheGetSizeWithSha: Future[(Long, Sha256)] = {
       for {
         contentStream <- content match {
           case ContentForUpload.Bytes(_, _, bytes) => Future.successful(new ByteArrayInputStream(bytes))
           case ContentForUpload.Uri(_, _, uri) => Future.fromTry(uriHelper.openInputStream(uri))
+          case ContentForUpload.File(_, _, encrFile) => Future(encrFile.encryption.decrypt(new FileInputStream(encrFile.file)))
         }
-        rawAssetCacheKey = cacheKey(rawAssetId)
-        _ <- cache.put(rawAssetCacheKey, contentStream)(targetEncryption)
-        encryptedContentSize <- cache.getCacheEntrySize(rawAssetCacheKey)
-        encryptedContent <- cache.get(rawAssetCacheKey)(NoEncryption)
+        _ <- cache.putStream(rawAssetId, targetEncryption.encrypt(contentStream))
+        encryptedContentSize <- cache.getFileSize(rawAssetId)
+        encryptedContent <- cache.getStream(rawAssetId)
         encryptedContentSha <- Future.fromTry(Sha256.calculate(encryptedContent))
       } yield encryptedContentSize -> encryptedContentSha
     }
@@ -231,7 +219,7 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
         }
     }
 
-    (extractDetails zip createLocalSource zip putContentInCacheGetSizeWithSha)
+    (assetDetailsService.extract(content) zip createLocalSource zip putContentInCacheGetSizeWithSha)
       .map { case ((details, localSource), (encryptedContentSize, encryptedContentSha)) =>
         RawAsset(
           id = rawAssetId,
@@ -252,13 +240,5 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
         )
       }
   }
-
-}
-
-object AssetServiceImpl {
-
-  def cacheKey(asset: Asset[General]): String = "asset_" + asset.id.str
-  def cacheKey(asset: RawAsset[RawGeneral]): String = cacheKey(asset.id)
-  def cacheKey(id: RawAssetId): String = "raw_asset_" + id.str
 
 }

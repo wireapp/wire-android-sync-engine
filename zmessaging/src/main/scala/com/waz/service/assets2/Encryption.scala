@@ -17,15 +17,24 @@
  */
 package com.waz.service.assets2
 
-import java.io.InputStream
-import java.net.URI
+import java.io.{File, InputStream}
 
-import com.waz.model.Mime
+import com.waz.model.AESKey
+import com.waz.utils.crypto.AESUtils
 
-import scala.util.Try
-
-trait UriHelper {
-  def openInputStream(uri: URI): Try[InputStream]
-  def extractMime(uri: URI): Try[Mime]
-  def extractFileName(uri: URI): Try[String]
+trait Encryption {
+  def decrypt(is: InputStream): InputStream
+  def encrypt(os: InputStream): InputStream
 }
+
+case object NoEncryption extends Encryption {
+  override def decrypt(is: InputStream): InputStream = is
+  override def encrypt(is: InputStream): InputStream = is
+}
+
+case class AES_CBC_Encryption(key: AESKey) extends Encryption {
+  override def decrypt(is: InputStream): InputStream = AESUtils.decryptInputStream(key.bytes, is)
+  override def encrypt(is: InputStream): InputStream = AESUtils.encryptInputStream(key.bytes, is)
+}
+
+case class EncryptedFile(file: File, encryption: Encryption)

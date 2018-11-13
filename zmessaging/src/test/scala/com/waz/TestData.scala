@@ -15,17 +15,16 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-package com.waz.service.assets2
+package com.waz
 
-import java.io.InputStream
-import java.net.URI
+import scala.util.Random
 
-import com.waz.model.Mime
+object TestData {
 
-import scala.util.Try
+  def bytes(size: Int): Array[Byte] = {
+    val bytes = Array.ofDim[Byte](size)
+    new Random().nextBytes(bytes)
+    bytes
+  }
 
-trait UriHelper {
-  def openInputStream(uri: URI): Try[InputStream]
-  def extractMime(uri: URI): Try[Mime]
-  def extractFileName(uri: URI): Try[String]
 }

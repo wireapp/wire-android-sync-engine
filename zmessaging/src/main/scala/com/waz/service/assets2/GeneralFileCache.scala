@@ -17,15 +17,17 @@
  */
 package com.waz.service.assets2
 
-import java.io.InputStream
-import java.net.URI
+import java.io.File
 
-import com.waz.model.Mime
+import com.waz.cache2.{FileCache, SimpleFileCache}
 
-import scala.util.Try
+import scala.concurrent.ExecutionContext
 
-trait UriHelper {
-  def openInputStream(uri: URI): Try[InputStream]
-  def extractMime(uri: URI): Try[Mime]
-  def extractFileName(uri: URI): Try[String]
+trait GeneralFileCache extends FileCache[String]
+
+class GeneralFileCacheImpl(val cacheDirectory: File)
+                          (implicit val ec: ExecutionContext) extends SimpleFileCache[String] with GeneralFileCache {
+
+  override protected def createFileName(key: String): String = key
+
 }

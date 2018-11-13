@@ -23,13 +23,12 @@ import android.content.{ComponentCallbacks2, Context}
 import com.softwaremill.macwire._
 import com.waz.ZLog._
 import com.waz.api.ContentSearchQuery
-import com.waz.cache2.{CacheService, LruFileCacheServiceImpl}
 import com.waz.content.{MembersStorageImpl, UsersStorageImpl, ZmsDatabase, _}
 import com.waz.model._
 import com.waz.model.otr.ClientId
 import com.waz.service.EventScheduler.{Sequential, Stage}
 import com.waz.service.assets._
-import com.waz.service.assets2.AssetStorage
+import com.waz.service.assets2.{AssetCache, AssetCacheImpl, AssetStorage, GeneralFileCacheImpl}
 import com.waz.service.call._
 import com.waz.service.conversation._
 import com.waz.service.downloads.{AssetLoader, AssetLoaderImpl}
@@ -274,7 +273,7 @@ class ZMessaging(val teamId: Option[TeamId], val clientId: ClientId, account: Ac
   lazy val propertiesSyncHandler                      = wire[PropertiesSyncHandler]
   lazy val propertiesService: PropertiesService       = wire[PropertiesServiceImpl]
 
-  lazy val cacheService: CacheService = new LruFileCacheServiceImpl(
+  lazy val cacheService: AssetCache = new AssetCacheImpl(
     cacheDirectory = new File(context.getExternalCacheDir, s"assets_${selfUserId.str}"),
     directorySizeThreshold = 1024 * 1024 * 200,
     sizeCheckingInterval = 30.seconds

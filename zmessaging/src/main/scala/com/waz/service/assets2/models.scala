@@ -19,7 +19,6 @@ package com.waz.service.assets2
 
 import java.net.URI
 
-import com.waz.cache2.CacheService.Encryption
 import com.waz.model._
 import com.waz.sync.client.AssetClient2.Retention
 import com.waz.utils.Identifiable
@@ -32,7 +31,7 @@ sealed trait ContentForUpload {
 object ContentForUpload {
   case class Uri(override val mime: Mime, override val name: String, uri: URI)             extends ContentForUpload
   case class Bytes(override val mime: Mime, override val name: String, bytes: Array[Byte]) extends ContentForUpload
-//  case class BitmapInput(bitmap: Bitmap, orientation: Int = ExifInterface.ORIENTATION_NORMAL) extends ContentForUpload
+  case class File(override val mime: Mime, override val name: String, file: EncryptedFile) extends ContentForUpload
 }
 
 case class LocalSource(uri: URI, sha: Sha256)
@@ -130,3 +129,4 @@ case object Medium  extends ImageTag
 case object Empty   extends ImageTag
 
 case class Loudness(levels: Vector[Float])
+

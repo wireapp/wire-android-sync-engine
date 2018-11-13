@@ -17,13 +17,8 @@
  */
 package com.waz.service.assets2
 
-import java.net.URI
-
 import scala.concurrent.Future
 
 trait AssetDetailsService {
-  def extract(uri: URI): Future[AssetDetails]
-  def extractForImage(uri: URI, tag: ImageTag): Future[ImageDetails]
-  def extractForVideo(uri: URI): Future[VideoDetails]
-  def extractForAudio(uri: URI, bars: Int = 100): Future[AudioDetails]
+  def extract(content: ContentForUpload): Future[AssetDetails]
 }

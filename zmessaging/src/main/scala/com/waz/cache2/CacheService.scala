@@ -18,117 +18,165 @@
 package com.waz.cache2
 
 import java.io._
-import java.text.DecimalFormat
 
+import com.waz.ZLog
 import com.waz.ZLog.ImplicitTag._
 import com.waz.ZLog.verbose
-import com.waz.cache2.CacheService.Encryption
-import com.waz.model.AESKey
 import com.waz.model.errors.{FailedExpectationsError, FileSystemError, NotFoundLocal, ZError}
 import com.waz.utils.IoUtils
-import com.waz.utils.crypto.AESUtils
 import com.waz.utils.events._
 
 import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{ExecutionContext, Future}
 
-trait CacheService {
-  implicit def ec: ExecutionContext
+trait FileCache[K] {
+  def exists(key: K): Future[Boolean]
+  def remove(key: K): Future[Unit]
 
-  protected def getOutputStream(key: String): OutputStream
-  protected def getInputStream(key: String): Option[InputStream]
+  def put(key: K, file: File, removeOriginal: Boolean = false): Future[Unit]
+  def putStream(key: K, in: InputStream): Future[Unit]
+  def putBytes(key: K, bytes: Array[Byte]): Future[Unit]
 
-  def putEncrypted(key: String, file: File): Future[Unit]
-  def remove(key: String): Future[Unit]
-  def getCacheEntrySize(key: String): Future[Long]
-  def changeKey(oldKey: String, newKey: String): Future[Unit]
+  def find(key: K): Future[Option[File]]
+  def findStream(key: K): Future[Option[InputStream]]
+  def findBytes(key: K): Future[Option[Array[Byte]]]
 
-  def find(key: String)(encryption: Encryption): Future[Option[InputStream]] =
-    Future(getInputStream(key).map(encryption.decrypt))
-  def get(key: String)(encryption: Encryption): Future[InputStream] =
-    failedIfEmpty(key, find(key)(encryption))
-  def put(key: String, in: InputStream)(encryption: Encryption): Future[Unit] =
-    Future(IoUtils.copy(in, encryption.encrypt(getOutputStream(key))))
+  def get(key: K): Future[File]
+  def getStream(key: K): Future[InputStream]
+  def getBytes(key: K): Future[Array[Byte]]
 
-  def findBytes(key: String)(encryption: Encryption): Future[Option[Array[Byte]]] =
-    find(key)(encryption).map(_.map(IoUtils.toByteArray))
-  def getBytes(key: String)(encryption: Encryption): Future[Array[Byte]] =
-    failedIfEmpty(key, findBytes(key)(encryption))
-  def putBytes(key: String, bytes: Array[Byte])(encryption: Encryption): Future[Unit] =
-    put(key, new ByteArrayInputStream(bytes))(encryption)
+  def getFileSize(key: K): Future[Long]
+  def createEmptyFile(key: K): Future[File]
+  def changeKey(oldKey: K, newKey: K): Future[Unit]
+}
 
-  protected def failedIfEmpty[T](key: String, value: Future[Option[T]]): Future[T] =
+abstract class BaseFileCache[K] extends FileCache[K] {
+  import BaseFileCache._
+
+  protected implicit def ec: ExecutionContext
+
+  protected def failedIfEmpty[T](key: K, value: Future[Option[T]]): Future[T] =
     value.flatMap {
       case Some(is) => Future.successful(is)
-      case None => Future.failed(CacheService.keyNotFoundError(key))
+      case None => Future.failed(keyNotFoundError(createFileName(key)))
     }
+
+  protected def createFileName(key: K): String
+  protected def createFile(key: K): File
+
+  protected def getOperationHook(key: K, targetFile: File): Unit = ()
+  protected def putOperationHook(key: K, targetFile: File): Unit = ()
+
+  override def exists(key: K): Future[Boolean] =
+    Future { createFile(key).exists() }
+
+  override def put(key: K, file: File, removeOriginal: Boolean = false): Future[Unit] =
+    Future {
+      val targetFile = createFile(key)
+      if (removeOriginal) file.renameTo(targetFile)
+      else IoUtils.copy(file, targetFile)
+      putOperationHook(key, targetFile)
+    }
+
+  override def putStream(key: K, in: InputStream): Future[Unit] =
+    Future {
+      val targetFile = createFile(key)
+      IoUtils.copy(in, targetFile)
+      putOperationHook(key, targetFile)
+    }
+
+  override def putBytes(key: K, bytes: Array[Byte]): Future[Unit] =
+    putStream(key, new ByteArrayInputStream(bytes))
+
+  override def find(key: K): Future[Option[File]] =
+    Future {
+      val targetFile = createFile(key)
+      getOperationHook(key, targetFile)
+      if (!targetFile.exists()) None
+      else Some(targetFile)
+    }
+
+  override def get(key: K): Future[File] =
+    failedIfEmpty(key, find(key))
+
+  override def findStream(key: K): Future[Option[InputStream]] =
+    find(key).map(_.map(new FileInputStream(_)))
+
+  override def getStream(key: K): Future[InputStream] =
+    failedIfEmpty(key, findStream(key))
+
+  override def findBytes(key: K): Future[Option[Array[Byte]]] =
+    findStream(key).map(_.map(IoUtils.toByteArray))
+
+  override def getBytes(key: K): Future[Array[Byte]] =
+    failedIfEmpty(key, findBytes(key))
+
+  override def remove(key: K): Future[Unit] =
+    Future { createFile(key).delete() }
+
+  override def getFileSize(key: K): Future[Long] =
+    Future { createFile(key).length() }
+
+  override def createEmptyFile(key: K): Future[File] =
+    for {
+      targetFile <- Future(createFile(key))
+      _ <- if (targetFile.exists()) Future.failed(keyAlreadyExistError(createFileName(key)))
+           else Future.successful(targetFile.createNewFile())
+    } yield targetFile
+
+  override def changeKey(oldKey: K, newKey: K): Future[Unit] =
+    for {
+      oldFile <- Future(createFile(oldKey))
+      _ <- if (oldFile.exists()) Future.successful(()) else Future.failed(keyNotFoundError(createFileName(oldKey)))
+      newFile = createFile(newKey)
+      _ <- if (newFile.exists()) Future.failed(keyAlreadyExistError(createFileName(newKey))) else Future.successful(())
+      renamingResult = oldFile.renameTo(newFile)
+      _ <- if (renamingResult) Future.successful(()) else Future.failed(FileSystemError(s"Can not rename $oldFile to $newFile"))
+    } yield ()
 
 }
 
-object CacheService {
+object BaseFileCache {
+
+  trait Key[T] {
+    def fileName(value: T): String
+  }
 
   def keyNotFoundError(key: String): ZError =
     NotFoundLocal(s"Cache with key = '$key' not found.")
   def keyAlreadyExistError(key: String): ZError =
     FailedExpectationsError(s"Cache with key = '$key' already exist.")
 
-  trait Encryption {
-    def decrypt(is: InputStream): InputStream
-    def encrypt(os: OutputStream): OutputStream
-  }
-
-  case object NoEncryption extends Encryption {
-    override def decrypt(is: InputStream): InputStream   = is
-    override def encrypt(os: OutputStream): OutputStream = os
-  }
-
-  case class AES_CBC_Encryption(key: AESKey) extends Encryption {
-    override def decrypt(is: InputStream): InputStream   = AESUtils.inputStream(key, is)
-    override def encrypt(os: OutputStream): OutputStream = AESUtils.outputStream(key, os)
-  }
-
 }
 
-object LoggingUtils {
+abstract class LruFileCache[K] extends BaseFileCache[K] {
 
-  def formatSize(size: Long): String = {
-    if (size <= 0) return "0"
-    val units       = Array[String]("B", "kB", "MB", "GB", "TB")
-    val digitGroups = (Math.log10(size) / Math.log10(1024)).toInt
-    new DecimalFormat("#,##0.#").format(size / Math.pow(1024, digitGroups)) + " " + units(digitGroups)
-  }
+  protected def cacheDirectory: File
+  protected def directorySizeThreshold: Long
+  protected def sizeCheckingInterval: FiniteDuration
 
-}
-
-class LruFileCacheServiceImpl(
-    cacheDirectory: File,
-    directorySizeThreshold: Long,
-    sizeCheckingInterval: FiniteDuration
-)(implicit override val ec: ExecutionContext, ev: EventContext)
-    extends CacheService {
-
-  import CacheService._
+  protected implicit def ev: EventContext
 
   private val directorySize: SourceSignal[Long] = Signal()
   directorySize
     .throttle(sizeCheckingInterval)
     .filter { size =>
-      verbose(s"Current cache size: ${LoggingUtils.formatSize(size)}")
+      verbose(s"Current cache size: ${ZLog.formatSize(size)}")
       size > directorySizeThreshold
     } { size =>
       var shouldBeCleared = size - directorySizeThreshold
-      verbose(s"Cache directory size threshold reached. Current size: ${LoggingUtils.formatSize(size)}. " +
-        s"Should be cleared: ${LoggingUtils.formatSize(shouldBeCleared)}")
+      verbose(s"Cache directory size threshold reached. Current size: ${ZLog.formatSize(size)}. " +
+        s"Should be cleared: ${ZLog.formatSize(shouldBeCleared)}")
       cacheDirectory
         .listFiles()
         .sortBy(_.lastModified())
         .takeWhile { file =>
           val fileSize = file.length()
           if (file.delete()) {
-            verbose(s"File '${file.getName}' removed. Cleared ${LoggingUtils.formatSize(fileSize)}.")
+            verbose(s"File '${file.getName}' removed. Cleared ${ZLog.formatSize(fileSize)}.")
             shouldBeCleared -= fileSize
           } else {
-            verbose(s"File '${file.getName}' can not be removed. Not cleared ${LoggingUtils.formatSize(fileSize)}.")
+            verbose(s"File '${file.getName}' can not be removed. Not cleared ${ZLog.formatSize(fileSize)}.")
           }
           shouldBeCleared > 0
         }
@@ -139,45 +187,22 @@ class LruFileCacheServiceImpl(
   private def updateDirectorySize(): Unit =
     Future(cacheDirectory.listFiles().foldLeft(0L)(_ + _.length())).foreach(size => directorySize ! size)
 
-  private def getFile(key: String): File = new File(cacheDirectory, key)
+  override protected def createFile(key: K): File =
+    new File(cacheDirectory, createFileName(key))
 
-  override protected def getOutputStream(key: String): OutputStream = {
-    val file = getFile(key)
-    file.createNewFile()
-    new FileOutputStream(file)
-  }
+  override protected def getOperationHook(key: K, targetFile: File): Unit =
+    if (targetFile.exists()) targetFile.setLastModified(System.currentTimeMillis())
 
-  override protected def getInputStream(key: String): Option[InputStream] = {
-    val file = getFile(key)
-    if (file.exists()) {
-      file.setLastModified(System.currentTimeMillis())
-      Some(new FileInputStream(file))
-    } else None
-  }
-
-  override def put(key: String, in: InputStream)(encryption: Encryption): Future[Unit] =
-    super.put(key, in)(encryption).map(_ => updateDirectorySize())
-
-  override def remove(key: String): Future[Unit] = Future { getFile(key).delete() }
-
-  override def getCacheEntrySize(key: String): Future[Long] = Future { getFile(key).length() }
-
-  override def putEncrypted(key: String, file: File): Future[Unit] = Future {
-    val targetFile = new File(cacheDirectory, key)
-    if (targetFile.exists()) targetFile.delete()
-    file.setLastModified(System.currentTimeMillis())
-    file.renameTo(targetFile)
+  override protected def putOperationHook(key: K, targetFile: File): Unit =
     updateDirectorySize()
-  }
 
-  override def changeKey(oldKey: String, newKey: String): Future[Unit] =
-    for {
-      oldFile <- Future(getFile(oldKey))
-      _ <- if (oldFile.exists()) Future.successful(()) else Future.failed(keyNotFoundError(oldKey))
-      newFile = getFile(newKey)
-      _ <- if (newFile.exists()) Future.failed(keyAlreadyExistError(newKey)) else Future.successful(())
-      renamingResult = oldFile.renameTo(newFile)
-      _ <- if (renamingResult) Future.successful(()) else Future.failed(FileSystemError(s"Can not rename $oldFile to $newFile"))
-    } yield ()
+}
+
+abstract class SimpleFileCache[K] extends BaseFileCache[K] {
+
+  protected def cacheDirectory: File
+
+  override protected def createFile(key: K): File =
+    new File(cacheDirectory, createFileName(key))
 
 }

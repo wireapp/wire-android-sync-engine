@@ -23,9 +23,8 @@ import com.waz.{AuthenticationConfig, ZIntegrationSpec}
 import com.waz.ZLog.ImplicitTag._
 import com.waz.ZLog.verbose
 import com.waz.api.impl.ErrorResponse
-import com.waz.cache2.CacheService.NoEncryption
 import com.waz.model.{AssetId, Mime, Sha256}
-import com.waz.service.assets2.{Asset, BlobDetails}
+import com.waz.service.assets2.{Asset, BlobDetails, NoEncryption}
 import com.waz.sync.client.AssetClient.FileWithSha
 import com.waz.sync.client.AssetClient2.{AssetContent, Metadata, Retention, UploadResponse2}
 import com.waz.utils.returning
@@ -46,10 +45,14 @@ class AssetClient2Spec extends ZIntegrationSpec with AuthenticationConfig {
       id = AssetId(response.key.str),
       token = response.token,
       sha = Sha256.calculate(testAssetContent),
+      mime = Mime.Default,
       encryption = NoEncryption,
       localSource = None,
       preview = None,
+      name = "test_content",
+      size = testAssetContent.length,
       details = BlobDetails,
+      messageId = None,
       convId = None
     )
   }

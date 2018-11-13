@@ -36,11 +36,10 @@ object Codec {
 trait StorageCodecs {
   import java.net.URI
 
-  import com.waz.cache2.CacheService.{ AES_CBC_Encryption, Encryption, NoEncryption }
-  import com.waz.model.{ AESKey, AssetId, AssetToken, Sha256 }
+  import com.waz.model.{AESKey, AssetId, AssetToken, Sha256}
   import io.circe.parser._
   import io.circe.syntax._
-  import io.circe.{ Decoder, Encoder }
+  import io.circe.{Decoder, Encoder}
 
   implicit val EncryptionCodec: Codec[Encryption, String] = new Codec[Encryption, String] {
     val Unencrypted    = ""

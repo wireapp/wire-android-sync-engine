@@ -20,10 +20,13 @@ package com.waz.utils
 import java.io.InputStream
 import java.net.URI
 
+import com.waz.model.Mime
 import com.waz.service.assets2.UriHelper
 
 import scala.util.Try
 
 class TestUriHelper extends UriHelper {
   override def openInputStream(uri: URI): Try[InputStream] = Try { uri.toURL.openStream() }
+  override def extractMime(uri: URI): Try[Mime] = ???
+  override def extractFileName(uri: URI): Try[String] = ???
 }
