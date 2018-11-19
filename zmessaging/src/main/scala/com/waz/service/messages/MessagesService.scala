@@ -106,7 +106,7 @@ class MessagesServiceImpl(selfUserId:   UserId,
         Future successful None
       case Some(msg) if msg.canRecall(convId, userId) =>
         updater.deleteOnUserRequest(Seq(msgId)) flatMap { _ =>
-          val recall = MessageData(systemMsgId, convId, Message.Type.RECALLED, time = msg.time, editTime = time max msg.time, userId = userId, state = state, protos = Seq(GenericMessage(systemMsgId.uid, MsgRecall(msgId))))
+          val recall = MessageData(systemMsgId, convId, Message.Type.RECALLED, remoteTime = Option(msg.time), editTime = time max msg.time, userId = userId, state = state, protos = Seq(GenericMessage(systemMsgId.uid, MsgRecall(msgId))))
           if (userId == selfUserId) Future successful Some(recall) // don't save system message for self user
           else updater.addMessage(recall)
         }
@@ -131,7 +131,7 @@ class MessagesServiceImpl(selfUserId:   UserId,
       }
 
     gm match {
-      case GenericMessage(newId, MsgEdit(oldId, Text(text, mentions, links, quote))) =>
+      case GenericMessage(newId, MsgEdit(oldId, Text(text, mentions, links, _))) =>
 
         def applyEdit(msg: MessageData) = {
           val newMsgId = MessageId(newId.str)
@@ -246,13 +246,12 @@ class MessagesServiceImpl(selfUserId:   UserId,
   }
 
   override def addTimerChangedMessage(convId: ConvId, from: UserId, duration: Option[FiniteDuration], time: RemoteInstant) =
-    updater.addLocalMessage(MessageData(MessageId(), convId, Message.Type.MESSAGE_TIMER, from, time = time, duration = duration)).map(_ => {})
+    updater.addLocalMessage(MessageData(MessageId(), convId, Message.Type.MESSAGE_TIMER, from, remoteTime = Option(time), duration = duration)).map(_ => {})
 
   override def addConnectRequestMessage(convId: ConvId, fromUser: UserId, toUser: UserId, message: String, name: String, fromSync: Boolean = false) = {
     val msg = MessageData(
-      MessageId(), convId, Message.Type.CONNECT_REQUEST, fromUser, content = MessageData.textContent(message), name = Some(name), recipient = Some(toUser),
-      //time = if (fromSync) RemoteInstant.Epoch else now(clock))
-      time = RemoteInstant.Epoch )
+      MessageId(), convId, Message.Type.CONNECT_REQUEST, fromUser, content = MessageData.textContent(message), name = Some(name), recipient = Some(toUser), remoteTime = Some(RemoteInstant.Epoch)
+    )
 
     if (fromSync) storage.insert(msg) else updater.addLocalMessage(msg)
   }
@@ -265,7 +264,7 @@ class MessagesServiceImpl(selfUserId:   UserId,
   override def addDeviceStartMessages(convs: Seq[ConversationData], selfUserId: UserId): Future[Set[MessageData]] =
     Serialized.future('addDeviceStartMessages)(traverse(convs filter isGroupOrOneToOne) { conv =>
       storage.getLastMessage(conv.id) map {
-        case None =>    Some(MessageData(MessageId(), conv.id, Message.Type.STARTED_USING_DEVICE, selfUserId, time = RemoteInstant.Epoch))
+        case None =>    Some(MessageData(MessageId(), conv.id, Message.Type.STARTED_USING_DEVICE, selfUserId, remoteTime = Some(RemoteInstant.Epoch)))
         case Some(_) => None
       }
     } flatMap { msgs =>
@@ -279,7 +278,7 @@ class MessagesServiceImpl(selfUserId:   UserId,
     traverseSequential(cs) { conv =>
       storage.getLastMessage(conv.id) map {
         case Some(msg) if msg.msgType != Message.Type.STARTED_USING_DEVICE =>
-          Some(MessageData(MessageId(), conv.id, Message.Type.HISTORY_LOST, selfUserId, time = msg.time + 1.millis))
+          Some(MessageData(MessageId(), conv.id, Message.Type.HISTORY_LOST, selfUserId, remoteTime = Some(msg.time + 1.millis)))
         case _ =>
           // conversation has no messages or has STARTED_USING_DEVICE msg,
           // it means that conv was just created and we don't need to add history lost msg
@@ -386,7 +385,7 @@ class MessagesServiceImpl(selfUserId:   UserId,
 
   def messageSent(convId: ConvId, msgId: MessageId, newTime: RemoteInstant): Future[Option[MessageData]] = {
     import com.waz.utils.RichFiniteDuration
-    updater.updateMessage(msgId) { m => m.copy(state = Message.Status.SENT, time = newTime, expiryTime = m.ephemeral.map(_.fromNow())) } andThen {
+    updater.updateMessage(msgId) { m => m.copy(state = Message.Status.SENT, remoteTime = Some(newTime), expiryTime = m.ephemeral.map(_.fromNow())) } andThen {
       case Success(Some(m)) => storage.onMessageSent ! m
     }
   }
@@ -400,10 +399,10 @@ class MessagesServiceImpl(selfUserId:   UserId,
     }
 
   override def addMissedCallMessage(convId: ConvId, from: UserId, time: RemoteInstant): Future[Option[MessageData]] =
-    updater.addMessage(MessageData(MessageId(), convId, Message.Type.MISSED_CALL, from, time = time))
+    updater.addMessage(MessageData(MessageId(), convId, Message.Type.MISSED_CALL, from, remoteTime = Some(time)))
 
   override def addSuccessfulCallMessage(convId: ConvId, from: UserId, time: RemoteInstant, duration: FiniteDuration) =
-    updater.addMessage(MessageData(MessageId(), convId, Message.Type.SUCCESSFUL_CALL, from, time = time, duration = Some(duration)))
+    updater.addMessage(MessageData(MessageId(), convId, Message.Type.SUCCESSFUL_CALL, from, remoteTime = Some(time), duration = Some(duration)))
 
   def messageDeliveryFailed(convId: ConvId, msg: MessageData, error: ErrorResponse): Future[Option[MessageData]] =
     updateMessageState(convId, msg.id, Message.Status.FAILED) andThen {

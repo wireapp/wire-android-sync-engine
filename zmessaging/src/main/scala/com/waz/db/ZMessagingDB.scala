@@ -52,7 +52,7 @@ class ZMessagingDB(context: Context, dbName: String) extends DaoDB(context.getAp
 }
 
 object ZMessagingDB {
-  val DbVersion = 112
+  val DbVersion = 113
 
   lazy val daos = Seq (
     UserDataDao, SearchQueryCacheDao, AssetDataDao, ConversationDataDao,
@@ -264,6 +264,35 @@ object ZMessagingDB {
     },
     Migration(111, 112) { db =>
       db.execSQL("ALTER TABLE Conversations ADD COLUMN unread_quote_count INTEGER DEFAULT 0")
+    },
+    Migration(112, 113) { db =>
+      db.execSQL(
+        """
+          | CREATE TABLE MessagesCopy (
+          | _id TEXT PRIMARY KEY,
+          | conv_id TEXT, msg_type TEXT, user_id TEXT, content TEXT, protos BLOB, remote_time INTEGER, local_time INTEGER,
+          | first_msg INTEGER, members TEXT, recipient TEXT, email TEXT, name TEXT, msg_state TEXT, content_size INTEGER,
+          | edit_time INTEGER, ephemeral INTEGER, expiry_time INTEGER, expired INTEGER, duration INTEGER
+          | );
+        """.stripMargin)
+      db.execSQL(
+        """
+          |INSERT INTO MessagesCopy(
+          | _id,
+          |_id TEXT PRIMARY KEY,
+          | conv_id, msg_type, user_id, content, protos, remote_time, local_time,
+          | first_msg, members, recipient, email, name, msg_state, content_size,
+          | edit_time, ephemeral, expiry_time, expired, duration
+          | )
+          | SELECT
+          | _id,
+          | conv_id, msg_type, user_id, content, protos, time, local_time,
+          | first_msg, members, recipient, email, name, msg_state, content_size,
+          | edit_time, ephemeral, expiry_time, expired, duration
+          | FROM Messages;
+        """.stripMargin)
+      db.execSQL("DROP TABLE Messages;")
+      db.execSQL("ALTER TABLE MessagesCopy RENAME TO Messages;")
     }
   )
 }

@@ -218,14 +218,12 @@ class NotificationService(context:         Context,
 
       msgs.flatMap(msg =>
         mapMessageType(msg.msgType, msg.protos, msg.members, msg.userId).map { tp =>
-          val drift: bp.Duration = pushService.beDrift.currentValue.getOrElse(Duration.Zero)
-
           NotificationData(
             NotId(msg.id),
             if (msg.isEphemeral) "" else msg.contentString, msg.convId,
             msg.userId,
             tp,
-            if (msg.time == RemoteInstant.Epoch) msg.localTime.toRemote(drift) else msg.time,
+            msg.time,
             ephemeral = msg.isEphemeral,
             mentions = msg.mentions.flatMap(_.userId),
             isQuote = msg.quote.exists(quoteIds)

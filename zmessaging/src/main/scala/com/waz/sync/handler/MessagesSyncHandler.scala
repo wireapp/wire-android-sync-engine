@@ -114,8 +114,7 @@ class MessagesSyncHandler(selfUserId: UserId,
             verbose(s"postOtrMessage($msg) successful $time")
             for {
               _ <- service.messageSent(convId, msg.id, time)
-              (prevLastTime, lastTime) <- msgContent.updateLocalMessageTimes(convId, msg.time, time)
-                .map(_.lastOption.map { case (p, c) => (p.time, c.time)}.getOrElse((msg.time, time)))
+              (prevLastTime, lastTime) <- msgContent.updateLocalMessageTimes(convId, msg.time, time).map(_.lastOption.map { case (p, c) => (p.time, c.time)}.getOrElse((msg.time, time)))
               // update conv lastRead time if there is no unread message after the message that was just sent
               _ <- convs.storage.update(convId, c => if (!c.lastRead.isAfter(prevLastTime)) c.copy(lastRead = lastTime) else c)
               _ <- convs.updateLastEvent(convId, time)
@@ -167,9 +166,9 @@ class MessagesSyncHandler(selfUserId: UserId,
           // delete original message and create new message with edited content
           service.applyMessageEdit(conv.id, msg.userId, RemoteInstant(time.instant), gm) map {
             case Some(m) => Right(m)
-            case _ => Right(msg.copy(time = RemoteInstant(time.instant)))
+            case _ => Right(msg.copy(remoteTime = Some(RemoteInstant(time.instant))))
           }
-        case Right(time) => successful(Right(msg.copy(time = time)))
+        case Right(time) => successful(Right(msg.copy(remoteTime = Some(time))))
         case Left(err) => successful(Left(err))
       }
     }
@@ -214,9 +213,9 @@ class MessagesSyncHandler(selfUserId: UserId,
       val proto = GenericMessage(msg.id.uid, msg.ephemeral, Proto.Asset(asset, preview))
       CancellableFuture.lift(otrSync.postOtrMessage(conv.id, proto).flatMap {
         case Right(time) =>
-          val updateTime = origTime.getOrElse(time)
-          verbose(s"posted asset message for: $asset, with update time: $updateTime (origTime: $origTime)")
-          msgContent.updateMessage(msg.id)(_.copy(protos = Seq(proto), time = updateTime)).map(_ => Right(updateTime))
+          val newTime = origTime.getOrElse(time)
+          verbose(s"posted asset message for: $asset, with update time: $newTime (origTime: $origTime)")
+          msgContent.updateMessage(msg.id)(_.copy(protos = Seq(proto), remoteTime = Some(newTime))).map(_ => Right(newTime))
         case Left(err) =>
           warn(s"posting asset message failed: $err")
           Future.successful(Left(err))

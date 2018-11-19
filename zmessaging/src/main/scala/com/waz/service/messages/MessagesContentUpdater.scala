@@ -79,7 +79,7 @@ class MessagesContentUpdater(messagesStorage: MessagesStorage,
       for {
         time <- remoteTimeAfterLast(msg.convId) //TODO: can we find a way to save this only on the localTime of the message?
         exp  <- expiration
-        m = returning(msg.copy(state = state, time = time, localTime = localTime, ephemeral = exp)) { m =>
+        m = returning(msg.copy(state = state, remoteTime = Some(time), localTime = localTime, ephemeral = exp)) { m =>
           verbose(s"addLocalMessage: $m, exp: $exp, time: $time")
         }
         res <- messagesStorage.addMessage(m)
@@ -90,7 +90,7 @@ class MessagesContentUpdater(messagesStorage: MessagesStorage,
     verbose(s"addLocalSentMessage: $msg")
     time.fold(lastSentEventTime(msg.convId))(Future.successful).flatMap { t =>
       verbose(s"adding local sent message to storage, $t")
-      messagesStorage.addMessage(msg.copy(state = Status.SENT, time = t + 1.millis, localTime = LocalInstant.Now))
+      messagesStorage.addMessage(msg.copy(state = Status.SENT, remoteTime = Some(t + 1.millis), localTime = LocalInstant.Now))
     }
   }
 
@@ -191,7 +191,7 @@ class MessagesContentUpdater(messagesStorage: MessagesStorage,
         verbose(s"mergeMatching, prev: $prev, with new $msg")
         val u = prev.copy(
           msgType       = if (msg.msgType != Message.Type.UNKNOWN) msg.msgType else prev.msgType ,
-          time          = if (msg.time.isBefore(prev.time) || prev.isLocal) msg.time else prev.time,
+          remoteTime    = Option(if (msg.time.isBefore(prev.time) || prev.isLocal) msg.time else prev.time),
           protos        = prev.protos ++ msg.protos,
           content       = msg.content,
           quote         = msg.quote,
@@ -233,7 +233,7 @@ class MessagesContentUpdater(messagesStorage: MessagesStorage,
       verbose(s"local messages from $prevTime: $local")
       messagesStorage updateAll2(local.map(_.id), { m =>
         verbose(s"try updating local message time, msg: $m, time: $time")
-        if (m.isLocal) m.copy(time = time + (m.time.toEpochMilli - prevTime.toEpochMilli).millis) else m
+        if (m.isLocal) m.copy(remoteTime = Some(time + (m.time.toEpochMilli - prevTime.toEpochMilli).millis)) else m
       })
     }
 }

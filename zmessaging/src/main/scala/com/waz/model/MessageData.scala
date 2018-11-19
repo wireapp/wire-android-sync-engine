@@ -17,6 +17,9 @@
  */
 package com.waz.model
 
+import java.nio.ByteBuffer
+import java.nio.charset.Charset
+
 import android.database.DatabaseUtils.queryNumEntries
 import android.database.sqlite.SQLiteQueryBuilder
 import com.waz.ZLog.ImplicitTag._
@@ -26,20 +29,16 @@ import com.waz.api.Message.Type._
 import com.waz.api.{Message, TypeFilter}
 import com.waz.db.Col._
 import com.waz.db.Dao
-import com.waz.model.ConversationData.ConversationDataDao
 import com.waz.model.GenericContent.{Asset, ImageAsset, LinkPreview, Location, MsgEdit, Quote, Text}
 import com.waz.model.GenericMessage.{GenericMessageContent, TextMessage}
 import com.waz.model.MessageData.MessageState
 import com.waz.model.messages.media.{MediaAssetData, MediaAssetDataProtocol}
-import com.waz.service.ZMessaging.clock
+import com.waz.service.ZMessaging.currentBeDrift
 import com.waz.service.media.{MessageContentBuilder, RichMediaContentParser}
 import com.waz.sync.client.OpenGraphClient.OpenGraphData
 import com.waz.utils.wrappers.{DB, DBCursor, URI}
 import com.waz.utils.{EnumCodec, JsonDecoder, JsonEncoder, returning}
 import org.json.{JSONArray, JSONObject}
-import org.threeten.bp.Instant.now
-import java.nio.ByteBuffer
-import java.nio.charset.Charset
 
 import scala.collection.breakOut
 import scala.concurrent.duration._
@@ -56,8 +55,8 @@ case class MessageData(id:            MessageId              = MessageId(),
                        email:         Option[String]         = None,
                        name:          Option[String]         = None,
                        state:         MessageState           = Message.Status.SENT,
-                       time:          RemoteInstant          = RemoteInstant(now(clock)), //TODO: now is local...
-                       localTime:     LocalInstant           = LocalInstant.Epoch,
+           private val remoteTime:    Option[RemoteInstant]  = None,
+                       localTime:     LocalInstant           = LocalInstant.Now,
                        editTime:      RemoteInstant          = RemoteInstant.Epoch,
                        ephemeral:     Option[FiniteDuration] = None,
                        expiryTime:    Option[LocalInstant]   = None, // local expiration time
@@ -77,7 +76,7 @@ case class MessageData(id:            MessageId              = MessageId(),
        | userId:        $userId
        | protos:        ${protos.toString().replace("\n", "")}
        | state:         $state
-       | time:          $time
+       | remoteTime:    $remoteTime
        | localTime:     $localTime
        | editTime:      $editTime
        | members:       $members
@@ -85,6 +84,7 @@ case class MessageData(id:            MessageId              = MessageId(),
        | other fields:  $firstMessage, $recipient, $email, $name, $ephemeral, $expiryTime, $expired, $duration, $quote, $quoteValidity
     """.stripMargin
 
+  def time: RemoteInstant = remoteTime.getOrElse { localTime.toRemote(currentBeDrift) }
 
   def getContent(index: Int) = {
     if (index == 0) content.headOption.getOrElse(MessageContent.Empty)
@@ -294,7 +294,7 @@ object MessageContent extends ((Message.Part.Type, String, Option[MediaAssetData
 
 object MessageData extends
   ((MessageId, ConvId, Message.Type, UserId, Seq[MessageContent], Seq[GenericMessage], Boolean, Set[UserId], Option[UserId],
-    Option[String], Option[String], Message.Status, RemoteInstant, LocalInstant, RemoteInstant, Option[FiniteDuration],
+    Option[String], Option[String], Message.Status, Option[RemoteInstant], LocalInstant, RemoteInstant, Option[FiniteDuration],
     Option[LocalInstant], Boolean, Option[FiniteDuration], Option[MessageId], Boolean, Option[Sha256]) => MessageData) {
   val Empty = new MessageData(MessageId(""), ConvId(""), Message.Type.UNKNOWN, UserId(""))
   val Deleted = new MessageData(MessageId(""), ConvId(""), Message.Type.UNKNOWN, UserId(""), state = Message.Status.DELETED)
@@ -351,7 +351,7 @@ object MessageData extends
     val Email         = opt(text('email))(_.email)
     val Name          = opt(text('name))(_.name)
     val State         = text[MessageState]('msg_state, _.name, Message.Status.valueOf)(_.state)
-    val Time          = remoteTimestamp('time)(_.time)
+    val RemoteTime    = opt(remoteTimestamp('remote_time))(_.remoteTime)
     val LocalTime     = localTimestamp('local_time)(_.localTime)
     val EditTime      = remoteTimestamp('edit_time)(_.editTime)
     val Ephemeral     = opt(finiteDuration('ephemeral))(_.ephemeral)
@@ -364,38 +364,38 @@ object MessageData extends
     override val idCol = Id
 
     override val table =
-      Table("Messages", Id, Conv, Type, User, Content, Protos, Time, LocalTime, FirstMessage, Members, Recipient, Email, Name, State, ContentSize, EditTime, Ephemeral, ExpiryTime, Expired, Duration, Quote, QuoteValidity)
+      Table("Messages", Id, Conv, Type, User, Content, Protos, RemoteTime, LocalTime, FirstMessage, Members, Recipient, Email, Name, State, ContentSize, EditTime, Ephemeral, ExpiryTime, Expired, Duration, Quote, QuoteValidity)
 
     override def onCreate(db: DB): Unit = {
       super.onCreate(db)
-      db.execSQL(s"CREATE INDEX IF NOT EXISTS Messages_conv_time on Messages ( conv_id, time)")
+      db.execSQL(s"CREATE INDEX IF NOT EXISTS Messages_conv_time on Messages ( conv_id, remote_time)")
     }
 
     override def apply(implicit cursor: DBCursor): MessageData =
-      MessageData(Id, Conv, Type, User, Content, Protos, FirstMessage, Members, Recipient, Email, Name, State, Time, LocalTime, EditTime, Ephemeral, ExpiryTime, Expired, Duration, Quote, QuoteValidity)
+      MessageData(Id, Conv, Type, User, Content, Protos, FirstMessage, Members, Recipient, Email, Name, State, RemoteTime, LocalTime, EditTime, Ephemeral, ExpiryTime, Expired, Duration, Quote, QuoteValidity)
 
     def deleteForConv(id: ConvId)(implicit db: DB) = delete(Conv, id)
 
-    def deleteUpTo(id: ConvId, upTo: RemoteInstant)(implicit db: DB) = db.delete(table.name, s"${Conv.name} = '${id.str}' AND ${Time.name} <= ${Time(upTo)}", null)
+    def deleteUpTo(id: ConvId, upTo: RemoteInstant)(implicit db: DB) = db.delete(table.name, s"${Conv.name} = '${id.str}' AND ${RemoteTime.name} <= ${RemoteTime(Option(upTo))}", null)
 
-    def first(conv: ConvId)(implicit db: DB) = single(db.query(table.name, null, s"${Conv.name} = '$conv'", null, null, null, s"${Time.name} ASC", "1"))
+    def first(conv: ConvId)(implicit db: DB) = single(db.query(table.name, null, s"${Conv.name} = '$conv'", null, null, null, s"${RemoteTime.name} ASC", "1"))
 
-    def last(conv: ConvId)(implicit db: DB) = single(db.query(table.name, null, s"${Conv.name} = '$conv'", null, null, null, s"${Time.name} DESC", "1"))
+    def last(conv: ConvId)(implicit db: DB) = single(db.query(table.name, null, s"${Conv.name} = '$conv'", null, null, null, s"${RemoteTime.name} DESC", "1"))
 
-    def lastSent(conv: ConvId)(implicit db: DB) = single(db.query(table.name, null, s"${Conv.name} = '$conv' AND ${State.name} IN ('${Message.Status.SENT.name}', '${Message.Status.DELIVERED.name}')", null, null, null, s"${Time.name} DESC", "1"))
+    def lastSent(conv: ConvId)(implicit db: DB) = single(db.query(table.name, null, s"${Conv.name} = '$conv' AND ${State.name} IN ('${Message.Status.SENT.name}', '${Message.Status.DELIVERED.name}')", null, null, null, s"${RemoteTime.name} DESC", "1"))
 
-    def lastFromSelf(conv: ConvId, selfUserId: UserId)(implicit db: DB) = single(db.query(table.name, null, s"${Conv.name} = '${Conv(conv)}' AND ${User.name} = '${User(selfUserId)}' AND $userContentPredicate", null, null, null, s"${Time.name} DESC", "1"))
+    def lastFromSelf(conv: ConvId, selfUserId: UserId)(implicit db: DB) = single(db.query(table.name, null, s"${Conv.name} = '${Conv(conv)}' AND ${User.name} = '${User(selfUserId)}' AND $userContentPredicate", null, null, null, s"${RemoteTime.name} DESC", "1"))
 
-    def lastFromOther(conv: ConvId, selfUserId: UserId)(implicit db: DB) = single(db.query(table.name, null, s"${Conv.name} = '${Conv(conv)}' AND ${User.name} != '${User(selfUserId)}' AND $userContentPredicate", null, null, null, s"${Time.name} DESC", "1"))
+    def lastFromOther(conv: ConvId, selfUserId: UserId)(implicit db: DB) = single(db.query(table.name, null, s"${Conv.name} = '${Conv(conv)}' AND ${User.name} != '${User(selfUserId)}' AND $userContentPredicate", null, null, null, s"${RemoteTime.name} DESC", "1"))
 
     private val userContentPredicate = isUserContent.map(t => s"${Type.name} = '${Type(t)}'").mkString("(", " OR ", ")")
 
     def lastIncomingKnock(convId: ConvId, selfUser: UserId)(implicit db: DB): Option[MessageData] = single(
-      db.query(table.name, null, s"${Conv.name} = ? AND ${Type.name} = ? AND ${User.name} <> ?", Array(convId.toString, Type(Message.Type.KNOCK), selfUser.str), null, null, s"${Time.name} DESC", "1")
+      db.query(table.name, null, s"${Conv.name} = ? AND ${Type.name} = ? AND ${User.name} <> ?", Array(convId.toString, Type(Message.Type.KNOCK), selfUser.str), null, null, s"${RemoteTime.name} DESC", "1")
     )
 
     def lastMissedCall(convId: ConvId)(implicit db: DB): Option[MessageData] = single(
-      db.query(table.name, null, s"${Conv.name} = ? AND ${Type.name} = ?", Array(convId.toString, Type(Message.Type.MISSED_CALL)), null, null, s"${Time.name} DESC", "1")
+      db.query(table.name, null, s"${Conv.name} = ? AND ${Type.name} = ?", Array(convId.toString, Type(Message.Type.MISSED_CALL)), null, null, s"${RemoteTime.name} DESC", "1")
     )
 
     private val MessageEntryColumns = Array(Id.name, User.name, Type.name, State.name, ContentSize.name)
@@ -407,23 +407,23 @@ object MessageData extends
       iteratingWithReader(MessageEntryReader)(db.query(table.name, MessageEntryColumns, s"${Conv.name} = ?", Array(convId.toString), null, null, null)).acquire(_ count p)
 
     def countNewer(convId: ConvId, time: RemoteInstant)(implicit db: DB) =
-      queryNumEntries(db, table.name, s"${Conv.name} = '${convId.str}' AND ${Time.name} > ${time.toEpochMilli}")
+      queryNumEntries(db, table.name, s"${Conv.name} = '${convId.str}' AND ${RemoteTime.name} > ${time.toEpochMilli}")
 
     def countFailed(convId: ConvId)(implicit db: DB) = queryNumEntries(db, table.name, s"${Conv.name} = '${convId.str}' AND ${State.name} = '${Message.Status.FAILED}'")
 
-    def listLocalMessages(convId: ConvId)(implicit db: DB) = list(db.query(table.name, null, s"${Conv.name} = '$convId' AND ${State.name} in ('${Message.Status.DEFAULT}', '${Message.Status.PENDING}', '${Message.Status.FAILED}')", null, null, null, s"${Time.name} ASC"))
+    def listLocalMessages(convId: ConvId)(implicit db: DB) = list(db.query(table.name, null, s"${Conv.name} = '$convId' AND ${State.name} in ('${Message.Status.DEFAULT}', '${Message.Status.PENDING}', '${Message.Status.FAILED}')", null, null, null, s"${RemoteTime.name} ASC"))
 
     //TODO: use local instant?
     def findLocalFrom(convId: ConvId, time: RemoteInstant)(implicit db: DB) =
-      iterating(db.query(table.name, null, s"${Conv.name} = '$convId' AND ${State.name} in ('${Message.Status.DEFAULT}', '${Message.Status.PENDING}', '${Message.Status.FAILED}') AND ${Time.name} >= ${time.toEpochMilli}", null, null, null, s"${Time.name} ASC"))
+      iterating(db.query(table.name, null, s"${Conv.name} = '$convId' AND ${State.name} in ('${Message.Status.DEFAULT}', '${Message.Status.PENDING}', '${Message.Status.FAILED}') AND ${RemoteTime.name} >= ${time.toEpochMilli}", null, null, null, s"${RemoteTime.name} ASC"))
 
     def findLatestUpTo(convId: ConvId, time: RemoteInstant)(implicit db: DB) =
-      single(db.query(table.name, null, s"${Conv.name} = '$convId' AND ${Time.name} < ${time.toEpochMilli}", null, null, null, s"${Time.name} DESC", "1"))
+      single(db.query(table.name, null, s"${Conv.name} = '$convId' AND ${RemoteTime.name} < ${time.toEpochMilli}", null, null, null, s"${RemoteTime.name} DESC", "1"))
 
-    def findMessages(conv: ConvId)(implicit db: DB) = db.query(table.name, null, s"${Conv.name} = '$conv'", null, null, null, s"${Time.name} ASC")
+    def findMessages(conv: ConvId)(implicit db: DB) = db.query(table.name, null, s"${Conv.name} = '$conv'", null, null, null, s"${RemoteTime.name} ASC")
 
     def findMessagesFrom(conv: ConvId, time: RemoteInstant)(implicit db: DB) =
-      iterating(db.query(table.name, null, s"${Conv.name} = '$conv' and ${Time.name} >= ${time.toEpochMilli}", null, null, null, s"${Time.name} ASC"))
+      iterating(db.query(table.name, null, s"${Conv.name} = '$conv' and ${RemoteTime.name} >= ${time.toEpochMilli}", null, null, null, s"${RemoteTime.name} ASC"))
 
     def findExpired(time: LocalInstant = LocalInstant.Now)(implicit db: DB) =
       iterating(db.query(table.name, null, s"${ExpiryTime.name} IS NOT NULL and ${ExpiryTime.name} <= ${time.toEpochMilli}", null, null, null, s"${ExpiryTime.name} ASC"))
@@ -432,26 +432,26 @@ object MessageData extends
       iterating(db.query(table.name, null, s"${ExpiryTime.name} IS NOT NULL AND ${Expired.name} = 0", null, null, null, s"${ExpiryTime.name} ASC"))
 
     def findEphemeral(conv: ConvId)(implicit db: DB) =
-      iterating(db.query(table.name, null, s"${Conv.name} = '${conv.str}' and ${Ephemeral.name} IS NOT NULL and ${ExpiryTime.name} IS NULL", null, null, null, s"${Time.name} ASC"))
+      iterating(db.query(table.name, null, s"${Conv.name} = '${conv.str}' and ${Ephemeral.name} IS NOT NULL and ${ExpiryTime.name} IS NULL", null, null, null, s"${RemoteTime.name} ASC"))
 
     def findSystemMessage(conv: ConvId, serverTime: RemoteInstant, tpe: Message.Type, sender: UserId)(implicit db: DB) =
-      iterating(db.query(table.name, null, s"${Conv.name} = '${conv.str}' and ${Time.name} = ${Time(serverTime)} and ${Type.name} = '${Type(tpe)}' and ${User.name} = '${User(sender)}'", null, null, null, s"${Time.name} DESC"))
+      iterating(db.query(table.name, null, s"${Conv.name} = '${conv.str}' and ${RemoteTime.name} = ${RemoteTime(Option(serverTime))} and ${Type.name} = '${Type(tpe)}' and ${User.name} = '${User(sender)}'", null, null, null, s"${RemoteTime.name} DESC"))
 
-    private val IndexColumns = Array(Id.name, Time.name)
-    def msgIndexCursor(conv: ConvId)(implicit db: DB) = db.query(table.name, IndexColumns, s"${Conv.name} = '$conv'", null, null, null, s"${Time.name} ASC")
+    private val IndexColumns = Array(Id.name, RemoteTime.name)
+    def msgIndexCursor(conv: ConvId)(implicit db: DB) = db.query(table.name, IndexColumns, s"${Conv.name} = '$conv'", null, null, null, s"${RemoteTime.name} ASC")
 
-    def msgCursor(conv: ConvId)(implicit db: DB) = db.query(table.name, null, s"${Conv.name} = '$conv'", null, null, null, s"${Time.name} DESC")
+    def msgCursor(conv: ConvId)(implicit db: DB) = db.query(table.name, null, s"${Conv.name} = '$conv'", null, null, null, s"${RemoteTime.name} DESC")
 
     def countAtLeastAsOld(conv: ConvId, time: RemoteInstant)(implicit db: DB) =
-      queryNumEntries(db, table.name, s"""${Conv.name} = '${Conv(conv)}' AND ${Time.name} <= ${Time(time)}""")
+      queryNumEntries(db, table.name, s"""${Conv.name} = '${Conv(conv)}' AND ${RemoteTime.name} <= ${RemoteTime(Option(time))}""")
 
     def countLaterThan(conv: ConvId, time: RemoteInstant)(implicit db: DB) =
-      queryNumEntries(db, table.name, s"""${Conv.name} = '${Conv(conv)}' AND ${Time.name} > ${Time(time)}""")
+      queryNumEntries(db, table.name, s"""${Conv.name} = '${Conv(conv)}' AND ${RemoteTime.name} > ${RemoteTime(Option(time))}""")
 
     def countSentByType(selfUserId: UserId, tpe: Message.Type)(implicit db: DB) = queryNumEntries(db, table.name, s"${User.name} = '${User(selfUserId)}' AND ${Type.name} = '${Type(tpe)}'")
 
     def findByType(conv: ConvId, tpe: Message.Type)(implicit db: DB) =
-      iterating(db.query(table.name, null, s"${Conv.name} = '$conv' AND ${Type.name} = '${Type(tpe)}'", null, null, null, s"${Time.name} ASC"))
+      iterating(db.query(table.name, null, s"${Conv.name} = '$conv' AND ${Type.name} = '${Type(tpe)}'", null, null, null, s"${RemoteTime.name} ASC"))
 
     def findQuotesOf(msgId: MessageId)(implicit db: DB) = list(db.query(table.name, null, s"${Quote.name} = '$msgId'", null, null, null, null))
 
@@ -460,7 +460,7 @@ object MessageData extends
       val q = builder.buildUnionQuery(
         types.map(mt =>
           s"SELECT * FROM (" +
-            SQLiteQueryBuilder.buildQueryString(false, table.name, IndexColumns, s"${Conv.name} = '$conv' AND ${Type.name} = '${Type(mt.msgType)}' AND ${Expired.name} = 0", null, null, s"${Time.name} DESC", mt.limit.fold[String](null)(_.toString)) +
+            SQLiteQueryBuilder.buildQueryString(false, table.name, IndexColumns, s"${Conv.name} = '$conv' AND ${Type.name} = '${Type(mt.msgType)}' AND ${Expired.name} = 0", null, null, s"${RemoteTime.name} DESC", mt.limit.fold[String](null)(_.toString)) +
             s")").toArray,
         null, limit.fold[String](null)(_.toString))
       db.rawQuery(q, null)
