@@ -17,6 +17,7 @@
  */
 package com.waz.service.assets2
 
+import java.io.{ByteArrayInputStream, FileInputStream, InputStream}
 import java.net.URI
 
 import com.waz.model._
@@ -24,15 +25,32 @@ import com.waz.sync.client.AssetClient2.Retention
 import com.waz.utils.Identifiable
 import org.threeten.bp.Duration
 
-sealed trait ContentForUpload {
-  def mime: Mime
-  def name: String
+import scala.util.Try
+
+sealed trait Content {
+  def openInputStream(uriHelper: UriHelper): Try[InputStream] = this match {
+    case Content.Uri(uri) => uriHelper.openInputStream(uri)
+    case Content.File(_, file) => Try { new FileInputStream(file) }
+    case Content.Bytes(_, bytes) => Try { new ByteArrayInputStream(bytes) }
+  }
 }
-object ContentForUpload {
-  case class Uri(override val mime: Mime, override val name: String, uri: URI)             extends ContentForUpload
-  case class Bytes(override val mime: Mime, override val name: String, bytes: Array[Byte]) extends ContentForUpload
-  case class File(override val mime: Mime, override val name: String, file: EncryptedFile) extends ContentForUpload
+
+sealed trait CanExtractMetadata extends Content
+
+object Content {
+  case class Bytes(mime: Mime, bytes: Array[Byte]) extends Content
+  case class Uri(uri: URI)                         extends CanExtractMetadata
+  case class File(mime: Mime, file: java.io.File)  extends CanExtractMetadata
 }
+
+/**
+  * Be aware that content will be destroyed while upload process in case of [[Content.File]].
+  * It means that at some point in the future [[Content.File.file]] will not exist.
+  *
+  * @param name name for the future asset
+  * @param content content for the future asset
+  */
+case class ContentForUpload(name: String, content: Content)
 
 case class LocalSource(uri: URI, sha: Sha256)
 

@@ -29,6 +29,7 @@ import com.waz.sync.client.AssetClient.FileWithSha
 import com.waz.sync.client.AssetClient2.{AssetContent, Metadata, Retention, UploadResponse2}
 import com.waz.utils.returning
 
+import scala.concurrent.Future
 import scala.util.Random
 
 //TODO Think about tests resources cleanup
@@ -38,7 +39,7 @@ class AssetClient2Spec extends ZIntegrationSpec with AuthenticationConfig {
   private val testAssetContent = returning(Array.ofDim[Byte](1024))(Random.nextBytes)
   private val testAssetMetadata = Metadata(retention = Retention.Volatile)
   private val testAssetMime = Mime.Default
-  private val testRawAsset = AssetContent(testAssetMime, () => new ByteArrayInputStream(testAssetContent), Some(testAssetContent.length))
+  private val testRawAsset = AssetContent(testAssetMime, () => Future.successful(new ByteArrayInputStream(testAssetContent)), Some(testAssetContent.length))
 
   private def createBlobAsset(response: UploadResponse2): Asset[BlobDetails.type] = {
     Asset(

@@ -27,6 +27,7 @@ import scala.util.Try
 
 class TestUriHelper extends UriHelper {
   override def openInputStream(uri: URI): Try[InputStream] = Try { uri.toURL.openStream() }
+  override def extractSize(uri: URI): Try[Long] = ???
   override def extractMime(uri: URI): Try[Mime] = ???
   override def extractFileName(uri: URI): Try[String] = ???
 }

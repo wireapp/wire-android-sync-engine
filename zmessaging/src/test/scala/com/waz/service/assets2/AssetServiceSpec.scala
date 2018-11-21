@@ -40,7 +40,8 @@ class AssetServiceSpec extends ZIntegrationMockSpec {
   private val rawAssetStorage     = mock[RawAssetStorage]
   private val assetDetailsService = mock[AssetDetailsService]
   private val previewService      = mock[AssetPreviewService]
-  private val cache               = mock[AssetCache]
+  private val cache               = mock[AssetContentCache]
+  private val rawCache            = mock[RawAssetContentCache]
   private val client              = mock[AssetClient2]
   private val uriHelper           = mock[UriHelper]
 
@@ -69,7 +70,7 @@ class AssetServiceSpec extends ZIntegrationMockSpec {
   verbose(l"Test asset: $testAsset")
 
   private val service: AssetService =
-    new AssetServiceImpl(assetStorage, rawAssetStorage, assetDetailsService, previewService, uriHelper, cache, client)
+    new AssetServiceImpl(assetStorage, rawAssetStorage, assetDetailsService, previewService, uriHelper, cache, rawCache, client)
 
   feature("Assets") {
 

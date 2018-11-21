@@ -24,16 +24,18 @@ import android.media.AudioManager
 import android.telephony.TelephonyManager
 import com.waz.ZLog.ImplicitTag._
 import com.waz.ZLog._
+import com.waz.api
+import com.waz.api.Asset.LoadCallback
 import com.waz.api.ErrorType._
-import com.waz.api.impl.AudioAssetForUpload
+import com.waz.api.impl.PlaybackControls
 import com.waz.api.{AudioEffect, ErrorType}
 import com.waz.audioeffect.{AudioEffect => AVSEffect}
 import com.waz.cache.{CacheService, Expiration}
 import com.waz.model._
 import com.waz.service.AccountsService.InForeground
 import com.waz.service.assets.AudioLevels.peakLoudness
-import com.waz.service.assets2.{EncryptedFile, GeneralFileCache, NoEncryption}
-import com.waz.service.{AccountsService, ErrorsService}
+import com.waz.service.assets2.GeneralFileCache
+import com.waz.service.{AccountsService, ErrorsService, ZMessaging}
 import com.waz.threading.Threading
 import com.waz.utils._
 import com.waz.utils.events.{ClockSignal, EventContext, EventStream, Signal}
@@ -44,8 +46,8 @@ import org.threeten.bp.Instant
 import scala.concurrent.Future.{failed, successful}
 import scala.concurrent.duration._
 import scala.concurrent.{Future, Promise}
-import scala.util.Failure
 import scala.util.control.{NoStackTrace, NonFatal}
+import scala.util.{Failure, Success}
 
 class RecordAndPlayService(userId:        UserId,
                            globalService: GlobalRecordAndPlayService,
@@ -232,7 +234,7 @@ class GlobalRecordAndPlayService(cache: CacheService, context: Context, fileCach
             } ("onError failed")
           }
 
-          Next(Recording(recorder, key, start, Mime.Audio.PCM, EncryptedFile(file, NoEncryption), promisedResult))
+          Next(Recording(recorder, key, start, Mime.Audio.PCM, file, promisedResult))
         } { cause =>
           file.delete()
         }
@@ -262,14 +264,15 @@ class GlobalRecordAndPlayService(cache: CacheService, context: Context, fileCach
   protected def startRecording(destination: File, lengthLimit: FiniteDuration): PCMRecorder = PCMRecorder.startRecording(destination, lengthLimit)
 
   def stopRecording(key: AssetMediaKey): Future[State] = transitionF {
-    case rec @ Recording(recorder, `key`, start, mime, audio, promisedAsset) =>
+    case rec @ Recording(recorder, `key`, start, mime, file, promisedAsset) =>
       val newState = for {
         cause <- recorder.stopRecording()
-        _ = if (audio.file.exists()) {
-          verbose(s"stop recording: passing asset with data entry: ???, is it encrypted?: ${audio.encryption} bytes at $key")
-          val successState = RecordingSuccessful(audio, mime, cause == PCMRecorder.LengthLimitReached)
+        _ = if (file.exists()) {
+          verbose(s"stop recording: passing asset with data entry: ???, is it encrypted?: no bytes at $key")
+          val audio = Audio(key, file, PCM.durationFromByteCount(file.length), mime, applyAudioEffect)
+          val successState = RecordingSuccessful(audio, cause == PCMRecorder.LengthLimitReached)
           promisedAsset.trySuccess(successState)
-        } else promisedAsset.tryFailure(new FileNotFoundException(s"audio file does not exist after recording: ${audio.file}"))
+        } else promisedAsset.tryFailure(new FileNotFoundException(s"audio file does not exist after recording: $file"))
       } yield Next(Idle)
       newState.andThen { case _ => abandonAudioFocus() }
     case other =>
@@ -289,7 +292,7 @@ class GlobalRecordAndPlayService(cache: CacheService, context: Context, fileCach
   private def cancelOngoingRecording(rec: Recording): Future[Unit] =
     for {
       _ <- rec.recorder.cancelRecording().recoverWithLog()
-      _ = rec.audio.file.delete()
+      _ = rec.file.delete()
     } yield rec.result.trySuccess(RecordingCancelled)
 
   def releaseAnyOngoing(keys: Set[MediaKey]): Future[State] = transitionF {
@@ -305,17 +308,17 @@ class GlobalRecordAndPlayService(cache: CacheService, context: Context, fileCach
     case other => successful(KeepCurrent())
   }(s"error cancelling any ongoing $keys")
 
-  def applyAudioEffect(effect: AudioEffect, pcmFile: File): Future[AudioAssetForUpload] = {
+  def applyAudioEffect(effect: AudioEffect, pcmFile: File): Future[Audio] = {
     val id = AssetId()
-    cache.createForFile(CacheKey.fromAssetId(id), Mime.Audio.PCM, cacheLocation = Some(saveDir))(recordingExpiration).map { entry =>
+    fileCache.createEmptyFile(CacheKey.fromAssetId(id).str).map { file =>
       withCleanupOnFailure {
         val fx = new AVSEffect
         try {
-          val result = fx.applyEffectPCM(pcmFile.getAbsolutePath, entry.cacheFile.getAbsolutePath, PCM.sampleRate, effect.avsOrdinal, true)
+          val result = fx.applyEffectPCM(pcmFile.getAbsolutePath, file.getAbsolutePath, PCM.sampleRate, effect.avsOrdinal, true)
           if (result < 0) throw new RuntimeException(s"applyEffectPCM returned error code: $result")
-          AudioAssetForUpload(id, entry, PCM.durationFromByteCount(entry.length), applyAudioEffect _)
+          Audio(AssetMediaKey(id), file, PCM.durationFromByteCount(file.length()), Mime.Audio.PCM, applyAudioEffect)
         } finally fx.destroy
-      }(_ => entry.delete)
+      }(_ => file.delete)
     }(Threading.BlockingIO)
   }
 
@@ -422,15 +425,38 @@ class GlobalRecordAndPlayService(cache: CacheService, context: Context, fileCach
 }
 
 object GlobalRecordAndPlayService {
+
+  case class Audio(key: MediaKey,
+                   file: File,
+                   duration: bp.Duration,
+                   mime: Mime,
+                   private val fx: (AudioEffect, File) => Future[Audio]) {
+
+    def getPlaybackControls: PlaybackControls =
+      new PlaybackControls(key, PCMContent(file), _ => Signal.const(duration))(ZMessaging.currentUi)
+
+    def applyEffect(effect: api.AudioEffect, callback: LoadCallback[Audio]): Unit = {
+      verbose(s"applyEffect($effect) $this")
+      fx(effect, file).onComplete {
+        case Success(asset) =>
+          callback.onLoaded(asset)
+        case Failure(cause) =>
+          error("effect application failed", cause)
+          callback.onLoadFailed()
+      }(Threading.Ui)
+    }
+
+  }
+
   sealed trait State
   case object Idle extends State
   case class Playing(player: Player, key: MediaKey) extends State
   case class Paused(player: Player, key: MediaKey, playhead: MediaPointer, transient: Boolean = false) extends State
-  case class Recording(recorder: PCMRecorder, key: MediaKey, start: Instant, mime: Mime, audio: EncryptedFile, result: Promise[RecordingResult]) extends State
+  case class Recording(recorder: PCMRecorder, key: MediaKey, start: Instant, mime: Mime, file: File, result: Promise[RecordingResult]) extends State
 
   sealed trait RecordingResult
   case object RecordingCancelled extends RecordingResult
-  case class RecordingSuccessful(audio: EncryptedFile, mime: Mime, lengthLimitReached: Boolean) extends RecordingResult
+  case class RecordingSuccessful(audio: Audio, lengthLimitReached: Boolean) extends RecordingResult
 
   sealed abstract class Transition(val changedState: Option[State], val error: Option[Error])
   case class KeepCurrent(override val error: Option[Error] = None) extends Transition(None, error)

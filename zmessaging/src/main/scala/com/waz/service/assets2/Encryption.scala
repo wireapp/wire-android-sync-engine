@@ -17,7 +17,7 @@
  */
 package com.waz.service.assets2
 
-import java.io.{File, InputStream}
+import java.io.{File, FileInputStream, InputStream}
 
 import com.waz.model.AESKey
 import com.waz.utils.crypto.AESUtils
@@ -25,16 +25,21 @@ import com.waz.utils.crypto.AESUtils
 trait Encryption {
   def decrypt(is: InputStream): InputStream
   def encrypt(os: InputStream): InputStream
+  def sizeAfterEncryption(sizeBeforeEncryption: Long): Long
 }
 
 case object NoEncryption extends Encryption {
   override def decrypt(is: InputStream): InputStream = is
   override def encrypt(is: InputStream): InputStream = is
+  override def sizeAfterEncryption(sizeBeforeEncryption: Long): Long = sizeBeforeEncryption
 }
 
 case class AES_CBC_Encryption(key: AESKey) extends Encryption {
   override def decrypt(is: InputStream): InputStream = AESUtils.decryptInputStream(key.bytes, is)
   override def encrypt(is: InputStream): InputStream = AESUtils.encryptInputStream(key.bytes, is)
+  override def sizeAfterEncryption(sizeBeforeEncryption: Long): Long = AESUtils.sizeAfterEncryption(key.bytes, sizeBeforeEncryption)
 }
 
-case class EncryptedFile(file: File, encryption: Encryption)
+case class EncryptedFile(file: File, encryption: Encryption) {
+  def decryptedStream: InputStream = encryption.decrypt(new FileInputStream(file))
+}

@@ -17,12 +17,10 @@
  */
 package com.waz.service.assets2
 
-import java.io.InputStream
-
 import com.waz.service.assets2.Asset.General
 
 import scala.concurrent.Future
 
 trait AssetPreviewService {
-  def extractPreview(rawAsset: RawAsset[General], contentStream: => Future[InputStream]): Future[ContentForUpload]
+  def extractPreview(rawAsset: RawAsset[General], content: CanExtractMetadata): Future[Content]
 }

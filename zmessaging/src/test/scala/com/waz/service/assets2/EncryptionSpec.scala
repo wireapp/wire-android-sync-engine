@@ -54,6 +54,21 @@ class EncryptionSpec extends ZSpec {
       decrypted shouldBe unencrypted
     }
 
+    scenario("should calculate after encryption size properly") {
+      val unencrypted = TestData.bytes(1024)
+
+      val key          = AESUtils.randomBytes(16)
+      val outputStream = new ByteArrayOutputStream()
+
+      IoUtils.copy(
+        in = AESUtils.encryptInputStream(key, new ByteArrayInputStream(unencrypted)),
+        out = outputStream
+      )
+      val encrypted = outputStream.toByteArray
+
+      AESUtils.sizeAfterEncryption(key, unencrypted.length) shouldBe encrypted.length
+    }
+
   }
 
 }

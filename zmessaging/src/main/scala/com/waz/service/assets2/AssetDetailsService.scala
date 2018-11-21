@@ -17,8 +17,10 @@
  */
 package com.waz.service.assets2
 
+import com.waz.model.Mime
+
 import scala.concurrent.Future
 
 trait AssetDetailsService {
-  def extract(content: ContentForUpload): Future[AssetDetails]
+  def extract(mime: Mime, content: CanExtractMetadata): Future[AssetDetails]
 }

@@ -28,7 +28,7 @@ import com.waz.model._
 import com.waz.model.otr.ClientId
 import com.waz.service.EventScheduler.{Sequential, Stage}
 import com.waz.service.assets._
-import com.waz.service.assets2.{AssetCache, AssetCacheImpl, AssetStorage, GeneralFileCacheImpl}
+import com.waz.service.assets2.{AssetService => _, AssetServiceImpl => _, _}
 import com.waz.service.call._
 import com.waz.service.conversation._
 import com.waz.service.downloads.{AssetLoader, AssetLoaderImpl}
@@ -273,7 +273,7 @@ class ZMessaging(val teamId: Option[TeamId], val clientId: ClientId, account: Ac
   lazy val propertiesSyncHandler                      = wire[PropertiesSyncHandler]
   lazy val propertiesService: PropertiesService       = wire[PropertiesServiceImpl]
 
-  lazy val cacheService: AssetCache = new AssetCacheImpl(
+  lazy val contentCache: AssetContentCache = new AssetContentCacheImpl(
     cacheDirectory = new File(context.getExternalCacheDir, s"assets_${selfUserId.str}"),
     directorySizeThreshold = 1024 * 1024 * 200,
     sizeCheckingInterval = 30.seconds
@@ -288,7 +288,8 @@ class ZMessaging(val teamId: Option[TeamId], val clientId: ClientId, account: Ac
     assets2Module.assetDetailsService,
     assets2Module.assetPreviewService,
     assets2Module.uriHelper,
-    cacheService,
+    contentCache,
+    new RawAssetContentCacheImpl(new File(context.getCacheDir, s"raw_assets_${selfUserId.str}"))(Threading.BlockingIO),
     asset2Client
   )
 
