@@ -17,6 +17,7 @@
  */
 package com.waz.service.assets2
 
+import android.util.Base64
 import com.waz.model.{MessageId, Mime, RawAssetId}
 import com.waz.sync.client.AssetClient2.Retention
 
@@ -36,25 +37,32 @@ object Codec {
 trait StorageCodecs {
   import java.net.URI
 
-  import com.waz.model.{AESKey, AssetId, AssetToken, Sha256}
+  import com.waz.model.{AssetId, AssetToken, Sha256}
   import io.circe.parser._
   import io.circe.syntax._
   import io.circe.{Decoder, Encoder}
 
+  def asBase64String(bytes: Array[Byte]): String = Base64.encodeToString(bytes, Base64.NO_PADDING)
+  def asBytes(base64String: String): Array[Byte] = Base64.decode(base64String, Base64.NO_PADDING)
+
+  implicit val SaltCodec: Codec[Salt, String] = new Codec[Salt, String] {
+    override def serialize(value: Salt): String = asBase64String(value.bytes)
+    override def deserialize(value: String): Salt = Salt(asBytes(value))
+  }
+
   implicit val EncryptionCodec: Codec[Encryption, String] = new Codec[Encryption, String] {
     val Unencrypted    = ""
     val AES_CBC_Prefix = "AES_CBS__"
-    val AES_GCM_Prefix = "AES_GCM__"
 
     override def serialize(value: Encryption): String = value match {
       case NoEncryption            => Unencrypted
-      case AES_CBC_Encryption(key) => AES_CBC_Prefix + key.str
+      case AES_CBC_Encryption(key) => AES_CBC_Prefix + asBase64String(key.bytes)
     }
 
     override def deserialize(value: String): Encryption = value match {
       case Unencrypted => NoEncryption
       case str if str.startsWith(AES_CBC_Prefix) =>
-        AES_CBC_Encryption(AESKey(str.substring(AES_CBC_Prefix.length)))
+        AES_CBC_Encryption(AESKey2(asBytes(str.substring(AES_CBC_Prefix.length))))
     }
   }
 

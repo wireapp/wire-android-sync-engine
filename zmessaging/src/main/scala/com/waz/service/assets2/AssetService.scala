@@ -72,7 +72,7 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
           CancellableFuture.failed(ValidationError(s"SHA256 is not equal. Asset: $asset"))
         case Right(fileWithSha) =>
           contentCache.put(asset.id, fileWithSha.file, removeOriginal = true)
-            .flatMap(_ => contentCache.getStream(asset.id).map(asset.encryption.decrypt))
+            .flatMap(_ => contentCache.getStream(asset.id).map(asset.encryption.decrypt(_)))
             .toCancellable
       }
       .recoverWith { case err =>
@@ -83,7 +83,7 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
 
   private def loadFromCache(asset: Asset[General], callback: Option[ProgressCallback]): CancellableFuture[InputStream] = {
     verbose(s"Load asset content from cache. $asset")
-    contentCache.getStream(asset.id).map(asset.encryption.decrypt)
+    contentCache.getStream(asset.id).map(asset.encryption.decrypt(_))
       .recoverWith { case err =>
         verbose(s"Can not load asset content from cache. $err")
         Future.failed(err)
@@ -150,7 +150,7 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
       val metadata = Metadata(rawAsset.public, rawAsset.retention)
       val content = AssetContent(
         rawAsset.mime,
-        () => getRawAssetContent(rawAsset).map(rawAsset.encryption.encrypt),
+        () => getRawAssetContent(rawAsset).map(rawAsset.encryption.encrypt(_, rawAsset.encryptionSalt)),
         Some(rawAsset.size)
       )
       val uploadCallback: ProgressCallback = (p: Progress) => {
@@ -237,6 +237,7 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
                              messageId: Option[MessageId] = None): Future[RawAsset[General]] = {
 
     val rawAssetId = RawAssetId()
+    val encryptionSalt = targetEncryption.randomSalt
 
     def extractMime: Future[Mime] = contentForUpload.content match {
       case Content.Uri(uri) => Future.fromTry(uriHelper.extractMime (uri))
@@ -263,11 +264,14 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
       } yield LocalSource(uri, sha)).value
 
     //as part of optimization can be moved away from this method
-    def calculateEncryptedSize: Future[Long] = contentForUpload.content match {
-      case Content.Uri(uri) => Future.fromTry(uriHelper.extractSize(uri).map(targetEncryption.sizeAfterEncryption))
-      case Content.File(_, file) => Future.successful(targetEncryption.sizeAfterEncryption(file.length()))
-      case Content.Bytes(_, bytes) => Future.successful(targetEncryption.sizeAfterEncryption(bytes.length))
-    }
+    def calculateEncryptedSize: Future[Long] =
+      for {
+        size <- contentForUpload.content match {
+          case Content.Uri(uri) => Future.fromTry(uriHelper.extractSize(uri))
+          case Content.File(_, file) => Future.successful(file.length())
+          case Content.Bytes(_, bytes) => Future.successful(bytes.length.toLong)
+        }
+      } yield targetEncryption.sizeAfterEncryption(size, encryptionSalt)
 
     def calculateEncryptedSha(content: CanExtractMetadata): Future[Sha256] =
       for {
@@ -275,7 +279,7 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
           case Content.Uri(uri) => Future.fromTry(uriHelper.openInputStream(uri))
           case Content.File(_, file) => Future.successful(new FileInputStream(file))
         }
-        sha <- Future.fromTry(Sha256.calculate(targetEncryption.encrypt(is)))
+        sha <- Future.fromTry(Sha256.calculate(targetEncryption.encrypt(is, encryptionSalt)))
       } yield sha
 
     for {
@@ -294,6 +298,7 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
       retention = retention,
       public = public,
       encryption = targetEncryption,
+      encryptionSalt = encryptionSalt,
       details = details,
       uploadStatus = UploadStatus.NotStarted,
       assetId = None,

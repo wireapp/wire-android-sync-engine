@@ -72,6 +72,7 @@ case class RawAsset[+T <: RawAssetDetails](
     retention: Retention,
     public: Boolean,
     encryption: Encryption,
+    encryptionSalt: Option[Salt],
     details: T,
     uploadStatus: UploadStatus,
     assetId: Option[AssetId],

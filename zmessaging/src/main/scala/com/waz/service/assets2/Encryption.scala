@@ -19,27 +19,54 @@ package com.waz.service.assets2
 
 import java.io.{File, FileInputStream, InputStream}
 
-import com.waz.model.AESKey
 import com.waz.utils.crypto.AESUtils
+import javax.crypto.KeyGenerator
 
 trait Encryption {
-  def decrypt(is: InputStream): InputStream
-  def encrypt(os: InputStream): InputStream
-  def sizeAfterEncryption(sizeBeforeEncryption: Long): Long
+  def decrypt(is: InputStream, salt: Option[Salt] = None): InputStream
+  def encrypt(os: InputStream, salt: Option[Salt] = None): InputStream
+  def sizeAfterEncryption(sizeBeforeEncryption: Long, salt: Option[Salt] = None): Long
+  def randomSalt: Option[Salt]
 }
 
 case object NoEncryption extends Encryption {
-  override def decrypt(is: InputStream): InputStream = is
-  override def encrypt(is: InputStream): InputStream = is
-  override def sizeAfterEncryption(sizeBeforeEncryption: Long): Long = sizeBeforeEncryption
+  override def decrypt(is: InputStream, salt: Option[Salt] = None): InputStream = is
+  override def encrypt(is: InputStream, salt: Option[Salt] = None): InputStream = is
+  override def sizeAfterEncryption(sizeBeforeEncryption: Long, salt: Option[Salt] = None): Long = sizeBeforeEncryption
+  override def randomSalt: Option[Salt] = None
 }
 
-case class AES_CBC_Encryption(key: AESKey) extends Encryption {
-  override def decrypt(is: InputStream): InputStream = AESUtils.decryptInputStream(key.bytes, is)
-  override def encrypt(is: InputStream): InputStream = AESUtils.encryptInputStream(key.bytes, is)
-  override def sizeAfterEncryption(sizeBeforeEncryption: Long): Long = AESUtils.sizeAfterEncryption(key.bytes, sizeBeforeEncryption)
+case class AES_CBC_Encryption(key: AESKey2) extends Encryption {
+  override def decrypt(is: InputStream, salt: Option[Salt] = None): InputStream =
+    AESUtils.decryptInputStream(key.bytes, is)
+  override def encrypt(is: InputStream, salt: Option[Salt] = None): InputStream =
+    AESUtils.encryptInputStream(key.bytes, (salt orElse randomSalt).get.bytes, is)
+  override def sizeAfterEncryption(sizeBeforeEncryption: Long, salt: Option[Salt] = None): Long =
+    AESUtils.sizeAfterEncryption(key.bytes, (salt orElse randomSalt).get.bytes, sizeBeforeEncryption)
+  override def randomSalt: Option[Salt] =
+    Some(Salt(AESUtils.generateIV))
+}
+
+object AES_CBC_Encryption {
+  def random: AES_CBC_Encryption = AES_CBC_Encryption(AESKey2.random)
 }
 
 case class EncryptedFile(file: File, encryption: Encryption) {
   def decryptedStream: InputStream = encryption.decrypt(new FileInputStream(file))
+}
+
+//TODO Can be removed when we will remove android Base64 from project
+case class AESKey2(bytes: Array[Byte]) extends AnyVal
+
+case class Salt(bytes: Array[Byte]) extends AnyVal
+
+object AESKey2 {
+
+  def random: AESKey2 = {
+    val keyGen = KeyGenerator.getInstance("AES")
+    keyGen.init(256)
+    val secretKey = keyGen.generateKey
+    AESKey2(secretKey.getEncoded)
+  }
+
 }

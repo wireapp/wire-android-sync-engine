@@ -101,19 +101,24 @@ object AESUtils {
 
   private val InitializingVectorLength = 16
 
+  def generateIV: Array[Byte] = randomBytes(InitializingVectorLength)
+
   //This solution will not work for files larger then 2147 mb
-  def sizeAfterEncryption(key: Array[Byte], sizeBeforeEncryption: Long): Long = {
-    InitializingVectorLength +
-    cipher(key, randomBytes(InitializingVectorLength), Cipher.ENCRYPT_MODE).getOutputSize(sizeBeforeEncryption.toInt)
+  def sizeAfterEncryption(key: Array[Byte], iv: Array[Byte], sizeBeforeEncryption: Long): Long = {
+    iv.length + cipher(key, iv, Cipher.ENCRYPT_MODE).getOutputSize(sizeBeforeEncryption.toInt)
   }
 
-  def encryptInputStream(key: Array[Byte], is: InputStream): InputStream = inputStream(key, is, Cipher.ENCRYPT_MODE)
+  def encryptInputStream(key: Array[Byte], iv: Array[Byte], is: InputStream): InputStream =
+    inputStream(key, Some(iv), is, Cipher.ENCRYPT_MODE)
 
-  def decryptInputStream(key: Array[Byte], is: InputStream): InputStream = inputStream(key, is, Cipher.DECRYPT_MODE)
+  def decryptInputStream(key: Array[Byte], is: InputStream): InputStream =
+    inputStream(key, None, is, Cipher.DECRYPT_MODE)
 
-  private def inputStream(key: Array[Byte], is: InputStream, mode: Int): InputStream = {
+  private def inputStream(key: Array[Byte], initVect: Option[Array[Byte]], is: InputStream, mode: Int): InputStream = {
+
+
     val iv = mode match {
-      case Cipher.ENCRYPT_MODE => randomBytes(InitializingVectorLength)
+      case Cipher.ENCRYPT_MODE => initVect.get
       case Cipher.DECRYPT_MODE => returning(new Array[Byte](16))(IoUtils.readFully(is, _, 0, InitializingVectorLength))
     }
 

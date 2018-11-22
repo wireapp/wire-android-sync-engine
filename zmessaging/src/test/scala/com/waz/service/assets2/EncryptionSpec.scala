@@ -17,58 +17,63 @@
  */
 package com.waz.service.assets2
 
-import java.io.{ ByteArrayInputStream, ByteArrayOutputStream }
+import java.io.{ByteArrayInputStream, ByteArrayOutputStream, InputStream}
 
 import com.waz.TestData
 import com.waz.specs.ZSpec
 import com.waz.utils.IoUtils
-import com.waz.utils.crypto.AESUtils
 
-class EncryptionSpec extends ZSpec {
+abstract class EncryptionSpec(encryption: Encryption) extends ZSpec {
 
-  feature("AESUtils") {
+  private val unencrypted = TestData.bytes(1024)
+
+  private def copy(bytes: Array[Byte], transformation: InputStream => InputStream): Array[Byte] = {
+    val outputStream = new ByteArrayOutputStream()
+    IoUtils.copy(
+      in = transformation(new ByteArrayInputStream(bytes)),
+      out = outputStream
+    )
+
+    outputStream.toByteArray
+  }
+
+  private def encryptContent(bytes: Array[Byte], salt: Option[Salt] = None): Array[Byte] =
+    copy(bytes, encryption.encrypt(_, salt))
+
+  private def decryptContent(bytes: Array[Byte], salt: Option[Salt] = None): Array[Byte] =
+    copy(bytes, encryption.decrypt(_, salt))
+
+  feature(s"Basic encryption") {
 
     scenario("should encrypt and decrypt input stream properly") {
-      val unencrypted = TestData.bytes(200)
-
-      val key          = AESUtils.randomBytes(16)
-      val outputStream = new ByteArrayOutputStream()
-
-      IoUtils.copy(
-        in = AESUtils.encryptInputStream(key, new ByteArrayInputStream(unencrypted)),
-        out = outputStream
-      )
-
-      val encrypted = outputStream.toByteArray
-      outputStream.reset()
-
+      val encrypted = encryptContent(unencrypted)
       encrypted shouldNot contain(unencrypted)
-
-      IoUtils.copy(
-        in = AESUtils.decryptInputStream(key, new ByteArrayInputStream(encrypted)),
-        out = outputStream
-      )
-
-      val decrypted = outputStream.toByteArray
-
+      val decrypted = decryptContent(encrypted)
       decrypted shouldBe unencrypted
     }
 
+  }
+
+  feature("Additional contracts") {
+
     scenario("should calculate after encryption size properly") {
-      val unencrypted = TestData.bytes(1024)
+      val encrypted = encryptContent(unencrypted)
+      encryption.sizeAfterEncryption(unencrypted.length) shouldBe encrypted.length
+    }
 
-      val key          = AESUtils.randomBytes(16)
-      val outputStream = new ByteArrayOutputStream()
+    scenario("encryption should be stateless if salt is the same") {
+      val salt = encryption.randomSalt
+      if (salt.nonEmpty) {
+        val encrypted1 = encryptContent(unencrypted, salt)
+        val encrypted2 = encryptContent(unencrypted, salt)
 
-      IoUtils.copy(
-        in = AESUtils.encryptInputStream(key, new ByteArrayInputStream(unencrypted)),
-        out = outputStream
-      )
-      val encrypted = outputStream.toByteArray
-
-      AESUtils.sizeAfterEncryption(key, unencrypted.length) shouldBe encrypted.length
+        encrypted1 shouldBe encrypted2
+      }
     }
 
   }
 
 }
+
+class NoEncryptionSpec extends EncryptionSpec(NoEncryption)
+class AES_CBC_EncryptionSpec extends EncryptionSpec(AES_CBC_Encryption.random)

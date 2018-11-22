@@ -164,8 +164,9 @@ class ConversationsUiServiceImpl(selfUserId:      UserId,
     for {
       conversation <- convStorage.get(convId).map(_.get)//TODO Fix force unwrapping
       retention  <- messages.retentionPolicy2(conversation)
+
       rr <- readReceiptSettings(convId)
-      rawAsset   <- assets.createAndSaveRawAsset(content, AES_CBC_Encryption(AESKey()), public = false, retention, Some(messageId))
+      rawAsset   <- assets.createAndSaveRawAsset(content, AES_CBC_Encryption.random, public = false, retention, Some(messageId))
       message    <- messages.addAssetMessage(convId, messageId, rawAsset, rr, exp)
       _          <- updateLastRead(message)
       _          <- Future.successful(tracking.assetContribution(AssetId(rawAsset.id.str), selfUserId)) //TODO Maybe we can track raw assets contribution separately?
