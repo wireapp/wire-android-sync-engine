@@ -71,4 +71,7 @@ object errors {
   case class FileSystemError(override val description: String, override val cause: Option[Throwable] = None)
     extends ZError(description, cause)
 
+  case class PermissionDeniedError(permissions: Seq[String]) extends
+    ZError(s"Permissions list: ${permissions.mkString}", None)
+
 }

@@ -187,7 +187,7 @@ class AssetLoaderServiceSpec extends AndroidFreeSpec {
       intercept[CancelException](result(cf1))
 
       //finish all active jobs
-      (1 to MaxConcurrentLoadRequests).map(_.toString).map(AssetId).foreach(finishedDownload ! _)
+      (1 to MaxConcurrentLoadRequests).map(_.toString).map(AssetId.apply).foreach(finishedDownload ! _)
 
       awaitAllTasks
 
@@ -222,7 +222,7 @@ class AssetLoaderServiceSpec extends AndroidFreeSpec {
       intercept[CancelException](result(cf1))
 
       //finish all active jobs
-      (1 to MaxConcurrentLoadRequests).map(_.toString).map(AssetId).foreach(finishedDownload ! _)
+      (1 to MaxConcurrentLoadRequests).map(_.toString).map(AssetId.apply).foreach(finishedDownload ! _)
 
       awaitAllTasks
     }
@@ -251,7 +251,7 @@ class AssetLoaderServiceSpec extends AndroidFreeSpec {
       def removeFirst() = assets.remove(0)
       def remove(assetId: AssetId) = assets --= assets.filter(_.id == assetId)
       def load(number: Int) = (1 to number).foreach(_ => service.load(nextAsset()))
-      def finish(number: Int) = (1 to MaxConcurrentLoadRequests).map(_.toString).map(AssetId).foreach { id =>
+      def finish(number: Int) = (1 to MaxConcurrentLoadRequests).map(_.toString).map(AssetId.apply).foreach { id =>
         finishedDownload ! _
         remove(id)
       }

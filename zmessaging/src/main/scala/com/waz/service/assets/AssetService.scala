@@ -146,9 +146,9 @@ class AssetServiceImpl(storage:         AssetsStorage,
     markDownloadFailed(id)
   }
 
-  messages.onMessageFailed { case (m, _) =>
-    if (m.isAssetMessage) markUploadFailed(m.assetId, UploadFailed)
-  }
+//  messages.onMessageFailed { case (m, _) =>
+//    if (m.isAssetMessage) markUploadFailed(m.assetId, UploadFailed)
+//  }
 
   messages.onDeleted { msgs => removeAssets(msgs.map(id => AssetId(id.str))) }
 

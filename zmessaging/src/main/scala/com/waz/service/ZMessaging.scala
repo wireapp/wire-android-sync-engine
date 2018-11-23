@@ -99,6 +99,7 @@ class StorageModule(context: Context, val userId: UserId, globalPreferences: Glo
   lazy val propertiesStorage:   PropertiesStorage       = new PropertiesStorageImpl()(context, db2, Threading.IO)
 
   lazy val db2: DB = DB(db.dbHelper.getWritableDatabase)
+  lazy val inProgressAssetStorage: assets2.InProgressAssetStorage = new assets2.InProgressAssetStorageImpl(context, db2)(Threading.BlockingIO)
   lazy val rawAssetStorage: assets2.RawAssetStorage   = new assets2.RawAssetStorageImpl(context, db2)(Threading.BlockingIO)
   lazy val assetStorage: assets2.AssetStorage         = new assets2.AssetStorageImpl(context, db2, Threading.BlockingIO)
 
@@ -285,6 +286,7 @@ class ZMessaging(val teamId: Option[TeamId], val clientId: ClientId, account: Ac
   lazy val assetService = new assets2.AssetServiceImpl(
     storage.assetStorage,
     storage.rawAssetStorage,
+    storage.inProgressAssetStorage,
     assets2Module.assetDetailsService,
     assets2Module.assetPreviewService,
     assets2Module.uriHelper,

@@ -114,23 +114,37 @@ sealed trait AssetIdGeneral
 
 object AssetIdGeneral {
   private val RawAssetPrefix = "raw_"
+  private val InProgressAssetPrefix = "in_progress_"
 
   //TODO Use 'Codecs' concept instead of such methods
   def encode(id: AssetIdGeneral): String = id match {
     case AssetId(str) => str
     case RawAssetId(str) => RawAssetPrefix + str
+    case InProgressAssetId(str) => InProgressAssetPrefix + str
   }
 
   def decode(str: String): AssetIdGeneral = {
     if (str.startsWith(RawAssetPrefix)) RawAssetId(str.substring(RawAssetPrefix.length))
+    else if (str.startsWith(InProgressAssetPrefix)) InProgressAssetId(str.substring(InProgressAssetPrefix.length))
     else AssetId(str)
   }
 
 }
 
+case class InProgressAssetId(str: String) extends AssetIdGeneral
+
+object InProgressAssetId {
+  def apply(): InProgressAssetId = Id.random()
+
+  implicit object Id extends Id[InProgressAssetId] {
+    override def random() = InProgressAssetId(Uid().toString)
+    override def decode(str: String) = InProgressAssetId(str)
+  }
+}
+
 case class RawAssetId(str: String) extends AssetIdGeneral
 
-object RawAssetId extends (String => RawAssetId) {
+object RawAssetId {
   def apply(): RawAssetId = Id.random()
 
   implicit object Id extends Id[RawAssetId] {
@@ -143,7 +157,7 @@ case class AssetId(str: String) extends AssetIdGeneral {
   override def toString: String = str
 }
 
-object AssetId extends (String => AssetId) {
+object AssetId {
   def apply(): AssetId = Id.random()
 
   implicit object Id extends Id[AssetId] {

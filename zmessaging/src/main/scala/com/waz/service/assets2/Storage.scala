@@ -113,27 +113,51 @@ trait StorageCodecs {
     }
   }
 
-  implicit val UploadStatusCodec: Codec[UploadStatus, Int] = new Codec[UploadStatus, Int] {
+  implicit val AssetUploadStatusCodec: Codec[AssetUploadStatus, Int] = new Codec[AssetUploadStatus, Int] {
     val NotStarted = 1
     val InProgress = 2
     val Done       = 3
     val Cancelled  = 4
     val Failed     = 5
 
-    override def serialize(value: UploadStatus): Int = value match {
-      case UploadStatus.NotStarted => NotStarted
-      case UploadStatus.InProgress => InProgress
-      case UploadStatus.Done       => Done
-      case UploadStatus.Cancelled  => Cancelled
-      case UploadStatus.Failed     => Failed
+    override def serialize(value: AssetUploadStatus): Int = value match {
+      case AssetUploadStatus.NotStarted => NotStarted
+      case AssetUploadStatus.InProgress => InProgress
+      case AssetStatus.Done             => Done
+      case AssetUploadStatus.Cancelled  => Cancelled
+      case AssetUploadStatus.Failed     => Failed
     }
 
-    override def deserialize(value: Int): UploadStatus = value match {
-      case NotStarted => UploadStatus.NotStarted
-      case InProgress => UploadStatus.InProgress
-      case Done       => UploadStatus.Done
-      case Cancelled  => UploadStatus.Cancelled
-      case Failed     => UploadStatus.Failed
+    override def deserialize(value: Int): AssetUploadStatus = value match {
+      case NotStarted => AssetUploadStatus.NotStarted
+      case InProgress => AssetUploadStatus.InProgress
+      case Done       => AssetStatus.Done
+      case Cancelled  => AssetUploadStatus.Cancelled
+      case Failed     => AssetUploadStatus.Failed
+    }
+  }
+
+  implicit val AssetDownloadStatusCodec: Codec[AssetDownloadStatus, Int] = new Codec[AssetDownloadStatus, Int] {
+    val NotStarted = 1
+    val InProgress = 2
+    val Done       = 3
+    val Cancelled  = 4
+    val Failed     = 5
+
+    override def serialize(value: AssetDownloadStatus): Int = value match {
+      case AssetDownloadStatus.NotStarted => NotStarted
+      case AssetDownloadStatus.InProgress => InProgress
+      case AssetStatus.Done               => Done
+      case AssetDownloadStatus.Cancelled  => Cancelled
+      case AssetDownloadStatus.Failed     => Failed
+    }
+
+    override def deserialize(value: Int): AssetDownloadStatus = value match {
+      case NotStarted => AssetDownloadStatus.NotStarted
+      case InProgress => AssetDownloadStatus.InProgress
+      case Done       => AssetStatus.Done
+      case Cancelled  => AssetDownloadStatus.Cancelled
+      case Failed     => AssetDownloadStatus.Failed
     }
   }
 

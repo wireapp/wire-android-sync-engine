@@ -17,13 +17,14 @@
  */
 package com.waz.sync.client
 
+import java.io.{BufferedOutputStream, File, FileOutputStream}
 import java.net.URL
 
 import com.waz.api.impl.ErrorResponse
-import com.waz.sync.client.OpenGraphClient.OpenGraphData
-import com.waz.threading.Threading
+import com.waz.sync.client.OpenGraphClient.{OpenGraphData, OpenGraphImage}
+import com.waz.threading.{CancellableFuture, Threading}
 import com.waz.utils.wrappers.URI
-import com.waz.utils.{JsonDecoder, JsonEncoder}
+import com.waz.utils.{IoUtils, JsonDecoder, JsonEncoder}
 import com.waz.znet2.http.HttpClient.{ConnectionError, HttpClientError}
 import com.waz.znet2.http._
 import org.json.JSONObject
@@ -32,12 +33,13 @@ import scala.util.matching.Regex
 
 trait OpenGraphClient {
   def loadMetadata(uri: URI): ErrorOrResponse[Option[OpenGraphData]]
+  def downloadImage(image: OpenGraphImage): CancellableFuture[File]
 }
 
 class OpenGraphClientImpl(implicit httpClient: HttpClient) extends OpenGraphClient {
-  import OpenGraphClient._
-  import HttpClient.dsl._
   import HttpClient.AutoDerivationOld._
+  import HttpClient.dsl._
+  import OpenGraphClient._
   import Threading.Implicits.Background
 
   implicit val OpenGraphDataDeserializer: RawBodyDeserializer[OpenGraphDataResponse] =
@@ -55,6 +57,20 @@ class OpenGraphClientImpl(implicit httpClient: HttpClient) extends OpenGraphClie
       }
   }
 
+  private implicit def fileBodyDeserializer: RawBodyDeserializer[File] =
+    RawBodyDeserializer.create { body =>
+      val tempFile = File.createTempFile("http_client_download", null)
+      val out = new BufferedOutputStream(new FileOutputStream(tempFile))
+      IoUtils.copy(body.data(), out)
+      tempFile
+    }
+
+  override def downloadImage(image: OpenGraphImage): CancellableFuture[File] = {
+    Request.create(method = Method.Get, url = image.url)
+      .withResultType[File]
+      .execute
+  }
+
 }
 
 object OpenGraphClient {
@@ -64,15 +80,27 @@ object OpenGraphClient {
 
   case class OpenGraphDataResponse(data: Option[OpenGraphData])
 
-  case class OpenGraphData(title: String, description: String, image: Option[URI], tpe: String, permanentUrl: Option[URI])
+  case class OpenGraphImage(url: URL) extends AnyVal
 
-  object OpenGraphData extends ((String, String, Option[URI], String, Option[URI]) => OpenGraphData) {
+  case class OpenGraphData(title: String,
+                           description: String,
+                           image: Option[OpenGraphImage],
+                           tpe: String,
+                           permanentUrl: Option[URL])
+
+  object OpenGraphData extends ((String, String, Option[OpenGraphImage], String, Option[URL]) => OpenGraphData) {
     val Empty = OpenGraphData("", "", None, "", None)
 
     implicit object Decoder extends JsonDecoder[OpenGraphData] {
       import JsonDecoder._
       override def apply(implicit js: JSONObject): OpenGraphData =
-        OpenGraphData('title, 'description, decodeOptString('image).map(URI.parse), 'tpe, decodeOptString('url).map(URI.parse))
+        OpenGraphData(
+          'title,
+          'description,
+          decodeOptString('image).map(new URL(_)).map(OpenGraphImage.apply),
+          'tpe,
+          decodeOptString('url).map(new URL(_))
+        )
     }
 
     implicit object Encoder extends JsonEncoder[OpenGraphData] {
@@ -116,9 +144,9 @@ object OpenGraphClient {
             OpenGraphData(
               ogMeta.get(Title).orElse(htmlTitle).getOrElse(""),
               ogMeta.getOrElse(Description, ""),
-              ogMeta.get(Image).map(URI.parse),
+              ogMeta.get(Image).map(new URL(_)).map(OpenGraphImage.apply),
               ogMeta.getOrElse(Type, ""),
-              ogMeta.get(Url).map(URI.parse)
+              ogMeta.get(Url).map(new URL(_))
             )
           )
         } else None)

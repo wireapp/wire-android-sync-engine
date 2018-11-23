@@ -25,10 +25,11 @@ import com.waz.ZLog.ImplicitTag._
 import com.waz.ZLog._
 import com.waz.model._
 import com.waz.model.errors._
-import com.waz.service.assets2.Asset.{General, Video}
+import com.waz.service.assets2.Asset.{General, RawGeneral, Video}
 import com.waz.sync.client.{AssetClient2, ErrorOrResponse}
 import com.waz.sync.client.AssetClient2.{AssetContent, Metadata, Retention, UploadResponse2}
 import com.waz.threading.CancellableFuture
+import com.waz.utils.events.Signal
 import com.waz.znet2.http.HttpClient._
 import com.waz.znet2.http.ResponseCode
 
@@ -36,6 +37,16 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Failure
 
 trait AssetService {
+  def assetSignal(id: AssetIdGeneral): Signal[GeneralAsset]
+  def assetStatusSignal(id: AssetIdGeneral): Signal[(AssetStatus, Option[Progress])]
+  def downloadProgress(id: InProgressAssetId): Signal[Progress]
+  def uploadProgress(id: RawAssetId): Signal[Progress]
+
+  def cancelUpload(id: RawAssetId): Unit
+  def cancelDownload(id: InProgressAssetId): Unit
+
+  def getAsset(id: AssetId): Future[Asset[General]]
+
   def loadContentById(assetId: AssetId, callback: Option[ProgressCallback] = None): CancellableFuture[InputStream]
   def loadContent(asset: Asset[General], callback: Option[ProgressCallback] = None): CancellableFuture[InputStream]
   def uploadAsset(rawAssetId: RawAssetId): CancellableFuture[Asset[General]]
@@ -49,6 +60,7 @@ trait AssetService {
 
 class AssetServiceImpl(assetsStorage: AssetStorage,
                        rawAssetStorage: RawAssetStorage,
+                       inProgressAssetStorage: InProgressAssetStorage,
                        assetDetailsService: AssetDetailsService,
                        previewService: AssetPreviewService,
                        uriHelper: UriHelper,
@@ -56,6 +68,44 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
                        rawContentCache: RawAssetContentCache,
                        assetClient: AssetClient2)
                       (implicit ec: ExecutionContext) extends AssetService {
+
+
+  override def assetSignal(idGeneral: AssetIdGeneral): Signal[GeneralAsset] =
+    (idGeneral match {
+      case id: AssetId => assetsStorage.signal(id)
+      case id: RawAssetId => rawAssetStorage.signal(id)
+      case id: InProgressAssetId => inProgressAssetStorage.signal(id)
+    }).map(a => a: GeneralAsset)
+
+  override def assetStatusSignal(idGeneral: AssetIdGeneral): Signal[(AssetStatus, Option[Progress])] =
+    assetSignal(idGeneral) map {
+      case _: Asset[General] => AssetStatus.Done -> None
+      case asset: RawAsset[RawGeneral] =>
+        asset.status match {
+          case AssetStatus.Done => asset.status -> None
+          case AssetUploadStatus.NotStarted => asset.status -> None
+          case _ => asset.status -> Some(Progress(asset.uploaded, Some(asset.size)))
+        }
+      case asset: InProgressAsset =>
+        asset.status match {
+          case AssetStatus.Done => asset.status -> None
+          case AssetDownloadStatus.NotStarted => asset.status -> None
+          case _ => asset.status -> Some(Progress(asset.downloaded, Some(asset.size)))
+        }
+    }
+
+  override def downloadProgress(id: InProgressAssetId): Signal[Progress] =
+    assetStatusSignal(id).collect { case (_, Some(progress)) => progress }
+
+  override def uploadProgress(id: RawAssetId): Signal[Progress] =
+    assetStatusSignal(id).collect { case (_, Some(progress)) => progress }
+
+  override def cancelUpload(id: RawAssetId): Unit = ()
+
+  override def cancelDownload(id: InProgressAssetId): Unit = ()
+
+  override def getAsset(id: AssetId): Future[Asset[General]] =
+    assetsStorage.get(id)
 
   private def loadFromBackend(asset: Asset[General], callback: Option[ProgressCallback]): CancellableFuture[InputStream] = {
     verbose(s"Load asset content from backend. $asset")
@@ -134,7 +184,7 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
 
     def actionsOnCancellation(): Unit = {
       info(s"Asset uploading cancelled: $rawAssetId")
-      rawAssetStorage.update(rawAssetId, _.copy(uploadStatus = UploadStatus.Cancelled))
+      rawAssetStorage.update(rawAssetId, _.copy(status = AssetUploadStatus.Cancelled))
     }
 
     def loadRawAsset: Future[RawAsset[General]] = rawAssetStorage.get(rawAssetId).flatMap { rawAsset =>
@@ -163,12 +213,12 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
     def handleUploadResult(result: Either[ErrorResponse, UploadResponse2], rawAsset: RawAsset[General]): Future[Asset[General]] =
       result match {
         case Left(err) =>
-          rawAssetStorage.update(rawAsset.id, _.copy(uploadStatus = UploadStatus.Failed)).flatMap(_ => Future.failed(err))
+          rawAssetStorage.update(rawAsset.id, _.copy(status = AssetUploadStatus.Failed)).flatMap(_ => Future.failed(err))
         case Right(response) =>
           val asset = Asset.create(response.key, response.token, rawAsset)
           for {
             _ <- assetsStorage.save(asset)
-            _ <- rawAssetStorage.update(rawAsset.id, _.copy(uploadStatus = UploadStatus.Done, assetId = Some(asset.id)))
+            _ <- rawAssetStorage.update(rawAsset.id, _.copy(status = AssetStatus.Done, assetId = Some(asset.id)))
           } yield asset
       }
 
@@ -183,7 +233,7 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
     for {
       _ <- CancellableFuture.lift(Future.successful(()), actionsOnCancellation())
       rawAsset <- loadRawAsset.toCancellable
-      _ <- rawAssetStorage.update(rawAsset.id, _.copy(uploaded = 0, uploadStatus = UploadStatus.InProgress)).toCancellable
+      _ <- rawAssetStorage.update(rawAsset.id, _.copy(uploaded = 0, status = AssetUploadStatus.InProgress)).toCancellable
       uploadResult <- doUpload(rawAsset)
       asset <- handleUploadResult(uploadResult, rawAsset).toCancellable
       _ <- encryptAssetContentAndMoveToCache(asset).toCancellable
@@ -240,7 +290,7 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
     val encryptionSalt = targetEncryption.randomSalt
 
     def extractMime: Future[Mime] = contentForUpload.content match {
-      case Content.Uri(uri) => Future.fromTry(uriHelper.extractMime (uri))
+      case Content.Uri(uri) => Future.fromTry(uriHelper.extractMime(uri))
       case Content.File(mime, _) => Future.successful(mime)
       case Content.Bytes(mime, _) => Future.successful(mime)
     }
@@ -300,7 +350,7 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
       encryption = targetEncryption,
       encryptionSalt = encryptionSalt,
       details = details,
-      uploadStatus = UploadStatus.NotStarted,
+      status = AssetUploadStatus.NotStarted,
       assetId = None,
       messageId = messageId
     )

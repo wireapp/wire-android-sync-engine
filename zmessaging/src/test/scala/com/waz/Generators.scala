@@ -18,6 +18,7 @@
 package com.waz
 
 import java.lang.System.currentTimeMillis
+import java.net.URL
 import java.util.concurrent.atomic.AtomicLong
 import java.util.{Date, Locale}
 
@@ -34,7 +35,7 @@ import com.waz.model.sync.{SyncJob, SyncRequest}
 import com.waz.service.SearchKey
 import com.waz.service.messages.MessageAndLikes
 import com.waz.sync.client.AuthenticationManager.AccessToken
-import com.waz.sync.client.OpenGraphClient.OpenGraphData
+import com.waz.sync.client.OpenGraphClient.{OpenGraphData, OpenGraphImage}
 import com.waz.utils.Locales.bcp47
 import com.waz.utils.sha2
 import com.waz.utils.wrappers.URI
@@ -56,6 +57,7 @@ object Generators {
   } yield URI.parse(s"$scheme://$path"))
 
   implicit lazy val arbName = Arbitrary(resultOf((Name)))
+  implicit lazy val arbUrl: Arbitrary[URL] = Arbitrary(alphaNumStr.map(s => new URL("http://" + s)))
 
   implicit lazy val arbConversationData: Arbitrary[ConversationData] = Arbitrary(for {
     id            <- arbitrary[ConvId]
@@ -100,6 +102,11 @@ object Generators {
     handle                <- arbitrary[Option[Handle]]
   } yield UserData(id, teamId, name, email, phone, trackingId, picture, accent, searchKey, connection, connectionLastUpdated, connectionMessage, conversation, relation, syncTimestamp, displayName, handle = handle))
 
+  implicit lazy val arbOpenGraphDataImage: Arbitrary[OpenGraphImage] = Arbitrary(
+    for {
+      url <- arbitrary[URL]
+    } yield OpenGraphImage(url)
+  )
   implicit lazy val arbOpenGraphData: Arbitrary[OpenGraphData] = Arbitrary(resultOf(OpenGraphData))
 
   implicit lazy val arbMessageContent: Arbitrary[MessageContent] = Arbitrary(resultOf(MessageContent))
@@ -231,6 +238,7 @@ object Generators {
   implicit lazy val arbUserId: Arbitrary[UserId]         = Arbitrary(sideEffect(UserId()))
   implicit lazy val arbTeamId: Arbitrary[TeamId]         = Arbitrary(sideEffect(TeamId()))
   implicit lazy val arbRAssetDataId: Arbitrary[RAssetId] = Arbitrary(sideEffect(RAssetId()))
+  implicit lazy val arbAssetIdGeneral: Arbitrary[AssetIdGeneral] = Arbitrary(sideEffect(AssetId()))
   implicit lazy val arbAssetId: Arbitrary[AssetId]       = Arbitrary(sideEffect(AssetId()))
   implicit lazy val arbSyncId: Arbitrary[SyncId]         = Arbitrary(sideEffect(SyncId()))
   implicit lazy val arbGcmId: Arbitrary[PushToken]           = Arbitrary(sideEffect(PushToken()))

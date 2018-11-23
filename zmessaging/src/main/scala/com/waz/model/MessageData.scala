@@ -19,7 +19,7 @@ package com.waz.model
 
 import java.nio.ByteBuffer
 import java.nio.charset.Charset
-
+import java.net.URL
 import android.database.DatabaseUtils.queryNumEntries
 import android.database.sqlite.SQLiteQueryBuilder
 import com.waz.ZLog.ImplicitTag._
@@ -44,28 +44,48 @@ import org.threeten.bp.Instant.now
 import scala.collection.breakOut
 import scala.concurrent.duration._
 
-case class MessageData(override val id:   MessageId              = MessageId(),
-                       convId:            ConvId                 = ConvId(),
-                       msgType:           Message.Type           = Message.Type.TEXT,
-                       userId:            UserId                 = UserId(),
-                       content:           Seq[MessageContent]    = Seq.empty,
-                       protos:            Seq[GenericMessage]    = Seq.empty,
-                       firstMessage:      Boolean                = false,
-                       members:           Set[UserId]            = Set.empty[UserId],
-                       recipient:         Option[UserId]         = None,
-                       email:             Option[String]         = None,
-                       name:              Option[Name]           = None,
-                       state:             MessageState           = Message.Status.SENT,
-                       time:              RemoteInstant          = RemoteInstant(now(clock)), //TODO: now is local...
-                       localTime:         LocalInstant           = LocalInstant.Epoch,
-                       editTime:          RemoteInstant          = RemoteInstant.Epoch,
-                       ephemeral:         Option[FiniteDuration] = None,
-                       expiryTime:        Option[LocalInstant]   = None, // local expiration time
-                       expired:           Boolean                = false,
-                       duration:          Option[FiniteDuration] = None, //for successful calls and message_timer changes
+case class MessageData(override val id: MessageId              = MessageId(),
+                       convId:          ConvId                 = ConvId(),
+                       msgType:         Message.Type           = Message.Type.TEXT,
+                       userId:          UserId                 = UserId(),
+                       content:         Seq[MessageContent]    = Seq.empty,
+                       protos:          Seq[GenericMessage]    = Seq.empty,
+                       firstMessage:    Boolean                = false,
+                       members:         Set[UserId]            = Set.empty[UserId],
+                       recipient:       Option[UserId]         = None,
+                       email:           Option[String]         = None,
+                       name:            Option[Name]           = None,
+                       state:           MessageState           = Message.Status.SENT,
+                       time:            RemoteInstant          = RemoteInstant(now(clock)), //TODO: now is local...
+                       localTime:       LocalInstant           = LocalInstant.Epoch,
+                       editTime:        RemoteInstant          = RemoteInstant.Epoch,
+                       ephemeral:       Option[FiniteDuration] = None,
+                       expiryTime:      Option[LocalInstant]   = None, // local expiration time
+                       expired:         Boolean                = false,
+                       duration:        Option[FiniteDuration] = None, //for successful calls and message_timer changes
+                       assetId:         Option[AssetIdGeneral] = None,
                        quote:             Option[QuoteContent]   = None,
                        forceReadReceipts: Option[Int]    = None
                       ) extends Identifiable[MessageId] {
+
+  override def toString: String =
+    s"""
+       |MessageData:
+       | id:            $id
+       | convId:        $convId
+       | msgType:       $msgType
+       | userId:        $userId
+       | protos:        ${protos.toString().replace("\n", "")}
+       | state:         $state
+       | time:          $time
+       | localTime:     $localTime
+       | editTime:      $editTime
+       | members:       $members
+       | content:       ${content.map(c => (c.content, c.mentions))}
+       | other fields:  $firstMessage, $recipient, $email, $name, $ephemeral, $expiryTime, $expired, $duration
+    """.stripMargin
+
+
   def getContent(index: Int) = {
     if (index == 0) content.headOption.getOrElse(MessageContent.Empty)
     else content.drop(index).headOption.getOrElse(MessageContent.Empty)
@@ -106,8 +126,6 @@ case class MessageData(override val id:   MessageId              = MessageId(),
     }
     copy(quote = Some(QuoteContent(quoteId, validity = true, None)), protos = newProtos)
   }
-
-  def assetId = AssetId(id.str)
 
   def isLocal = state == Message.Status.DEFAULT || state == Message.Status.PENDING || state == Message.Status.FAILED || state == Message.Status.FAILED_READ
 
@@ -283,10 +301,10 @@ object MessageContent extends ((Message.Part.Type, String, Option[MediaAssetData
   }
 }
 
-object MessageData extends
-  ((MessageId, ConvId, Message.Type, UserId, Seq[MessageContent], Seq[GenericMessage], Boolean, Set[UserId], Option[UserId],
-    Option[String], Option[Name], Message.Status, RemoteInstant, LocalInstant, RemoteInstant, Option[FiniteDuration],
-    Option[LocalInstant], Boolean, Option[FiniteDuration], Option[QuoteContent], Option[Int]) => MessageData) {
+object MessageData extends ((MessageId, ConvId, Message.Type, UserId, Seq[MessageContent], Seq[GenericMessage], Boolean,
+  Set[UserId], Option[UserId], Option[String], Option[Name], Message.Status, RemoteInstant, LocalInstant, RemoteInstant,
+  Option[FiniteDuration], Option[LocalInstant], Boolean, Option[FiniteDuration], Option[AssetIdGeneral], Option[QuoteContent],
+  Option[Int]) => MessageData) {
 
   val Empty = new MessageData(MessageId(""), ConvId(""), Message.Type.UNKNOWN, UserId(""))
   val Deleted = new MessageData(MessageId(""), ConvId(""), Message.Type.UNKNOWN, UserId(""), state = Message.Status.DELETED)
@@ -367,7 +385,7 @@ object MessageData extends
     }
 
     override def apply(implicit cursor: DBCursor): MessageData =
-      MessageData(Id, Conv, Type, User, Content, Protos, FirstMessage, Members, Recipient, Email, Name, State, Time, LocalTime, EditTime, Ephemeral, ExpiryTime, Expired, Duration, Quote.map(QuoteContent(_, QuoteValidity, None)), ForceReadReceipts)
+      MessageData(Id, Conv, Type, User, Content, Protos, FirstMessage, Members, Recipient, Email, Name, State, Time, LocalTime, EditTime, Ephemeral, ExpiryTime, Expired, Duration, None, Quote.map(QuoteContent(_, QuoteValidity, None)), ForceReadReceipts)
 
     def deleteForConv(id: ConvId)(implicit db: DB) = delete(Conv, id)
 
@@ -497,7 +515,7 @@ object MessageData extends
 
           returning(linkEnd(link.urlOffset)) { end =>
             if (end > link.urlOffset) {
-              val openGraph = Option(link.getArticle).map { a => OpenGraphData(a.title, a.summary, None, "", Option(a.permanentUrl).filter(_.nonEmpty).map(URI.parse)) }
+              val openGraph = Option(link.getArticle).map { a => OpenGraphData(a.title, a.summary, None, "", Option(a.permanentUrl).filter(_.nonEmpty).map(new URL(_))) }
               res += MessageContent(Message.Part.Type.WEB_LINK, message.substring(link.urlOffset, end), openGraph)
             }
           }

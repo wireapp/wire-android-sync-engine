@@ -17,14 +17,13 @@
  */
 package com.waz.model
 
+import java.net.URL
+
 import com.waz.api.{MediaProvider, Message}
 import com.waz.model.messages.media.{MediaAssetData, TrackData}
 import com.waz.specs.AndroidFreeSpec
-import com.waz.sync.client.OpenGraphClient.OpenGraphData
-import com.waz.utils.wrappers.URI
+import com.waz.sync.client.OpenGraphClient.{OpenGraphData, OpenGraphImage}
 import com.waz.utils._
-import org.json.JSONArray
-import org.scalatest._
 import org.threeten.bp
 import org.threeten.bp.Instant
 
@@ -53,7 +52,7 @@ class MessageDataDaoSpec extends AndroidFreeSpec {
         Message.Part.Type.YOUTUBE,
         "youtube link",
         richMedia = Option[MediaAssetData](TrackData(MediaProvider.YOUTUBE, "title", None, "link-url", None, Some(bp.Duration.ofMillis(123L)), streamable = true, None, Some("preview-url"), now)),
-        openGraph = Some(OpenGraphData("wire", "descr", Some(URI.parse("http://www.wire.com")), "website", None)),
+        openGraph = Some(OpenGraphData("wire", "descr", Some(OpenGraphImage(new URL("http://www.wire.com"))), "website", None)),
         Some(assetId),
         100,
         80,

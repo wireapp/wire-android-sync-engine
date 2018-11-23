@@ -77,7 +77,7 @@ object RawAssetStorage {
     val EncryptionSalt = asTextOpt(_.encryptionSalt)('encryption_salt)
     val Type           = text(getAssetTypeString)('type)
     val Details        = asText(_.details)('details)
-    val UploadStatus   = asInt(_.uploadStatus)('upload_status)
+    val UploadStatus   = asInt(_.status)('status)
     val AssetId        = asTextOpt(_.assetId)('asset_id)
     val MessageId      = asText(_.messageId)('message_id)
 

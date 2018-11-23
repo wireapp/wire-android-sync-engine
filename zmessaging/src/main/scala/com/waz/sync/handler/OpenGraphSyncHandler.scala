@@ -17,28 +17,32 @@
  */
 package com.waz.sync.handler
 
+import java.io.File
+
 import com.waz.ZLog.ImplicitTag._
 import com.waz.ZLog._
 import com.waz.api.Message
 import com.waz.api.Message.Part
 import com.waz.api.impl.ErrorResponse
 import com.waz.content._
-import com.waz.model.AssetMetaData.Image.Tag.Medium
 import com.waz.model.GenericContent.{Asset, LinkPreview, Text}
 import com.waz.model.GenericMessage.TextMessage
 import com.waz.model._
-import com.waz.service.assets.AssetService
+import com.waz.model.errors._
+import com.waz.service.assets2.Asset.General
+import com.waz.service.assets2.{AES_CBC_Encryption, AssetService, Content, ContentForUpload, Asset => Asset2}
 import com.waz.service.images.{ImageAssetGenerator, ImageLoader}
 import com.waz.service.messages.MessagesService
 import com.waz.service.otr.OtrServiceImpl
 import com.waz.sync.SyncResult
-import com.waz.sync.SyncResult.{Failure, Success}
-import com.waz.sync.client.AssetClient.Retention
+import com.waz.sync.client.AssetClient2.Retention
 import com.waz.sync.client.OpenGraphClient.OpenGraphData
-import com.waz.sync.client.{AssetClient, OpenGraphClient}
+import com.waz.sync.client.{ErrorOr, OpenGraphClient}
 import com.waz.sync.otr.OtrSyncHandler
+import com.waz.threading.CancellableFuture
 import com.waz.utils.RichFuture
 import com.waz.utils.wrappers.URI
+import com.waz.api.impl.ErrorResponse.{Cancelled, internalError}
 
 import scala.concurrent.Future
 
@@ -52,47 +56,46 @@ class OpenGraphSyncHandler(convs:           ConversationStorage,
                            client:          OpenGraphClient,
                            imageGenerator:  ImageAssetGenerator,
                            imageLoader:     ImageLoader,
-                           messagesService: MessagesService,
-                           assetClient:     AssetClient) { //TODO assetClient not used
+                           messagesService: MessagesService) {
   import com.waz.threading.Threading.Implicits.Background
 
-  def postMessageMeta(convId: ConvId, msgId: MessageId, editTime: RemoteInstant): Future[SyncResult] =
-    messages.getMessage(msgId) flatMap {
-      case None =>
-        Future.successful(Failure(s"No message found with id: $msgId"))
-      case Some(msg) if msg.msgType != Message.Type.RICH_MEDIA =>
-        debug(s"postMessageMeta, message is not RICH_MEDIA: $msg")
-        Future.successful(Success)
-      case Some(msg) if msg.content.forall(_.tpe != Part.Type.WEB_LINK) =>
-        verbose(s"postMessageMeta, no WEB_LINK found in msg: $msg")
-        Future.successful(Success)
-      case Some(msg) if msg.editTime != editTime =>
-        verbose(s"postMessageMeta, message has already been edited: $msg")
-        Future.successful(Success)
-      case Some(msg) =>
-        convs.get(convId) flatMap {
-          case None =>
-            Future.successful(Failure(s"No conversation found with id: $convId"))
-          case Some(conv) =>
-            messagesService.retentionPolicy(conv).future.flatMap { retention =>
-              updateOpenGraphData(msg, retention).flatMap {
-                case Left(errors) => Future.successful(SyncResult(errors.head))
-                case Right(links) =>
-                  updateLinkPreviews(msg, links, retention) flatMap {
-                    case Left(errors) => Future.successful(SyncResult(errors.head))
-                    case Right(TextMessage(_, _, Seq(), _, _)) =>
-                      verbose(s"didn't find any previews in message links: $msg")
-                      Future.successful(Success)
-                    case Right(proto) =>
-                      verbose(s"updated link previews: $proto")
-                      otrSync
-                        .postOtrMessage(conv.id, proto)
-                        .map(SyncResult(_))
-                  }
-              }
+
+
+  def postMessageMeta(convId: ConvId, msgId: MessageId, editTime: RemoteInstant): Future[SyncResult] = messages.getMessage(msgId) flatMap {
+    case None => Future successful SyncResult(internalError(s"No message found with id: $msgId"))
+    case Some(msg) if msg.msgType != Message.Type.RICH_MEDIA =>
+      debug(s"postMessageMeta, message is not RICH_MEDIA: $msg")
+      Future successful SyncResult.Success
+    case Some(msg) if msg.content.forall(_.tpe != Part.Type.WEB_LINK) =>
+      verbose(s"postMessageMeta, no WEB_LINK found in msg: $msg")
+      Future successful SyncResult.Success
+    case Some(msg) if msg.editTime != editTime =>
+      verbose(s"postMessageMeta, message has already been edited: $msg")
+      Future successful SyncResult.Success
+    case Some(msg) =>
+      convs.get(convId) flatMap {
+        case None => Future successful SyncResult(internalError(s"No conversation found with id: $convId"))
+        case Some(conv) =>
+          messagesService.retentionPolicy2(conv).flatMap { retention =>
+            updateOpenGraphData(msg, retention) flatMap {
+              case Left(errors) => Future successful SyncResult(errors.head)
+              case Right(links) =>
+                updateLinkPreviews(msg, links, retention) flatMap {
+                  case Left(errors) => Future successful SyncResult(errors.head)
+                  case Right(TextMessage(_, _, Seq(), _, _)) =>
+                    verbose(s"didn't find any previews in message links: $msg")
+                    Future successful SyncResult.Success
+                  case Right(proto) =>
+                    verbose(s"updated link previews: $proto")
+                    otrSync.postOtrMessage(conv.id, proto) map {
+                      case Left(err) => SyncResult(err)
+                      case Right(_)  => SyncResult.Success
+                    }
+                }
             }
-        }
-    }
+          }
+      }
+  }
 
   private def updateIfNotEdited(msg: MessageData, updater: MessageData => MessageData) =
     messages.update(msg.id, {
@@ -127,7 +130,8 @@ class OpenGraphSyncHandler(convs:           ConversationStorage,
     }
   }
 
-  def updateLinkPreviews(msg: MessageData, links: Seq[MessageContent], retention: Retention) = {
+  //TODO Refactor. Be explicit about intentions in situation when we have few links in one message
+  def updateLinkPreviews(msg: MessageData, links: Seq[MessageContent], retention: Retention): Future[Either[Seq[ErrorResponse], GenericMessage]] = {
 
     def createEmptyPreviews(content: String) = {
       var offset = -1
@@ -142,10 +146,10 @@ class OpenGraphSyncHandler(convs:           ConversationStorage,
       case Some(TextMessage(content, mentions, ps, quote, rr)) =>
         val previews = if (ps.isEmpty) createEmptyPreviews(content) else ps
 
-        RichFuture.traverseSequential(links zip previews) { case (link, preview) => generatePreview(msg.assetId, link.openGraph.get, preview, retention) } flatMap { res =>
+        RichFuture.traverseSequential(links zip previews) { case (link, preview) => generatePreview(msg.id, link.openGraph.get, preview, retention) } flatMap { res =>
           val errors = res collect { case Left(err) => err }
           val updated = (res zip previews) collect {
-            case (Right(p), _) => p
+            case (Right(p), _) => p._2
             case (_, p) => p
           }
 
@@ -159,33 +163,40 @@ class OpenGraphSyncHandler(convs:           ConversationStorage,
     }
   }
 
-  def generatePreview(assetId: AssetId, meta: OpenGraphData, prev: LinkPreview, retention: Retention) = {
+  def generatePreview(messageId: MessageId, meta: OpenGraphData, prev: LinkPreview, retention: Retention): ErrorOr[(Option[AssetId], LinkPreview)] = {
 
-    /**
-      * Generates and uploads link preview image for given open graph metadata.
-      * @return
-      *         Left(error) if upload fails
-      *         Right(None) if metadata doesn't include a link or if source image could not be fetched (XXX: in some cases this could be due to network issues or image download setting preventing us from downloading on metered network)
-      *         Right(Asset) if upload was successful
-      */
-    def uploadImage: Future[Either[ErrorResponse, Option[AssetData]]] = meta.image match {
-      case None => Future successful Right(None)
-      case Some(uri) =>
-        for {
-          Some(asset) <- imageGenerator.generateWireAsset(AssetData.newImageAsset(assetId, Medium).copy(source = Some(uri)), profilePicture = false).map(Some(_)).recover { case _: Throwable => None }.future
-          _           <- assetsStorage.mergeOrCreateAsset(asset) //must be in storage for assetsync
-          resp        <- assetSync.uploadAssetData(asset.id, retention = retention).future
-        } yield resp match {
-          case Right(uploaded)  => Right(Option(uploaded))
-          case Left(err)        => Left(err)
-        }
+    def downloadImageFile: CancellableFuture[Option[File]] = meta.image match {
+      case None => CancellableFuture.successful(None)
+      case Some(image) => client.downloadImage(image).map(Option.apply).recover { case err => None }
     }
-    if (prev.hasArticle) Future successful Right(prev)
-    else
-      uploadImage map {
-        case Left(error) => Left(error)
-        case Right(imageAsset) =>
-          Right(LinkPreview(URI.parse(prev.url), prev.urlOffset, meta.title, meta.description, imageAsset.map(Asset(_, None, expectsReadConfirmation = false)), meta.permanentUrl))
+
+    def uploadImage(imageFile: File): CancellableFuture[Asset2[General]] = {
+      val content = ContentForUpload(s"open_graph_image_${prev.permanentUrl}", Content.File(Mime.Image.Jpg, imageFile))
+      val encryption = AES_CBC_Encryption.random
+      for {
+        rawAsset <- assets.createAndSaveRawAsset(content, encryption, public = false, retention, Some(messageId)).toCancellable
+        asset <- assets.uploadAsset(rawAsset.id)
+      } yield asset
+    }
+
+    if (prev.hasArticle) Future successful Right(None -> prev)
+    else for {
+      imageFile <- downloadImageFile
+      imageAsset <- imageFile match {
+        case None => CancellableFuture.successful(Right(None))
+        case Some(file) =>
+          uploadImage(file)
+            .map(asset => Right(Option(asset)))
+            .recover { case err => Left(ErrorResponse.internalError(s"Error while uploading open graph image $err")) }
       }
+      result = imageAsset.right.map { asset =>
+        val assetId = asset.map(_.id)
+        val messagesAsset = asset.map(Asset.apply(_, None, expectsReadConfirmation = false))
+        val permanentUri = meta.permanentUrl.map(url => URI.parse(url.toString))
+        val preview = LinkPreview(URI.parse(prev.url), prev.urlOffset, meta.title, meta.description, messagesAsset, permanentUri)
+
+        assetId -> preview
+      }
+    } yield result
   }
 }

@@ -25,7 +25,7 @@ import com.waz.model.AssetStatus.{DownloadFailed, UploadCancelled, UploadDone, U
 import com.waz.model.nano.Messages
 import com.waz.model.nano.Messages.MessageEdit
 import com.waz.service.assets2.Asset.{Audio, General, Image, Video}
-import com.waz.service.assets2.{AES_CBC_Encryption, RawAsset, UploadStatus, Asset => Asset2}
+import com.waz.service.assets2.{AES_CBC_Encryption, RawAsset, AssetUploadStatus, Asset => Asset2}
 import com.waz.utils._
 import com.waz.utils.crypto.AESUtils
 import com.waz.utils.wrappers.URI
@@ -258,9 +258,9 @@ object GenericContent {
       returning(new Messages.Asset) { proto =>
         proto.original = Original(asset)
         preview.foreach(p => proto.preview = Preview(p))
-        asset.uploadStatus match {
-          case UploadStatus.Cancelled => proto.setNotUploaded(Messages.Asset.CANCELLED)
-          case UploadStatus.Failed    => proto.setNotUploaded(Messages.Asset.FAILED)
+        asset.status match {
+          case AssetUploadStatus.Cancelled => proto.setNotUploaded(Messages.Asset.CANCELLED)
+          case AssetUploadStatus.Failed    => proto.setNotUploaded(Messages.Asset.FAILED)
           case _ =>
         }
         proto.expectsReadConfirmation = expectsReadConfirmation

@@ -37,6 +37,7 @@ import scala.util.{ Failure, Random, Success }
 class AssetServiceSpec extends ZIntegrationMockSpec {
 
   private val assetStorage        = mock[AssetStorage]
+  private val inProgressAssetStorage   = mock[InProgressAssetStorage]
   private val rawAssetStorage     = mock[RawAssetStorage]
   private val assetDetailsService = mock[AssetDetailsService]
   private val previewService      = mock[AssetPreviewService]
@@ -70,7 +71,7 @@ class AssetServiceSpec extends ZIntegrationMockSpec {
   verbose(l"Test asset: $testAsset")
 
   private val service: AssetService =
-    new AssetServiceImpl(assetStorage, rawAssetStorage, assetDetailsService, previewService, uriHelper, cache, rawCache, client)
+    new AssetServiceImpl(assetStorage, rawAssetStorage, inProgressAssetStorage, assetDetailsService, previewService, uriHelper, cache, rawCache, client)
 
   feature("Assets") {
 

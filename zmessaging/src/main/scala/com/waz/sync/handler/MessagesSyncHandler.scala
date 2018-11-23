@@ -188,7 +188,7 @@ class MessagesSyncHandler(selfUserId: UserId,
     import Message.Type._
 
     msg.msgType match {
-      case _ if msg.isAssetMessage => Cancellable(UploadTaskKey(msg.assetId))(uploadAsset(conv, msg)).future
+      case _ if msg.isAssetMessage => Cancellable(UploadTaskKey(msg.assetId.get))(uploadAsset(conv, msg)).future
       case KNOCK => otrSync.postOtrMessage(conv.id, GenericMessage(msg.id.uid, msg.ephemeral, Proto.Knock(msg.expectsRead.getOrElse(false))))
       case TEXT | TEXT_EMOJI_ONLY => postTextMessage().map(_.map(_.time))
       case RICH_MEDIA =>
@@ -235,7 +235,7 @@ class MessagesSyncHandler(selfUserId: UserId,
 
     //TODO Dean: Update asset status to UploadInProgress after posting original - what about images...?
     def postOriginal(rawAsset: RawAsset[General]): CancellableFuture[RemoteInstant] =
-      if (rawAsset.uploadStatus != UploadStatus.NotStarted) CancellableFuture.successful(msg.time)
+      if (rawAsset.status != AssetUploadStatus.NotStarted) CancellableFuture.successful(msg.time)
       else rawAsset.details match {
         case _: Image => CancellableFuture.successful(msg.time)
         case _ => postAssetMessage(GenericMessage(msg.id.uid, msg.ephemeral, Proto.Asset(rawAsset, None, expectsReadConfirmation = msg.expectsRead.contains(true))))
@@ -282,12 +282,12 @@ class MessagesSyncHandler(selfUserId: UserId,
 
     //want to wait until asset meta and preview data is loaded before we send any messages
     for {
-      _ <- AssetProcessing.get(ProcessingTaskKey(msg.assetId))
+      _ <- AssetProcessing.get(ProcessingTaskKey(msg.assetId.get))
       rawAsset <- rawAssetStorage.findBy(msg.id).toCancellable
       result <- rawAsset match {
         case None =>
           CancellableFuture.successful(Left(internalError(s"no asset found for msg: $msg")))
-        case Some(asset) if asset.uploadStatus == UploadStatus.Cancelled =>
+        case Some(asset) if asset.status == AssetUploadStatus.Cancelled =>
           CancellableFuture.successful(Left(ErrorResponse.Cancelled))
         case Some(asset) =>
           verbose(s"Sending asset: $asset")
