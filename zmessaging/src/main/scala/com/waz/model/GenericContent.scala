@@ -516,7 +516,7 @@ object GenericContent {
 
   type Receipt = Messages.Confirmation
 
-  implicit object Receipt extends GenericContent[Receipt] {
+  object DeliveryReceipt extends GenericContent[Receipt] {
     override def set(msg: GenericMessage) = msg.setConfirmation
 
     def apply(msg: MessageId) = returning(new Messages.Confirmation) { c =>
@@ -525,6 +525,17 @@ object GenericContent {
     }
 
     def unapply(proto: Receipt): Option[MessageId] = if (proto.`type` == Messages.Confirmation.DELIVERED) Some(MessageId(proto.firstMessageId)) else None
+  }
+
+  object ReadReceipt extends GenericContent[Receipt] {
+    override def set(msg: GenericMessage) = msg.setConfirmation
+
+    def apply(msg: MessageId) = returning(new Messages.Confirmation) { c =>
+      c.firstMessageId = msg.str
+      c.`type` = Messages.Confirmation.READ
+    }
+
+    def unapply(proto: Receipt): Option[MessageId] = if (proto.`type` == Messages.Confirmation.READ) Some(MessageId(proto.firstMessageId)) else None
   }
 
   type External = Messages.External

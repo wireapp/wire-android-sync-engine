@@ -82,6 +82,7 @@ class StorageModule(context: Context, val userId: UserId, globalPreferences: Glo
   lazy val msgDeletions:      MsgDeletionStorage      = wire[MsgDeletionStorageImpl]
   lazy val searchQueryCache:  SearchQueryCacheStorage = wire[SearchQueryCacheStorageImpl]
   lazy val msgEdits:          EditHistoryStorage      = wire[EditHistoryStorageImpl]
+  lazy val readReceiptsStorage: ReadReceiptsStorage   = wire[ReadReceiptsStorageImpl]
 }
 
 
@@ -153,6 +154,7 @@ class ZMessaging(val teamId: Option[TeamId], val clientId: ClientId, account: Ac
   def msgDeletions      = storage.msgDeletions
   def msgEdits          = storage.msgEdits
   def searchQueryCache  = storage.searchQueryCache
+  def readReceiptsStorage = storage.readReceiptsStorage
 
   lazy val messagesStorage: MessagesStorage = wire[MessagesStorageImpl]
   lazy val msgAndLikes: MessageAndLikesStorageImpl = wire[MessageAndLikesStorageImpl]
@@ -207,7 +209,7 @@ class ZMessaging(val teamId: Option[TeamId], val clientId: ClientId, account: Ac
   lazy val verificationUpdater                        = wire[VerificationStateUpdater]
   lazy val msgEvents: MessageEventProcessor           = wire[MessageEventProcessor]
   lazy val connection: ConnectionServiceImpl          = wire[ConnectionServiceImpl]
-  lazy val calling: CallingServiceImpl                    = wire[CallingServiceImpl]
+  lazy val calling: CallingServiceImpl                = wire[CallingServiceImpl]
   lazy val callLogging: CallLoggingService            = wire[CallLoggingService]
   lazy val contacts: ContactsServiceImpl              = wire[ContactsServiceImpl]
   lazy val typing: TypingService                      = wire[TypingService]

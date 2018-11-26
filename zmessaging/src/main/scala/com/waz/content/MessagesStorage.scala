@@ -67,6 +67,7 @@ trait MessagesStorage extends CachedStorage[MessageId, MessageData] {
   def countLaterThan(conv: ConvId, time: RemoteInstant): Future[Long]
 
   def findMessagesFrom(conv: ConvId, time: RemoteInstant): Future[IndexedSeq[MessageData]]
+  def findMessagesBetween(conv: ConvId, from: RemoteInstant, to: RemoteInstant): Future[IndexedSeq[MessageData]]
 
   def clear(convId: ConvId, clearTime: RemoteInstant): Future[Unit]
 
@@ -223,6 +224,9 @@ class MessagesStorageImpl(context:     Context,
 
   def findMessagesFrom(conv: ConvId, time: RemoteInstant) =
     find(m => m.convId == conv && !m.time.isBefore(time), MessageDataDao.findMessagesFrom(conv, time)(_), identity)
+
+  def findMessagesBetween(conv: ConvId, from: RemoteInstant, to: RemoteInstant): Future[IndexedSeq[MessageData]] =
+    find(m => !m.isLocal, MessageDataDao.findMessagesBetween(conv, from, to)(_), identity)
 
   override def delete(msg: MessageData) =
     for {

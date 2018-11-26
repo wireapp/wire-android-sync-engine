@@ -23,6 +23,7 @@ import com.waz.log.ZLog2._
 import com.waz.api.IConversation.{Access, AccessRole}
 import com.waz.content._
 import com.waz.model.ConversationData.ConversationType
+import com.waz.model.sync.ReceiptType
 import com.waz.model.{UserId, _}
 import com.waz.service.tracking.TrackingService
 import com.waz.sync.SyncServiceHandle

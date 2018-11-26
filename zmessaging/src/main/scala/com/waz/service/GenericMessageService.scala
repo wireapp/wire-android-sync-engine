@@ -17,7 +17,7 @@
  */
 package com.waz.service
 
-import com.waz.ZLog
+import com.waz.{ZLog, model}
 import com.waz.ZLog.LogTag
 import com.waz.log.ZLog2._
 import com.waz.model.GenericContent._
@@ -60,12 +60,16 @@ class GenericMessageService(selfUserId: UserId,
     }
 
     val confirmed = events collect {
-      case GenericMessageEvent(_, _, _, GenericMessage(_, Receipt(msg))) => msg
+      case GenericMessageEvent(_, _, _, GenericMessage(_, DeliveryReceipt(msg))) => msg
     }
 
     val availabilities = (events collect {
       case GenericMessageEvent(_, _, userId, GenericMessage(_, AvailabilityStatus(available))) => userId -> available
     }).toMap
+
+    val read = events collect {
+      case GenericMessageEvent(_, time, from, GenericMessage(_, Proto.ReadReceipt(msg))) => model.ReadReceipt(msg, from, time)
+    }
 
     for {
       _ <- messages.deleteOnUserRequest(deleted)
@@ -76,7 +80,8 @@ class GenericMessageService(selfUserId: UserId,
       _ <- traverse(cleared) { case (remoteId, timestamp) =>
         convs.processConvWithRemoteId(remoteId, retryAsync = true) { conv => convs.updateConversationCleared(conv.id, timestamp) }
       }
-      _ <- receipts.processReceipts(confirmed)
+      _ <- receipts.processDeliveryReceipts(confirmed)
+      _ <- receipts.processReadReceipts(read)
       _ <- users.storeAvailabilities(availabilities)
     } yield ()
   }

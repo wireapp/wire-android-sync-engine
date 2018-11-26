@@ -24,8 +24,8 @@ import com.waz.content.MessagesStorage
 import com.waz.log.ZLog2._
 import com.waz.model.AssetMetaData.Image.Tag.{Medium, Preview}
 import com.waz.model.AssetStatus.{UploadCancelled, UploadFailed}
-import com.waz.model.GenericContent.{Asset, Calling, Cleared, Ephemeral, ImageAsset, Knock, LastRead, LinkPreview, Location, MsgDeleted, MsgEdit, MsgRecall, Reaction, Receipt, Text}
-import com.waz.model._
+import com.waz.model.GenericContent.{Asset, Calling, Cleared, DeliveryReceipt, Ephemeral, ImageAsset, Knock, LastRead, LinkPreview, Location, MsgDeleted, MsgEdit, MsgRecall, Reaction, Text}
+import com.waz.model.{GenericContent, _}
 import com.waz.service.EventScheduler
 import com.waz.service.assets.AssetService
 import com.waz.service.conversation.{ConversationsContentUpdater, ConversationsService}
@@ -208,7 +208,8 @@ class MessageEventProcessor(selfUserId:          UserId,
       case MsgDeleted(_, _) => MessageData.Empty
       case MsgRecall(_) => MessageData.Empty
       case MsgEdit(_, _) => MessageData.Empty
-      case Receipt(_) => MessageData.Empty
+      case DeliveryReceipt(_) => MessageData.Empty
+      case GenericContent.ReadReceipt(_) => MessageData.Empty
       case Calling(_) => MessageData.Empty
       case Ephemeral(expiry, ct) =>
         content(id, ct, from, time, proto).copy(ephemeral = expiry)

@@ -25,8 +25,6 @@ import com.waz.threading.SerialDispatchQueue
 import com.waz.utils.TrimmingLruCache.Fixed
 import com.waz.utils.events.{AggregatingSignal, EventContext}
 import com.waz.utils._
-import org.threeten.bp.Instant
-import org.threeten.bp.Instant.EPOCH
 
 import scala.collection.{breakOut, mutable}
 import scala.concurrent.duration._

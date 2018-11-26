@@ -29,6 +29,7 @@ import com.waz.model.ConversationData.{ConversationType, getAccessAndRoleForGrou
 import com.waz.model.GenericContent.{Location, MsgEdit, Quote}
 import com.waz.model.UserData.ConnectionStatus
 import com.waz.model._
+import com.waz.model.sync.ReceiptType
 import com.waz.service.AccountsService.InForeground
 import com.waz.service.ZMessaging.currentBeDrift
 import com.waz.service._
@@ -378,13 +379,24 @@ class ConversationsUiServiceImpl(selfUserId:      UserId,
     _   <- sync.postMessage(msg.id, id, msg.editTime)
   } yield Some(msg)
 
-  override def setLastRead(convId: ConvId, msg: MessageData): Future[Option[ConversationData]] =
-    convsContent.updateConversationLastRead(convId, msg.time) map {
-      case Some((_, conv)) =>
-        sync.postLastRead(convId, conv.lastRead)
-        Some(conv)
+  override def setLastRead(convId: ConvId, msg: MessageData): Future[Option[ConversationData]] = {
+
+    def sendReadReceipts(from: RemoteInstant, to: RemoteInstant): Future[Seq[SyncId]] = {
+      messagesStorage.findMessagesBetween(convId, from, to).flatMap { messages =>
+        RichFuture.traverseSequential(messages.filter(_.userId != selfUserId))({ m =>
+          sync.postReceipt(convId, m.id, m.userId, ReceiptType.Read)
+        })
+      }
+    }
+
+    convsContent.updateConversationLastRead(convId, msg.time).map {
+      case Some((oldConv, newConv)) =>
+        sync.postLastRead(convId, newConv.lastRead)
+        sendReadReceipts(oldConv.lastRead, newConv.lastRead)
+        Some(newConv)
       case _ => None
     }
+  }
 
   override def setEphemeral(id: ConvId, expiration: Option[FiniteDuration]) = {
     convStorage.update(id, _.copy(localEphemeral = expiration)).map(_ => {})

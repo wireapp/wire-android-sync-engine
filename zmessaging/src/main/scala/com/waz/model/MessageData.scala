@@ -406,6 +406,9 @@ object MessageData extends
     def findMessagesFrom(conv: ConvId, time: RemoteInstant)(implicit db: DB) =
       iterating(db.query(table.name, null, s"${Conv.name} = '$conv' and ${Time.name} >= ${time.toEpochMilli}", null, null, null, s"${Time.name} ASC"))
 
+    def findMessagesBetween(conv: ConvId, from: RemoteInstant, to: RemoteInstant)(implicit db: DB) =
+      iterating(db.query(table.name, null, s"${Conv.name} = '$conv' and ${Time.name} > ${from.toEpochMilli} and ${Time.name} <= ${to.toEpochMilli}", null, null, null, s"${Time.name} ASC"))
+
     def findExpired(time: LocalInstant = LocalInstant.Now)(implicit db: DB) =
       iterating(db.query(table.name, null, s"${ExpiryTime.name} IS NOT NULL and ${ExpiryTime.name} <= ${time.toEpochMilli}", null, null, null, s"${ExpiryTime.name} ASC"))
 

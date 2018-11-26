@@ -91,7 +91,8 @@ class MessagesSyncHandler(selfUserId: UserId,
     convs.convById(convId) flatMap {
       case Some(conv) =>
         val (msg, recipients) = tpe match {
-          case ReceiptType.Delivery         => (GenericMessage(msgId.uid, Proto.Receipt(msgId)), Set(userId))
+          case ReceiptType.Delivery         => (GenericMessage(msgId.uid, Proto.DeliveryReceipt(msgId))(Proto.DeliveryReceipt), Set(userId))
+          case ReceiptType.Read             => (GenericMessage(msgId.uid, Proto.ReadReceipt(msgId))(Proto.ReadReceipt), Set(userId))
           case ReceiptType.EphemeralExpired => (GenericMessage(msgId.uid, Proto.MsgRecall(msgId)), Set(selfUserId, userId))
         }
 

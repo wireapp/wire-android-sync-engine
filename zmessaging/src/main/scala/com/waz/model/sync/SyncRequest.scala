@@ -427,7 +427,7 @@ object SyncRequest {
         case PostReceipt(_, messageId, userId, tpe) =>
           putId("message", messageId)
           putId("user", userId)
-          o.put("type", tpe)
+          o.put("type", tpe.name)
 
         case PostConnection(_, name, message) =>
           o.put("name", name)

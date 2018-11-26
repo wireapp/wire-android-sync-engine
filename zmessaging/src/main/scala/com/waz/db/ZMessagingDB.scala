@@ -35,6 +35,7 @@ import com.waz.model.MessageData.MessageDataDao
 import com.waz.model.MsgDeletion.MsgDeletionDao
 import com.waz.model.NotificationData.NotificationDataDao
 import com.waz.model.PushNotificationEvents.PushNotificationEventsDao
+import com.waz.model.ReadReceipt.ReadReceiptDao
 import com.waz.model.SearchQueryCache.SearchQueryCacheDao
 import com.waz.model.UserData.UserDataDao
 import com.waz.model.otr.UserClients.UserClientsDao
@@ -53,7 +54,7 @@ class ZMessagingDB(context: Context, dbName: String, tracking: TrackingService) 
 }
 
 object ZMessagingDB {
-  val DbVersion = 112
+  val DbVersion = 113
 
   lazy val daos = Seq (
     UserDataDao, SearchQueryCacheDao, AssetDataDao, ConversationDataDao,
@@ -61,7 +62,8 @@ object ZMessagingDB {
     SyncJobDao, NotificationDataDao, ErrorDataDao, ReceivedPushDataDao,
     ContactHashesDao, ContactsOnWireDao, UserClientsDao, LikingDao,
     ContactsDao, EmailAddressesDao, PhoneNumbersDao, MsgDeletionDao,
-    EditHistoryDao, MessageContentIndexDao, PushNotificationEventsDao
+    EditHistoryDao, MessageContentIndexDao, PushNotificationEventsDao,
+    ReadReceiptDao
   )
 
   lazy val migrations = Seq(
@@ -265,6 +267,9 @@ object ZMessagingDB {
     },
     Migration(111, 112) { db =>
       db.execSQL("ALTER TABLE Conversations ADD COLUMN unread_quote_count INTEGER DEFAULT 0")
+    },
+    Migration(112, 113) { db =>
+      db.execSQL("CREATE TABLE ReadReceipts(message_id TEXT, user_id, timestamp INTEGER, PRIMARY KEY (message_id, user_id))")
     }
   )
 }

@@ -29,6 +29,7 @@ import com.waz.model.AccountData.Password
 import com.waz.model.GenericContent.Location
 import com.waz.model._
 import com.waz.model.otr.{Client, ClientId, UserClients}
+import com.waz.model.sync.ReceiptType
 import com.waz.service.PlaybackRoute
 import com.waz.service.assets.AssetService.RawAssetInput
 import com.waz.service.assets.AssetService.RawAssetInput.{BitmapInput, ByteInput, UriInput, WireAssetInput}
@@ -355,6 +356,13 @@ object ZLog2 {
     }
 
     implicit val LocationLogShow: LogShow[Location] = LogShow.logShowWithHash
+
+    implicit val ReadReceiptShow: LogShow[ReadReceipt] = LogShow.createFrom { r =>
+      import r._
+      l"ReadReceipt($message, $user, $timestamp)"
+    }
+
+    implicit val ReceiptType: LogShow[ReceiptType] = logShowWithToString
   }
 
   trait CanBeShown {
