@@ -134,17 +134,11 @@ class Signal[A](@volatile protected[events] var value: Option[A] = None) extends
     override protected[events] def onUnwire(): Unit = self.unsubscribe(this)
   }
 
-  def head(implicit logTag: LogTag): Future[A] = currentValue match {
-    case Some(v) => CancellableFuture successful v
-    case None =>
-      val p = Promise[A]()
-      val listener = new SignalListener {
-        override def changed(ec: Option[ExecutionContext]): Unit = value foreach p.trySuccess
-      }
-      subscribe(listener)
-      p.future.onComplete(_ => unsubscribe(listener))(Threading.Background)
-      value foreach p.trySuccess
-      p.future
+  def head: Future[A] = {
+    val p = Promise[A]()
+    val subscription = this.apply(p.trySuccess)(EventContext.Global)
+    p.future.onComplete(_ => subscription.destroy())(Threading.Background)
+    p.future
   }
 
   def zip[B](s: Signal[B]): Signal[(A, B)] = new Zip2Signal[A, B](this, s)

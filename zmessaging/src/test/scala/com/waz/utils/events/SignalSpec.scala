@@ -29,6 +29,7 @@ import com.waz.threading.{SerialDispatchQueue, Threading}
 import scala.collection.JavaConverters._
 import scala.concurrent._
 import scala.concurrent.duration._
+import scala.ref.WeakReference
 
 class SignalSpec extends AndroidFreeSpec {
   import scala.concurrent.ExecutionContext.Implicits.global
@@ -130,6 +131,23 @@ class SignalSpec extends AndroidFreeSpec {
       s ! 1
       r.currentValue.get shouldEqual 4
       received shouldEqual Seq(2, 4)
+    }
+  }
+
+  feature("currentValue and head") {
+    scenario("Calling head without a reference to the signal won't allow the signal to be garbage collected") {
+
+      def makeFuture[T](p: Promise[T]) =
+        Signal.future(p.future).head
+
+      val p = Promise[Int]()
+      val future = makeFuture(p)
+
+      System.gc() //TODO this doesn't seem to reproduce the error...
+
+      p.trySuccess(1)
+
+      result(future) shouldEqual 1
     }
   }
 
