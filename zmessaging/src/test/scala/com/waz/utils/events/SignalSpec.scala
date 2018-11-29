@@ -149,6 +149,13 @@ class SignalSpec extends AndroidFreeSpec {
 
       result(future) shouldEqual 1
     }
+
+    scenario("Race condition between mutate and head") {
+      val s = Signal(0)
+      result(s.head) shouldEqual 0
+      await(Future(s.mutate(_ + 1))(Threading.Background)) //mutate signal on another thread
+      result(s.head) shouldEqual 1
+    }
   }
 
   feature("Concurrency") {
