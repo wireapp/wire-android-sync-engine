@@ -29,7 +29,7 @@ import com.waz.api.{Message, TypeFilter}
 import com.waz.db.Col._
 import com.waz.db.Dao
 import com.waz.log.ZLog2._
-import com.waz.model.GenericContent.{Asset, ImageAsset, LinkPreview, Location, MsgEdit, Quote, Text}
+import com.waz.model.GenericContent.{Asset, ImageAsset, Knock, LinkPreview, Location, MsgEdit, Quote, Text}
 import com.waz.model.GenericMessage.{GenericMessageContent, TextMessage}
 import com.waz.model.MessageData.MessageState
 import com.waz.model.messages.media.{MediaAssetData, MediaAssetDataProtocol}
@@ -63,9 +63,7 @@ case class MessageData(id:            MessageId              = MessageId(),
                        expiryTime:    Option[LocalInstant]   = None, // local expiration time
                        expired:       Boolean                = false,
                        duration:      Option[FiniteDuration] = None, //for successful calls and message_timer changes
-                       quote:         Option[MessageId]      = None,
-                       quoteValidity: Boolean                = false,
-                       quoteHash:     Option[Sha256]         = None
+                       quote:         Option[QuoteContent]   = None
                       ) {
   def getContent(index: Int) = {
     if (index == 0) content.headOption.getOrElse(MessageContent.Empty)
@@ -73,29 +71,37 @@ case class MessageData(id:            MessageId              = MessageId(),
   }
 
   lazy val contentString = protos.lastOption match {
-    case Some(TextMessage(ct, _, _, _)) => ct
+    case Some(TextMessage(ct, _, _, _, _)) => ct
     case _ if msgType == api.Message.Type.RICH_MEDIA => content.map(_.content).mkString(" ")
     case _ => content.headOption.fold("")(_.content)
   }
 
   lazy val links: Seq[LinkPreview] = protos.lastOption match {
-    case Some(TextMessage(_, _, links, _)) => links
+    case Some(TextMessage(_, _, links, _, _)) => links
     case _ => Nil
   }
 
   lazy val protoQuote: Option[Quote] = protos.lastOption match {
-    case Some(TextMessage(_, _, _, quote)) => quote
+    case Some(TextMessage(_, _, _, quote, _)) => quote
     case _ => None
+  }
+
+  lazy val expectsRead: Option[Boolean] = protos.lastOption.map {
+    case GenericMessage(_, a @ Text(_, _, _, _))     => a.expectsReadConfirmation
+    case GenericMessage(_, a @ Knock())              => a.expectsReadConfirmation
+    case GenericMessage(_, a @ Location(_, _, _, _)) => a.expectsReadConfirmation
+    case GenericMessage(_, a @ Asset(_, _))          => a.expectsReadConfirmation
+    case _ => false
   }
 
   // used to create a copy of the message quoting the one that had its msgId changed
   def replaceQuote(quoteId: MessageId): MessageData = {
     // we assume that the reply is already valid, so we don't have to update the hash (the old one is invalid)
     val newProtos = protos.lastOption match {
-      case Some(TextMessage(text, ms, ls, Some(q))) => Seq(TextMessage(text, ms, ls, Some(Quote(quoteId, None))))
+      case Some(TextMessage(text, ms, ls, Some(q), rr)) => Seq(TextMessage(text, ms, ls, Some(Quote(quoteId, None)), rr))
       case _ => protos
     }
-    copy(quote = Some(quoteId), quoteHash = None, protos = newProtos)
+    copy(quote = Some(QuoteContent(quoteId, validity = true, None)), protos = newProtos)
   }
 
   def assetId = AssetId(id.str)
@@ -167,12 +173,12 @@ case class MessageData(id:            MessageId              = MessageId(),
       val newMentions = newContent.flatMap(_.mentions)
 
       val newProto = protos.lastOption match {
-        case Some(GenericMessage(uid, MsgEdit(ref, Text(_, _, links, quote)))) =>
-          GenericMessage(uid, MsgEdit(ref, Text(contentString, newMentions, links, quote)))
-        case Some(GenericMessage(uid, Text(_, _, links, quote))) =>
-          GenericMessage(uid, ephemeral, Text(contentString, newMentions, links, quote))
+        case Some(GenericMessage(uid, MsgEdit(ref, t @ Text(_, _, links, quote)))) =>
+          GenericMessage(uid, MsgEdit(ref, Text(contentString, newMentions, links, quote, t.expectsReadConfirmation)))
+        case Some(GenericMessage(uid, t @ Text(_, _, links, quote))) =>
+          GenericMessage(uid, ephemeral, Text(contentString, newMentions, links, quote, t.expectsReadConfirmation))
         case _ =>
-          GenericMessage(id.uid, ephemeral, Text(contentString, newMentions, Nil))
+          GenericMessage(id.uid, ephemeral, Text(contentString, newMentions, Nil, expectsRead.getOrElse(false)))
       }
 
       if (content == newContent && protos.lastOption.contains(newProto)) None
@@ -193,6 +199,8 @@ case class MessageContent(tpe:        Message.Part.Type,
 
   def contentAsUri: URI = RichMediaContentParser.parseUriWithScheme(content)
 }
+
+case class QuoteContent(message: MessageId, validity: Boolean, hash: Option[Sha256] = None)
 
 object MessageContent extends ((Message.Part.Type, String, Option[MediaAssetData], Option[OpenGraphData], Option[AssetId], Int, Int, Boolean, Seq[Mention]) => MessageContent) {
 
@@ -275,7 +283,7 @@ object MessageContent extends ((Message.Part.Type, String, Option[MediaAssetData
 object MessageData extends
   ((MessageId, ConvId, Message.Type, UserId, Seq[MessageContent], Seq[GenericMessage], Boolean, Set[UserId], Option[UserId],
     Option[String], Option[Name], Message.Status, RemoteInstant, LocalInstant, RemoteInstant, Option[FiniteDuration],
-    Option[LocalInstant], Boolean, Option[FiniteDuration], Option[MessageId], Boolean, Option[Sha256]) => MessageData) {
+    Option[LocalInstant], Boolean, Option[FiniteDuration], Option[QuoteContent]) => MessageData) {
 
   val Empty = new MessageData(MessageId(""), ConvId(""), Message.Type.UNKNOWN, UserId(""))
   val Deleted = new MessageData(MessageId(""), ConvId(""), Message.Type.UNKNOWN, UserId(""), state = Message.Status.DELETED)
@@ -339,8 +347,8 @@ object MessageData extends
     val ExpiryTime = opt(localTimestamp('expiry_time))(_.expiryTime)
     val Expired = bool('expired)(_.expired)
     val Duration = opt(finiteDuration('duration))(_.duration)
-    val Quote         = opt(id[MessageId]('quote))(_.quote)
-    val QuoteValidity = bool('quote_validity)(_.quoteValidity)
+    val Quote         = opt(id[MessageId]('quote))(_.quote.map(_.message))
+    val QuoteValidity = bool('quote_validity)(_.quote.exists(_.validity))
 
     override val idCol = Id
 
@@ -353,7 +361,7 @@ object MessageData extends
     }
 
     override def apply(implicit cursor: DBCursor): MessageData =
-      MessageData(Id, Conv, Type, User, Content, Protos, FirstMessage, Members, Recipient, Email, Name, State, Time, LocalTime, EditTime, Ephemeral, ExpiryTime, Expired, Duration, Quote, QuoteValidity)
+      MessageData(Id, Conv, Type, User, Content, Protos, FirstMessage, Members, Recipient, Email, Name, State, Time, LocalTime, EditTime, Ephemeral, ExpiryTime, Expired, Duration, Quote.map(QuoteContent(_, QuoteValidity, None)))
 
     def deleteForConv(id: ConvId)(implicit db: DB) = delete(Conv, id)
 

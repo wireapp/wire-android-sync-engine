@@ -119,7 +119,8 @@ class ConversationsUiServiceImpl(selfUserId:      UserId,
                                  client:          ConversationsClient,
                                  accounts:        AccountsService,
                                  tracking:        TrackingService,
-                                 errors:          ErrorsService) extends ConversationsUiService {
+                                 errors:          ErrorsService,
+                                 userPreferences: UserPreferences) extends ConversationsUiService {
   import ConversationsUiService._
   import Threading.Implicits.Background
 
@@ -128,7 +129,8 @@ class ConversationsUiServiceImpl(selfUserId:      UserId,
 
   override def sendTextMessage(convId: ConvId, text: String, mentions: Seq[Mention] = Nil, exp: Option[Option[FiniteDuration]] = None) =
     for {
-      msg <- messages.addTextMessage(convId, text, mentions, exp)
+      rr  <- userPreferences(UserPreferences.ReadReceiptsEnabled).apply()
+      msg <- messages.addTextMessage(convId, text, rr, mentions, exp)
       _   <- updateLastRead(msg)
       _   <- sync.postMessage(msg.id, convId, msg.editTime)
     } yield Some(msg)
@@ -137,14 +139,16 @@ class ConversationsUiServiceImpl(selfUserId:      UserId,
     Future.sequence(convs.map(id => sendTextMessage(id, text, mentions, Some(exp)))).map(_ => {})
 
   override def sendReplyMessage(quote: MessageId, text: String, mentions: Seq[Mention] = Nil, exp: Option[Option[FiniteDuration]] = None) =
-    messages.addReplyMessage(quote, text, mentions, exp).flatMap {
-      case Some(m) =>
-        for {
-          _ <- updateLastRead(m)
-          _ <- sync.postMessage(m.id, m.convId, m.editTime)
-        } yield Some(m)
-      case None =>
-        Future.successful(None)
+    userPreferences(UserPreferences.ReadReceiptsEnabled).apply().flatMap { rr =>
+      messages.addReplyMessage(quote, text, rr, mentions, exp).flatMap {
+        case Some(m) =>
+          for {
+            _ <- updateLastRead(m)
+            _ <- sync.postMessage(m.id, m.convId, m.editTime)
+          } yield Some(m)
+        case None =>
+          Future.successful(None)
+      }
     }
 
   override def sendAssetMessage(convId: ConvId, rawInput: RawAssetInput, confirmation: WifiWarningConfirmation = DefaultConfirmation, exp: Option[Option[FiniteDuration]] = None) =
@@ -165,7 +169,8 @@ class ConversationsUiServiceImpl(selfUserId:      UserId,
   private def postAssetMessage(convId: ConvId, asset: AssetData, confirmation: WifiWarningConfirmation, exp: Option[Option[FiniteDuration]] = None) = {
     verbose(l"postAssetMessage: $convId, $asset")
     for {
-      message    <- messages.addAssetMessage(convId, asset, exp)
+      rr         <- userPreferences(UserPreferences.ReadReceiptsEnabled).apply()
+      message    <- messages.addAssetMessage(convId, asset, rr, exp)
       _          <- updateLastRead(message)
       _          <- Future.successful(tracking.assetContribution(asset.id, selfUserId))
       shouldSend <- checkSize(convId, Some(asset.size), asset.mime, message, confirmation)
@@ -174,9 +179,9 @@ class ConversationsUiServiceImpl(selfUserId:      UserId,
   }
 
   override def sendLocationMessage(convId: ConvId, l: api.MessageContent.Location): Future[Some[MessageData]] = {
-    val loc = Location(l.getLongitude, l.getLatitude, l.getName, l.getZoom)
     for {
-      msg <- messages.addLocationMessage(convId, loc)
+      rr  <- userPreferences(UserPreferences.ReadReceiptsEnabled).apply()
+      msg <- messages.addLocationMessage(convId, Location(l.getLongitude, l.getLatitude, l.getName, l.getZoom, rr))
       _   <- updateLastRead(msg)
       _   <- sync.postMessage(msg.id, convId, msg.editTime)
     } yield Some(msg)
@@ -191,7 +196,7 @@ class ConversationsUiServiceImpl(selfUserId:      UserId,
         m.copy(
           msgType = tpe,
           content = ct,
-          protos = Seq(GenericMessage(Uid(), MsgEdit(id, GenericContent.Text(text, ct.flatMap(_.mentions), Nil, m.protoQuote)))),
+          protos = Seq(GenericMessage(Uid(), MsgEdit(id, GenericContent.Text(text, ct.flatMap(_.mentions), Nil, m.protoQuote, m.expectsRead.getOrElse(false))))),
           state = Message.Status.PENDING,
           editTime = (m.time max m.editTime) + 1.millis max LocalInstant.Now.toRemote(currentBeDrift)
         )
@@ -375,27 +380,43 @@ class ConversationsUiServiceImpl(selfUserId:      UserId,
   }
 
   override def knock(id: ConvId): Future[Option[MessageData]] = for {
-    msg <- messages.addKnockMessage(id, selfUserId)
+    rr  <- userPreferences(UserPreferences.ReadReceiptsEnabled).apply()
+    msg <- messages.addKnockMessage(id, selfUserId, rr)
     _   <- sync.postMessage(msg.id, id, msg.editTime)
   } yield Some(msg)
 
   override def setLastRead(convId: ConvId, msg: MessageData): Future[Option[ConversationData]] = {
 
-    def sendReadReceipts(from: RemoteInstant, to: RemoteInstant): Future[Seq[SyncId]] = {
-      messagesStorage.findMessagesBetween(convId, from, to).flatMap { messages =>
-        RichFuture.traverseSequential(messages.filter(_.userId != selfUserId))({ m =>
-          sync.postReceipt(convId, m.id, m.userId, ReceiptType.Read)
-        })
+    def sendReadReceipts(from: RemoteInstant, to: RemoteInstant, groupPref: Option[Boolean], userPref: Boolean): Future[Seq[SyncId]] = {
+      verbose(l"sendReadReceipts($from, $to, $groupPref, $userPref)")
+      if ((!userPref && groupPref.isEmpty) || groupPref.contains(false)) {
+        Future.successful(Seq())
+      } else {
+        messagesStorage.findMessagesBetween(convId, from, to).flatMap { messages =>
+          RichFuture.traverseSequential(messages.filter(_.userId != selfUserId))({ m =>
+            if ((m.expectsRead.contains(true) && userPref && groupPref.isEmpty) || groupPref.contains(true)) {
+              sync.postReceipt(convId, m.id, m.userId, ReceiptType.Read).map(Some(_))
+            } else {
+              Future.successful(Option.empty[SyncId])
+            }
+          }).map(_.flatten)
+        }
       }
     }
 
-    convsContent.updateConversationLastRead(convId, msg.time).map {
-      case Some((oldConv, newConv)) =>
-        sync.postLastRead(convId, newConv.lastRead)
-        sendReadReceipts(oldConv.lastRead, newConv.lastRead)
-        Some(newConv)
-      case _ => None
-    }
+    for {
+      userPref <- userPreferences(UserPreferences.ReadReceiptsEnabled).apply()
+      isGroup <- convs.isGroupConversation(convId)
+      update <- convsContent.updateConversationLastRead(convId, msg.time)
+      _ <- update.fold(Future.successful({})) {
+        case (_, newConv) => sync.postLastRead(convId, newConv.lastRead).map(_ => {})
+      }
+      _ <- update.fold(Future.successful({})) {
+        case (oldConv, newConv) =>
+          val groupPref = Option(true).filter(_ => !isGroup) //TODO: Add the setting in the ConvData
+          sendReadReceipts(oldConv.lastRead, newConv.lastRead, groupPref, userPref).map(_ => {})
+      }
+    } yield update.map(_._2)
   }
 
   override def setEphemeral(id: ConvId, expiration: Option[FiniteDuration]) = {

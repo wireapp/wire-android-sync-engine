@@ -64,12 +64,12 @@ class MessageEventProcessor(selfUserId:          UserId,
     val (standard, quotes) = msgs.partition(_.quote.isEmpty)
 
     for {
-      originals     <- storage.getMessages(quotes.flatMap(_.quote): _*)
+      originals     <- storage.getMessages(quotes.flatMap(_.quote.map(_.message)): _*)
       hashes        <- replyHashing.hashMessages(originals.flatten)
       updatedQuotes =  quotes.map(q => q.quote match {
-                         case Some(id) if hashes.contains(id) =>
-                           val newValidity = q.quoteHash.contains(hashes(id))
-                           if (q.quoteValidity != newValidity) q.copy(quoteValidity = newValidity) else q
+                         case Some(QuoteContent(message, validity, hash)) if hashes.contains(message) =>
+                           val newValidity = hash.contains(hashes(message))
+                           if (validity != newValidity) q.copy(quote = Some(QuoteContent(message, newValidity, hash) )) else q
                          case _ => q
                        })
     } yield standard ++ updatedQuotes
@@ -184,8 +184,8 @@ class MessageEventProcessor(selfUserId:          UserId,
       case Text(text, mentions, links, quote) =>
         val (tpe, content) = MessageData.messageContent(text, mentions, links)
         verbose(l"MessageData content: $content")
-        val messageData = MessageData(id, conv.id, tpe, from, content, time = time, localTime = event.localTime, protos = Seq(proto),
-          quote = quote.map(q => MessageId(q.quotedMessageId)), quoteHash = quote.map(q => Sha256(q.quotedMessageSha256)))
+        val quoteContent = quote.map(q => QuoteContent(MessageId(q.quotedMessageId), validity = false, Some(Sha256(q.quotedMessageSha256))))
+        val messageData = MessageData(id, conv.id, tpe, from, content, time = time, localTime = event.localTime, protos = Seq(proto), quote = quoteContent)
         messageData.adjustMentions(false).getOrElse(messageData)
       case Knock() =>
         MessageData(id, conv.id, Message.Type.KNOCK, from, time = time, localTime = event.localTime, protos = Seq(proto))
@@ -249,8 +249,8 @@ class MessageEventProcessor(selfUserId:          UserId,
       * We may need to do more involved checks in future.
       */
     def sanitize(msg: GenericMessage): GenericMessage = msg match {
-      case GenericMessage(uid, Text(text, mentions, links, quote)) if text.length > MaxTextContentLength =>
-        GenericMessage(uid, Text(text.take(MaxTextContentLength), mentions, links.filter { p => p.url.length + p.urlOffset <= MaxTextContentLength }, quote))
+      case GenericMessage(uid, t @ Text(text, mentions, links, quote)) if text.length > MaxTextContentLength =>
+        GenericMessage(uid, Text(text.take(MaxTextContentLength), mentions, links.filter { p => p.url.length + p.urlOffset <= MaxTextContentLength }, quote, t.expectsReadConfirmation))
       case _ =>
         msg
     }

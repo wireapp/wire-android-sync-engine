@@ -41,7 +41,7 @@ class ReadReceiptsStorageImpl(context: Context, storage: Database) extends Cache
 
   override def receipts(message: MessageId): Signal[Seq[ReadReceipt]] = {
     val changed = onChanged.map(_.filter(_.message == message).map(_.id)).union(onDeleted.map(_.filter(_._1 == message)))
-    RefreshingSignal[Seq[ReadReceipt], Seq[ReadReceipt.Id]](getReceipts(message), changed)
+    RefreshingSignal[Seq[ReadReceipt]](getReceipts(message), changed)
   }
 }
 

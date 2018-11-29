@@ -164,10 +164,10 @@ class MessagesStorageImpl(context:     Context,
       msgs.acquire { msgs =>
         val unread = msgs.filter { m => !m.isLocal && m.convId == conv && m.time.isAfter(lastReadTime) && !m.isDeleted && m.userId != selfUserId && m.msgType != Message.Type.UNKNOWN }.toVector
 
-        val repliesNotMentionsCount = getAll(unread.filter(!_.hasMentionOf(selfUserId)).flatMap(_.quote)).map(_.flatten)
+        val repliesNotMentionsCount = getAll(unread.filter(!_.hasMentionOf(selfUserId)).flatMap(_.quote.map(_.message))).map(_.flatten)
           .map { quotes =>
             unread.count { m =>
-              val quote = quotes.find(q => m.quote.contains(q.id))
+              val quote = quotes.find(q => m.quote.map(_.message).contains(q.id))
               quote.exists(_.userId == selfUserId)
             }
           }
@@ -346,7 +346,7 @@ class MessageAndLikesStorageImpl(selfUserId: UserId, messages: MessagesStorage, 
   override def combineWithLikes(msg: MessageData): Future[MessageAndLikes] = combineWithLikes(Seq(msg)).map(_.head)
 
   def getQuotes(msgs: Seq[MessageData]): Future[Map[MessageId, Option[MessageData]]] = {
-    Future.sequence(msgs.flatMap(m => m.quote.map(m.id -> _).toSeq).map {
+    Future.sequence(msgs.flatMap(m => m.quote.map(m.id -> _.message).toSeq).map {
       case (m, q) => messages.getMessage(q).map(m -> _)
     }).map(_.toMap)
   }

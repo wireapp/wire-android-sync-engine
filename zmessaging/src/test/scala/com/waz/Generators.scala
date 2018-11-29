@@ -114,6 +114,14 @@ object Generators {
     length <- chooseNum(1,10)
   } yield Mention(id, start, length))
 
+  implicit lazy val arbQuoteContent: Arbitrary[QuoteContent] = Arbitrary(for {
+    message <- arbitrary[MessageId]
+    validity <- arbitrary[Boolean]
+    hash <- optGen(arbitrary[Sha256])
+  } yield QuoteContent(message, validity, hash))
+
+  implicit lazy val arbOptQuoteContent: Arbitrary[Option[QuoteContent]] = Arbitrary(optGen(arbitrary[QuoteContent]))
+
   implicit lazy val arbMessageData: Arbitrary[MessageData] = Arbitrary(resultOf(MessageData))
 
   implicit lazy val arbAssetData: Arbitrary[AssetData] = Arbitrary(for {
