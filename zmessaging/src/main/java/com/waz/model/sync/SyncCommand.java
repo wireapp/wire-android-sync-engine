@@ -33,6 +33,7 @@ public enum SyncCommand {
     SyncSearchQuery("sync-search"),
     ExactMatchHandle("exact-match"),
     PostConv("post-conv"),
+    PostConvReceiptMode("post-conv-receipt-mode"),
     PostConvName("post-conv-name"),
     PostConvState("post-conv-state"),
     PostLastRead("post-last-read"),

@@ -61,11 +61,12 @@ trait SyncServiceHandle {
   def postLiking(id: ConvId, liking: Liking): Future[SyncId]
   def postConnection(user: UserId, name: Name, message: String): Future[SyncId]
   def postConnectionStatus(user: UserId, status: ConnectionStatus): Future[SyncId]
+  def postReceiptMode(id: ConvId, receiptMode: Int): Future[SyncId]
   def postConversationName(id: ConvId, name: Name): Future[SyncId]
   def postConversationMemberJoin(id: ConvId, members: Seq[UserId]): Future[SyncId]
   def postConversationMemberLeave(id: ConvId, member: UserId): Future[SyncId]
   def postConversationState(id: ConvId, state: ConversationState): Future[SyncId]
-  def postConversation(id: ConvId, users: Set[UserId], name: Option[Name], team: Option[TeamId], access: Set[Access], accessRole: AccessRole): Future[SyncId]
+  def postConversation(id: ConvId, users: Set[UserId], name: Option[Name], team: Option[TeamId], access: Set[Access], accessRole: AccessRole, receiptMode: Option[Int]): Future[SyncId]
   def postLastRead(id: ConvId, time: RemoteInstant): Future[SyncId]
   def postCleared(id: ConvId, time: RemoteInstant): Future[SyncId]
   def postAddressBook(ab: AddressBook): Future[SyncId]
@@ -142,7 +143,9 @@ class AndroidSyncServiceHandle(account: UserId, service: SyncRequestService, tim
   def postConversationState(id: ConvId, state: ConversationState) = addRequest(PostConvState(id, state))
   def postConversationMemberJoin(id: ConvId, members: Seq[UserId]) = addRequest(PostConvJoin(id, members.toSet))
   def postConversationMemberLeave(id: ConvId, member: UserId) = addRequest(PostConvLeave(id, member))
-  def postConversation(id: ConvId, users: Set[UserId], name: Option[Name], team: Option[TeamId], access: Set[Access], accessRole: AccessRole) = addRequest(PostConv(id, users, name, team, access, accessRole))
+  def postConversation(id: ConvId, users: Set[UserId], name: Option[Name], team: Option[TeamId], access: Set[Access], accessRole: AccessRole, receiptMode: Option[Int]): Future[SyncId]
+  = addRequest(PostConv(id, users, name, team, access, accessRole, receiptMode))
+  def postReceiptMode(id: ConvId, receiptMode: Int): Future[SyncId] = addRequest(PostConvReceiptMode(id, receiptMode))
   def postLiking(id: ConvId, liking: Liking): Future[SyncId] = addRequest(PostLiking(id, liking))
   def postLastRead(id: ConvId, time: RemoteInstant) = addRequest(PostLastRead(id, time), priority = Priority.Low, delay = timeouts.messages.lastReadPostDelay)
   def postCleared(id: ConvId, time: RemoteInstant) = addRequest(PostCleared(id, time))
@@ -234,8 +237,9 @@ class AccountSyncHandler(accounts: AccountsService) extends SyncHandler {
           case PostAssetStatus(cid, mid, exp, status)              => zms.messagesSync.postAssetStatus(cid, mid, exp, status)
           case PostConvJoin(convId, u)                             => zms.conversationSync.postConversationMemberJoin(convId, u)
           case PostConvLeave(convId, u)                            => zms.conversationSync.postConversationMemberLeave(convId, u)
-          case PostConv(convId, u, name, team, access, accessRole) => zms.conversationSync.postConversation(convId, u, name, team, access, accessRole)
+          case PostConv(convId, u, name, team, access, accessRole, receiptMode) => zms.conversationSync.postConversation(convId, u, name, team, access, accessRole, receiptMode)
           case PostConvName(convId, name)                          => zms.conversationSync.postConversationName(convId, name)
+          case PostConvReceiptMode(convId, receiptMode)            => zms.conversationSync.postConversationReceiptMode(convId, receiptMode)
           case PostConvState(convId, state)                        => zms.conversationSync.postConversationState(convId, state)
           case PostTypingState(convId, ts)                         => zms.typingSync.postTypingState(convId, ts)
           case PostCleared(convId, time)                           => zms.clearedSync.postCleared(convId, time)

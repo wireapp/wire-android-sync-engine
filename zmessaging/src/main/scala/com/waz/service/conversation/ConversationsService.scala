@@ -51,6 +51,7 @@ trait ConversationsService {
   def getSelfConversation: Future[Option[ConversationData]]
   def updateConversationsWithDeviceStartMessage(conversations: Seq[ConversationResponse]): Future[Unit]
   def setConversationArchived(id: ConvId, archived: Boolean): Future[Option[ConversationData]]
+  def setReceiptMode(id: ConvId, receiptMode: Int): Future[Option[ConversationData]]
   def forceNameUpdate(id: ConvId): Future[Option[(ConversationData, ConversationData)]]
   def onMemberAddFailed(conv: ConvId, users: Set[UserId], error: Option[ErrorType], resp: ErrorResponse): Future[Unit]
   def groupConversation(convId: ConvId): Signal[Boolean]
@@ -194,6 +195,9 @@ class ConversationsServiceImpl(teamId:          Option[TeamId],
     case ConversationCodeDeleteEvent(_, _, _) =>
       convsStorage.update(conv.id, _.copy(link = None))
 
+    case ConversationReceiptModeEvent(_, _, _, receiptMode) =>
+      content.updateReceiptMode(conv.id, receiptMode = receiptMode)
+
     case MessageTimerEvent(_, time, from, duration) =>
       convsStorage.update(conv.id, _.copy(globalEphemeral = duration))
 
@@ -256,7 +260,9 @@ class ConversationsServiceImpl(teamId:          Option[TeamId],
             access          = resp.access,
             accessRole      = resp.accessRole,
             link            = resp.link,
-            globalEphemeral = resp.messageTimer
+            globalEphemeral = resp.messageTimer,
+            receiptMode     = resp.receiptMode
+
           ))(c => if (prev.isEmpty) created += c)
       }
 
@@ -287,6 +293,13 @@ class ConversationsServiceImpl(teamId:          Option[TeamId],
   def setConversationArchived(id: ConvId, archived: Boolean) = content.updateConversationArchived(id, archived) flatMap {
     case Some((_, conv)) =>
       sync.postConversationState(id, ConversationState(archived = Some(conv.archived), archiveTime = Some(conv.archiveTime))) map { _ => Some(conv) }
+    case None =>
+      Future successful None
+  }
+
+  def setReceiptMode(id: ConvId, receiptMode: Int) = content.updateReceiptMode(id, receiptMode).flatMap {
+    case Some((_, conv)) =>
+      sync.postReceiptMode(id, receiptMode) map { _ => Some(conv) }
     case None =>
       Future successful None
   }

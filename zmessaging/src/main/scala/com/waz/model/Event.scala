@@ -125,6 +125,7 @@ case class ConnectRequestEvent(convId: RConvId, time: RemoteInstant, from: UserI
 case class ConversationAccessEvent(convId: RConvId, time: RemoteInstant, from: UserId, access: Set[Access], accessRole: AccessRole) extends ConversationStateEvent
 case class ConversationCodeUpdateEvent(convId: RConvId, time: RemoteInstant, from: UserId, link: ConversationData.Link) extends ConversationStateEvent
 case class ConversationCodeDeleteEvent(convId: RConvId, time: RemoteInstant, from: UserId) extends ConversationStateEvent
+case class ConversationReceiptModeEvent(convId: RConvId, time: RemoteInstant, from: UserId, receiptMode: Int) extends ConversationStateEvent
 
 sealed trait OtrEvent extends ConversationEvent {
   val sender: ClientId
@@ -246,6 +247,7 @@ object ConversationEvent {
         case "conversation.access-update"        => ConversationAccessEvent('conversation, time, 'from, decodeAccess('access)(d.get), decodeAccessRole('access_role)(d.get))
         case "conversation.code-update"          => ConversationCodeUpdateEvent('conversation, time, 'from, ConversationData.Link(d.get.getString("uri")))
         case "conversation.code-delete"          => ConversationCodeDeleteEvent('conversation, time, 'from)
+        case "conversation.receipt-mode-update"  => ConversationReceiptModeEvent('conversation, time, 'from, decodeInt('receipt_mode)(d.get))
         case "conversation.message-timer-update" => MessageTimerEvent('conversation, time, 'from, decodeOptLong('message_timer)(d.get).map(EphemeralDuration(_)))
 
           //Note, the following events are not from the backend, but are the result of decrypting and re-encoding conversation.otr-message-add events - hence the different name for `convId

@@ -54,7 +54,7 @@ class ZMessagingDB(context: Context, dbName: String, tracking: TrackingService) 
 }
 
 object ZMessagingDB {
-  val DbVersion = 113
+  val DbVersion = 114
 
   lazy val daos = Seq (
     UserDataDao, SearchQueryCacheDao, AssetDataDao, ConversationDataDao,
@@ -270,6 +270,9 @@ object ZMessagingDB {
     },
     Migration(112, 113) { db =>
       db.execSQL("CREATE TABLE ReadReceipts(message_id TEXT, user_id, timestamp INTEGER, PRIMARY KEY (message_id, user_id))")
+    },
+    Migration(113, 114) { db =>
+      db.execSQL("ALTER TABLE Conversations ADD COLUMN receipt_mode INTEGER DEFAULT 0")
     }
   )
 }

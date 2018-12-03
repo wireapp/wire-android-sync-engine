@@ -132,13 +132,20 @@ object SyncRequest {
     override val mergeKey: Any = (cmd, availability.id)
   }
 
-  case class PostConv(convId:     ConvId,
-                      users:      Set[UserId],
-                      name:       Option[Name],
-                      team:       Option[TeamId],
-                      access:     Set[Access],
-                      accessRole: AccessRole) extends RequestForConversation(Cmd.PostConv) with Serialized {
+  case class PostConv(convId:       ConvId,
+                      users:        Set[UserId],
+                      name:         Option[Name],
+                      team:         Option[TeamId],
+                      access:       Set[Access],
+                      accessRole:   AccessRole,
+                      receiptMode:  Option[Int]
+                     ) extends RequestForConversation(Cmd.PostConv) with Serialized {
     override def merge(req: SyncRequest) = mergeHelper[PostConv](req)(Merged(_))
+  }
+
+  case class PostConvReceiptMode(convId: ConvId, receiptMode: Int)
+    extends RequestForConversation(Cmd.PostConvReceiptMode) with Serialized {
+    override def merge(req: SyncRequest) = mergeHelper[PostConvReceiptMode](req)(Merged(_))
   }
 
   case class PostConvName(convId: ConvId, name: Name) extends RequestForConversation(Cmd.PostConvName) with Serialized {
@@ -324,8 +331,9 @@ object SyncRequest {
           case Cmd.SyncConvLink              => SyncConvLink('conv)
           case Cmd.SyncSearchQuery           => SyncSearchQuery(SearchQuery.fromCacheKey(decodeString('queryCacheKey)))
           case Cmd.ExactMatchHandle          => ExactMatchHandle(Handle(decodeString('handle)))
-          case Cmd.PostConv                  => PostConv(convId, decodeStringSeq('users).map(UserId(_)).toSet, 'name, 'team, 'access, 'access_role)
+          case Cmd.PostConv                  => PostConv(convId, decodeStringSeq('users).map(UserId(_)).toSet, 'name, 'team, 'access, 'access_role, 'receipt_mode)
           case Cmd.PostConvName              => PostConvName(convId, 'name)
+          case Cmd.PostConvReceiptMode       => PostConvReceiptMode(convId, 'receipt_mode)
           case Cmd.PostConvState             => PostConvState(convId, JsonDecoder[ConversationState]('state))
           case Cmd.PostLastRead              => PostLastRead(convId, 'time)
           case Cmd.PostCleared               => PostCleared(convId, 'time)
@@ -448,12 +456,14 @@ object SyncRequest {
         case PostTypingState(_, typing) => o.put("typing", typing)
         case PostConvState(_, state) => o.put("state", JsonEncoder.encode(state))
         case PostConvName(_, name) => o.put("name", name)
-        case PostConv(_, users, name, team, access, accessRole) =>
+        case PostConvReceiptMode(_, receiptMode) => o.put("receipt_mode", receiptMode)
+        case PostConv(_, users, name, team, access, accessRole, receiptMode) =>
           o.put("users", arrString(users.map(_.str).toSeq))
           name.foreach(o.put("name", _))
           team.foreach(o.put("team", _))
           o.put("access", JsonEncoder.encodeAccess(access))
           o.put("access_role", JsonEncoder.encodeAccessRole(accessRole))
+          receiptMode.foreach(o.put("receipt_mode", _))
         case PostAddressBook(ab) => o.put("addressBook", JsonEncoder.encode(ab))
         case PostLiking(_, liking) =>
           o.put("liking", JsonEncoder.encode(liking))

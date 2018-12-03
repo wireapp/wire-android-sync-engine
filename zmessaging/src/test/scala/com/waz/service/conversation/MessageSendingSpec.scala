@@ -28,6 +28,7 @@ import com.waz.service.messages.{MessagesContentUpdater, MessagesService}
 import com.waz.specs.AndroidFreeSpec
 import com.waz.sync.SyncServiceHandle
 import com.waz.sync.client.ConversationsClient
+import com.waz.testutils.TestUserPreferences
 import com.waz.threading.Threading
 
 import scala.concurrent.duration._
@@ -53,21 +54,23 @@ class MessageSendingSpec extends AndroidFreeSpec { test =>
   lazy val convs            = mock[ConversationsService]
   lazy val sync             = mock[SyncServiceHandle]
   lazy val errors           = mock[ErrorsService]
+  lazy val userPrefs        = new TestUserPreferences {
+    result(this.preference(UserPreferences.ReadReceiptsEnabled) := false)
+  }
   
   private def stubService() = new ConversationsUiServiceImpl(account1Id, None, assets, usersStorage, messages,
-    messagesStorage, messagesContent, members, assetStorage, convsContent, convStorage, network, convs, sync, null, accounts, tracking, errors)
+    messagesStorage, messagesContent, members, assetStorage, convsContent, convStorage, network, convs, sync, null, accounts, tracking, errors, userPrefs)
 
   feature("Text messages") {
     scenario("Add text message") {
 
       val mId = MessageId()
-      val msgData = MessageData(mId, conv.id, Message.Type.TEXT, UserId(), MessageData.textContent("test"), protos = Seq(GenericMessage(mId.uid, Text("test", Nil, Nil))))
+      val msgData = MessageData(mId, conv.id, Message.Type.TEXT, UserId(), MessageData.textContent("test"), protos = Seq(GenericMessage(mId.uid, Text("test"))))
       val syncId = SyncId()
 
-      (messages.addTextMessage _).expects(conv.id, "test", Nil, None).once().returning(Future.successful(msgData))
+      (messages.addTextMessage _).expects(conv.id, "test", false, *, *).once().returning(Future.successful(msgData))
 
       (convsContent.updateConversationLastRead _).expects(conv.id, msgData.time).once().returning(Future.successful(Some((conv, conv))))
-
 
       (sync.postMessage _).expects(msgData.id, conv.id, msgData.editTime).once().returning(Future.successful(syncId))
       val convsUi = stubService()
@@ -89,11 +92,11 @@ class MessageSendingSpec extends AndroidFreeSpec { test =>
         Message.Type.TEXT,
         UserId(),
         MessageData.messageContent(text, mentions)._2,
-        protos = Seq(GenericMessage(mId.uid, Text(text, mentions, Nil)))
+        protos = Seq(GenericMessage(mId.uid, Text(text, mentions, Nil, expectsReadConfirmation = false)))
       )
       val syncId = SyncId()
 
-      (messages.addTextMessage _).expects(conv.id, text, mentions, None).once().returning(Future.successful(msgData))
+      (messages.addTextMessage _).expects(conv.id, text, false, mentions, None).once().returning(Future.successful(msgData))
 
       (convsContent.updateConversationLastRead _).expects(conv.id, msgData.time).once().returning(Future.successful(Some((conv, conv))))
 
