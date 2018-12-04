@@ -17,13 +17,14 @@
  */
 package com.waz.model.sync
 
-import com.waz.log.ZLog2._
-import com.waz.api.IConversation.{Access, AccessRole}
 import com.waz.ZLog.ImplicitTag._
+import com.waz.api.IConversation.{Access, AccessRole}
+import com.waz.log.ZLog2._
 import com.waz.model.AddressBook.AddressBookDecoder
 import com.waz.model.UserData.ConnectionStatus
 import com.waz.model.otr.ClientId
 import com.waz.model.{AccentColor, Availability, SearchQuery, _}
+import com.waz.service.PropertyKey
 import com.waz.service.tracking.TrackingService
 import com.waz.sync.client.{ConversationsClient, UsersClient}
 import com.waz.sync.queue.SyncJobMerger._
@@ -80,6 +81,7 @@ object SyncRequest {
   case object SyncSelfPermissions extends BaseRequest(Cmd.SyncSelfPermissions)
   case object SyncClientsLocation extends BaseRequest(Cmd.SyncClientLocation)
   case object SyncTeam            extends BaseRequest(Cmd.SyncTeam)
+  case object SyncProperties      extends BaseRequest(Cmd.SyncProperties)
 
   case class SyncTeamMember(userId: UserId) extends BaseRequest(Cmd.SyncTeam) {
     override val mergeKey: Any = (cmd, userId)
@@ -309,6 +311,18 @@ object SyncRequest {
     override val mergeKey = (cmd, convId, user)
   }
 
+  case class PostStringProperty(key: PropertyKey, value: String) extends BaseRequest(Cmd.PostStringProperty) {
+    override def mergeKey: Any = (cmd, key)
+  }
+
+  case class PostBoolProperty(key: PropertyKey, value: Boolean) extends BaseRequest(Cmd.PostBoolProperty) {
+    override def mergeKey: Any = (cmd, key)
+  }
+
+  case class PostIntProperty(key: PropertyKey, value: Int) extends BaseRequest(Cmd.PostIntProperty) {
+    override def mergeKey: Any = (cmd, key)
+  }
+
   private def mergeHelper[A <: SyncRequest : ClassTag](other: SyncRequest)(f: A => MergeResult[A]): MergeResult[A] = other match {
     case req: A if req.mergeKey == other.mergeKey => f(req)
     case _ => Unchanged
@@ -373,6 +387,10 @@ object SyncRequest {
           case Cmd.PostSessionReset          => PostSessionReset(convId, userId, decodeId[ClientId]('client))
           case Cmd.PostOpenGraphMeta         => PostOpenGraphMeta(convId, messageId, 'time)
           case Cmd.PostReceipt               => PostReceipt(convId, messageId, userId, ReceiptType.fromName('type))
+          case Cmd.PostBoolProperty          => PostBoolProperty('key, 'value)
+          case Cmd.PostIntProperty           => PostIntProperty('key, 'value)
+          case Cmd.PostStringProperty        => PostStringProperty('key, 'value)
+          case Cmd.SyncProperties            => SyncProperties
           case Cmd.Unknown                   => Unknown
         }
       } catch {
@@ -477,8 +495,17 @@ object SyncRequest {
         case SyncPreKeys(user, clients) =>
           o.put("user", user.str)
           o.put("clients", arrString(clients.toSeq map (_.str)))
+        case PostBoolProperty(key, value) =>
+          o.put("key", key)
+          o.put("value", value)
+        case PostIntProperty(key, value) =>
+          o.put("key", key)
+          o.put("value", value)
+        case PostStringProperty(key, value) =>
+          o.put("key", key)
+          o.put("value", value)
         case SyncSelf | SyncTeam | DeleteAccount | SyncConversations | SyncConnections |
-             SyncSelfClients | SyncSelfPermissions | SyncClientsLocation | Unknown => () // nothing to do
+             SyncSelfClients | SyncSelfPermissions | SyncClientsLocation | SyncProperties | Unknown => () // nothing to do
       }
     }
   }

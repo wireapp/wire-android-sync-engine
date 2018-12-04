@@ -19,6 +19,7 @@ package com.waz.db
 
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
+import com.waz.content.PropertiesDao
 import com.waz.db.ZMessagingDB.{DbVersion, daos, migrations}
 import com.waz.db.migrate._
 import com.waz.model.AddressBook.ContactHashesDao
@@ -54,7 +55,7 @@ class ZMessagingDB(context: Context, dbName: String, tracking: TrackingService) 
 }
 
 object ZMessagingDB {
-  val DbVersion = 114
+  val DbVersion = 113
 
   lazy val daos = Seq (
     UserDataDao, SearchQueryCacheDao, AssetDataDao, ConversationDataDao,
@@ -63,7 +64,7 @@ object ZMessagingDB {
     ContactHashesDao, ContactsOnWireDao, UserClientsDao, LikingDao,
     ContactsDao, EmailAddressesDao, PhoneNumbersDao, MsgDeletionDao,
     EditHistoryDao, MessageContentIndexDao, PushNotificationEventsDao,
-    ReadReceiptDao
+    ReadReceiptDao, PropertiesDao
   )
 
   lazy val migrations = Seq(
@@ -270,9 +271,8 @@ object ZMessagingDB {
     },
     Migration(112, 113) { db =>
       db.execSQL("CREATE TABLE ReadReceipts(message_id TEXT, user_id, timestamp INTEGER, PRIMARY KEY (message_id, user_id))")
-    },
-    Migration(113, 114) { db =>
       db.execSQL("ALTER TABLE Conversations ADD COLUMN receipt_mode INTEGER DEFAULT 0")
+      db.execSQL("CREATE TABLE Properties(key TEXT PRIMARY KEY, value TEXT)")
     }
   )
 }

@@ -44,7 +44,7 @@ import com.waz.threading.{CancellableFuture, SerialDispatchQueue, Threading}
 import com.waz.ui.UiModule
 import com.waz.utils.Locales
 import com.waz.utils.crypto.{Base64, ReplyHashingImpl}
-import com.waz.utils.wrappers.{AndroidContext, GoogleApi}
+import com.waz.utils.wrappers.{AndroidContext, DB, GoogleApi}
 import com.waz.znet2.http.HttpClient
 import com.waz.znet2.http.Request.UrlCreator
 import com.waz.znet2.{AuthRequestInterceptor, OkHttpWebSocketFactory}
@@ -71,6 +71,8 @@ class ZMessagingFactory(global: GlobalModule) {
 
 class StorageModule(context: Context, val userId: UserId, globalPreferences: GlobalPreferences, tracking: TrackingService) {
   lazy val db                                         = new ZmsDatabase(userId, context, tracking)
+  lazy val db2: DB = DB(db.dbHelper.getWritableDatabase)
+
   lazy val userPrefs                                  = UserPreferences.apply(context, db, globalPreferences)
   lazy val usersStorage:      UsersStorage            = wire[UsersStorageImpl]
   lazy val otrClientsStorage: OtrClientsStorage       = wire[OtrClientsStorageImpl]
@@ -83,6 +85,7 @@ class StorageModule(context: Context, val userId: UserId, globalPreferences: Glo
   lazy val searchQueryCache:  SearchQueryCacheStorage = wire[SearchQueryCacheStorageImpl]
   lazy val msgEdits:          EditHistoryStorage      = wire[EditHistoryStorageImpl]
   lazy val readReceiptsStorage: ReadReceiptsStorage   = wire[ReadReceiptsStorageImpl]
+  lazy val propertiesStorage:   PropertiesStorage       = new PropertiesStorageImpl(context, db2, Threading.IO)
 }
 
 
@@ -155,6 +158,7 @@ class ZMessaging(val teamId: Option[TeamId], val clientId: ClientId, account: Ac
   def msgEdits          = storage.msgEdits
   def searchQueryCache  = storage.searchQueryCache
   def readReceiptsStorage = storage.readReceiptsStorage
+  def propertiesStorage = storage.propertiesStorage
 
   lazy val messagesStorage: MessagesStorage = wire[MessagesStorageImpl]
   lazy val msgAndLikes: MessageAndLikesStorageImpl = wire[MessageAndLikesStorageImpl]
@@ -181,6 +185,7 @@ class ZMessaging(val teamId: Option[TeamId], val clientId: ClientId, account: Ac
   lazy val handlesClient      = new HandlesClientImpl()(urlCreator, httpClient, authRequestInterceptor)
   lazy val integrationsClient = new IntegrationsClientImpl()(urlCreator, httpClient, authRequestInterceptor)
   lazy val callingClient      = new CallingClientImpl()(urlCreator, httpClient, authRequestInterceptor)
+  lazy val propertiesClient: PropertiesClient = new PropertiesClientImpl()(urlCreator, httpClient, authRequestInterceptor)
 
   lazy val convsContent: ConversationsContentUpdaterImpl = wire[ConversationsContentUpdaterImpl]
   lazy val messagesContent: MessagesContentUpdater = wire[MessagesContentUpdater]
@@ -244,6 +249,8 @@ class ZMessaging(val teamId: Option[TeamId], val clientId: ClientId, account: Ac
   lazy val openGraphSync                              = wire[OpenGraphSyncHandler]
   lazy val integrationsSync: IntegrationsSyncHandler  = wire[IntegrationsSyncHandlerImpl]
   lazy val expiringUsers                              = wire[ExpiredUsersService]
+  lazy val propertiesSyncHandler                      = wire[PropertiesSyncHandler]
+  lazy val propertiesService: PropertiesService       = wire[PropertiesServiceImpl]
 
   lazy val eventPipeline: EventPipeline = new EventPipelineImpl(Vector(), eventScheduler.enqueue)
 
@@ -268,7 +275,8 @@ class ZMessaging(val teamId: Option[TeamId], val clientId: ClientId, account: Ac
               msgEvents.messageEventProcessingStage,
               genericMsgs.eventProcessingStage
             )
-          )
+          ),
+          propertiesService.eventProcessor
         ),
         notifications.notificationEventsStage,
         notifications.lastReadProcessingStage

@@ -123,7 +123,7 @@ class ConversationsUiServiceImpl(selfUserId:      UserId,
                                  accounts:        AccountsService,
                                  tracking:        TrackingService,
                                  errors:          ErrorsService,
-                                 userPreferences: UserPreferences) extends ConversationsUiService {
+                                 propertiesService: PropertiesService) extends ConversationsUiService {
   import ConversationsUiService._
   import Threading.Implicits.Background
 
@@ -142,7 +142,7 @@ class ConversationsUiServiceImpl(selfUserId:      UserId,
     Future.sequence(convs.map(id => sendTextMessage(id, text, mentions, Some(exp)))).map(_ => {})
 
   override def sendReplyMessage(quote: MessageId, text: String, mentions: Seq[Mention] = Nil, exp: Option[Option[FiniteDuration]] = None) =
-    userPreferences(UserPreferences.ReadReceiptsEnabled).apply().flatMap { rr =>
+    propertiesService.readReceiptsEnabled.head.flatMap { rr =>
       messages.addReplyMessage(quote, text, rr, mentions, exp).flatMap {
         case Some(m) =>
           for {
@@ -387,10 +387,10 @@ class ConversationsUiServiceImpl(selfUserId:      UserId,
       for {
         isGroup <- convs.isGroupConversation(convId)
         rr      <- if (isGroup) convStorage.get(convId).map(_.exists(_.readReceiptsAllowed))
-                   else userPreferences(UserPreferences.ReadReceiptsEnabled).apply()
+                   else propertiesService.readReceiptsEnabled.head
       } yield rr
     else
-      userPreferences(UserPreferences.ReadReceiptsEnabled).apply()
+      propertiesService.readReceiptsEnabled.head
 
   override def setReceiptMode(id: ConvId, receiptMode: Int): Future[Option[ConversationData]] = convs.setReceiptMode(id, receiptMode)
 
@@ -402,14 +402,14 @@ class ConversationsUiServiceImpl(selfUserId:      UserId,
 
   override def setLastRead(convId: ConvId, msg: MessageData): Future[Option[ConversationData]] = {
 
-    def sendReadReceipts(from: RemoteInstant, to: RemoteInstant, readReceipts: Boolean): Future[Seq[SyncId]] = {
+    def sendReadReceipts(from: RemoteInstant, to: RemoteInstant, isGroup: Boolean, readReceipts: Boolean): Future[Seq[SyncId]] = {
       verbose(l"sendReadReceipts($from, $to, $readReceipts)")
       if (!readReceipts) {
         Future.successful(Seq())
       } else {
         messagesStorage.findMessagesBetween(convId, from, to).flatMap { messages =>
           RichFuture.traverseSequential(messages.filter(_.userId != selfUserId))({ m =>
-            if (m.expectsRead.contains(true) && readReceipts) {
+            if (isGroup || m.expectsRead.contains(true)) {
               sync.postReceipt(convId, m.id, m.userId, ReceiptType.Read).map(Some(_))
             } else {
               Future.successful(Option.empty[SyncId])
@@ -421,13 +421,14 @@ class ConversationsUiServiceImpl(selfUserId:      UserId,
 
     for {
       readReceipts <- expectReadReceipt(convId)
+      isGroup      <- convs.isGroupConversation(convId)
       update       <- convsContent.updateConversationLastRead(convId, msg.time)
       _            <- update.fold(Future.successful({})) {
                         case (_, newConv) => sync.postLastRead(convId, newConv.lastRead).map(_ => {})
                       }
       _            <- update.fold(Future.successful({})) {
                         case (oldConv, newConv) =>
-                          sendReadReceipts(oldConv.lastRead, newConv.lastRead, readReceipts).map(_ => {})
+                          sendReadReceipts(oldConv.lastRead, newConv.lastRead, isGroup, readReceipts).map(_ => {})
                       }
     } yield update.map(_._2)
   }

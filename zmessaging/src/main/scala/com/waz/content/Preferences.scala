@@ -447,6 +447,4 @@ object UserPreferences {
   lazy val FixDuplicatedConversations       = PrefKey[Boolean]("fix_duplicated_conversations", customDefault = true)
 
   lazy val CheckMutedStatus                 = PrefKey[Boolean]("check_muted_status", customDefault = true)
-
-  lazy val ReadReceiptsEnabled              = PrefKey[Boolean]("read_receipts_enabled", customDefault = true) //TODO: set default to false
 }

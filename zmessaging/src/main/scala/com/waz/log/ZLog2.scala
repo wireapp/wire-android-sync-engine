@@ -30,7 +30,7 @@ import com.waz.model.GenericContent.Location
 import com.waz.model._
 import com.waz.model.otr.{Client, ClientId, UserClients}
 import com.waz.model.sync.ReceiptType
-import com.waz.service.PlaybackRoute
+import com.waz.service.{PlaybackRoute, PropertyKey}
 import com.waz.service.assets.AssetService.RawAssetInput
 import com.waz.service.assets.AssetService.RawAssetInput.{BitmapInput, ByteInput, UriInput, WireAssetInput}
 import com.waz.service.call.Avs.AvsClosedReason.reasonString
@@ -223,7 +223,8 @@ object ZLog2 {
     implicit val SearchQueryShow: LogShow[SearchQuery] = logShowWithHash
     implicit val AESKeyShow:      LogShow[AESKey]      = logShowWithHash
 
-    implicit val PrefKeyLogShow: LogShow[PrefKey[_]]    = logShowWithToString
+    implicit val PrefKeyLogShow: LogShow[PrefKey[_]]      = logShowWithToString
+    implicit val PropertyKeyLogShow: LogShow[PropertyKey] = logShowWithToString
 
     implicit val RawAssetInputLogShow: LogShow[RawAssetInput] =
       createFrom {

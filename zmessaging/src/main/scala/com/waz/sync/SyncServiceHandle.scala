@@ -73,6 +73,9 @@ trait SyncServiceHandle {
   def postTypingState(id: ConvId, typing: Boolean): Future[SyncId]
   def postOpenGraphData(conv: ConvId, msg: MessageId, editTime: RemoteInstant): Future[SyncId]
   def postReceipt(conv: ConvId, message: MessageId, user: UserId, tpe: ReceiptType): Future[SyncId]
+  def postProperty(key: PropertyKey, value: Boolean): Future[SyncId]
+  def postProperty(key: PropertyKey, value: Int): Future[SyncId]
+  def postProperty(key: PropertyKey, value: String): Future[SyncId]
 
   def registerPush(token: PushToken): Future[SyncId]
   def deletePushToken(token: PushToken): Future[SyncId]
@@ -82,6 +85,7 @@ trait SyncServiceHandle {
   def postClientLabel(id: ClientId, label: String): Future[SyncId]
   def syncClients(user: UserId): Future[SyncId]
   def syncClientsLocation(): Future[SyncId]
+  def syncProperties(): Future[SyncId]
 
   def syncPreKeys(user: UserId, clients: Set[ClientId]): Future[SyncId]
   def postSessionReset(conv: ConvId, user: UserId, client: ClientId): Future[SyncId]
@@ -153,6 +157,9 @@ class AndroidSyncServiceHandle(account: UserId, service: SyncRequestService, tim
   def postReceipt(conv: ConvId, message: MessageId, user: UserId, tpe: ReceiptType): Future[SyncId] = addRequest(PostReceipt(conv, message, user, tpe), priority = Priority.Optional)
   def postAddBot(cId: ConvId, pId: ProviderId, iId: IntegrationId) = addRequest(PostAddBot(cId, pId, iId))
   def postRemoveBot(cId: ConvId, botId: UserId) = addRequest(PostRemoveBot(cId, botId))
+  def postProperty(key: PropertyKey, value: Boolean): Future[SyncId] = addRequest(PostBoolProperty(key, value), forceRetry = true)
+  def postProperty(key: PropertyKey, value: Int): Future[SyncId] = addRequest(PostIntProperty(key, value), forceRetry = true)
+  def postProperty(key: PropertyKey, value: String): Future[SyncId] = addRequest(PostStringProperty(key, value), forceRetry = true)
 
   def registerPush(token: PushToken)    = addRequest(RegisterPushToken(token), priority = Priority.High, forceRetry = true)
   def deletePushToken(token: PushToken) = addRequest(DeletePushToken(token), priority = Priority.Low)
@@ -163,17 +170,19 @@ class AndroidSyncServiceHandle(account: UserId, service: SyncRequestService, tim
   def syncClients(user: UserId) = addRequest(SyncClients(user))
   def syncClientsLocation() = addRequest(SyncClientsLocation)
   def syncPreKeys(user: UserId, clients: Set[ClientId]) = addRequest(SyncPreKeys(user, clients))
+  def syncProperties(): Future[SyncId] = addRequest(SyncProperties, forceRetry = true)
 
   def postSessionReset(conv: ConvId, user: UserId, client: ClientId) = addRequest(PostSessionReset(conv, user, client))
 
   override def performFullSync(): Future[Unit] = for {
     id1 <- syncSelfUser()
-    id6 <- syncConnections()
     id2 <- syncSelfClients()
     id3 <- syncSelfPermissions()
     id4 <- syncTeam()
     id5 <- syncConversations()
-    _ <- service.await(Set(id1, id2, id3, id4, id5, id6))
+    id6 <- syncConnections()
+    id7 <- syncProperties()
+    _ <- service.await(Set(id1, id2, id3, id4, id5, id6, id7))
   } yield ()
 }
 
@@ -187,10 +196,9 @@ object SyncHandler {
 }
 
 class AccountSyncHandler(accounts: AccountsService) extends SyncHandler {
-  import com.waz.model.sync.SyncRequest._
-
   import SyncHandler._
   import Threading.Implicits.Background
+  import com.waz.model.sync.SyncRequest._
 
   override def apply(accountId: UserId, req: SyncRequest)(implicit reqInfo: RequestInfo): Future[SyncResult] =
     accounts.getZms(accountId).flatMap {
@@ -243,6 +251,10 @@ class AccountSyncHandler(accounts: AccountsService) extends SyncHandler {
           case PostConvState(convId, state)                        => zms.conversationSync.postConversationState(convId, state)
           case PostTypingState(convId, ts)                         => zms.typingSync.postTypingState(convId, ts)
           case PostCleared(convId, time)                           => zms.clearedSync.postCleared(convId, time)
+          case PostBoolProperty(key, value)                        => zms.propertiesSyncHandler.postProperty(key, value)
+          case PostIntProperty(key, value)                         => zms.propertiesSyncHandler.postProperty(key, value)
+          case PostStringProperty(key, value)                      => zms.propertiesSyncHandler.postProperty(key, value)
+          case SyncProperties                                      => zms.propertiesSyncHandler.syncProperties
           case Unknown                                             => Future.successful(Failure("Unknown sync request"))
       }
       case None => Future.successful(Failure(s"Account $accountId is not logged in"))
