@@ -84,10 +84,7 @@ class PropertiesServiceImpl(prefs: UserPreferences, syncServiceHandle: SyncServi
     import io.circe.parser._
 
     storage.optSignal(key).map {
-      case Some(v) =>
-        val decoded = decode[T](v.value)
-        ZLog.verbose(s"$decoded")
-        decoded match {
+      case Some(v) => decode[T](v.value) match {
           case Left(_) => Option.empty[T]
           case Right(x) => Option(x)
       }
@@ -104,7 +101,7 @@ class PropertiesServiceImpl(prefs: UserPreferences, syncServiceHandle: SyncServi
     } yield ()
   }
 
-  def readReceiptsEnabled: Signal[Boolean] = propertySignal[Int](PropertyKey.ReadReceiptsEnabled).collect { case Some(x) => x > 0 }
+  def readReceiptsEnabled: Signal[Boolean] = propertySignal[Int](PropertyKey.ReadReceiptsEnabled).map(_.exists(_ > 0))
 }
 
 case class PropertyKey(str: String) {
