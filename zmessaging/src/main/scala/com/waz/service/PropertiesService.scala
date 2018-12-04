@@ -57,7 +57,7 @@ class PropertiesServiceImpl(prefs: UserPreferences, syncServiceHandle: SyncServi
   private def processEvent(event: PropertyEvent): Future[Unit] = {
     event match {
       case ReadReceiptEnabledPropertyEvent(value) => updateProperty(PropertyKey.ReadReceiptsEnabled, value)
-      case UnknownPropertyEvent(key) =>
+      case UnknownPropertyEvent(key, _) =>
         verbose(l"Unhandled property event $key")
         Future.successful({})
     }

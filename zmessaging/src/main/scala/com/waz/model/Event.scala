@@ -137,7 +137,7 @@ case class OtrMessageEvent(convId: RConvId, time: RemoteInstant, from: UserId, s
 sealed trait PropertyEvent extends UserEvent
 
 case class ReadReceiptEnabledPropertyEvent(value: Int) extends PropertyEvent
-case class UnknownPropertyEvent(key: PropertyKey) extends PropertyEvent
+case class UnknownPropertyEvent(key: PropertyKey, value: String) extends PropertyEvent
 
 case class ConversationState(archived:    Option[Boolean] = None,
                              archiveTime: Option[RemoteInstant] = None,
@@ -421,7 +421,7 @@ object PropertyEvent {
       import PropertyKey._
       decodePropertyKey('key) match {
         case ReadReceiptsEnabled => ReadReceiptEnabledPropertyEvent('value)
-        case key => UnknownPropertyEvent(key)
+        case key => UnknownPropertyEvent(key, 'value)
       }
     }
   }
