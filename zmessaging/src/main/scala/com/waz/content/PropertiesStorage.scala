@@ -20,8 +20,9 @@ import android.content.Context
 import com.waz.db.{ColumnBuilders, Dao, Table}
 import com.waz.service.PropertyKey
 import com.waz.service.assets2.StorageCodecs
+import com.waz.utils.TrimmingLruCache.Fixed
 import com.waz.utils.wrappers.{DB, DBCursor}
-import com.waz.utils.{DbStorage2, ReactiveStorage2, ReactiveStorageImpl2}
+import com.waz.utils.{CachedStorage2, DbStorage2, InMemoryStorage2, ReactiveStorage2, ReactiveStorageImpl2, TrimmingLruCache}
 
 import scala.concurrent.ExecutionContext
 
@@ -29,7 +30,10 @@ case class PropertyValue(key: PropertyKey, value: String)
 
 trait PropertiesStorage extends ReactiveStorage2[PropertyKey, PropertyValue]
 
-class PropertiesStorageImpl(context: Context, db: DB, ec: ExecutionContext) extends ReactiveStorageImpl2[PropertyKey, PropertyValue](new DbStorage2(PropertiesDao)(ec, db))
+class PropertiesStorageImpl(implicit context: Context, db: DB, ec: ExecutionContext) extends ReactiveStorageImpl2[PropertyKey, PropertyValue](
+    new CachedStorage2(
+      new DbStorage2(PropertiesDao, PropertiesDao.idExtractor),
+      new InMemoryStorage2(new TrimmingLruCache(context, Fixed(8)), PropertiesDao.idExtractor)))
   with PropertiesStorage
 
 

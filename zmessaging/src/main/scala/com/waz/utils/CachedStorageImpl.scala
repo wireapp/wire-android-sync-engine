@@ -102,12 +102,11 @@ trait ReactiveStorage2[K, V] extends Storage2[K, V] {
     optSignal(key).collect { case Some(v) => v }
 }
 
-class DbStorage2[K,V](dao: StorageDao[K,V])
+class DbStorage2[K,V](dao: StorageDao[K,V],
+                      override val keyExtractor: V => K)
                      (implicit
                       override val ec: ExecutionContext,
                       db: DB) extends Storage2[K,V] {
-
-  override val keyExtractor: V => K = dao.idExtractor
 
   override def loadAll(keys: Set[K]): Future[Seq[V]] = Future(dao.getAll(keys))
   override def saveAll(values: Iterable[V]): Future[Unit] = Future(dao.insertOrReplace(values))
@@ -127,8 +126,6 @@ class InMemoryStorage2[K, V](cache: LruCache[K, V],
 class CachedStorage2[K,V](main: Storage2[K,V], cache: Storage2[K,V])
                          (implicit
                           override val ec: ExecutionContext) extends Storage2[K, V] {
-
-  require(main.keyExtractor == cache.keyExtractor)//TODO Think how to make utils explicit
 
   override val keyExtractor: V => K = main.keyExtractor
 

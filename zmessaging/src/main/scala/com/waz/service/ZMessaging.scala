@@ -73,19 +73,19 @@ class StorageModule(context: Context, val userId: UserId, globalPreferences: Glo
   lazy val db                                         = new ZmsDatabase(userId, context, tracking)
   lazy val db2: DB = DB(db.dbHelper.getWritableDatabase)
 
-  lazy val userPrefs                                  = UserPreferences.apply(context, db, globalPreferences)
-  lazy val usersStorage:      UsersStorage            = wire[UsersStorageImpl]
-  lazy val otrClientsStorage: OtrClientsStorage       = wire[OtrClientsStorageImpl]
-  lazy val membersStorage                             = wire[MembersStorageImpl]
-  lazy val assetsStorage :    AssetsStorage           = wire[AssetsStorageImpl]
-  lazy val reactionsStorage                           = wire[ReactionsStorageImpl]
-  lazy val notifStorage:      NotificationStorage     = wire[NotificationStorageImpl]
-  lazy val convsStorage:      ConversationStorage     = wire[ConversationStorageImpl]
-  lazy val msgDeletions:      MsgDeletionStorage      = wire[MsgDeletionStorageImpl]
-  lazy val searchQueryCache:  SearchQueryCacheStorage = wire[SearchQueryCacheStorageImpl]
-  lazy val msgEdits:          EditHistoryStorage      = wire[EditHistoryStorageImpl]
-  lazy val readReceiptsStorage: ReadReceiptsStorage   = wire[ReadReceiptsStorageImpl]
-  lazy val propertiesStorage:   PropertiesStorage       = new PropertiesStorageImpl(context, db2, Threading.IO)
+  lazy val userPrefs                                    = UserPreferences.apply(context, db, globalPreferences)
+  lazy val usersStorage:        UsersStorage            = wire[UsersStorageImpl]
+  lazy val otrClientsStorage:   OtrClientsStorage       = wire[OtrClientsStorageImpl]
+  lazy val membersStorage                               = wire[MembersStorageImpl]
+  lazy val assetsStorage :      AssetsStorage           = wire[AssetsStorageImpl]
+  lazy val reactionsStorage                             = wire[ReactionsStorageImpl]
+  lazy val notifStorage:        NotificationStorage     = wire[NotificationStorageImpl]
+  lazy val convsStorage:        ConversationStorage     = wire[ConversationStorageImpl]
+  lazy val msgDeletions:        MsgDeletionStorage      = wire[MsgDeletionStorageImpl]
+  lazy val searchQueryCache:    SearchQueryCacheStorage = wire[SearchQueryCacheStorageImpl]
+  lazy val msgEdits:            EditHistoryStorage      = wire[EditHistoryStorageImpl]
+  lazy val readReceiptsStorage: ReadReceiptsStorage     = wire[ReadReceiptsStorageImpl]
+  lazy val propertiesStorage:   PropertiesStorage       = new PropertiesStorageImpl()(context, db2, Threading.IO)
 }
 
 
