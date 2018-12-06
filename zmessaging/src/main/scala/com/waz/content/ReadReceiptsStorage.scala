@@ -18,7 +18,8 @@
 package com.waz.content
 import android.content.Context
 import com.waz.model.ReadReceipt.ReadReceiptDao
-import com.waz.model.{MessageId, ReadReceipt, UserId}
+import com.waz.model.{MessageId, ReadReceipt}
+import com.waz.service.messages.MessagesService
 import com.waz.threading.SerialDispatchQueue
 import com.waz.utils.TrimmingLruCache.Fixed
 import com.waz.utils.events.{RefreshingSignal, Signal}
@@ -29,12 +30,27 @@ import scala.concurrent.{ExecutionContext, Future}
 trait ReadReceiptsStorage extends CachedStorage[ReadReceipt.Id, ReadReceipt] {
   def getReceipts(message: MessageId): Future[Seq[ReadReceipt]]
   def receipts(message: MessageId): Signal[Seq[ReadReceipt]]
+  def removeAllForMessages(message: Set[MessageId]): Future[Unit]
 }
 
-class ReadReceiptsStorageImpl(context: Context, storage: Database) extends CachedStorageImpl[ReadReceipt.Id, ReadReceipt](new TrimmingLruCache(context, Fixed(ReadReceiptsStorage.cacheSize)), storage)(ReadReceiptDao, "ReadReceiptsStorage")
+class ReadReceiptsStorageImpl(context: Context, storage: Database, msgStorage: MessagesStorage, msgService: MessagesService)
+  extends CachedStorageImpl[ReadReceipt.Id, ReadReceipt](new TrimmingLruCache(context, Fixed(ReadReceiptsStorage.cacheSize)), storage)(ReadReceiptDao, "ReadReceiptsStorage")
   with ReadReceiptsStorage {
-
+  import com.waz.utils.events.EventContext.Implicits.global
   private implicit val dispatcher: ExecutionContext = new SerialDispatchQueue()
+
+  msgStorage.onDeleted { ids => removeAllForMessages(ids.toSet) }
+
+  msgService.msgEdited { case (prev, cur) =>
+    // `updateAll2` is not going to work here, because we're updating the messageId of the receipts which is a part of the receipt's id.
+    // `update*` methods assume that the ids are not going to be updated. Instead, we need to remove the old and insert the new receipts.
+      for {
+        receipts    <- getReceipts(prev)
+        _           <- removeAll(receipts.map(_.id))
+        newReceipts =  receipts.map(r => r.id -> r.copy(message = cur)).toMap
+        _           <- updateOrCreateAll2(newReceipts.keys, { (k, _) => newReceipts(k) })
+      } yield ()
+  }
 
   override def getReceipts(message: MessageId): Future[Seq[ReadReceipt]] =
     find(_.message == message, ReadReceiptDao.findForMessage(message)(_), identity)
@@ -43,6 +59,11 @@ class ReadReceiptsStorageImpl(context: Context, storage: Database) extends Cache
     val changed = onChanged.map(_.filter(_.message == message).map(_.id)).union(onDeleted.map(_.filter(_._1 == message)))
     RefreshingSignal[Seq[ReadReceipt]](getReceipts(message), changed)
   }
+
+  override def removeAllForMessages(messages: Set[MessageId]): Future[Unit] =
+    find(rr => messages.contains(rr.message), ReadReceiptDao.findForMessages(messages)(_), identity)
+      .map(_.map(_.id))
+      .flatMap(removeAll)
 }
 
 object ReadReceiptsStorage {

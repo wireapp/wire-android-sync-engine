@@ -78,13 +78,11 @@ class StorageModule(context: Context, val userId: UserId, globalPreferences: Glo
   lazy val otrClientsStorage:   OtrClientsStorage       = wire[OtrClientsStorageImpl]
   lazy val membersStorage                               = wire[MembersStorageImpl]
   lazy val assetsStorage :      AssetsStorage           = wire[AssetsStorageImpl]
-  lazy val reactionsStorage                             = wire[ReactionsStorageImpl]
   lazy val notifStorage:        NotificationStorage     = wire[NotificationStorageImpl]
   lazy val convsStorage:        ConversationStorage     = wire[ConversationStorageImpl]
   lazy val msgDeletions:        MsgDeletionStorage      = wire[MsgDeletionStorageImpl]
   lazy val searchQueryCache:    SearchQueryCacheStorage = wire[SearchQueryCacheStorageImpl]
   lazy val msgEdits:            EditHistoryStorage      = wire[EditHistoryStorageImpl]
-  lazy val readReceiptsStorage: ReadReceiptsStorage     = wire[ReadReceiptsStorageImpl]
   lazy val propertiesStorage:   PropertiesStorage       = new PropertiesStorageImpl()(context, db2, Threading.IO)
 }
 
@@ -151,20 +149,20 @@ class ZMessaging(val teamId: Option[TeamId], val clientId: ClientId, account: Ac
   def otrClientsStorage = storage.otrClientsStorage
   def membersStorage    = storage.membersStorage
   def assetsStorage     = storage.assetsStorage
-  def reactionsStorage  = storage.reactionsStorage
   def notifStorage      = storage.notifStorage
   def convsStorage      = storage.convsStorage
   def msgDeletions      = storage.msgDeletions
   def msgEdits          = storage.msgEdits
   def searchQueryCache  = storage.searchQueryCache
-  def readReceiptsStorage = storage.readReceiptsStorage
   def propertiesStorage = storage.propertiesStorage
 
-  lazy val messagesStorage: MessagesStorage = wire[MessagesStorageImpl]
-  lazy val msgAndLikes: MessageAndLikesStorageImpl = wire[MessageAndLikesStorageImpl]
-  lazy val messagesIndexStorage: MessageIndexStorage = wire[MessageIndexStorage]
+  lazy val messagesStorage: MessagesStorage            = wire[MessagesStorageImpl]
+  lazy val msgAndLikes: MessageAndLikesStorageImpl     = wire[MessageAndLikesStorageImpl]
+  lazy val messagesIndexStorage: MessageIndexStorage   = wire[MessageIndexStorage]
   lazy val eventStorage: PushNotificationEventsStorage = wire[PushNotificationEventsStorageImpl]
-  lazy val receivedPushStorage: ReceivedPushStorage = wire[ReceivedPushStorageImpl]
+  lazy val receivedPushStorage: ReceivedPushStorage    = wire[ReceivedPushStorageImpl]
+  lazy val readReceiptsStorage: ReadReceiptsStorage    = wire[ReadReceiptsStorageImpl]
+  lazy val reactionsStorage: ReactionsStorage          = wire[ReactionsStorageImpl]
 
   lazy val youtubeClient      = new YouTubeClientImpl()(urlCreator, httpClient, authRequestInterceptor)
   lazy val soundCloudClient   = new SoundCloudClientImpl()(urlCreator, httpClient, authRequestInterceptor)

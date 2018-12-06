@@ -35,6 +35,7 @@ import com.waz.utils.TrimmingLruCache.Fixed
 import com.waz.utils._
 import com.waz.utils.events.{EventStream, Signal, SourceStream}
 
+import scala.collection.immutable.Set
 import scala.collection._
 import scala.concurrent.Future
 
@@ -315,7 +316,7 @@ trait MessageAndLikesStorage {
   def sortedLikes(likes: Likes, selfUserId: UserId): (IndexedSeq[UserId], Boolean)
 }
 
-class MessageAndLikesStorageImpl(selfUserId: UserId, messages: MessagesStorage, likings: ReactionsStorage) extends MessageAndLikesStorage {
+class MessageAndLikesStorageImpl(selfUserId: UserId, messages: => MessagesStorage, likings: ReactionsStorage) extends MessageAndLikesStorage {
   import com.waz.threading.Threading.Implicits.Background
   import com.waz.utils.events.EventContext.Implicits.global
 
