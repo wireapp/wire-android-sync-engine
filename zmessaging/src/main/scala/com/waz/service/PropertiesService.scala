@@ -16,7 +16,6 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 package com.waz.service
-import com.waz.ZLog
 
 import scala.language.implicitConversions
 import com.waz.ZLog.ImplicitTag.implicitLogTag
@@ -49,14 +48,23 @@ class PropertiesServiceImpl(prefs: UserPreferences, syncServiceHandle: SyncServi
   }
 
   for {
-    readReceipts <- getProperty[Boolean](PropertyKey.ReadReceiptsEnabled)
+    readReceipts <- getProperty[Int](PropertyKey.ReadReceiptsEnabled)
     if readReceipts.isEmpty
     _ <- syncServiceHandle.syncProperties()
   } ()
 
   private def processEvent(event: PropertyEvent): Future[Unit] = {
     event match {
-      case ReadReceiptEnabledPropertyEvent(value) => updateProperty(PropertyKey.ReadReceiptsEnabled, value)
+      case ReadReceiptEnabledPropertyEvent(value) =>
+        getProperty[Int](PropertyKey.ReadReceiptsEnabled).flatMap {
+          case Some(current) if current != value =>
+            for {
+              _ <- prefs(UserPreferences.ReadReceiptsRemotelyChanged) := true
+              _ <- updateProperty(PropertyKey.ReadReceiptsEnabled, value)
+            } yield ()
+          case _ =>
+            Future.successful({})
+        }
       case UnknownPropertyEvent(key, _) =>
         verbose(l"Unhandled property event $key")
         Future.successful({})
