@@ -56,7 +56,9 @@ class MessageEventProcessor(selfUserId:          UserId,
     verbose(l"got events to process: $events")
     convs.processConvWithRemoteId(convId, retryAsync = true) { conv =>
       verbose(l"processing events for conv: $conv, events: $events")
-      processEvents(conv, events)
+      convsService.isGroupConversation(conv.id).flatMap { isGroup =>
+        processEvents(conv, isGroup, events)
+      }
     }
   }
 
@@ -75,7 +77,7 @@ class MessageEventProcessor(selfUserId:          UserId,
     } yield standard ++ updatedQuotes
   }
 
-  private[service] def processEvents(conv: ConversationData, events: Seq[MessageEvent]): Future[Set[MessageData]] = {
+  private[service] def processEvents(conv: ConversationData, isGroup: Boolean, events: Seq[MessageEvent]): Future[Set[MessageData]] = {
     val toProcess = events.filter {
       case GenericMessageEvent(_, _, _, msg) if GenericMessage.isBroadcastMessage(msg) => false
       case e => conv.cleared.forall(_.isBefore(e.time))
@@ -92,7 +94,7 @@ class MessageEventProcessor(selfUserId:          UserId,
 
     for {
       as    <- updateAssets(toProcess)
-      msgs  = toProcess map { createMessage(conv, _) } filter (_ != MessageData.Empty)
+      msgs  = toProcess map { createMessage(conv, isGroup, _) } filter (_ != MessageData.Empty)
       msgs  <- checkReplyHashes(msgs)
       _     = verbose(l"messages from events: ${msgs.map(m => m.id -> m.msgType)}")
       _     <- convsService.addUnexpectedMembersToConv(conv.id, potentiallyUnexpectedMembers)
@@ -175,9 +177,11 @@ class MessageEventProcessor(selfUserId:          UserId,
     }) map { _.flatten }
   }
 
-  private def createMessage(conv: ConversationData, event: MessageEvent) = {
+  private def createMessage(conv: ConversationData, isGroup: Boolean, event: MessageEvent) = {
     val id = MessageId()
     val convId = conv.id
+
+    def forceReceiptMode: Option[Int] = conv.receiptMode.filter(_ => isGroup)
 
     //v3 assets go here
     def content(id: MessageId, msgContent: Any, from: UserId, time: RemoteInstant, proto: GenericMessage): MessageData = msgContent match {
@@ -185,24 +189,24 @@ class MessageEventProcessor(selfUserId:          UserId,
         val (tpe, content) = MessageData.messageContent(text, mentions, links)
         verbose(l"MessageData content: $content")
         val quoteContent = quote.map(q => QuoteContent(MessageId(q.quotedMessageId), validity = false, Some(Sha256(q.quotedMessageSha256))))
-        val messageData = MessageData(id, conv.id, tpe, from, content, time = time, localTime = event.localTime, protos = Seq(proto), quote = quoteContent)
-        messageData.adjustMentions(false).getOrElse(messageData)
+        val messageData = MessageData(id, conv.id, tpe, from, content, time = time, localTime = event.localTime, protos = Seq(proto), quote = quoteContent, forceReadReceipts = forceReceiptMode)
+          messageData.adjustMentions(false).getOrElse(messageData)
       case Knock() =>
-        MessageData(id, conv.id, Message.Type.KNOCK, from, time = time, localTime = event.localTime, protos = Seq(proto))
+        MessageData(id, conv.id, Message.Type.KNOCK, from, time = time, localTime = event.localTime, protos = Seq(proto), forceReadReceipts = forceReceiptMode)
       case Reaction(_, _) => MessageData.Empty
       case Asset(AssetData.WithStatus(UploadCancelled), _) => MessageData.Empty
       case Asset(AssetData.IsVideo(), _) =>
-        MessageData(id, convId, Message.Type.VIDEO_ASSET, from, time = time, localTime = event.localTime, protos = Seq(proto))
+        MessageData(id, convId, Message.Type.VIDEO_ASSET, from, time = time, localTime = event.localTime, protos = Seq(proto), forceReadReceipts = forceReceiptMode)
       case Asset(AssetData.IsAudio(), _) =>
-        MessageData(id, convId, Message.Type.AUDIO_ASSET, from, time = time, localTime = event.localTime, protos = Seq(proto))
+        MessageData(id, convId, Message.Type.AUDIO_ASSET, from, time = time, localTime = event.localTime, protos = Seq(proto), forceReadReceipts = forceReceiptMode)
       case Asset(AssetData.IsImage(), _) | ImageAsset(AssetData.IsImage()) =>
-        MessageData(id, convId, Message.Type.ASSET, from, time = time, localTime = event.localTime, protos = Seq(proto))
+        MessageData(id, convId, Message.Type.ASSET, from, time = time, localTime = event.localTime, protos = Seq(proto), forceReadReceipts = forceReceiptMode)
       case a@Asset(_, _) if a.original == null =>
         MessageData(id, convId, Message.Type.UNKNOWN, from, time = time, localTime = event.localTime, protos = Seq(proto))
       case Asset(_, _) =>
-        MessageData(id, convId, Message.Type.ANY_ASSET, from, time = time, localTime = event.localTime, protos = Seq(proto))
+        MessageData(id, convId, Message.Type.ANY_ASSET, from, time = time, localTime = event.localTime, protos = Seq(proto), forceReadReceipts = forceReceiptMode)
       case Location(_, _, _, _) =>
-        MessageData(id, convId, Message.Type.LOCATION, from, time = time, localTime = event.localTime, protos = Seq(proto))
+        MessageData(id, convId, Message.Type.LOCATION, from, time = time, localTime = event.localTime, protos = Seq(proto), forceReadReceipts = forceReceiptMode)
       case LastRead(_, _) => MessageData.Empty
       case Cleared(_, _) => MessageData.Empty
       case MsgDeleted(_, _) => MessageData.Empty

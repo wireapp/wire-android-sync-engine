@@ -78,7 +78,7 @@ class ReactionsStorageImpl(context: Context, storage: Database) extends CachedSt
   }
 
   override def likes(msg: MessageId): Signal[Likes] =
-    new RefreshingSignal[Likes, Seq[Liking]](
+    new RefreshingSignal[Likes](
       CancellableFuture.lift(getLikes(msg)),
       onChanged.map(_.filter(_.message == msg))
     )

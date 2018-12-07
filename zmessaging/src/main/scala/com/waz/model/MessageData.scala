@@ -44,26 +44,27 @@ import org.threeten.bp.Instant.now
 import scala.collection.breakOut
 import scala.concurrent.duration._
 
-case class MessageData(id:            MessageId              = MessageId(),
-                       convId:        ConvId                 = ConvId(),
-                       msgType:       Message.Type           = Message.Type.TEXT,
-                       userId:        UserId                 = UserId(),
-                       content:       Seq[MessageContent]    = Seq.empty,
-                       protos:        Seq[GenericMessage]    = Seq.empty,
-                       firstMessage:  Boolean                = false,
-                       members:       Set[UserId]            = Set.empty[UserId],
-                       recipient:     Option[UserId]         = None,
-                       email:         Option[String]         = None,
-                       name:          Option[Name]           = None,
-                       state:         MessageState           = Message.Status.SENT,
-                       time:          RemoteInstant          = RemoteInstant(now(clock)), //TODO: now is local...
-                       localTime:     LocalInstant           = LocalInstant.Epoch,
-                       editTime:      RemoteInstant          = RemoteInstant.Epoch,
-                       ephemeral:     Option[FiniteDuration] = None,
-                       expiryTime:    Option[LocalInstant]   = None, // local expiration time
-                       expired:       Boolean                = false,
-                       duration:      Option[FiniteDuration] = None, //for successful calls and message_timer changes
-                       quote:         Option[QuoteContent]   = None
+case class MessageData(id:                MessageId              = MessageId(),
+                       convId:            ConvId                 = ConvId(),
+                       msgType:           Message.Type           = Message.Type.TEXT,
+                       userId:            UserId                 = UserId(),
+                       content:           Seq[MessageContent]    = Seq.empty,
+                       protos:            Seq[GenericMessage]    = Seq.empty,
+                       firstMessage:      Boolean                = false,
+                       members:           Set[UserId]            = Set.empty[UserId],
+                       recipient:         Option[UserId]         = None,
+                       email:             Option[String]         = None,
+                       name:              Option[Name]           = None,
+                       state:             MessageState           = Message.Status.SENT,
+                       time:              RemoteInstant          = RemoteInstant(now(clock)), //TODO: now is local...
+                       localTime:         LocalInstant           = LocalInstant.Epoch,
+                       editTime:          RemoteInstant          = RemoteInstant.Epoch,
+                       ephemeral:         Option[FiniteDuration] = None,
+                       expiryTime:        Option[LocalInstant]   = None, // local expiration time
+                       expired:           Boolean                = false,
+                       duration:          Option[FiniteDuration] = None, //for successful calls and message_timer changes
+                       quote:             Option[QuoteContent]   = None,
+                       forceReadReceipts: Option[Int]    = None
                       ) {
   def getContent(index: Int) = {
     if (index == 0) content.headOption.getOrElse(MessageContent.Empty)
@@ -86,13 +87,15 @@ case class MessageData(id:            MessageId              = MessageId(),
     case _ => None
   }
 
-  lazy val expectsRead: Option[Boolean] = protos.lastOption.map {
+  lazy val protoReadReceipts: Option[Boolean] = protos.lastOption.map {
     case GenericMessage(_, a @ Text(_, _, _, _))     => a.expectsReadConfirmation
     case GenericMessage(_, a @ Knock())              => a.expectsReadConfirmation
     case GenericMessage(_, a @ Location(_, _, _, _)) => a.expectsReadConfirmation
     case GenericMessage(_, a @ Asset(_, _))          => a.expectsReadConfirmation
     case _ => false
   }
+
+  lazy val expectsRead: Option[Boolean] = forceReadReceipts.map(_ > 0).orElse(protoReadReceipts)
 
   // used to create a copy of the message quoting the one that had its msgId changed
   def replaceQuote(quoteId: MessageId): MessageData = {
@@ -283,7 +286,7 @@ object MessageContent extends ((Message.Part.Type, String, Option[MediaAssetData
 object MessageData extends
   ((MessageId, ConvId, Message.Type, UserId, Seq[MessageContent], Seq[GenericMessage], Boolean, Set[UserId], Option[UserId],
     Option[String], Option[Name], Message.Status, RemoteInstant, LocalInstant, RemoteInstant, Option[FiniteDuration],
-    Option[LocalInstant], Boolean, Option[FiniteDuration], Option[QuoteContent]) => MessageData) {
+    Option[LocalInstant], Boolean, Option[FiniteDuration], Option[QuoteContent], Option[Int]) => MessageData) {
 
   val Empty = new MessageData(MessageId(""), ConvId(""), Message.Type.UNKNOWN, UserId(""))
   val Deleted = new MessageData(MessageId(""), ConvId(""), Message.Type.UNKNOWN, UserId(""), state = Message.Status.DELETED)
@@ -349,11 +352,12 @@ object MessageData extends
     val Duration = opt(finiteDuration('duration))(_.duration)
     val Quote         = opt(id[MessageId]('quote))(_.quote.map(_.message))
     val QuoteValidity = bool('quote_validity)(_.quote.exists(_.validity))
+    val ForceReadReceipts = opt(int('force_read_receipts))(_.forceReadReceipts)
 
     override val idCol = Id
 
     override val table =
-      Table("Messages", Id, Conv, Type, User, Content, Protos, Time, LocalTime, FirstMessage, Members, Recipient, Email, Name, State, ContentSize, EditTime, Ephemeral, ExpiryTime, Expired, Duration, Quote, QuoteValidity)
+      Table("Messages", Id, Conv, Type, User, Content, Protos, Time, LocalTime, FirstMessage, Members, Recipient, Email, Name, State, ContentSize, EditTime, Ephemeral, ExpiryTime, Expired, Duration, Quote, QuoteValidity, ForceReadReceipts)
 
     override def onCreate(db: DB): Unit = {
       super.onCreate(db)
@@ -361,7 +365,7 @@ object MessageData extends
     }
 
     override def apply(implicit cursor: DBCursor): MessageData =
-      MessageData(Id, Conv, Type, User, Content, Protos, FirstMessage, Members, Recipient, Email, Name, State, Time, LocalTime, EditTime, Ephemeral, ExpiryTime, Expired, Duration, Quote.map(QuoteContent(_, QuoteValidity, None)))
+      MessageData(Id, Conv, Type, User, Content, Protos, FirstMessage, Members, Recipient, Email, Name, State, Time, LocalTime, EditTime, Ephemeral, ExpiryTime, Expired, Duration, Quote.map(QuoteContent(_, QuoteValidity, None)), ForceReadReceipts)
 
     def deleteForConv(id: ConvId)(implicit db: DB) = delete(Conv, id)
 
