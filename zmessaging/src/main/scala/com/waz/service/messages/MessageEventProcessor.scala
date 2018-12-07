@@ -268,6 +268,10 @@ class MessageEventProcessor(selfUserId:          UserId,
         MessageData(id, convId, Message.Type.MESSAGE_TIMER, from, time = time, duration = duration, localTime = event.localTime)
       case MemberJoinEvent(_, time, from, userIds, firstEvent) =>
         MessageData(id, convId, Message.Type.MEMBER_JOIN, from, members = userIds.toSet, time = time, localTime = event.localTime, firstMessage = firstEvent)
+      case ConversationReceiptModeEvent(_, time, from, 0) =>
+        MessageData(id, convId, Message.Type.READ_RECEIPTS_OFF, from, time = time, localTime = event.localTime)
+      case ConversationReceiptModeEvent(_, time, from, receiptMode) if receiptMode > 0 =>
+        MessageData(id, convId, Message.Type.READ_RECEIPTS_ON, from, time = time, localTime = event.localTime)
       case MemberLeaveEvent(_, time, from, userIds) =>
         MessageData(id, convId, Message.Type.MEMBER_LEAVE, from, members = userIds.toSet, time = time, localTime = event.localTime)
       case OtrErrorEvent(_, time, from, IdentityChangedError(_, _)) =>

@@ -139,7 +139,7 @@ case class MessageData(id:                MessageId              = MessageId(),
    *
    */
   def isSystemMessage = msgType match {
-    case RENAME | CONNECT_REQUEST | CONNECT_ACCEPTED | MEMBER_JOIN | MEMBER_LEAVE | MISSED_CALL | SUCCESSFUL_CALL | MESSAGE_TIMER => true
+    case RENAME | CONNECT_REQUEST | CONNECT_ACCEPTED | MEMBER_JOIN | MEMBER_LEAVE | MISSED_CALL | SUCCESSFUL_CALL | MESSAGE_TIMER | READ_RECEIPTS_ON | READ_RECEIPTS_OFF => true
     case _ => false
   }
 
@@ -307,6 +307,8 @@ object MessageData extends
     case Message.Type.KNOCK                => "Knock"
     case Message.Type.MEMBER_JOIN          => "MemberJoin"
     case Message.Type.MEMBER_LEAVE         => "MemberLeave"
+    case Message.Type.READ_RECEIPTS_ON     => "ReadReceiptsOn"
+    case Message.Type.READ_RECEIPTS_OFF    => "ReadReceiptsOff"
     case Message.Type.CONNECT_REQUEST      => "ConnectRequest"
     case Message.Type.CONNECT_ACCEPTED     => "ConnectAccepted"
     case Message.Type.RENAME               => "Rename"

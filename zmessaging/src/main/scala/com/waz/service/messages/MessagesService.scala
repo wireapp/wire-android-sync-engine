@@ -57,7 +57,7 @@ trait MessagesService {
   def addSuccessfulCallMessage(convId: ConvId, from: UserId, time: RemoteInstant, duration: FiniteDuration): Future[Option[MessageData]]
 
   def addConnectRequestMessage(convId: ConvId, fromUser: UserId, toUser: UserId, message: String, name: Name, fromSync: Boolean = false): Future[MessageData]
-  def addConversationStartMessage(convId: ConvId, creator: UserId, users: Set[UserId], name: Option[Name], time: Option[RemoteInstant] = None): Future[MessageData]
+  def addConversationStartMessage(convId: ConvId, creator: UserId, users: Set[UserId], name: Option[Name], readReceiptsAllowed: Boolean, time: Option[RemoteInstant] = None): Future[Unit]
 
   //TODO forceCreate is a hacky workaround for a bug where previous system messages are not marked as SENT. Do NOT use!
   def addMemberJoinMessage(convId: ConvId, creator: UserId, users: Set[UserId], firstMessage: Boolean = false, forceCreate: Boolean = false): Future[Option[MessageData]]
@@ -295,8 +295,13 @@ class MessagesServiceImpl(selfUserId:   UserId,
     }
   }
 
-  def addConversationStartMessage(convId: ConvId, creator: UserId, users: Set[UserId], name: Option[Name], time: Option[RemoteInstant]) = {
-    updater.addLocalSentMessage(MessageData(MessageId(), convId, Message.Type.MEMBER_JOIN, creator, name = name, members = users, firstMessage = true), time)
+  def addConversationStartMessage(convId: ConvId, creator: UserId, users: Set[UserId], name: Option[Name], readReceiptsAllowed: Boolean, time: Option[RemoteInstant]) = {
+    updater
+      .addLocalSentMessage(MessageData(MessageId(), convId, Message.Type.MEMBER_JOIN, creator, name = name, members = users, firstMessage = true), time)
+      .flatMap(_ =>
+        updater.addLocalSentMessage(MessageData(MessageId(), convId, if (readReceiptsAllowed) Message.Type.READ_RECEIPTS_ON else Message.Type.READ_RECEIPTS_OFF, creator, firstMessage = true), time.map(_ + 1.millis))
+      )
+      .map(_ => ())
   }
 
   override def addMemberJoinMessage(convId: ConvId, creator: UserId, users: Set[UserId], firstMessage: Boolean = false, forceCreate: Boolean = false) = {
