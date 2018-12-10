@@ -37,11 +37,11 @@ class ReceiptService(messages: MessagesStorage, convsStorage: ConversationStorag
   import Threading.Implicits.Background
 
   messages.onAdded { msgs =>
-    Future.traverse(msgs.iterator.filter(msg => msg.userId != selfUserId && confirmable(msg.msgType))) { msg =>
+    val filteredMessages = msgs.filter(msg => msg.userId != selfUserId && confirmable(msg.msgType)).groupBy(m => (m.convId, m.userId))
+    Future.traverse(filteredMessages) { case ((convId, userId), groupMessages) =>
       for {
-        Some(conv) <- convsStorage.get(msg.convId)
-        false <- convsService.isGroupConversation(conv.id)
-        _ <- sync.postReceipt(msg.convId, msg.id, msg.userId, ReceiptType.Delivery)
+        false <- convsService.isGroupConversation(convId)
+        _ <- sync.postReceipt(convId, groupMessages.map(_.id), userId, ReceiptType.Delivery)
       } yield ()
     }
   }

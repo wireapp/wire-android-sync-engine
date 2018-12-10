@@ -91,7 +91,7 @@ class EphemeralMessagesService(selfUserId: UserId,
       for {
         _ <- messages.deleteOnUserRequest(toRemove.map(_.id))
         // recalling message, this informs the sender that message is already expired
-        _ <- Future.traverse(toRemove) { m => sync.postReceipt(m.convId, m.id, m.userId, ReceiptType.EphemeralExpired) }
+        _ <- Future.traverse(toRemove) { m => sync.postReceipt(m.convId, Seq(m.id), m.userId, ReceiptType.EphemeralExpired) }
         _ <- storage.updateAll2(toObfuscate.map(_.id), obfuscate)
       } yield ()
     }

@@ -199,6 +199,7 @@ object JsonDecoder {
   implicit def decodeHandle(s: Symbol)(implicit js: JSONObject): Handle = Handle(js.getString(s.name))
   implicit def decodeInvitationId(s: Symbol)(implicit js: JSONObject): InvitationId = InvitationId(js.getString(s.name))
   implicit def decodeMessage(s: Symbol)(implicit js: JSONObject): GenericMessage = GenericMessage(AESUtils.base64(decodeString(s)))
+  implicit def decodeMessageIdSeq(s: Symbol)(implicit js: JSONObject): Seq[MessageId] = array[MessageId](s)({ (arr, i) => MessageId(arr.getString(i)) })
 
   implicit def decodeId[A](s: Symbol)(implicit js: JSONObject, id: Id[A]): A = id.decode(js.getString(s.name))
 

@@ -198,8 +198,8 @@ object SyncRequest {
     override def merge(req: SyncRequest) = mergeHelper[PostOpenGraphMeta](req)(r => Merged(PostOpenGraphMeta(convId, messageId, editTime max r.editTime)))
   }
 
-  case class PostReceipt(convId: ConvId, messageId: MessageId, userId: UserId, tpe: ReceiptType) extends RequestForConversation(Cmd.PostReceipt) {
-    override val mergeKey = (cmd, messageId, userId, tpe)
+  case class PostReceipt(convId: ConvId, messages: Seq[MessageId], userId: UserId, tpe: ReceiptType) extends RequestForConversation(Cmd.PostReceipt) {
+    override val mergeKey = (cmd, messages, userId, tpe)
   }
 
   case class PostDeleted(convId: ConvId, messageId: MessageId) extends RequestForConversation(Cmd.PostDeleted) {
@@ -386,7 +386,7 @@ object SyncRequest {
           case Cmd.PostRemoveBot             => PostRemoveBot(decodeId[ConvId]('convId), decodeId[UserId]('botId))
           case Cmd.PostSessionReset          => PostSessionReset(convId, userId, decodeId[ClientId]('client))
           case Cmd.PostOpenGraphMeta         => PostOpenGraphMeta(convId, messageId, 'time)
-          case Cmd.PostReceipt               => PostReceipt(convId, messageId, userId, ReceiptType.fromName('type))
+          case Cmd.PostReceipt               => PostReceipt(convId, decodeMessageIdSeq('messages), userId, ReceiptType.fromName('type))
           case Cmd.PostBoolProperty          => PostBoolProperty('key, 'value)
           case Cmd.PostIntProperty           => PostIntProperty('key, 'value)
           case Cmd.PostStringProperty        => PostStringProperty('key, 'value)
@@ -450,8 +450,8 @@ object SyncRequest {
           putId("message", messageId)
           o.put("time", time.toEpochMilli)
 
-        case PostReceipt(_, messageId, userId, tpe) =>
-          putId("message", messageId)
+        case PostReceipt(_, messages, userId, tpe) =>
+          o.put("messages", arrString(messages.map(_.str)))
           putId("user", userId)
           o.put("type", tpe.name)
 

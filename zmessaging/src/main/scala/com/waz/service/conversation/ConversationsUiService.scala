@@ -410,13 +410,12 @@ class ConversationsUiServiceImpl(selfUserId:      UserId,
         Future.successful(Seq())
       } else {
         messagesStorage.findMessagesBetween(convId, from, to).flatMap { messages =>
-          RichFuture.traverseSequential(messages.filter(_.userId != selfUserId))({ m =>
-            if (m.expectsRead.contains(true)) {
-              sync.postReceipt(convId, m.id, m.userId, ReceiptType.Read).map(Some(_))
-            } else {
-              Future.successful(Option.empty[SyncId])
-            }
-          }).map(_.flatten)
+          val msgs = messages.filter { m =>
+            m.userId != selfUserId && m.expectsRead.contains(true)
+          }
+          RichFuture.traverseSequential(msgs.groupBy(_.userId).toSeq)( { case (u, ms) if ms.nonEmpty =>
+            sync.postReceipt(convId, ms.map(_.id), u, ReceiptType.Read)
+          })
         }
       }
     }

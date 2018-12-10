@@ -527,6 +527,12 @@ object GenericContent {
       c.`type` = Messages.Confirmation.DELIVERED
     }
 
+    def apply(msgs: Seq[MessageId]) = returning(new Messages.Confirmation) { c =>
+      c.firstMessageId = msgs.head.str
+      c.moreMessageIds = msgs.map(_.str).tail.toArray
+      c.`type` = Messages.Confirmation.DELIVERED
+    }
+
     def unapply(proto: Receipt): Option[Seq[MessageId]] = if (proto.`type` == Messages.Confirmation.DELIVERED)
       Some(Seq(MessageId(proto.firstMessageId)) ++ proto.moreMessageIds.map(MessageId(_)).toSeq)
     else
@@ -538,6 +544,12 @@ object GenericContent {
 
     def apply(msg: MessageId) = returning(new Messages.Confirmation) { c =>
       c.firstMessageId = msg.str
+      c.`type` = Messages.Confirmation.READ
+    }
+
+    def apply(msgs: Seq[MessageId]) = returning(new Messages.Confirmation) { c =>
+      c.firstMessageId = msgs.head.str
+      c.moreMessageIds = msgs.map(_.str).tail.toArray
       c.`type` = Messages.Confirmation.READ
     }
 
