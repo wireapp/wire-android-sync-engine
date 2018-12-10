@@ -63,6 +63,7 @@ trait MessagesService {
   def addMemberJoinMessage(convId: ConvId, creator: UserId, users: Set[UserId], firstMessage: Boolean = false, forceCreate: Boolean = false): Future[Option[MessageData]]
   def addMemberLeaveMessage(convId: ConvId, selfUserId: UserId, user: UserId): Future[Any]
   def addRenameConversationMessage(convId: ConvId, selfUserId: UserId, name: Name): Future[Option[MessageData]]
+  def addReceiptModeChangeMessage(convId: ConvId, from: UserId, receiptMode: Int): Future[Option[MessageData]]
   def addTimerChangedMessage(convId: ConvId, from: UserId, duration: Option[FiniteDuration], time: RemoteInstant): Future[Unit]
   def addHistoryLostMessages(cs: Seq[ConversationData], selfUserId: UserId): Future[Set[MessageData]]
 
@@ -241,6 +242,12 @@ class MessagesServiceImpl(selfUserId:   UserId,
     def update(msg: MessageData) = msg.copy(name = Some(name))
     def create = MessageData(MessageId(), convId, Message.Type.RENAME, from, name = Some(name))
     updater.updateOrCreateLocalMessage(convId, Message.Type.RENAME, update, create)
+  }
+
+  override def addReceiptModeChangeMessage(convId: ConvId, from: UserId, receiptMode: Int) = {
+    val msgType = if (receiptMode > 0) Message.Type.READ_RECEIPTS_ON else Message.Type.READ_RECEIPTS_OFF
+    def create = MessageData(MessageId(), convId, msgType, from)
+    updater.updateOrCreateLocalMessage(convId, msgType, msg => msg, create)
   }
 
   override def addTimerChangedMessage(convId: ConvId, from: UserId, duration: Option[FiniteDuration], time: RemoteInstant) =

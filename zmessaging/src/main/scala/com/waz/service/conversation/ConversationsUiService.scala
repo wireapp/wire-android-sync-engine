@@ -393,13 +393,7 @@ class ConversationsUiServiceImpl(selfUserId:      UserId,
       propertiesService.readReceiptsEnabled.head
 
   override def setReceiptMode(id: ConvId, receiptMode: Int): Future[Option[ConversationData]] = {
-    messagesContent.addLocalSentMessage(
-      MessageData(MessageId(),
-        id,
-        if (receiptMode > 0) Message.Type.READ_RECEIPTS_ON else Message.Type.READ_RECEIPTS_OFF,
-        selfUserId
-      )
-    ).flatMap(_ => convs.setReceiptMode(id, receiptMode))
+    messages.addReceiptModeChangeMessage(id, selfUserId, receiptMode).flatMap(_ => convs.setReceiptMode(id, receiptMode))
   }
 
   override def knock(id: ConvId): Future[Option[MessageData]] = for {
