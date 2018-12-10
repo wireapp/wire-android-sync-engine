@@ -527,7 +527,10 @@ object GenericContent {
       c.`type` = Messages.Confirmation.DELIVERED
     }
 
-    def unapply(proto: Receipt): Option[MessageId] = if (proto.`type` == Messages.Confirmation.DELIVERED) Some(MessageId(proto.firstMessageId)) else None
+    def unapply(proto: Receipt): Option[Seq[MessageId]] = if (proto.`type` == Messages.Confirmation.DELIVERED)
+      Some(Seq(MessageId(proto.firstMessageId)) ++ proto.moreMessageIds.map(MessageId(_)).toSeq)
+    else
+      None
   }
 
   object ReadReceipt extends GenericContent[Receipt] {
@@ -538,7 +541,10 @@ object GenericContent {
       c.`type` = Messages.Confirmation.READ
     }
 
-    def unapply(proto: Receipt): Option[MessageId] = if (proto.`type` == Messages.Confirmation.READ) Some(MessageId(proto.firstMessageId)) else None
+    def unapply(proto: Receipt): Option[Seq[MessageId]] = if (proto.`type` == Messages.Confirmation.READ)
+      Some(Seq(MessageId(proto.firstMessageId)) ++ proto.moreMessageIds.map(MessageId(_)).toSeq)
+    else
+      None
   }
 
   type External = Messages.External

@@ -59,17 +59,19 @@ class GenericMessageService(selfUserId: UserId,
       case GenericMessageEvent(_, _, _, GenericMessage(_, MsgDeleted(_, msg))) => msg
     }
 
-    val confirmed = events collect {
-      case GenericMessageEvent(_, _, _, GenericMessage(_, DeliveryReceipt(msg))) => msg
-    }
+    val confirmed = events.collect {
+      case GenericMessageEvent(_, _, _, GenericMessage(_, DeliveryReceipt(msgs))) => msgs
+    }.flatten
 
     val availabilities = (events collect {
       case GenericMessageEvent(_, _, userId, GenericMessage(_, AvailabilityStatus(available))) => userId -> available
     }).toMap
 
-    val read = events collect {
-      case GenericMessageEvent(_, time, from, GenericMessage(_, Proto.ReadReceipt(msg))) => model.ReadReceipt(msg, from, time)
-    }
+    val read = events.collect {
+      case GenericMessageEvent(_, time, from, GenericMessage(_, Proto.ReadReceipt(msgs))) => msgs.map { msg =>
+        model.ReadReceipt(msg, from, time)
+      }
+    }.flatten
 
     for {
       _ <- messages.deleteOnUserRequest(deleted)
