@@ -299,7 +299,7 @@ class ConversationsServiceImpl(teamId:          Option[TeamId],
 
   def setReceiptMode(id: ConvId, receiptMode: Int) = content.updateReceiptMode(id, receiptMode).flatMap {
     case Some((_, conv)) =>
-      sync.postReceiptMode(id, receiptMode) map { _ => Some(conv) }
+      sync.postReceiptMode(id, receiptMode).map(_ => Some(conv))
     case None =>
       Future successful None
   }
