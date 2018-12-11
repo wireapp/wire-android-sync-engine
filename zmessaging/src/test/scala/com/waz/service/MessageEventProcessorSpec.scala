@@ -61,7 +61,7 @@ class MessageEventProcessorSpec extends AndroidFreeSpec with Inside {
   }
 
   (replyHashing.hashMessages _).expects(*).anyNumberOfTimes.onCall { msgs: Seq[MessageData] =>
-    Future.successful(msgs.filter(m => m.quote.isDefined && m.quoteHash.isDefined).map(m => m.id -> m.quoteHash.get).toMap)
+    Future.successful(msgs.filter(m => m.quote.isDefined && m.quote.flatMap(_.hash).isDefined).map(m => m.id -> m.quote.flatMap(_.hash).get).toMap)
   }
 
   feature("Push events processing") {
