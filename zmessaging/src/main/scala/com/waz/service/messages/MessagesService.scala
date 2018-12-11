@@ -306,9 +306,11 @@ class MessagesServiceImpl(selfUserId:   UserId,
     updater
       .addLocalSentMessage(MessageData(MessageId(), convId, Message.Type.MEMBER_JOIN, creator, name = name, members = users, firstMessage = true), time)
       .flatMap(_ =>
-        updater.addLocalSentMessage(MessageData(MessageId(), convId, if (readReceiptsAllowed) Message.Type.READ_RECEIPTS_ON else Message.Type.READ_RECEIPTS_OFF, creator, firstMessage = true), time.map(_ + 1.millis))
+        if (readReceiptsAllowed)
+          updater.addLocalSentMessage(MessageData(MessageId(), convId, Message.Type.READ_RECEIPTS_ON, creator, firstMessage = true), time.map(_ + 1.millis)).map(_ => ())
+        else
+          Future.successful({})
       )
-      .map(_ => ())
   }
 
   override def addMemberJoinMessage(convId: ConvId, creator: UserId, users: Set[UserId], firstMessage: Boolean = false, forceCreate: Boolean = false) = {
