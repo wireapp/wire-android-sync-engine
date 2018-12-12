@@ -225,6 +225,7 @@ object ZLog2 {
 
     implicit val PrefKeyLogShow: LogShow[PrefKey[_]]      = logShowWithToString
     implicit val PropertyKeyLogShow: LogShow[PropertyKey] = logShowWithToString
+    implicit val ReadReceiptSettingsShow: LogShow[ReadReceiptSettings] = logShowWithToString
 
     implicit val RawAssetInputLogShow: LogShow[RawAssetInput] =
       createFrom {

@@ -67,7 +67,9 @@ class MessageSendingSpec extends AndroidFreeSpec { test =>
 
       (properties.readReceiptsEnabled _).expects().anyNumberOfTimes().returning(Signal.const(false))
 
-      (messages.addTextMessage _).expects(conv.id, "test", false, Nil, None).once().returning(Future.successful(msgData))
+      (convs.isGroupConversation _).expects(conv.id).anyNumberOfTimes().returning(Future.successful(false))
+
+      (messages.addTextMessage _).expects(conv.id, "test", AllDisabled, Nil, None).once().returning(Future.successful(msgData))
 
       (convsContent.updateConversationLastRead _).expects(conv.id, msgData.time).once().returning(Future.successful(Some((conv, conv))))
 
@@ -97,7 +99,9 @@ class MessageSendingSpec extends AndroidFreeSpec { test =>
 
       (properties.readReceiptsEnabled _).expects().anyNumberOfTimes().returning(Signal.const(false))
 
-      (messages.addTextMessage _).expects(conv.id, text, false, mentions, None).once().returning(Future.successful(msgData))
+      (convs.isGroupConversation _).expects(conv.id).anyNumberOfTimes().returning(Future.successful(false))
+
+      (messages.addTextMessage _).expects(conv.id, text, AllDisabled, mentions, None).once().returning(Future.successful(msgData))
 
       (convsContent.updateConversationLastRead _).expects(conv.id, msgData.time).once().returning(Future.successful(Some((conv, conv))))
 
@@ -117,9 +121,11 @@ class MessageSendingSpec extends AndroidFreeSpec { test =>
 
       (properties.readReceiptsEnabled _).expects().anyNumberOfTimes().returning(Signal.const(true))
 
-      (messages.addTextMessage _).expects(conv.id, "test", true, Nil, None).once().onCall {
-        (cId: ConvId, text: String, rr: Boolean, _: Seq[Mention], _: Option[Option[FiniteDuration]]) =>
-          Future.successful(MessageData(mId, cId, Message.Type.TEXT, UserId(), MessageData.textContent(text), protos = Seq(GenericMessage(mId.uid, Text(text, Nil, Nil, expectsReadConfirmation = rr)))))
+      (convs.isGroupConversation _).expects(conv.id).anyNumberOfTimes().returning(Future.successful(false))
+
+      (messages.addTextMessage _).expects(conv.id, "test", ReadReceiptSettings(selfSettings = true, None), Nil, None).once().onCall {
+        (cId: ConvId, text: String, rr: ReadReceiptSettings, _: Seq[Mention], _: Option[Option[FiniteDuration]]) =>
+          Future.successful(MessageData(mId, cId, Message.Type.TEXT, UserId(), MessageData.textContent(text), protos = Seq(GenericMessage(mId.uid, Text(text, Nil, Nil, expectsReadConfirmation = rr.selfSettings)))))
       }
 
       (convsContent.updateConversationLastRead _).expects(conv.id, *).once().returning(Future.successful(Some((conv, conv))))

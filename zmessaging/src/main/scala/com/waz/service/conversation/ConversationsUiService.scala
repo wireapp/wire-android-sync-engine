@@ -80,7 +80,7 @@ trait ConversationsUiService {
   def leaveConversation(conv: ConvId): Future[Unit]
   def clearConversation(id: ConvId): Future[Option[ConversationData]]
 
-  def expectReadReceipt(convId: ConvId): Future[Boolean]
+  def readReceiptSettings(convId: ConvId): Future[ReadReceiptSettings]
   def setReceiptMode(id: ConvId, receiptMode: Int): Future[Option[ConversationData]]
 
   def knock(id: ConvId): Future[Option[MessageData]]
@@ -132,7 +132,7 @@ class ConversationsUiServiceImpl(selfUserId:      UserId,
 
   override def sendTextMessage(convId: ConvId, text: String, mentions: Seq[Mention] = Nil, exp: Option[Option[FiniteDuration]] = None) =
     for {
-      rr  <- expectReadReceipt(convId)
+      rr  <- readReceiptSettings(convId)
       msg <- messages.addTextMessage(convId, text, rr, mentions, exp)
       _   <- updateLastRead(msg)
       _   <- sync.postMessage(msg.id, convId, msg.editTime)
@@ -142,8 +142,10 @@ class ConversationsUiServiceImpl(selfUserId:      UserId,
     Future.sequence(convs.map(id => sendTextMessage(id, text, mentions, Some(exp)))).map(_ => {})
 
   override def sendReplyMessage(quote: MessageId, text: String, mentions: Seq[Mention] = Nil, exp: Option[Option[FiniteDuration]] = None) =
-    propertiesService.readReceiptsEnabled.head.flatMap { rr =>
-      messages.addReplyMessage(quote, text, rr, mentions, exp).flatMap {
+    for {
+      Some(q) <- messagesStorage.get(quote)
+      rr <- readReceiptSettings(q.convId)
+      res <- messages.addReplyMessage(quote, text, rr, mentions, exp).flatMap {
         case Some(m) =>
           for {
             _ <- updateLastRead(m)
@@ -152,7 +154,7 @@ class ConversationsUiServiceImpl(selfUserId:      UserId,
         case None =>
           Future.successful(None)
       }
-    }
+    } yield res
 
   override def sendAssetMessage(convId: ConvId, rawInput: RawAssetInput, confirmation: WifiWarningConfirmation = DefaultConfirmation, exp: Option[Option[FiniteDuration]] = None) =
     assets.addAsset(rawInput).flatMap {
@@ -172,7 +174,7 @@ class ConversationsUiServiceImpl(selfUserId:      UserId,
   private def postAssetMessage(convId: ConvId, asset: AssetData, confirmation: WifiWarningConfirmation, exp: Option[Option[FiniteDuration]] = None) = {
     verbose(l"postAssetMessage: $convId, $asset")
     for {
-      rr         <- expectReadReceipt(convId)
+      rr         <- readReceiptSettings(convId)
       message    <- messages.addAssetMessage(convId, asset, rr, exp)
       _          <- updateLastRead(message)
       _          <- Future.successful(tracking.assetContribution(asset.id, selfUserId))
@@ -183,8 +185,8 @@ class ConversationsUiServiceImpl(selfUserId:      UserId,
 
   override def sendLocationMessage(convId: ConvId, l: api.MessageContent.Location): Future[Some[MessageData]] = {
     for {
-      rr  <- expectReadReceipt(convId)
-      msg <- messages.addLocationMessage(convId, Location(l.getLongitude, l.getLatitude, l.getName, l.getZoom, rr))
+      rr  <- readReceiptSettings(convId)
+      msg <- messages.addLocationMessage(convId, Location(l.getLongitude, l.getLatitude, l.getName, l.getZoom, rr.selfSettings))
       _   <- updateLastRead(msg)
       _   <- sync.postMessage(msg.id, convId, msg.editTime)
     } yield Some(msg)
@@ -199,7 +201,7 @@ class ConversationsUiServiceImpl(selfUserId:      UserId,
         m.copy(
           msgType = tpe,
           content = ct,
-          protos = Seq(GenericMessage(Uid(), MsgEdit(id, GenericContent.Text(text, ct.flatMap(_.mentions), Nil, m.protoQuote, m.expectsRead.getOrElse(false))))),
+          protos = Seq(GenericMessage(Uid(), MsgEdit(id, GenericContent.Text(text, ct.flatMap(_.mentions), Nil, m.protoQuote, m.protoReadReceipts.getOrElse(false))))),
           state = Message.Status.PENDING,
           editTime = (m.time max m.editTime) + 1.millis max LocalInstant.Now.toRemote(currentBeDrift)
         )
@@ -273,7 +275,7 @@ class ConversationsUiServiceImpl(selfUserId:      UserId,
       Some(_) <- members.remove(conv, user)
       _       <- messages.addMemberLeaveMessage(conv, selfUserId, user)
       syncId  <- sync.postConversationMemberLeave(conv, user)
-    } yield Some(syncId))
+    } yield Option(syncId))
       .recover {
         case NonFatal(e) =>
           warn(l"Failed to remove member: $user from conv: $conv", e)
@@ -382,31 +384,30 @@ class ConversationsUiServiceImpl(selfUserId:      UserId,
     } yield (conv, syncId)
   }
 
-  override def expectReadReceipt(convId: ConvId): Future[Boolean] =
-    if (teamId.isDefined)
-      for {
-        isGroup <- convs.isGroupConversation(convId)
-        rr      <- if (isGroup) convStorage.get(convId).map(_.exists(_.readReceiptsAllowed))
-                   else propertiesService.readReceiptsEnabled.head
-      } yield rr
-    else
-      propertiesService.readReceiptsEnabled.head
+  override def readReceiptSettings(convId: ConvId): Future[ReadReceiptSettings] = {
+    for {
+      selfSetting <- propertiesService.readReceiptsEnabled.head
+      isGroup     <- convs.isGroupConversation(convId)
+      convSetting <- if (isGroup) convStorage.get(convId).map(_.exists(_.readReceiptsAllowed)).map(Option(_))
+                     else Future.successful(Option.empty[Boolean])
+    } yield ReadReceiptSettings(selfSetting, convSetting.map(if(_) 1 else 0))
+  }
 
   override def setReceiptMode(id: ConvId, receiptMode: Int): Future[Option[ConversationData]] = {
     messages.addReceiptModeChangeMessage(id, selfUserId, receiptMode).flatMap(_ => convs.setReceiptMode(id, receiptMode))
   }
 
   override def knock(id: ConvId): Future[Option[MessageData]] = for {
-    rr  <- expectReadReceipt(id)
+    rr  <- readReceiptSettings(id)
     msg <- messages.addKnockMessage(id, selfUserId, rr)
     _   <- sync.postMessage(msg.id, id, msg.editTime)
   } yield Some(msg)
 
   override def setLastRead(convId: ConvId, msg: MessageData): Future[Option[ConversationData]] = {
 
-    def sendReadReceipts(from: RemoteInstant, to: RemoteInstant, isGroup: Boolean, readReceipts: Boolean): Future[Seq[SyncId]] = {
-      verbose(l"sendReadReceipts($from, $to, $readReceipts)")
-      if (!readReceipts && !isGroup) {
+    def sendReadReceipts(from: RemoteInstant, to: RemoteInstant, readReceiptSettings: ReadReceiptSettings): Future[Seq[SyncId]] = {
+      verbose(l"sendReadReceipts($from, $to, $readReceiptSettings)")
+      if (!readReceiptSettings.selfSettings && readReceiptSettings.convSetting.isEmpty) {
         Future.successful(Seq())
       } else {
         messagesStorage.findMessagesBetween(convId, from, to).flatMap { messages =>
@@ -421,15 +422,14 @@ class ConversationsUiServiceImpl(selfUserId:      UserId,
     }
 
     for {
-      readReceipts <- expectReadReceipt(convId)
-      isGroup      <- convs.isGroupConversation(convId)
+      readReceipts <- readReceiptSettings(convId)
       update       <- convsContent.updateConversationLastRead(convId, msg.time)
       _            <- update.fold(Future.successful({})) {
                         case (_, newConv) => sync.postLastRead(convId, newConv.lastRead).map(_ => {})
                       }
       _            <- update.fold(Future.successful({})) {
                         case (oldConv, newConv) =>
-                          sendReadReceipts(oldConv.lastRead, newConv.lastRead, isGroup, readReceipts).map(_ => {})
+                          sendReadReceipts(oldConv.lastRead, newConv.lastRead, readReceipts).map(_ => {})
                       }
     } yield update.map(_._2)
   }

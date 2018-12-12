@@ -46,11 +46,11 @@ import scala.util.Success
 trait MessagesService {
   def msgEdited: EventStream[(MessageId, MessageId)]
 
-  def addTextMessage(convId: ConvId, content: String, expectsReadReceipt: Boolean = false, mentions: Seq[Mention] = Nil, exp: Option[Option[FiniteDuration]] = None): Future[MessageData]
-  def addKnockMessage(convId: ConvId, selfUserId: UserId, expectsReadReceipt: Boolean = false): Future[MessageData]
-  def addAssetMessage(convId: ConvId, asset: AssetData, expectsReadReceipt: Boolean = false, exp: Option[Option[FiniteDuration]] = None): Future[MessageData]
-  def addLocationMessage(convId: ConvId, content: Location): Future[MessageData]
-  def addReplyMessage(quote: MessageId, content: String, expectsReadReceipt: Boolean = false, mentions: Seq[Mention] = Nil, exp: Option[Option[FiniteDuration]] = None): Future[Option[MessageData]]
+  def addTextMessage(convId: ConvId, content: String, expectsReadReceipt: ReadReceiptSettings = AllDisabled, mentions: Seq[Mention] = Nil, exp: Option[Option[FiniteDuration]] = None): Future[MessageData]
+  def addKnockMessage(convId: ConvId, selfUserId: UserId, expectsReadReceipt: ReadReceiptSettings = AllDisabled): Future[MessageData]
+  def addAssetMessage(convId: ConvId, asset: AssetData, expectsReadReceipt: ReadReceiptSettings = AllDisabled, exp: Option[Option[FiniteDuration]] = None): Future[MessageData]
+  def addLocationMessage(convId: ConvId, content: Location, expectsReadReceipt: ReadReceiptSettings = AllDisabled): Future[MessageData]
+  def addReplyMessage(quote: MessageId, content: String, expectsReadReceipt: ReadReceiptSettings = AllDisabled, mentions: Seq[Mention] = Nil, exp: Option[Option[FiniteDuration]] = None): Future[Option[MessageData]]
 
   def addMissedCallMessage(rConvId: RConvId, from: UserId, time: RemoteInstant): Future[Option[MessageData]]
   def addMissedCallMessage(convId: ConvId, from: UserId, time: RemoteInstant): Future[Option[MessageData]]
@@ -181,15 +181,15 @@ class MessagesServiceImpl(selfUserId:   UserId,
     }
   }
 
-  override def addTextMessage(convId: ConvId, content: String, expectsReadReceipt: Boolean = false, mentions: Seq[Mention] = Nil, exp: Option[Option[FiniteDuration]] = None) = {
+  override def addTextMessage(convId: ConvId, content: String, expectsReadReceipt: ReadReceiptSettings = AllDisabled, mentions: Seq[Mention] = Nil, exp: Option[Option[FiniteDuration]] = None) = {
     verbose(l"addTextMessage($convId, ${content.size}, $mentions, $exp")
     val (tpe, ct) = MessageData.messageContent(content, mentions, weblinkEnabled = true)
     verbose(l"parsed content: $ct")
     val id = MessageId()
-    updater.addLocalMessage(MessageData(id, convId, tpe, selfUserId, ct, protos = Seq(GenericMessage(id.uid, Text(content, ct.flatMap(_.mentions), Nil, expectsReadReceipt)))), exp = exp) // FIXME: links
+    updater.addLocalMessage(MessageData(id, convId, tpe, selfUserId, ct, protos = Seq(GenericMessage(id.uid, Text(content, ct.flatMap(_.mentions), Nil, expectsReadReceipt.selfSettings))), forceReadReceipts = expectsReadReceipt.convSetting), exp = exp) // FIXME: links
   }
 
-  override def addReplyMessage(quote: MessageId, content: String, expectsReadReceipt: Boolean = false, mentions: Seq[Mention] = Nil, exp: Option[Option[FiniteDuration]] = None): Future[Option[MessageData]] = {
+  override def addReplyMessage(quote: MessageId, content: String, expectsReadReceipt: ReadReceiptSettings = AllDisabled, mentions: Seq[Mention] = Nil, exp: Option[Option[FiniteDuration]] = None): Future[Option[MessageData]] = {
 
     verbose(l"addReplyMessage($quote, ${content.size}, $mentions, $exp)")
     updater.getMessage(quote).flatMap {
@@ -203,8 +203,9 @@ class MessagesServiceImpl(selfUserId:   UserId,
           updater.addLocalMessage(
             MessageData(
               id, original.convId, tpe, selfUserId, ct,
-              protos = Seq(GenericMessage(id.uid, Text(content, ct.flatMap(_.mentions), Nil, Some(Quote(quote, Some(hash))), expectsReadReceipt))),
-              quote = Some(QuoteContent(quote, validity = true, hash = Some(hash)))
+              protos = Seq(GenericMessage(id.uid, Text(content, ct.flatMap(_.mentions), Nil, Some(Quote(quote, Some(hash))), expectsReadReceipt.selfSettings))),
+              quote = Some(QuoteContent(quote, validity = true, hash = Some(hash))),
+              forceReadReceipts = expectsReadReceipt.convSetting
             ),
             exp = exp,
             localTime = localTime
@@ -221,13 +222,13 @@ class MessagesServiceImpl(selfUserId:   UserId,
     }
   }
 
-  override def addLocationMessage(convId: ConvId, content: Location) = {
+  override def addLocationMessage(convId: ConvId, content: Location, expectsReadReceipt: ReadReceiptSettings = AllDisabled) = {
     verbose(l"addLocationMessage($convId, $content)")
     val id = MessageId()
-    updater.addLocalMessage(MessageData(id, convId, Type.LOCATION, selfUserId, protos = Seq(GenericMessage(id.uid, content))))
+    updater.addLocalMessage(MessageData(id, convId, Type.LOCATION, selfUserId, protos = Seq(GenericMessage(id.uid, content)), forceReadReceipts = expectsReadReceipt.convSetting))
   }
 
-  override def addAssetMessage(convId: ConvId, asset: AssetData, expectsReadReceipt: Boolean = false, exp: Option[Option[FiniteDuration]] = None) = {
+  override def addAssetMessage(convId: ConvId, asset: AssetData, expectsReadReceipt: ReadReceiptSettings = AllDisabled, exp: Option[Option[FiniteDuration]] = None) = {
     val tpe = asset match {
       case AssetData.IsImage() => Message.Type.ASSET
       case AssetData.IsVideo() => Message.Type.VIDEO_ASSET
@@ -235,7 +236,7 @@ class MessagesServiceImpl(selfUserId:   UserId,
       case _                   => Message.Type.ANY_ASSET
     }
     val mid = MessageId(asset.id.str)
-    updater.addLocalMessage(MessageData(mid, convId, tpe, selfUserId, protos = Seq(GenericMessage(mid.uid, Asset(asset, expectsReadConfirmation = expectsReadReceipt)))), exp = exp)
+    updater.addLocalMessage(MessageData(mid, convId, tpe, selfUserId, protos = Seq(GenericMessage(mid.uid, Asset(asset, expectsReadConfirmation = expectsReadReceipt.selfSettings))), forceReadReceipts = expectsReadReceipt.convSetting), exp = exp)
   }
 
   override def addRenameConversationMessage(convId: ConvId, from: UserId, name: Name) = {
@@ -262,9 +263,9 @@ class MessagesServiceImpl(selfUserId:   UserId,
     if (fromSync) storage.insert(msg) else updater.addLocalMessage(msg)
   }
 
-  override def addKnockMessage(convId: ConvId, selfUserId: UserId, expectsReadReceipt: Boolean = false) = {
+  override def addKnockMessage(convId: ConvId, selfUserId: UserId, expectsReadReceipt: ReadReceiptSettings = AllDisabled) = {
     debug(l"addKnockMessage($convId, $selfUserId)")
-    updater.addLocalMessage(MessageData(MessageId(), convId, Message.Type.KNOCK, selfUserId))
+    updater.addLocalMessage(MessageData(MessageId(), convId, Message.Type.KNOCK, selfUserId, forceReadReceipts = expectsReadReceipt.convSetting))
   }
 
   override def addDeviceStartMessages(convs: Seq[ConversationData], selfUserId: UserId): Future[Set[MessageData]] =

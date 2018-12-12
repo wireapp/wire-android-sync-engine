@@ -181,7 +181,7 @@ case class MessageData(id:                MessageId              = MessageId(),
         case Some(GenericMessage(uid, t @ Text(_, _, links, quote))) =>
           GenericMessage(uid, ephemeral, Text(contentString, newMentions, links, quote, t.expectsReadConfirmation))
         case _ =>
-          GenericMessage(id.uid, ephemeral, Text(contentString, newMentions, Nil, expectsRead.getOrElse(false)))
+          GenericMessage(id.uid, ephemeral, Text(contentString, newMentions, Nil, protoReadReceipts.getOrElse(false)))
       }
 
       if (content == newContent && protos.lastOption.contains(newProto)) None
@@ -290,7 +290,7 @@ object MessageData extends
 
   val Empty = new MessageData(MessageId(""), ConvId(""), Message.Type.UNKNOWN, UserId(""))
   val Deleted = new MessageData(MessageId(""), ConvId(""), Message.Type.UNKNOWN, UserId(""), state = Message.Status.DELETED)
-  val isUserContent = Set(TEXT, TEXT_EMOJI_ONLY, ASSET, ANY_ASSET, VIDEO_ASSET, AUDIO_ASSET, RICH_MEDIA, LOCATION)
+  val isUserContent = Set(TEXT, TEXT_EMOJI_ONLY, ASSET, ANY_ASSET, VIDEO_ASSET, AUDIO_ASSET, RICH_MEDIA, LOCATION, KNOCK)
 
   val EphemeralMessageTypes = Set(TEXT, TEXT_EMOJI_ONLY, KNOCK, ASSET, ANY_ASSET, VIDEO_ASSET, AUDIO_ASSET, RICH_MEDIA, LOCATION)
 
@@ -550,4 +550,6 @@ object MessageData extends
   }
 
   def decode(array: Array[Byte]) = UTF_16_CHARSET.decode(ByteBuffer.wrap(array)).toString
+
+  def readReceiptMode(enabled: Boolean) = if (enabled) Some(1) else Some(0)
 }
