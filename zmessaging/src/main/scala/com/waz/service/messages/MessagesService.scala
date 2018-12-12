@@ -66,6 +66,7 @@ trait MessagesService {
   def addReceiptModeChangeMessage(convId: ConvId, from: UserId, receiptMode: Int): Future[Option[MessageData]]
   def addTimerChangedMessage(convId: ConvId, from: UserId, duration: Option[FiniteDuration], time: RemoteInstant): Future[Unit]
   def addHistoryLostMessages(cs: Seq[ConversationData], selfUserId: UserId): Future[Set[MessageData]]
+  def addReceiptModeIsOnMessage(convId: ConvId): Future[MessageData]
 
   def addDeviceStartMessages(convs: Seq[ConversationData], selfUserId: UserId): Future[Set[MessageData]]
   def addOtrVerifiedMessage(convId: ConvId): Future[Option[MessageData]]
@@ -250,6 +251,10 @@ class MessagesServiceImpl(selfUserId:   UserId,
     def create = MessageData(MessageId(), convId, msgType, from)
     updater.updateOrCreateLocalMessage(convId, msgType, msg => msg, create)
   }
+
+  override def addReceiptModeIsOnMessage(convId: ConvId): Future[MessageData] =
+    updater.addLocalMessage(MessageData(MessageId(), convId, Message.Type.READ_RECEIPTS_ON, selfUserId, firstMessage = true))
+
 
   override def addTimerChangedMessage(convId: ConvId, from: UserId, duration: Option[FiniteDuration], time: RemoteInstant) =
     updater.addLocalMessage(MessageData(MessageId(), convId, Message.Type.MESSAGE_TIMER, from, time = time, duration = duration)).map(_ => {})

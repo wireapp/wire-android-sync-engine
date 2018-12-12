@@ -150,8 +150,11 @@ class ConversationsServiceImpl(teamId:          Option[TeamId],
               for {
                 conv <- convsStorage.insert(ConversationData(ConvId(), rConvId, None, from, ConversationType.Group, lastEventTime = time))
                 ms   <- membersStorage.add(conv.id, from +: members)
+                sId  <- sync.syncConversations(Set(conv.id))
+                _    <- syncReqService.await(sId)
+                Some(conv) <- convsStorage.get(conv.id)
+                _    <- if (conv.receiptMode.exists(_ > 0)) messages.addReceiptModeIsOnMessage(conv.id) else Future.successful(None)
                 _    <- messages.addMemberJoinMessage(conv.id, from, members.toSet)
-                _    <- sync.syncConversations(Set(conv.id))
               } yield {}
             case _ =>
               warn(l"No conversation data found for event: $ev on try: $retryCount")
@@ -164,12 +167,19 @@ class ConversationsServiceImpl(teamId:          Option[TeamId],
     case RenameConversationEvent(_, _, _, name) => content.updateConversationName(conv.id, name)
 
     case MemberJoinEvent(_, _, _, userIds, _) =>
-      if (userIds.contains(selfUserId)) sync.syncConversations(Set(conv.id)) //we were re-added to a group and in the meantime might have missed events
+      val selfAdded = userIds.contains(selfUserId)//we were re-added to a group and in the meantime might have missed events
       for {
+        convSync <- if (selfAdded)
+          sync.syncConversations(Set(conv.id)).map(Option(_))
+        else
+          Future.successful(None)
         syncId <- users.syncIfNeeded(userIds.toSet)
         _ <- syncId.fold(Future.successful(()))(sId => syncReqService.await(sId).map(_ => ()))
         _ <- membersStorage.add(conv.id, userIds)
         _ <- if (userIds.contains(selfUserId)) content.setConvActive(conv.id, active = true) else successful(None)
+        _ <- convSync.fold(Future.successful(()))(sId => syncReqService.await(sId).map(_ => ()))
+        Some(conv) <- convsStorage.get(conv.id)
+        _ <- if (selfAdded && conv.receiptMode.exists(_ > 0)) messages.addReceiptModeIsOnMessage(conv.id) else Future.successful(None)
       } yield ()
 
     case MemberLeaveEvent(_, _, _, userIds) =>
