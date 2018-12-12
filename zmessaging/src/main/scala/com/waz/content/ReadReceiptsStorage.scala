@@ -47,7 +47,7 @@ class ReadReceiptsStorageImpl(context: Context, storage: Database, msgStorage: M
       for {
         receipts    <- getReceipts(prev)
         _           <- removeAll(receipts.map(_.id))
-        newReceipts =  receipts.map(r => r.id -> r.copy(message = cur)).toMap
+        newReceipts =  receipts.map(r => (cur, r.user) -> r.copy(message = cur)).toMap
         _           <- updateOrCreateAll2(newReceipts.keys, { (k, _) => newReceipts(k) })
       } yield ()
   }
