@@ -274,6 +274,7 @@ object ZMessagingDB {
       db.execSQL("ALTER TABLE Conversations ADD COLUMN receipt_mode INTEGER DEFAULT 0")
       db.execSQL("CREATE TABLE Properties(key TEXT PRIMARY KEY, value TEXT)")
       db.execSQL("ALTER TABLE Messages ADD COLUMN force_read_receipt INTEGER DEFAULT null")
+      db.execSQL("UPDATE KeyValues SET value = 'true' WHERE key = 'should_sync_conversations_1'")
     }
   )
 }
