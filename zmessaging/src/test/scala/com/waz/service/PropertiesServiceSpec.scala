@@ -19,8 +19,9 @@ package com.waz.service
 import com.waz.content.{PropertiesStorage, PropertyValue, UserPreferences}
 import com.waz.model.{ReadReceiptEnabledPropertyEvent, SyncId}
 import com.waz.service.EventScheduler.{Sequential, Stage}
+import com.waz.service.push.PushService
 import com.waz.specs.AndroidFreeSpec
-import com.waz.sync.SyncServiceHandle
+import com.waz.sync.{SyncRequestService, SyncServiceHandle}
 import com.waz.testutils.TestUserPreferences
 import com.waz.threading.Threading
 import com.waz.utils.events.Signal
@@ -35,8 +36,10 @@ class PropertiesServiceSpec extends AndroidFreeSpec {
   private lazy val sync    = mock[SyncServiceHandle]
   private lazy val storage = mock[PropertiesStorage]
   private lazy val prefs   = new TestUserPreferences()
+  private lazy val req     = mock[SyncRequestService]
+  private lazy val push    = mock[PushService]
 
-  private lazy val service   = new PropertiesServiceImpl(prefs, sync, storage)
+  private lazy val service   = new PropertiesServiceImpl(prefs, sync, storage, req, push)
   private lazy val scheduler = new EventScheduler(Stage(Sequential)(service.eventProcessor))
   private lazy val pipeline  = new EventPipelineImpl(Vector.empty, scheduler.enqueue)
 
