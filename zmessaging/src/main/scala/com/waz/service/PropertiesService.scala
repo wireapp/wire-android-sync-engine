@@ -24,7 +24,9 @@ import com.waz.log.ZLog2._
 import com.waz.model.{PropertyEvent, ReadReceiptEnabledPropertyEvent, UnknownPropertyEvent}
 import com.waz.service.EventScheduler.Stage
 import com.waz.service.assets2.AssetStorageImpl.Codec
-import com.waz.sync.SyncServiceHandle
+import com.waz.service.push.PushService
+import com.waz.service.push.PushService.ForceSync
+import com.waz.sync.{SyncRequestService, SyncServiceHandle}
 import com.waz.utils.RichFuture
 import com.waz.utils.events.Signal
 import io.circe.{Decoder, Encoder}
@@ -40,7 +42,7 @@ trait PropertiesService {
   def readReceiptsEnabled: Signal[Boolean]
 }
 
-class PropertiesServiceImpl(prefs: UserPreferences, syncServiceHandle: SyncServiceHandle, storage: PropertiesStorage) extends PropertiesService {
+class PropertiesServiceImpl(prefs: UserPreferences, syncServiceHandle: SyncServiceHandle, storage: PropertiesStorage, requestService: SyncRequestService, pushService: PushService) extends PropertiesService {
   import com.waz.threading.Threading.Implicits.Background
 
   val eventProcessor: Stage.Atomic = EventScheduler.Stage[PropertyEvent]{ (_, events) =>
@@ -50,7 +52,9 @@ class PropertiesServiceImpl(prefs: UserPreferences, syncServiceHandle: SyncServi
   for {
     readReceipts <- getProperty[Int](PropertyKey.ReadReceiptsEnabled)
     if readReceipts.isEmpty
-    _ <- syncServiceHandle.syncProperties()
+    syncId <- syncServiceHandle.syncProperties()
+    _ <- requestService.await(syncId)
+    _ <- pushService.syncHistory(ForceSync) // Force fetch to clear the sync event
   } ()
 
   private def processEvent(event: PropertyEvent): Future[Unit] = {
@@ -58,11 +62,13 @@ class PropertiesServiceImpl(prefs: UserPreferences, syncServiceHandle: SyncServi
       case ReadReceiptEnabledPropertyEvent(value) =>
         getProperty[Int](PropertyKey.ReadReceiptsEnabled).flatMap {
           case Some(current) if current != value =>
+            verbose(l"processEvent ReadReceiptsEnabled: current:$current value:$value")
             for {
               _ <- prefs(UserPreferences.ReadReceiptsRemotelyChanged) := true
               _ <- updateProperty(PropertyKey.ReadReceiptsEnabled, value)
             } yield ()
-          case _ =>
+          case other =>
+            verbose(l"processEvent ReadReceiptsEnabled: other:$other value:$value")
             Future.successful({})
         }
       case UnknownPropertyEvent(key, _) =>
@@ -101,11 +107,13 @@ class PropertiesServiceImpl(prefs: UserPreferences, syncServiceHandle: SyncServi
   }
 
   def setReadReceiptsEnabled(enabled: Boolean): Future[Unit] = {
+    verbose(l"setReadReceiptsEnabled $enabled")
     val enabledInt = if (enabled) 1 else 0
     for {
-      current <- getProperty[Int](PropertyKey.ReadReceiptsEnabled).map(_.getOrElse(0))
-      _ <- if (current != enabledInt) updateProperty(PropertyKey.ReadReceiptsEnabled, enabledInt) else Future.successful({})
-      _ <- if (current != enabledInt) syncServiceHandle.postProperty(PropertyKey.ReadReceiptsEnabled, enabledInt) else Future.successful({})
+      current <- getProperty[Int](PropertyKey.ReadReceiptsEnabled)
+      _ = verbose(l"setReadReceiptsEnabled current: $current")
+      _ <- if (!current.contains(enabledInt)) updateProperty(PropertyKey.ReadReceiptsEnabled, enabledInt) else Future.successful({})
+      _ <- if (!current.contains(enabledInt)) syncServiceHandle.postProperty(PropertyKey.ReadReceiptsEnabled, enabledInt) else Future.successful({})
     } yield ()
   }
 

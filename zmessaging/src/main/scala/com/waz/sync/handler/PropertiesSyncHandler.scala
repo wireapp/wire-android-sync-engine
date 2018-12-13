@@ -16,6 +16,7 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 package com.waz.sync.handler
+import com.waz.model.TeamId
 import com.waz.service.{PropertiesService, PropertyKey}
 import com.waz.sync.SyncResult
 import com.waz.sync.client.{ErrorOrResponse, PropertiesClient}
@@ -24,7 +25,7 @@ import io.circe.{Decoder, Encoder}
 
 import scala.concurrent.Future
 
-class PropertiesSyncHandler(prefsClient: PropertiesClient, propertiesService: PropertiesService) {
+class PropertiesSyncHandler(prefsClient: PropertiesClient, propertiesService: PropertiesService, teamId: Option[TeamId]) {
 
   import com.waz.threading.Threading.Implicits.Background
 
@@ -48,7 +49,7 @@ class PropertiesSyncHandler(prefsClient: PropertiesClient, propertiesService: Pr
       }
 
     for {
-      res <- syncProperty[Int](PropertyKey.ReadReceiptsEnabled, Some(0))
+      res <- syncProperty[Int](PropertyKey.ReadReceiptsEnabled, teamId.fold(Some(0))(_ => Some(1)) )
     } yield res
 
   }

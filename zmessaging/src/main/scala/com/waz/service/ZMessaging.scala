@@ -306,6 +306,8 @@ class ZMessaging(val teamId: Option[TeamId], val clientId: ClientId, account: Ac
 
     verificationUpdater
 
+    propertiesService
+
     reporting.addStateReporter { pw =>
       Future {
         userPrefs foreachCached {
