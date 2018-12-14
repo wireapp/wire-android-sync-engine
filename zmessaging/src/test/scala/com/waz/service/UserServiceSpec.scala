@@ -35,6 +35,7 @@ import scala.concurrent.Future
 class UserServiceSpec extends AndroidFreeSpec {
 
   private lazy val me = UserData(name = "me").updateConnectionStatus(ConnectionStatus.Self)
+  private lazy val meAccount = AccountData(me.id)
 
   private lazy val users = Seq(me, UserData("other user 1"), UserData("other user 2"), UserData("some name"),
     UserData("related user 1"), UserData("related user 2"), UserData("other related"),
@@ -99,6 +100,7 @@ class UserServiceSpec extends AndroidFreeSpec {
 
       val id = users.head.id
       (usersStorage.get _).expects(id).once().returning(Future.successful(users.headOption))
+      (accountsStrg.update _).expects(me.id, *).once().returning(Future.successful(Some((meAccount, meAccount))))
 
       val service = getService
       result(service.updateSyncedUsers(Seq(UserInfo(id))))

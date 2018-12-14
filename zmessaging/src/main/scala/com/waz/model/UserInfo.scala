@@ -27,7 +27,7 @@ import org.json
 import org.json.{JSONArray, JSONObject}
 
 import scala.util.Try
-import com.waz.model.UserInfo.{SSOId, Service}
+import com.waz.model.UserInfo.Service
 
 case class UserInfo(id:           UserId,
                     name:         Option[Name]            = None,
@@ -54,19 +54,10 @@ object UserInfo {
 
   case class Service(id: IntegrationId, provider: ProviderId)
 
-  case class SSOId(subject: String, tenant: String)
-
   def decodeService(s: Symbol)(implicit js: JSONObject): Service = Service(decodeId[IntegrationId]('id), decodeId[ProviderId]('provider))
-
-  def decodeSSOId(s: Symbol)(implicit js: JSONObject): SSOId = SSOId(decodeString('subject), decodeString('tenant))
 
   def decodeOptService(s: Symbol)(implicit js: JSONObject): Option[Service] = decodeOptObject(s) match {
     case Some(serviceJs) => Option(decodeService(s)(serviceJs))
-    case _ => None
-  }
-
-  def decodeOptSSOId(s: Symbol)(implicit js: JSONObject): Option[SSOId] = decodeOptObject(s) match {
-    case Some(ssoId) => Option(decodeSSOId(s)(ssoId))
     case _ => None
   }
 
@@ -124,7 +115,7 @@ object UserInfo {
       UserInfo(
         id, 'name, accentId, 'email, 'phone, Some(pic), decodeOptString('tracking_id) map (TrackingId(_)),
         deleted = 'deleted, handle = 'handle, privateMode = privateMode, service = decodeOptService('service),
-        'team, decodeOptISORemoteInstant('expires_at), ssoId = decodeOptSSOId('sso_id))
+        'team, decodeOptISORemoteInstant('expires_at), ssoId = SSOId.decodeOptSSOId('sso_id))
     }
   }
 
