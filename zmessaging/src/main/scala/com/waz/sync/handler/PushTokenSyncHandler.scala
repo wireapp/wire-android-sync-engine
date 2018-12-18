@@ -17,21 +17,25 @@
  */
 package com.waz.sync.handler
 
-import com.waz.ZLog._
 import com.waz.ZLog.ImplicitTag._
-import com.waz.model.otr.ClientId
+import com.waz.ZLog._
 import com.waz.model.PushToken
+import com.waz.model.otr.ClientId
 import com.waz.service.BackendConfig
 import com.waz.service.push.PushTokenService
-import com.waz.sync.SyncResult
 import com.waz.sync.SyncResult.Retry
 import com.waz.sync.client.PushTokenClient
 import com.waz.sync.client.PushTokenClient.PushTokenRegistration
+import com.waz.sync.{SyncResult, SyncServiceHandle}
 import com.waz.threading.{CancellableFuture, Threading}
 
 import scala.concurrent.Future
 
-class PushTokenSyncHandler(pushTokenService: PushTokenService, backend: BackendConfig, clientId: ClientId, client: PushTokenClient) {
+class PushTokenSyncHandler(pushTokenService: PushTokenService,
+                           backend:          BackendConfig,
+                           clientId:         ClientId,
+                           sync:             SyncServiceHandle,
+                           client:           PushTokenClient) {
 
   import Threading.Implicits.Background
 
@@ -49,8 +53,18 @@ class PushTokenSyncHandler(pushTokenService: PushTokenService, backend: BackendC
     }
   }
 
-  def deleteGcmToken(token: PushToken): CancellableFuture[SyncResult] = {
+  def deletePushToken(token: PushToken): CancellableFuture[SyncResult] = {
     debug(s"deleteGcmToken($token)")
     client.deletePushToken(token.str).map(SyncResult(_))
   }
+
+  def checkPushToken(): Future[SyncResult] =
+    client.getPushTokens().future.flatMap {
+      case Right(tokens) =>
+        pushTokenService.checkCurrentUserTokens(tokens).map { syncRequired =>
+          if (syncRequired) sync.syncNotifications(None)
+          SyncResult.Success
+        }
+      case Left(err) => Future.successful(SyncResult(err))
+    }
 }

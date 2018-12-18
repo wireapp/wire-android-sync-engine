@@ -71,17 +71,18 @@ object SyncRequest {
 
   import sync.{SyncCommand => Cmd}
 
-  case object Unknown             extends BaseRequest(Cmd.Unknown)
-  case object SyncSelf            extends BaseRequest(Cmd.SyncSelf)
-  case object DeleteAccount       extends BaseRequest(Cmd.DeleteAccount)
-  case object SyncConversations   extends BaseRequest(Cmd.SyncConversations)
-  case object SyncConnections     extends BaseRequest(Cmd.SyncConnections)
-  case object SyncSelfClients     extends BaseRequest(Cmd.SyncSelfClients)
-  case object SyncSelfPermissions extends BaseRequest(Cmd.SyncSelfPermissions)
-  case object SyncClientsLocation extends BaseRequest(Cmd.SyncClientLocation)
-  case object SyncTeam            extends BaseRequest(Cmd.SyncTeam)
-  case object SyncProperties      extends BaseRequest(Cmd.SyncProperties)
+  case object Unknown              extends BaseRequest(Cmd.Unknown)
+  case object SyncSelf             extends BaseRequest(Cmd.SyncSelf)
+  case object DeleteAccount        extends BaseRequest(Cmd.DeleteAccount)
+  case object SyncConversations    extends BaseRequest(Cmd.SyncConversations)
+  case object SyncConnections      extends BaseRequest(Cmd.SyncConnections)
+  case object SyncSelfClients      extends BaseRequest(Cmd.SyncSelfClients)
+  case object SyncSelfPermissions  extends BaseRequest(Cmd.SyncSelfPermissions)
+  case object SyncClientsLocation  extends BaseRequest(Cmd.SyncClientLocation)
+  case object SyncTeam             extends BaseRequest(Cmd.SyncTeam)
+  case object SyncProperties       extends BaseRequest(Cmd.SyncProperties)
   case object ProcessNotifications extends BaseRequest(Cmd.ProcessNotifications) with Offline with Serialized
+  case object CheckPushToken       extends BaseRequest(Cmd.CheckPushToken)
 
   case class SyncTeamMember(userId: UserId) extends BaseRequest(Cmd.SyncTeam) {
     override val mergeKey: Any = (cmd, userId)
@@ -379,6 +380,7 @@ object SyncRequest {
           case Cmd.SyncTeamMember            => SyncTeamMember(userId)
           case Cmd.SyncConnections           => SyncConnections
           case Cmd.RegisterPushToken         => RegisterPushToken(decodeId[PushToken]('token))
+          case Cmd.CheckPushToken            => CheckPushToken
           case Cmd.SyncNotifications         => SyncNotifications('trigger)
           case Cmd.ProcessNotifications      => ProcessNotifications
           case Cmd.PostSelf                  => PostSelf(JsonDecoder[UserInfo]('user))
@@ -517,7 +519,7 @@ object SyncRequest {
           o.put("value", value)
         case SyncSelf | SyncTeam | DeleteAccount | SyncConversations | SyncConnections |
              SyncSelfClients | SyncSelfPermissions | SyncClientsLocation | SyncProperties |
-             ProcessNotifications | Unknown => () // nothing to do
+             ProcessNotifications | CheckPushToken | Unknown => () // nothing to do
       }
     }
   }

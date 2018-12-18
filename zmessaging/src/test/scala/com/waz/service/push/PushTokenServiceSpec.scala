@@ -19,7 +19,6 @@ package com.waz.service.push
 
 import java.io.IOException
 
-import com.waz.DisabledTrackingService
 import com.waz.ZLog.ImplicitTag._
 import com.waz.api.NetworkMode
 import com.waz.content.{AccountStorage, GlobalPreferences}
@@ -29,10 +28,9 @@ import com.waz.service.AccountsService.{InBackground, LoggedOut}
 import com.waz.service.NetworkModeService
 import com.waz.specs.AndroidFreeSpec
 import com.waz.sync.SyncServiceHandle
-import com.waz.sync.client.PushTokenClient
 import com.waz.sync.client.PushTokenClient.PushTokenRegistration
 import com.waz.testutils.{TestBackoff, TestGlobalPreferences}
-import com.waz.threading.{CancellableFuture, Threading}
+import com.waz.threading.Threading
 import com.waz.utils.events.Signal
 import com.waz.utils.returning
 import com.waz.utils.wrappers.GoogleApi
@@ -155,7 +153,6 @@ class PushTokenServiceSpec extends AndroidFreeSpec {
 
     val global           = mock[GlobalTokenService]
     val accStorage       = mock[AccountStorage]
-    val client           = mock[PushTokenClient]
     val sync             = mock[SyncServiceHandle]
     val loggedInAccounts = Signal(Set.empty[AccountData])
 
@@ -190,7 +187,7 @@ class PushTokenServiceSpec extends AndroidFreeSpec {
       (global.currentToken _).expects().anyNumberOfTimes().returning(currentToken)
 
       accountIds.zip(syncs).map { case (id, sync) =>
-        new PushTokenService(id, ClientId(id.str), global, accounts, accStorage, client, sync)
+        new PushTokenService(id, ClientId(id.str), global, accounts, accStorage, sync)
       }
     }
 
@@ -209,15 +206,12 @@ class PushTokenServiceSpec extends AndroidFreeSpec {
       lazy val Seq(service) = initTokenService()
 
       //The service should attempt to re-register the global device token
-      (client.getPushTokens _).expects().once().returning(CancellableFuture.successful(Right(registeredTokens)))
       (sync.registerPush _).expects(deviceToken).returning(Future.successful(SyncId()))
 
-      val accountToken = accountSignal(account1Id).map(_.pushToken)
-      service.checkCurrentUserTokens()
+      val accountToken = accountSignal(account1Id).map(_.pushToken).disableAutowiring()
+      result(service.checkCurrentUserTokens(registeredTokens)) shouldEqual true
 
-      await(accountToken.head.filter(_.isEmpty)) //token gets deleted
-      awaitAllTasks
-      await(accountToken.head.filter(_ == deviceToken)) //token is reset
+      result(accountToken.filter(_.isEmpty).head) //token gets deleted
     }
 
     scenario("Check current push tokens registered with backend - if token is registered we do nothing") {
@@ -226,7 +220,7 @@ class PushTokenServiceSpec extends AndroidFreeSpec {
       currentToken ! Some(deviceToken)
 
       val registeredTokens = Seq(
-        PushTokenRegistration(PushToken("token1"), "", ClientId(account1Id.str)), //we have a matching token for our client!
+        PushTokenRegistration(deviceToken, "", ClientId(account1Id.str)), //we have a matching token for our client!
         PushTokenRegistration(PushToken("token2"), "", ClientId("otherClient2"))
       )
 
@@ -235,15 +229,14 @@ class PushTokenServiceSpec extends AndroidFreeSpec {
       lazy val Seq(service) = initTokenService()
 
       //The service should NOT attempt to re-register the global device token
-      (client.getPushTokens _).expects().once().returning(CancellableFuture.successful(Right(registeredTokens)))
       (sync.registerPush _).expects(*).never()
       (sync.deletePushToken _).expects(*).never()
 
       val accountToken = accountSignal(account1Id).map(_.pushToken)
-      service.checkCurrentUserTokens()
+      result(service.checkCurrentUserTokens(registeredTokens)) shouldEqual false
 
       awaitAllTasks
-      await(accountToken.head.filter(_ == deviceToken)) //token should be the same
+      result(accountToken.filter(_.contains(deviceToken)).head) //token should be the same
     }
 
     scenario("Remove Push Token event should create new token and delete all previous tokens") {

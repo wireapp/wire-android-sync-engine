@@ -30,6 +30,7 @@ import com.waz.service.ZMessaging.accountTag
 import com.waz.service._
 import com.waz.service.tracking.TrackingService
 import com.waz.sync.SyncServiceHandle
+import com.waz.sync.client.PushTokenClient.PushTokenRegistration
 import com.waz.sync.client.{ErrorOr, PushTokenClient}
 import com.waz.threading.{CancellableFuture, SerialDispatchQueue}
 import com.waz.utils.events.{EventContext, Signal}
@@ -48,7 +49,6 @@ class PushTokenService(userId:       UserId,
                        globalToken:  GlobalTokenService,
                        accounts:     AccountsService,
                        accStorage:   AccountStorage,
-                       client:       PushTokenClient,
                        sync:         SyncServiceHandle)(implicit accountContext: AccountContext) {
 
   implicit lazy val logTag: LogTag = accountTag[PushTokenService](userId)
@@ -82,30 +82,27 @@ class PushTokenService(userId:       UserId,
   }
 
   /**
-    * @return Future(Right(true)) if we had to re-register the token (and thus should also perform a fetch. False
+    * @return Future(true) if we had to re-register the token (and thus should also perform a fetch. False
     *         indicates no need for a fetch
     */
-  def checkCurrentUserTokens(): ErrorOr[Boolean] =
+  def checkCurrentUserTokens(backendUserTokens: Seq[PushTokenRegistration]): Future[Boolean] =
     for {
-      res <- client.getPushTokens().future
-      tok <- res.flatMapFuture(ts => userToken.head.map(t => Right((t, ts))))
+      tok <- userToken.head
       res <- tok match {
-        case Right((Some(localUserToken), backendUserTokens)) =>
+        case Some(localUserToken) =>
           val backendUserToken = backendUserTokens.find(_.clientId == clientId).map(_.token)
           if (backendUserToken.contains(localUserToken)) {
             verbose(l"Current device push token is already registered with the backend")
-            Future.successful(Right(false))
+            Future.successful(false)
           }
           else {
             verbose(l"Current device push token is not registered with the Backend! Will re-register")
             //There is no matching push token for this client on the backend, we need to re-register this user with the
             //current device token. We can do this by wiping the current value saved for this user. The subscription above
             //will then re-evaluate and re-register the token.
-            accStorage.update(userId, _.copy(pushToken = None)).map(_ => Right(true))
+            accStorage.update(userId, _.copy(pushToken = None)).map(_ => true)
           }
-
-        case Right(_) => Future.successful(Right(false))
-        case Left(err) => Future.successful(Left(err))
+        case _ => Future.successful(false)
       }
     } yield res
 

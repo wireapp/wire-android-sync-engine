@@ -84,6 +84,7 @@ trait SyncServiceHandle {
   def processNotifications(): Future[SyncId]
   def registerPush(token: PushToken): Future[SyncId]
   def deletePushToken(token: PushToken): Future[SyncId]
+  def checkPushToken(): Future[SyncId]
 
   def syncSelfClients(): Future[SyncId]
   def syncSelfPermissions(): Future[SyncId]
@@ -171,6 +172,7 @@ class AndroidSyncServiceHandle(account: UserId, service: SyncRequestService, tim
 
   def registerPush(token: PushToken)    = addRequest(RegisterPushToken(token), priority = Priority.High, forceRetry = true)
   def deletePushToken(token: PushToken) = addRequest(DeletePushToken(token), priority = Priority.Low)
+  def checkPushToken()                  = addRequest(CheckPushToken)
 
   def syncSelfClients() = addRequest(SyncSelfClients, priority = Priority.Critical)
   def syncSelfPermissions() = addRequest(SyncSelfPermissions, priority = Priority.High)
@@ -224,7 +226,7 @@ class AccountSyncHandler(accounts: AccountsService) extends SyncHandler {
           case SyncSearchQuery(query)                              => zms.usersearchSync.syncSearchQuery(query)
           case ExactMatchHandle(query)                             => zms.usersearchSync.exactMatchHandle(query)
           case SyncRichMedia(messageId)                            => zms.richmediaSync.syncRichMedia(messageId)
-          case DeletePushToken(token)                              => zms.gcmSync.deleteGcmToken(token)
+          case DeletePushToken(token)                              => zms.pushTokenSync.deletePushToken(token)
           case PostConnection(userId, name, message)               => zms.connectionsSync.postConnection(userId, name, message)
           case PostConnectionStatus(userId, status)                => zms.connectionsSync.postConnectionStatus(userId, status)
           case SyncTeam                                            => zms.teamsSync.syncTeam()
@@ -239,7 +241,8 @@ class AccountSyncHandler(accounts: AccountsService) extends SyncHandler {
           case PostSelfAccentColor(color)                          => zms.usersSync.postSelfAccentColor(color)
           case PostAvailability(availability)                      => zms.usersSync.postAvailability(availability)
           case PostAddressBook(ab)                                 => zms.addressbookSync.postAddressBook(ab)
-          case RegisterPushToken(token)                            => zms.gcmSync.registerPushToken(token)
+          case RegisterPushToken(token)                            => zms.pushTokenSync.registerPushToken(token)
+          case CheckPushToken                                      => zms.pushTokenSync.checkPushToken()
           case SyncNotifications(trigger)                          => zms.pushNotificationsSync.syncNotifications(trigger)
           case ProcessNotifications                                => zms.pushNotificationsSync.processNotifications()
           case PostLiking(convId, liking)                          => zms.reactionsSync.postReaction(convId, liking)

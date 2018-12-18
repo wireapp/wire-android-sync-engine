@@ -238,7 +238,7 @@ class ZMessaging(val teamId: Option[TeamId], val clientId: ClientId, account: Ac
   lazy val teamsSync:       TeamsSyncHandler          = wire[TeamsSyncHandlerImpl]
   lazy val connectionsSync                            = wire[ConnectionsSyncHandler]
   lazy val addressbookSync                            = wire[AddressBookSyncHandler]
-  lazy val gcmSync                                    = wire[PushTokenSyncHandler]
+  lazy val pushTokenSync                              = wire[PushTokenSyncHandler]
   lazy val pushNotificationsSync                      = wire[PushNotificationSyncHandler]
   lazy val typingSync                                 = wire[TypingSyncHandler]
   lazy val richmediaSync                              = wire[RichMediaSyncHandler]

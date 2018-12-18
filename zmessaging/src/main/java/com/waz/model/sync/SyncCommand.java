@@ -56,6 +56,7 @@ public enum SyncCommand {
     SyncNotifications("sync-notifications"),
     ProcessNotifications("process-notifications"),
     RegisterPushToken("register-push-token"),
+    CheckPushToken("check-push-token"),
     PostSelf("post-self"),
     PostAddressBook("post-addressbook"),
     SyncSelfClients("sync-clients"),   // sync user clients, register current client and update prekeys when needed
