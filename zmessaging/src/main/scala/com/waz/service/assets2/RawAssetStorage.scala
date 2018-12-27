@@ -18,28 +18,17 @@
 package com.waz.service.assets2
 
 import android.content.Context
-import com.waz.db.{ ColumnBuilders, Dao }
-import com.waz.model.{ MessageId, RawAssetId }
+import com.waz.db.{ColumnBuilders, Dao}
+import com.waz.model.RawAssetId
 import com.waz.service.assets2.Asset._
 import com.waz.service.assets2.RawAssetStorage.RawAssetDao
 import com.waz.utils.TrimmingLruCache.Fixed
-import com.waz.utils.wrappers.{ DB, DBCursor }
-import com.waz.utils.{
-  CachedStorage2,
-  CirceJSONSupport,
-  DbStorage2,
-  InMemoryStorage2,
-  Managed,
-  ReactiveStorage2,
-  ReactiveStorageImpl2,
-  TrimmingLruCache
-}
+import com.waz.utils.wrappers.{DB, DBCursor}
+import com.waz.utils.{CachedStorage2, CirceJSONSupport, DbStorage2, InMemoryStorage2, ReactiveStorage2, ReactiveStorageImpl2, TrimmingLruCache}
 
-import scala.concurrent.{ ExecutionContext, Future }
+import scala.concurrent.ExecutionContext
 
-trait RawAssetStorage extends ReactiveStorage2[RawAssetId, RawAsset[RawGeneral]] {
-  def findBy(messageId: MessageId): Future[Option[RawAsset[RawGeneral]]]
-}
+trait RawAssetStorage extends ReactiveStorage2[RawAssetId, RawAsset[RawGeneral]]
 
 class RawAssetStorageImpl(context: Context, db: DB)(implicit ec: ExecutionContext)
     extends ReactiveStorageImpl2(
@@ -48,15 +37,10 @@ class RawAssetStorageImpl(context: Context, db: DB)(implicit ec: ExecutionContex
         new InMemoryStorage2[RawAssetId, RawAsset[RawGeneral]](new TrimmingLruCache(context, Fixed(8)))(ec)
       )(ec)
     )
-    with RawAssetStorage {
-  override def findBy(messageId: MessageId): Future[Option[RawAsset[RawGeneral]]] = Future {
-    RawAssetDao.assetByMessageId(messageId)(db).acquire(it => if (it.hasNext) Some(it.next()) else None)
-  }
-}
+    with RawAssetStorage
 
 object RawAssetStorage {
 
-  //TODO Actually we do not need DAO classes. We can generate them using 'shapeless'.
   object RawAssetDao
       extends Dao[RawAsset[RawGeneral], RawAssetId]
       with ColumnBuilders[RawAsset[RawGeneral]]
@@ -75,11 +59,9 @@ object RawAssetStorage {
     val Public         = bool(_.public)('public)
     val Encryption     = asText(_.encryption)('encryption)
     val EncryptionSalt = asTextOpt(_.encryptionSalt)('encryption_salt)
-    val Type           = text(getAssetTypeString)('type)
     val Details        = asText(_.details)('details)
     val UploadStatus   = asInt(_.status)('status)
     val AssetId        = asTextOpt(_.assetId)('asset_id)
-    val MessageId      = asText(_.messageId)('message_id)
 
     override val idCol = Id
     override val table = Table(
@@ -94,17 +76,9 @@ object RawAssetStorage {
       Retention,
       Public,
       Encryption,
-      Type,
       Details,
-      AssetId,
-      MessageId
+      AssetId
     )
-
-    private val Image    = "image"
-    private val Audio    = "audio"
-    private val Video    = "video"
-    private val Blob     = "blob"
-    private val NotReady = "not_ready"
 
     override def apply(implicit cursor: DBCursor): RawAsset[RawGeneral] =
       RawAsset(Id,
@@ -121,22 +95,7 @@ object RawAssetStorage {
                EncryptionSalt,
                Details,
                UploadStatus,
-               AssetId,
-               MessageId)
-
-    private def getAssetTypeString(asset: RawAsset[RawGeneral]): String = asset.details match {
-      case _: Image    => Image
-      case _: Audio    => Audio
-      case _: Video    => Video
-      case _: Blob     => Blob
-      case _: NotReady => NotReady
-    }
-
-    def assetByMessageId(messageId: MessageId)(db: DB): Managed[Iterator[RawAsset[RawGeneral]]] =
-      iterating(db.rawQuery(s"""SELECT *
-           |  FROM ${table.name}
-           | WHERE ${MessageId.name} = ${messageId.str}
-          """.stripMargin, null))
+               AssetId)
 
   }
 

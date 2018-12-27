@@ -27,9 +27,9 @@ import com.waz.{ FilesystemUtils, TestData, ZIntegrationSpec }
 import scala.concurrent.duration._
 import scala.concurrent.{ ExecutionContext, Future }
 
-class FileCacheSpec extends ZIntegrationSpec {
+class LruFileCacheSpec extends ZIntegrationSpec {
 
-  private def createCacheService(cacheDirectory: File = FilesystemUtils.createDirectoryForTest(),
+  private def createLruFileCache(cacheDirectory: File = FilesystemUtils.createDirectoryForTest(),
                                  directorySizeThreshold: Long = 1024,
                                  sizeCheckingInterval: FiniteDuration = 0.seconds): FileCache[String] = {
     val (dir, threshold, interval) = (cacheDirectory, directorySizeThreshold, sizeCheckingInterval)
@@ -50,7 +50,7 @@ class FileCacheSpec extends ZIntegrationSpec {
       val content = TestData.bytes(200)
 
       val cacheDir = FilesystemUtils.createDirectoryForTest()
-      val cache    = createCacheService(cacheDir)
+      val cache    = createLruFileCache(cacheDir)
       for {
         _ <- cache.putBytes(key, content)
         _ = println(s"Cache directory content: ${cacheDir.listFiles().map(_.getName).mkString(" ")}")
@@ -65,7 +65,7 @@ class FileCacheSpec extends ZIntegrationSpec {
       val key     = "key"
       val content = TestData.bytes(200)
 
-      val cache = createCacheService()
+      val cache = createLruFileCache()
       for {
         _         <- cache.putBytes(key, content)
         _         <- cache.remove(key)
@@ -82,7 +82,27 @@ class FileCacheSpec extends ZIntegrationSpec {
       val file          = new File(fileDirectory, "temporary_file_name")
       IoUtils.copy(new ByteArrayInputStream(content), file)
 
-      val cache = createCacheService()
+      val cache = createLruFileCache()
+      for {
+        _         <- cache.put(fileKey, file, removeOriginal = true)
+        fromCache <- cache.findBytes(fileKey)
+      } yield {
+        file.exists() shouldBe false
+        fromCache.nonEmpty shouldBe true
+        fromCache.get shouldBe content
+      }
+    }
+
+    scenario("Putting file directly in cache in case when cache directory does not exist") {
+      val fileKey       = "key"
+      val content       = TestData.bytes(200)
+      val fileDirectory = FilesystemUtils.createDirectoryForTest()
+      val file          = new File(fileDirectory, "temporary_file_name")
+      IoUtils.copy(new ByteArrayInputStream(content), file)
+
+      val cacheDirectory = new File(fileDirectory, "not_exist")
+      cacheDirectory.mkdirs()
+      val cache = createLruFileCache(cacheDirectory)
       for {
         _         <- cache.put(fileKey, file, removeOriginal = true)
         fromCache <- cache.findBytes(fileKey)
@@ -101,7 +121,7 @@ class FileCacheSpec extends ZIntegrationSpec {
       val file          = new File(fileDirectory, "temporary_file_name")
       IoUtils.copy(new ByteArrayInputStream(content), file)
 
-      val cache = createCacheService(directorySizeThreshold = content.length * 2, sizeCheckingInterval = 0.seconds)
+      val cache = createLruFileCache(directorySizeThreshold = content.length * 2, sizeCheckingInterval = 0.seconds)
       for {
         _             <- cache.putBytes(key1, content)
         _             <- CancellableFuture.delay(1.second).future
@@ -129,7 +149,7 @@ class FileCacheSpec extends ZIntegrationSpec {
       val contents                              = keys.map(_ -> TestData.bytes(contentLength)).toMap
       def timeoutFor(key: String): Future[Unit] = CancellableFuture.delay(puttingTimeout * keys.indexOf(key)).future
 
-      val cache = createCacheService(directorySizeThreshold = directoryMaxSize, sizeCheckingInterval = 0.seconds)
+      val cache = createLruFileCache(directorySizeThreshold = directoryMaxSize, sizeCheckingInterval = 0.seconds)
       for {
         _          <- Future.sequence { keys.map(key => timeoutFor(key).flatMap(_ => cache.putBytes(key, contents(key)))) }
         fromCache0 <- cache.findBytes(keys(0))

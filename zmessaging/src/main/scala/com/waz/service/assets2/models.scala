@@ -20,7 +20,11 @@ package com.waz.service.assets2
 import java.io.{ByteArrayInputStream, FileInputStream, InputStream}
 import java.net.URI
 
+import com.waz.model.GenericContent.Asset.{Original, Preview}
 import com.waz.model._
+import com.waz.model.GenericContent.{Asset => GenericAsset}
+import com.waz.model.nano.Messages
+import com.waz.model.nano.Messages.Asset.RemoteData
 import com.waz.sync.client.AssetClient2.Retention
 import com.waz.utils.Identifiable
 import org.threeten.bp.Duration
@@ -83,9 +87,7 @@ case class RawAsset[+T <: RawAssetDetails](
     encryptionSalt: Option[Salt],
     details: T,
     status: AssetUploadStatus,
-    assetId: Option[AssetId],
-    @deprecated("This one to one relation should be removed", "")
-    messageId: Option[MessageId]
+    assetId: Option[AssetId]
 ) extends GeneralAsset with Identifiable[RawAssetId]
 
 sealed trait AssetStatus
@@ -120,13 +122,9 @@ case class Asset[+T <: AssetDetails](
     name: String,
     size: Long,
     details: T,
-    @deprecated("This one to one relation should be removed", "")
-    messageId: Option[MessageId],
     @deprecated
     convId: Option[RConvId]
 ) extends GeneralAsset with Identifiable[AssetId]
-
-case class RemoteData(remoteId: AssetId, token: Option[AssetToken], sha: Sha256, encryption: Encryption)
 
 case class InProgressAsset(
     override val id: InProgressAssetId,
@@ -139,6 +137,23 @@ case class InProgressAsset(
     status: AssetDownloadStatus
 ) extends GeneralAsset with Identifiable[InProgressAssetId]
 
+object InProgressAsset {
+
+  def create(asset: GenericAsset): InProgressAsset = {
+    InProgressAsset(
+      id = InProgressAssetId(),
+      mime = Mime(asset.original.mimeType),
+      name = asset.original.name,
+      preview = if (asset.preview == null) None else Some(AssetId(asset.preview.remote.assetId)),
+      details = Asset.extractDetails(Left(asset.original)),
+      downloaded = 0,
+      size = asset.original.size,
+      status = AssetDownloadStatus.NotStarted
+    )
+  }
+
+}
+
 object Asset {
   type RawGeneral = RawAssetDetails
   type NotReady   = DetailsNotReady.type
@@ -148,21 +163,60 @@ object Asset {
   type Audio      = AudioDetails
   type Video      = VideoDetails
 
-  def create(inProgressAsset: InProgressAsset, remoteData: RemoteData): Asset[General] =
+  def extractEncryption(remote: RemoteData): Encryption = remote.encryption match {
+    case Messages.AES_GCM => AES_CBC_Encryption(AESKey2(remote.otrKey))
+    case Messages.AES_CBC => AES_CBC_Encryption(AESKey2(remote.otrKey))
+    case _ => NoEncryption
+  }
+
+  def extractDetails(either: Either[Original, Preview]): AssetDetails = {
+    if (either.fold(_.hasImage, _.hasImage)) {
+      val image = either.fold(_.getImage, _.getImage)
+      ImageDetails(Dim2(image.width, image.height))
+    } else either match {
+      case Left(original) if original.hasAudio =>
+        val audio = original.getAudio
+        AudioDetails(Duration.ofMillis(audio.durationInMillis), Loudness(audio.normalizedLoudness.toVector))
+      case Left(original) if original.hasVideo =>
+        val video = original.getVideo
+        VideoDetails(Dim2(video.width, video.height), Duration.ofMillis(video.durationInMillis))
+      case _ =>
+        BlobDetails
+    }
+  }
+
+  def create(asset: InProgressAsset, remote: RemoteData): Asset[General] = {
     Asset(
-      id = remoteData.remoteId,
-      token = remoteData.token,
-      sha = remoteData.sha,
-      mime = inProgressAsset.mime,
-      encryption = remoteData.encryption,
+      id = AssetId(remote.assetId),
+      token = if (remote.assetToken.isEmpty) None else Some(AssetToken(remote.assetToken)),
+      sha = Sha256(remote.sha256),
+      mime = asset.mime,
+      encryption = extractEncryption(remote),
       localSource = None,
-      preview = inProgressAsset.preview,
-      name = inProgressAsset.name,
-      size = inProgressAsset.size,
-      details = inProgressAsset.details,
-      messageId = None,
+      preview = asset.preview,
+      name = asset.name,
+      size = asset.size,
+      details = asset.details,
       convId = None
     )
+  }
+
+  def create(preview: Preview): Asset[General] = {
+    val remote = preview.remote
+    Asset(
+      id = AssetId(remote.assetId),
+      token = if (remote.assetToken.isEmpty) None else Some(AssetToken(remote.assetToken)),
+      sha = Sha256(remote.sha256),
+      mime = Mime(preview.mimeType),
+      encryption = extractEncryption(remote),
+      localSource = None,
+      preview = None,
+      name = s"preview_${System.currentTimeMillis()}",
+      size = preview.size,
+      details = Asset.extractDetails(Right(preview)),
+      convId = None
+    )
+  }
 
   def create(assetId: AssetId, token: Option[AssetToken], rawAsset: RawAsset[General]): Asset[General] =
     Asset(
@@ -176,7 +230,6 @@ object Asset {
       localSource = rawAsset.localSource,
       preview = None,
       details = rawAsset.details,
-      messageId = rawAsset.messageId,
       convId = None
     )
 
@@ -187,7 +240,7 @@ case object DetailsNotReady extends RawAssetDetails
 
 sealed trait AssetDetails                                       extends RawAssetDetails
 case object BlobDetails                                         extends AssetDetails
-case class ImageDetails(dimensions: Dim2, tag: ImageTag)        extends AssetDetails
+case class ImageDetails(dimensions: Dim2)                       extends AssetDetails
 case class AudioDetails(duration: Duration, loudness: Loudness) extends AssetDetails
 case class VideoDetails(dimensions: Dim2, duration: Duration)   extends AssetDetails
 
@@ -196,4 +249,4 @@ case object Preview extends ImageTag
 case object Medium  extends ImageTag
 case object Empty   extends ImageTag
 
-case class Loudness(levels: Vector[Float])
+case class Loudness(levels: Vector[Byte])

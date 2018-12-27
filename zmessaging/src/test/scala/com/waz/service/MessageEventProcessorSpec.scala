@@ -24,7 +24,7 @@ import com.waz.model.ConversationData.ConversationType
 import com.waz.model.GenericContent.Text
 import com.waz.model._
 import com.waz.model.otr.UserClients
-import com.waz.service.assets.AssetService
+import com.waz.service.assets2.AssetService
 import com.waz.service.conversation.{ConversationsContentUpdater, ConversationsService}
 import com.waz.service.messages.{MessageEventProcessor, MessagesContentUpdater, MessagesService}
 import com.waz.service.otr.OtrService

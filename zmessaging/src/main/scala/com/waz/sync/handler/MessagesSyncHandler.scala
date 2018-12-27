@@ -223,13 +223,13 @@ class MessagesSyncHandler(selfUserId: UserId,
 
     verbose(s"uploadAsset($conv, $msg)")
 
-    def postAssetMessage(proto: GenericMessage): CancellableFuture[RemoteInstant] = {
+    def postAssetMessage(proto: GenericMessage, id: AssetIdGeneral): CancellableFuture[RemoteInstant] = {
       for {
         time <- otrSync.postOtrMessage(conv.id, proto).flatMap {
           case Left(errorResponse) => Future.failed(errorResponse)
           case Right(time) => Future.successful(time)
         }.toCancellable
-        _ <- msgContent.updateMessage(msg.id)(_.copy(protos = Seq(proto), time = time)).toCancellable
+        _ <- msgContent.updateMessage(msg.id)(_.copy(protos = Seq(proto), time = time, assetId = Some(id))).toCancellable
       } yield time
     }
 
@@ -238,7 +238,7 @@ class MessagesSyncHandler(selfUserId: UserId,
       if (rawAsset.status != AssetUploadStatus.NotStarted) CancellableFuture.successful(msg.time)
       else rawAsset.details match {
         case _: Image => CancellableFuture.successful(msg.time)
-        case _ => postAssetMessage(GenericMessage(msg.id.uid, msg.ephemeral, Proto.Asset(rawAsset, None, expectsReadConfirmation = msg.expectsRead.contains(true))))
+        case _ => postAssetMessage(GenericMessage(msg.id.uid, msg.ephemeral, Proto.Asset(rawAsset, None, expectsReadConfirmation = msg.expectsRead.contains(true))), rawAsset.id)
       }
 
     def sendWithV3(rawAsset: RawAsset[RawGeneral]): CancellableFuture[RemoteInstant] = {
@@ -261,7 +261,7 @@ class MessagesSyncHandler(selfUserId: UserId,
                 msg.ephemeral,
                 Proto.Asset(updatedRawAsset, Some(previewAsset), expectsReadConfirmation = false)
               )
-              _ <- postAssetMessage(proto)
+              _ <- postAssetMessage(proto, rawAssetId)
             } yield Some(previewAsset)
           case RawPreviewUploaded(assetId) =>
             assetStorage.get(assetId).map(Some.apply).toCancellable
@@ -276,14 +276,14 @@ class MessagesSyncHandler(selfUserId: UserId,
           msg.ephemeral,
           Proto.Asset(asset, previewAsset, expectsReadConfirmation = msg.expectsRead.contains(true))
         )
-        _ <- postAssetMessage(proto)
+        _ <- postAssetMessage(proto, asset.id)
       } yield time
     }
 
     //want to wait until asset meta and preview data is loaded before we send any messages
     for {
       _ <- AssetProcessing.get(ProcessingTaskKey(msg.assetId.get))
-      rawAsset <- rawAssetStorage.findBy(msg.id).toCancellable
+      rawAsset <- rawAssetStorage.find(msg.assetId.collect { case id: RawAssetId => id }.get).toCancellable
       result <- rawAsset match {
         case None =>
           CancellableFuture.successful(Left(internalError(s"no asset found for msg: $msg")))

@@ -25,7 +25,7 @@ import com.waz.model.AssetStatus.{DownloadFailed, UploadCancelled, UploadDone, U
 import com.waz.model.nano.Messages
 import com.waz.model.nano.Messages.MessageEdit
 import com.waz.service.assets2.Asset.{Audio, General, Image, Video}
-import com.waz.service.assets2.{AES_CBC_Encryption, RawAsset, AssetUploadStatus, Asset => Asset2}
+import com.waz.service.assets2.{AES_CBC_Encryption, AssetUploadStatus, InProgressAsset, RawAsset, Asset => Asset2}
 import com.waz.utils._
 import com.waz.utils.crypto.AESUtils
 import com.waz.utils.wrappers.URI
@@ -117,7 +117,6 @@ object GenericContent {
       }
 
       def apply(details: Image): ImageMetaData = returning(new Messages.Asset.ImageMetaData) { p =>
-        p.tag = details.tag.toString
         p.width = details.dimensions.width
         p.height = details.dimensions.height
       }
@@ -153,7 +152,7 @@ object GenericContent {
 
       def apply(details: Audio): AudioMetaData = returning(new Messages.Asset.AudioMetaData) { p =>
         p.durationInMillis = details.duration.toMillis
-        p.normalizedLoudness = bytify(details.loudness.levels)
+        p.normalizedLoudness = bytify(details.loudness.levels.map(_.toFloat))
       }
 
       def unapply(p: AudioMetaData): Option[AssetMetaData.Audio] =

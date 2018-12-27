@@ -21,8 +21,8 @@ import java.io._
 
 import com.waz.ZLog
 import com.waz.ZLog.ImplicitTag._
-import com.waz.ZLog.verbose
-import com.waz.model.errors.{FailedExpectationsError, FileSystemError, NotFoundLocal, ZError}
+import com.waz.ZLog._
+import com.waz.model.errors.{FailedExpectationsError, FileSystemError, NotFoundLocal, UnexpectedError, ZError}
 import com.waz.utils.IoUtils
 import com.waz.utils.events._
 
@@ -73,8 +73,20 @@ abstract class BaseFileCache[K] extends FileCache[K] {
   override def put(key: K, file: File, removeOriginal: Boolean = false): Future[Unit] =
     Future {
       val targetFile = createFile(key)
-      if (removeOriginal) file.renameTo(targetFile)
-      else IoUtils.copy(file, targetFile)
+      def copy(): Unit = {
+        debug(s"Copy $file to $targetFile")
+        IoUtils.copy(file, targetFile)
+      }
+      if (removeOriginal) {
+        debug(s"Renaming $file to $targetFile")
+        if (!file.renameTo(targetFile)) {
+          debug("Renaming failed. Falling back to copy.")
+          copy()
+          targetFile.delete()
+        }
+      } else copy()
+
+      if (!targetFile.exists()) throw FailedExpectationsError(s"$targetFile does not exist after put operation")
       putOperationHook(key, targetFile)
     }
 
@@ -165,7 +177,7 @@ abstract class LruFileCache[K] extends BaseFileCache[K] {
       size > directorySizeThreshold
     } { size =>
       var shouldBeCleared = size - directorySizeThreshold
-      verbose(s"Cache directory size threshold reached. Current size: ${ZLog.formatSize(size)}. " +
+      verbose(s"Cache directory size threshold reached(${formatSize(directorySizeThreshold)}). Current size: ${formatSize(size)}. " +
         s"Should be cleared: ${ZLog.formatSize(shouldBeCleared)}")
       cacheDirectory
         .listFiles()

@@ -53,7 +53,6 @@ class AssetClient2Spec extends ZIntegrationSpec with AuthenticationConfig {
       name = "test_content",
       size = testAssetContent.length,
       details = BlobDetails,
-      messageId = None,
       convId = None
     )
   }

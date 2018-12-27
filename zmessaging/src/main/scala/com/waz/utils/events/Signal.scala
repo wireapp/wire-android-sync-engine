@@ -158,6 +158,7 @@ class Signal[A](@volatile protected[events] var value: Option[A] = None) extends
       pf.andThen(Some(_)).applyOrElse(v, { _: A => None })
     }
   }
+  def collectValues[B](implicit ev: A =:= Option[B]): Signal[B] = collect { case Some(value: B) => value }
   def foreach(f: A => Unit)(implicit eventContext: EventContext): Subscription = apply(f)
   def flatMap[B](f: A => Signal[B]): Signal[B] = new FlatMapSignal[A, B](this, f)
   def flatten[B](implicit evidence: A <:< Signal[B]): Signal[B] = flatMap(x => x)

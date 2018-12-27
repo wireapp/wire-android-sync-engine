@@ -23,6 +23,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.zip.{GZIPOutputStream, ZipEntry, ZipInputStream, ZipOutputStream}
 
 import com.waz.ZLog._
+import com.waz.model.errors.FileSystemError
 import com.waz.threading.CancellableFuture
 
 import scala.annotation.tailrec
@@ -38,6 +39,10 @@ object IoUtils {
   private val buffer = new ThreadLocal[Array[Byte]] {
     override def initialValue(): Array[Byte] = new Array[Byte](8096)
   }
+
+  def createDirectory(file: File): Unit =
+    if (!file.mkdirs() && !file.isDirectory)
+      throw FileSystemError(s"Can not create directory: $file")
 
   def copy(in: InputStream, out: OutputStream): Long = {
     try {

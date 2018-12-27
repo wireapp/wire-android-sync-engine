@@ -41,6 +41,9 @@ import com.waz.model.SearchQueryCache.SearchQueryCacheDao
 import com.waz.model.UserData.UserDataDao
 import com.waz.model.otr.UserClients.UserClientsDao
 import com.waz.model.sync.SyncJob.SyncJobDao
+import com.waz.service.assets2.AssetStorageImpl.AssetDao
+import com.waz.service.assets2.InProgressAssetStorage.InProgressAssetDao
+import com.waz.service.assets2.RawAssetStorage.RawAssetDao
 import com.waz.service.push.ReceivedPushData.ReceivedPushDataDao
 import com.waz.service.tracking.TrackingService
 
@@ -64,7 +67,8 @@ object ZMessagingDB {
     ContactHashesDao, ContactsOnWireDao, UserClientsDao, LikingDao,
     ContactsDao, EmailAddressesDao, PhoneNumbersDao, MsgDeletionDao,
     EditHistoryDao, MessageContentIndexDao, PushNotificationEventsDao,
-    ReadReceiptDao, PropertiesDao
+    ReadReceiptDao, PropertiesDao,
+    RawAssetDao, InProgressAssetDao, AssetDao
   )
 
   lazy val migrations = Seq(
@@ -275,6 +279,12 @@ object ZMessagingDB {
       db.execSQL("CREATE TABLE Properties(key TEXT PRIMARY KEY, value TEXT)")
       db.execSQL("ALTER TABLE Messages ADD COLUMN force_read_receipts INTEGER DEFAULT null")
       db.execSQL("UPDATE KeyValues SET value = 'true' WHERE key = 'should_sync_conversations_1'")
+    },
+    Migration(113, 114) { db =>
+      db.execSQL("ALTER TABLE Messages ADD COLUMN asset_id TEXT DEFAULT null")
+      db.execSQL(RawAssetDao.table.createSql)
+      db.execSQL(InProgressAssetDao.table.createSql)
+      db.execSQL(AssetDao.table.createSql)
     }
   )
 }

@@ -51,7 +51,7 @@ object ZLog {
   def logTime[A](message: String)(body: A)(implicit tag: LogTag): A = macro ZLogMacros.logTime[A]
 
   def formatSize(size: Long): String = {
-    if (size <= 0) return "0"
+    if (size <= 0) return "0B"
     val units       = Array[String]("B", "kB", "MB", "GB", "TB")
     val digitGroups = (Math.log10(size) / Math.log10(1024)).toInt
     new DecimalFormat("#,##0.#").format(size / Math.pow(1024, digitGroups)) + " " + units(digitGroups)

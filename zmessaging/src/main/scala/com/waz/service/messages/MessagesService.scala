@@ -254,7 +254,8 @@ class MessagesServiceImpl(selfUserId:   UserId,
       selfUserId,
       content = Seq(),
       protos = Seq(GenericMessage(msgId.uid, GenericAsset(asset, None, expectsReadConfirmation = expectsReadReceipt.selfSettings))),
-      forceReadReceipts = expectsReadReceipt.convSetting
+      forceReadReceipts = expectsReadReceipt.convSetting,
+      assetId = Some(asset.id)
     )
     updater.addLocalMessage(msgData, exp = exp)
   }

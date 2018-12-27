@@ -119,7 +119,7 @@ object AESUtils {
 
     val iv = mode match {
       case Cipher.ENCRYPT_MODE => initVect.get
-      case Cipher.DECRYPT_MODE => returning(new Array[Byte](16))(IoUtils.readFully(is, _, 0, InitializingVectorLength))
+      case Cipher.DECRYPT_MODE => returning(new Array[Byte](InitializingVectorLength))(IoUtils.readFully(is, _, 0, InitializingVectorLength))
     }
 
     val cipherInputStream: CipherInputStream = new CipherInputStream(is, cipher(key, iv, mode)) {

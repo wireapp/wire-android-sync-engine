@@ -18,7 +18,7 @@
 package com.waz.service.assets2
 
 import android.util.Base64
-import com.waz.model.{MessageId, Mime, RawAssetId}
+import com.waz.model.{AssetIdGeneral, MessageId, Mime, RawAssetId}
 import com.waz.sync.client.AssetClient2.Retention
 
 trait Codec[From, To] {
@@ -68,7 +68,7 @@ trait StorageCodecs {
 
   implicit val RawPreviewCodec: Codec[RawPreview, String] = new Codec[RawPreview, String] {
     val NotReady = "not_ready"
-    val WithoutPreview = ""
+    val WithoutPreview = "without"
     val NotUploadedPrefix = "not_uploaded__"
     val UploadedPrefix = "uploaded__"
 
@@ -166,6 +166,11 @@ trait StorageCodecs {
   implicit val MessageIdCodec: Codec[MessageId, String] = Codec.create(_.str, MessageId.apply)
 
   implicit val RawAssetIdCodec: Codec[RawAssetId, String] = Codec.create(_.str, RawAssetId.apply)
+
+  implicit val AssetIdGeneralCodec: Codec[AssetIdGeneral, String] = {
+    import io.circe.generic.auto._
+    JsonCodec[AssetIdGeneral]
+  }
 
   implicit val Sha256Codec: Codec[Sha256, Array[Byte]] = Codec.create(_.bytes, Sha256.apply)
 

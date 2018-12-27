@@ -168,7 +168,7 @@ lazy val macrosupport = project
   .enablePlugins(AutomateHeaderPlugin).settings(licenseHeaders)
   .settings(publishSettings: _*)
   .settings(
-    version := "3.1",
+    version := "3.2",
     crossPaths := false,
     exportJars := true,
     name := "zmessaging-android-macrosupport",

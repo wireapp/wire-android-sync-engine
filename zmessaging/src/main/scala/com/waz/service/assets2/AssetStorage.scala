@@ -60,7 +60,6 @@ object AssetStorageImpl {
 
     val Id         = asText(_.id)('_id, "PRIMARY KEY")
     val Token      = asTextOpt(_.token)('token)
-    val Type       = text(getAssetTypeString)('type)
     val Name       = text(_.name)('name)
     val Encryption = asText(_.encryption)('encryption)
     val Mime       = asText(_.mime)('mime)
@@ -69,27 +68,14 @@ object AssetStorageImpl {
     val Source     = asTextOpt(_.localSource)('source)
     val Preview    = asTextOpt(_.preview)('preview)
     val Details    = asText(_.details)('details)
-    val MessageId  = asText(_.messageId)('message_id)
     val ConvId     = asTextOpt(_.convId)('conversation_id)
 
     override val idCol = Id
     override val table =
-      Table("Assets", Id, Token, Type, Name, Encryption, Mime, Sha, Size, Source, Preview, Details, MessageId, ConvId)
-
-    private val Image = "image"
-    private val Audio = "audio"
-    private val Video = "video"
-    private val Blob  = "blob"
+      Table("Assets2", Id, Token, Name, Encryption, Mime, Sha, Size, Source, Preview, Details, ConvId)
 
     override def apply(implicit cursor: DBCursor): Asset[General] =
-      Asset(Id, Token, Sha, Mime, Encryption, Source, Preview, Name, Size, Details, MessageId, ConvId)
-
-    private def getAssetTypeString(asset: Asset[General]): String = asset.details match {
-      case _: Image => Image
-      case _: Audio => Audio
-      case _: Video => Video
-      case _: Blob  => Blob
-    }
+      Asset(Id, Token, Sha, Mime, Encryption, Source, Preview, Name, Size, Details, ConvId)
 
   }
 

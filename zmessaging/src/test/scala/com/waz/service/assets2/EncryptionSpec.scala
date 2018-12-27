@@ -25,7 +25,7 @@ import com.waz.utils.IoUtils
 
 abstract class EncryptionSpec(encryption: Encryption) extends ZSpec {
 
-  private val unencrypted = TestData.bytes(1024)
+  private val unencrypted = TestData.bytes(1024 * 1024)
 
   private def copy(bytes: Array[Byte], transformation: InputStream => InputStream): Array[Byte] = {
     val outputStream = new ByteArrayOutputStream()
@@ -66,8 +66,12 @@ abstract class EncryptionSpec(encryption: Encryption) extends ZSpec {
       if (salt.nonEmpty) {
         val encrypted1 = encryptContent(unencrypted, salt)
         val encrypted2 = encryptContent(unencrypted, salt)
+        val encrypted3 = encryptContent(unencrypted, salt)
+        val encrypted4 = encryptContent(unencrypted, salt)
 
         encrypted1 shouldBe encrypted2
+        encrypted2 shouldBe encrypted3
+        encrypted3 shouldBe encrypted4
       }
     }
 

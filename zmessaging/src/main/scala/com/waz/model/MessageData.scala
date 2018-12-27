@@ -20,6 +20,8 @@ package com.waz.model
 import java.nio.ByteBuffer
 import java.nio.charset.Charset
 import java.net.URL
+import java.nio.ByteBuffer
+import java.nio.charset.Charset
 import android.database.DatabaseUtils.queryNumEntries
 import android.database.sqlite.SQLiteQueryBuilder
 import com.waz.ZLog.ImplicitTag._
@@ -34,6 +36,7 @@ import com.waz.model.GenericMessage.{GenericMessageContent, TextMessage}
 import com.waz.model.MessageData.MessageState
 import com.waz.model.messages.media.{MediaAssetData, MediaAssetDataProtocol}
 import com.waz.service.ZMessaging.clock
+import com.waz.service.assets2.StorageCodecs
 import com.waz.service.media.{MessageContentBuilder, RichMediaContentParser}
 import com.waz.sync.client.OpenGraphClient.OpenGraphData
 import com.waz.utils.wrappers.{DB, DBCursor, URI}
@@ -373,11 +376,11 @@ object MessageData extends ((MessageId, ConvId, Message.Type, UserId, Seq[Messag
     val Quote         = opt(id[MessageId]('quote))(_.quote.map(_.message))
     val QuoteValidity = bool('quote_validity)(_.quote.exists(_.validity))
     val ForceReadReceipts = opt(int('force_read_receipts))(_.forceReadReceipts)
+    val AssetId = opt(text('asset_id, AssetIdGeneralCodec.serialize, AssetIdGeneralCodec.deserialize))(_.assetId)
 
     override val idCol = Id
 
-    override val table =
-      Table("Messages", Id, Conv, Type, User, Content, Protos, Time, LocalTime, FirstMessage, Members, Recipient, Email, Name, State, ContentSize, EditTime, Ephemeral, ExpiryTime, Expired, Duration, Quote, QuoteValidity, ForceReadReceipts)
+    override val table = Table("Messages", Id, Conv, Type, User, Content, Protos, Time, LocalTime, FirstMessage, Members, Recipient, Email, Name, State, ContentSize, EditTime, Ephemeral, ExpiryTime, Expired, Duration, Quote, QuoteValidity, ForceReadReceipts, AssetId)
 
     override def onCreate(db: DB): Unit = {
       super.onCreate(db)
