@@ -151,7 +151,7 @@ class AndroidSyncServiceHandle(account: UserId, service: SyncRequestService, tim
   = addRequest(PostConv(id, users, name, team, access, accessRole, receiptMode))
   def postReceiptMode(id: ConvId, receiptMode: Int): Future[SyncId] = addRequest(PostConvReceiptMode(id, receiptMode))
   def postLiking(id: ConvId, liking: Liking): Future[SyncId] = addRequest(PostLiking(id, liking))
-  def postLastRead(id: ConvId, time: RemoteInstant) = addRequest(PostLastRead(id, time), priority = Priority.Low, delay = timeouts.messages.lastReadPostDelay)
+  def postLastRead(id: ConvId, time: RemoteInstant) = addRequest(PostLastRead(id, time), priority = Priority.Normal)
   def postCleared(id: ConvId, time: RemoteInstant) = addRequest(PostCleared(id, time))
   def postOpenGraphData(conv: ConvId, msg: MessageId, time: RemoteInstant) = addRequest(PostOpenGraphMeta(conv, msg, time), priority = Priority.Low)
   def postReceipt(conv: ConvId, messages: Seq[MessageId], user: UserId, tpe: ReceiptType): Future[SyncId] = addRequest(PostReceipt(conv, messages, user, tpe), priority = Priority.Optional)
