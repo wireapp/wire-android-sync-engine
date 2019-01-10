@@ -100,7 +100,6 @@ class UserServiceSpec extends AndroidFreeSpec {
 
       val id = users.head.id
       (usersStorage.get _).expects(id).once().returning(Future.successful(users.headOption))
-      (accountsStrg.update _).expects(me.id, *).once().returning(Future.successful(Some((meAccount, meAccount))))
 
       val service = getService
       result(service.updateSyncedUsers(Seq(UserInfo(id))))

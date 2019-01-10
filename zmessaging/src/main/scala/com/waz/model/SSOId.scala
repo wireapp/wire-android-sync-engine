@@ -17,11 +17,17 @@
  */
 package com.waz.model
 
+import com.waz.log.ZLog2.LogShow
 import com.waz.utils.{JsonDecoder, JsonEncoder}
 import com.waz.utils.JsonDecoder.{decodeOptObject, decodeString}
 import org.json.JSONObject
 
-case class SSOId(subject: String, tenant: String)
+case class SSOId(subject: String, tenant: String) {
+  def encode(implicit js: JSONObject): Unit = {
+    js.put("subject", subject)
+    js.put("tenant", tenant)
+  }
+}
 
 object SSOId {
   private def decodeSSOId(implicit js: JSONObject): SSOId = SSOId(decodeString('subject), decodeString('tenant))
@@ -41,4 +47,6 @@ object SSOId {
       o.put("tenant", ssoId.tenant)
     }
   }
+
+  implicit val SSOIdLogShow: LogShow[SSOId] = LogShow.create(ssoId => s"$ssoId")
 }
