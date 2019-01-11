@@ -37,10 +37,10 @@ import scala.concurrent.duration._
 trait SyncServiceHandle {
   def syncSearchQuery(query: SearchQuery): Future[SyncId]
   def exactMatchHandle(handle: Handle): Future[SyncId]
-  def syncUsers(ids: Set[UserId]): Future[SyncId]
+  def syncUsers(ids: Set[UserId]): Future[Set[SyncId]]
   def syncSelfUser(): Future[SyncId]
   def deleteAccount(): Future[SyncId]
-  def syncConversations(ids: Set[ConvId] = Set.empty, dependsOn: Option[SyncId] = None): Future[SyncId]
+  def syncConversations(ids: Set[ConvId] = Set.empty, dependsOn: Option[SyncId] = None): Future[Set[SyncId]]
   def syncConvLink(id: ConvId): Future[SyncId]
   def syncTeam(dependsOn: Option[SyncId] = None): Future[SyncId]
   def syncTeamMember(id: UserId): Future[SyncId]
@@ -72,7 +72,7 @@ trait SyncServiceHandle {
   def postAddressBook(ab: AddressBook): Future[SyncId]
   def postTypingState(id: ConvId, typing: Boolean): Future[SyncId]
   def postOpenGraphData(conv: ConvId, msg: MessageId, editTime: RemoteInstant): Future[SyncId]
-  def postReceipt(conv: ConvId, messages: Seq[MessageId], user: UserId, tpe: ReceiptType): Future[SyncId]
+  def postReceipt(conv: ConvId, messages: Seq[MessageId], user: UserId, tpe: ReceiptType): Future[Set[SyncId]]
   def postProperty(key: PropertyKey, value: Boolean): Future[SyncId]
   def postProperty(key: PropertyKey, value: Int): Future[SyncId]
   def postProperty(key: PropertyKey, value: String): Future[SyncId]
@@ -116,13 +116,16 @@ class AndroidSyncServiceHandle(account: UserId, service: SyncRequestService, tim
     service.addRequest(account, req, priority, dependsOn, forceRetry, delay)
 
   def syncSearchQuery(query: SearchQuery) = addRequest(SyncSearchQuery(query), priority = Priority.High)
-  def syncUsers(ids: Set[UserId]) = addRequest(SyncUser(ids))
+  def syncUsers(ids: Set[UserId]): Future[Set[SyncId]] = Future.traverse(ids.grouped(SyncHandler.JobSplitCount))(us => addRequest(SyncUser(us))).map(_.toSet)
   def exactMatchHandle(handle: Handle) = addRequest(ExactMatchHandle(handle), priority = Priority.High)
   def syncSelfUser() = addRequest(SyncSelf, priority = Priority.High)
   def deleteAccount() = addRequest(DeleteAccount)
   def syncConversations(ids: Set[ConvId], dependsOn: Option[SyncId]) =
-    if (ids.nonEmpty) addRequest(SyncConversation(ids), priority = Priority.Normal, dependsOn = dependsOn.toSeq)
-    else              addRequest(SyncConversations,     priority = Priority.High,   dependsOn = dependsOn.toSeq)
+    if (ids.nonEmpty)
+      Future.traverse(ids.grouped(SyncHandler.JobSplitCount)) { cs =>
+        addRequest(SyncConversation(cs), priority = Priority.Normal, dependsOn = dependsOn.toSeq)
+      }.map(_.toSet)
+    else addRequest(SyncConversations, priority = Priority.High, dependsOn = dependsOn.toSeq).map(Set(_))
 
   def syncConvLink(id: ConvId) = addRequest(SyncConvLink(id))
   def syncTeam(dependsOn: Option[SyncId] = None): Future[SyncId] = addRequest(SyncTeam, priority = Priority.High, dependsOn = dependsOn.toSeq)
@@ -154,7 +157,10 @@ class AndroidSyncServiceHandle(account: UserId, service: SyncRequestService, tim
   def postLastRead(id: ConvId, time: RemoteInstant) = addRequest(PostLastRead(id, time), priority = Priority.Normal)
   def postCleared(id: ConvId, time: RemoteInstant) = addRequest(PostCleared(id, time))
   def postOpenGraphData(conv: ConvId, msg: MessageId, time: RemoteInstant) = addRequest(PostOpenGraphMeta(conv, msg, time), priority = Priority.Low)
-  def postReceipt(conv: ConvId, messages: Seq[MessageId], user: UserId, tpe: ReceiptType): Future[SyncId] = addRequest(PostReceipt(conv, messages, user, tpe), priority = Priority.Optional)
+  def postReceipt(conv: ConvId, messages: Seq[MessageId], user: UserId, tpe: ReceiptType): Future[Set[SyncId]] =
+    Future.traverse(messages.grouped(SyncHandler.JobSplitCount)) { ms =>
+      addRequest(PostReceipt(conv, ms, user, tpe), priority = Priority.Optional)
+    }.map(_.toSet)
   def postAddBot(cId: ConvId, pId: ProviderId, iId: IntegrationId) = addRequest(PostAddBot(cId, pId, iId))
   def postRemoveBot(cId: ConvId, botId: UserId) = addRequest(PostRemoveBot(cId, botId))
   def postProperty(key: PropertyKey, value: Boolean): Future[SyncId] = addRequest(PostBoolProperty(key, value), forceRetry = true)
@@ -176,13 +182,13 @@ class AndroidSyncServiceHandle(account: UserId, service: SyncRequestService, tim
 
   override def performFullSync(): Future[Unit] = for {
     id1 <- syncSelfUser()
+    id6 <- syncConnections()
     id2 <- syncSelfClients()
     id3 <- syncSelfPermissions()
     id4 <- syncTeam()
     id5 <- syncConversations()
-    id6 <- syncConnections()
     id7 <- syncProperties()
-    _ <- service.await(Set(id1, id2, id3, id4, id5, id6, id7))
+    _ <- service.await(Set(id1, id2, id3, id4, id6, id7) ++ id5)
   } yield ()
 }
 
@@ -193,6 +199,8 @@ trait SyncHandler {
 
 object SyncHandler {
   case class RequestInfo(attempt: Int, requestStart: Instant, network: Option[NetworkMode] = None)
+
+  val JobSplitCount = 50
 }
 
 class AccountSyncHandler(accounts: AccountsService) extends SyncHandler {
