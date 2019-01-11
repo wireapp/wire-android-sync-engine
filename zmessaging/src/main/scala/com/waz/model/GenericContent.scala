@@ -25,7 +25,7 @@ import com.waz.model.AssetStatus.{DownloadFailed, UploadCancelled, UploadDone, U
 import com.waz.model.nano.Messages
 import com.waz.model.nano.Messages.MessageEdit
 import com.waz.service.assets2.Asset.{Audio, General, Image, Video}
-import com.waz.service.assets2.{AES_CBC_Encryption, AssetUploadStatus, InProgressAsset, RawAsset, Asset => Asset2}
+import com.waz.service.assets2.{AES_CBC_Encryption, UploadAssetStatus, DownloadAsset, UploadAsset, Asset => Asset2}
 import com.waz.utils._
 import com.waz.utils.crypto.AESUtils
 import com.waz.utils.wrappers.URI
@@ -68,7 +68,7 @@ object GenericContent {
           //TODO Dean giphy source and caption
         }
 
-      def apply(asset: RawAsset[General]): Original =
+      def apply(asset: UploadAsset[General]): Original =
         returning(new Messages.Asset.Original) { o =>
           o.mimeType = asset.mime.str
           o.size = asset.size
@@ -253,13 +253,13 @@ object GenericContent {
       proto.expectsReadConfirmation = expectsReadConfirmation
     }
 
-    def apply(asset: RawAsset[General], preview: Option[Asset2[General]], expectsReadConfirmation: Boolean): Messages.Asset =
+    def apply(asset: UploadAsset[General], preview: Option[Asset2[General]], expectsReadConfirmation: Boolean): Messages.Asset =
       returning(new Messages.Asset) { proto =>
         proto.original = Original(asset)
         preview.foreach(p => proto.preview = Preview(p))
         asset.status match {
-          case AssetUploadStatus.Cancelled => proto.setNotUploaded(Messages.Asset.CANCELLED)
-          case AssetUploadStatus.Failed    => proto.setNotUploaded(Messages.Asset.FAILED)
+          case UploadAssetStatus.Cancelled => proto.setNotUploaded(Messages.Asset.CANCELLED)
+          case UploadAssetStatus.Failed    => proto.setNotUploaded(Messages.Asset.FAILED)
           case _ =>
         }
         proto.expectsReadConfirmation = expectsReadConfirmation

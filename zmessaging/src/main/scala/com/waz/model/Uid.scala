@@ -119,37 +119,37 @@ object AssetIdGeneral {
   //TODO Use 'Codecs' concept instead of such methods
   def encode(id: AssetIdGeneral): String = id match {
     case AssetId(str) => str
-    case RawAssetId(str) => RawAssetPrefix + str
-    case InProgressAssetId(str) => InProgressAssetPrefix + str
+    case UploadAssetId(str) => RawAssetPrefix + str
+    case DownloadAssetId(str) => InProgressAssetPrefix + str
   }
 
   def decode(str: String): AssetIdGeneral = {
-    if (str.startsWith(RawAssetPrefix)) RawAssetId(str.substring(RawAssetPrefix.length))
-    else if (str.startsWith(InProgressAssetPrefix)) InProgressAssetId(str.substring(InProgressAssetPrefix.length))
+    if (str.startsWith(RawAssetPrefix)) UploadAssetId(str.substring(RawAssetPrefix.length))
+    else if (str.startsWith(InProgressAssetPrefix)) DownloadAssetId(str.substring(InProgressAssetPrefix.length))
     else AssetId(str)
   }
 
 }
 
-case class InProgressAssetId(str: String) extends AssetIdGeneral
+case class DownloadAssetId(str: String) extends AssetIdGeneral
 
-object InProgressAssetId {
-  def apply(): InProgressAssetId = Id.random()
+object DownloadAssetId {
+  def apply(): DownloadAssetId = Id.random()
 
-  implicit object Id extends Id[InProgressAssetId] {
-    override def random() = InProgressAssetId(Uid().toString)
-    override def decode(str: String) = InProgressAssetId(str)
+  implicit object Id extends Id[DownloadAssetId] {
+    override def random() = DownloadAssetId(Uid().toString)
+    override def decode(str: String) = DownloadAssetId(str)
   }
 }
 
-case class RawAssetId(str: String) extends AssetIdGeneral
+case class UploadAssetId(str: String) extends AssetIdGeneral
 
-object RawAssetId {
-  def apply(): RawAssetId = Id.random()
+object UploadAssetId {
+  def apply(): UploadAssetId = Id.random()
 
-  implicit object Id extends Id[RawAssetId] {
-    override def random() = RawAssetId(Uid().toString)
-    override def decode(str: String) = RawAssetId(str)
+  implicit object Id extends Id[UploadAssetId] {
+    override def random() = UploadAssetId(Uid().toString)
+    override def decode(str: String) = UploadAssetId(str)
   }
 }
 

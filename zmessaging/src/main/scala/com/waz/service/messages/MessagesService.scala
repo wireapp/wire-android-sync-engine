@@ -28,7 +28,7 @@ import com.waz.model.GenericContent._
 import com.waz.model.{Mention, MessageId, _}
 import com.waz.service._
 import com.waz.service.assets2.Asset.General
-import com.waz.service.assets2.RawAsset
+import com.waz.service.assets2.UploadAsset
 import com.waz.service.conversation.ConversationsContentUpdater
 import com.waz.service.otr.VerificationStateUpdater.{ClientUnverified, MemberAdded, VerificationChange}
 import com.waz.sync.SyncServiceHandle
@@ -51,7 +51,7 @@ trait MessagesService {
 
   def addTextMessage(convId: ConvId, content: String, expectsReadReceipt: ReadReceiptSettings = AllDisabled, mentions: Seq[Mention] = Nil, exp: Option[Option[FiniteDuration]] = None): Future[MessageData]
   def addKnockMessage(convId: ConvId, selfUserId: UserId, expectsReadReceipt: ReadReceiptSettings = AllDisabled): Future[MessageData]
-  def addAssetMessage(convId: ConvId, msgId: MessageId, asset: RawAsset[General], expectsReadReceipt: ReadReceiptSettings = AllDisabled, exp: Option[Option[FiniteDuration]] = None): Future[MessageData]
+  def addAssetMessage(convId: ConvId, msgId: MessageId, asset: UploadAsset[General], expectsReadReceipt: ReadReceiptSettings = AllDisabled, exp: Option[Option[FiniteDuration]] = None): Future[MessageData]
   def addLocationMessage(convId: ConvId, content: Location, expectsReadReceipt: ReadReceiptSettings = AllDisabled): Future[MessageData]
   def addReplyMessage(quote: MessageId, content: String, expectsReadReceipt: ReadReceiptSettings = AllDisabled, mentions: Seq[Mention] = Nil, exp: Option[Option[FiniteDuration]] = None): Future[Option[MessageData]]
 
@@ -235,7 +235,7 @@ class MessagesServiceImpl(selfUserId:   UserId,
 
   override def addAssetMessage(convId: ConvId,
                                msgId: MessageId,
-                               asset: RawAsset[General],
+                               asset: UploadAsset[General],
                                expectsReadReceipt: ReadReceiptSettings = AllDisabled,
                                exp: Option[Option[FiniteDuration]] = None): Future[MessageData] = {
     import assets2.Asset

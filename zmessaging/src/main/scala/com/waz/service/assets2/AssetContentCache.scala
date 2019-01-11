@@ -20,7 +20,7 @@ package com.waz.service.assets2
 import java.io.File
 
 import com.waz.cache2.{FileCache, LruFileCache, SimpleFileCache}
-import com.waz.model.{AssetId, RawAssetId}
+import com.waz.model.{AssetId, UploadAssetId}
 import com.waz.utils.events.EventContext
 
 import scala.concurrent.ExecutionContext
@@ -43,10 +43,10 @@ class AssetContentCacheImpl(val cacheDirectory: File, val directorySizeThreshold
   * Cache by itself should not contain any auto cleanup logic.
   * So remove cache entries as soon as you can.
   */
-trait RawAssetContentCache extends FileCache[RawAssetId]
+trait RawAssetContentCache extends FileCache[UploadAssetId]
 
 class RawAssetContentCacheImpl(val cacheDirectory: File)
-                              (implicit val ec: ExecutionContext) extends SimpleFileCache[RawAssetId] with RawAssetContentCache {
+                              (implicit val ec: ExecutionContext) extends SimpleFileCache[UploadAssetId] with RawAssetContentCache {
 
-  override protected def createFileName(key: RawAssetId): String = key.str
+  override protected def createFileName(key: UploadAssetId): String = key.str
 }

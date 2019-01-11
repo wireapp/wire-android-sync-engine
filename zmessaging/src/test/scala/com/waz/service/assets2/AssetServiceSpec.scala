@@ -25,8 +25,8 @@ import com.waz.ZLog.ImplicitTag._
 import com.waz.service.assets2.Asset.General
 import com.waz.api.impl.ErrorResponse
 import com.waz.model.errors.NotFoundLocal
-import com.waz.model.{AssetId, Mime, RawAssetId, Sha256}
-import com.waz.service.assets2.Asset.RawGeneral
+import com.waz.model.{AssetId, Mime, UploadAssetId, Sha256}
+import com.waz.service.assets2.Asset.UploadGeneral
 import com.waz.sync.client.AssetClient2.{FileWithSha, Retention}
 import com.waz.sync.client.{AssetClient2, AssetClient2Impl}
 import com.waz.threading.CancellableFuture
@@ -39,8 +39,8 @@ import scala.util.{Failure, Random, Success}
 class AssetServiceSpec extends ZIntegrationMockSpec {
 
   private val assetStorage        = mock[AssetStorage]
-  private val inProgressAssetStorage   = mock[InProgressAssetStorage]
-  private val rawAssetStorage     = mock[RawAssetStorage]
+  private val inProgressAssetStorage   = mock[DownloadAssetStorage]
+  private val rawAssetStorage     = mock[UploadAssetStorage]
   private val assetDetailsService = mock[AssetDetailsService]
   private val previewService      = mock[AssetPreviewService]
   private val cache               = mock[AssetContentCache]
@@ -71,7 +71,7 @@ class AssetServiceSpec extends ZIntegrationMockSpec {
 
   verbose(l"Test asset: $testAsset")
 
-  private def service(rawAssetStorage: RawAssetStorage = rawAssetStorage,
+  private def service(rawAssetStorage: UploadAssetStorage = rawAssetStorage,
                       client: AssetClient2 = client): AssetService =
     new AssetServiceImpl(
       assetStorage,
@@ -251,7 +251,7 @@ class AssetServiceSpec extends ZIntegrationMockSpec {
       for {
         _ <- Future.successful(())
         client = new AssetClient2Impl
-        rawAssetStorage = new ReactiveStorageImpl2(new UnlimitedInMemoryStorage[RawAssetId, RawAsset[RawGeneral]](_.id)) with RawAssetStorage
+        rawAssetStorage = new ReactiveStorageImpl2(new UnlimitedInMemoryStorage[UploadAssetId, UploadAsset[UploadGeneral]](_.id)) with UploadAssetStorage
         assetService = service(rawAssetStorage, client)
 
         rawAsset <- assetService.createAndSaveRawAsset(contentForUpload, encryption, public = false, Retention.Persistent, None)

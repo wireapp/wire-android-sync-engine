@@ -31,7 +31,7 @@ import com.waz.model.GenericMessage.TextMessage
 import com.waz.model._
 import com.waz.model.sync.ReceiptType
 import com.waz.service.{ErrorsService, Timeouts}
-import com.waz.service.assets2.Asset.{General, Image, RawGeneral}
+import com.waz.service.assets2.Asset.{General, Image, UploadGeneral}
 import com.waz.service.assets2.{AssetService, _}
 import com.waz.service.conversation.{ConversationOrderEventsService, ConversationsContentUpdater}
 import com.waz.service.messages.{MessagesContentUpdater, MessagesService}
@@ -62,7 +62,7 @@ class MessagesSyncHandler(selfUserId: UserId,
                           sync:       SyncServiceHandle,
                           assets:     AssetService,
                           assetStorage: AssetStorage,
-                          rawAssetStorage: RawAssetStorage,
+                          rawAssetStorage: UploadAssetStorage,
                           cache:      CacheService,
                           members:    MembersStorage,
                           tracking:   TrackingService,
@@ -234,14 +234,14 @@ class MessagesSyncHandler(selfUserId: UserId,
     }
 
     //TODO Dean: Update asset status to UploadInProgress after posting original - what about images...?
-    def postOriginal(rawAsset: RawAsset[General]): CancellableFuture[RemoteInstant] =
-      if (rawAsset.status != AssetUploadStatus.NotStarted) CancellableFuture.successful(msg.time)
+    def postOriginal(rawAsset: UploadAsset[General]): CancellableFuture[RemoteInstant] =
+      if (rawAsset.status != UploadAssetStatus.NotStarted) CancellableFuture.successful(msg.time)
       else rawAsset.details match {
         case _: Image => CancellableFuture.successful(msg.time)
         case _ => postAssetMessage(GenericMessage(msg.id.uid, msg.ephemeral, Proto.Asset(rawAsset, None, expectsReadConfirmation = msg.expectsRead.contains(true))), rawAsset.id)
       }
 
-    def sendWithV3(rawAsset: RawAsset[RawGeneral]): CancellableFuture[RemoteInstant] = {
+    def sendWithV3(rawAsset: UploadAsset[UploadGeneral]): CancellableFuture[RemoteInstant] = {
       for {
         rawAssetWithMetadata <- rawAsset.details match {
           case details: General => CancellableFuture.successful(rawAsset.copy(details = details))
@@ -283,11 +283,11 @@ class MessagesSyncHandler(selfUserId: UserId,
     //want to wait until asset meta and preview data is loaded before we send any messages
     for {
       _ <- AssetProcessing.get(ProcessingTaskKey(msg.assetId.get))
-      rawAsset <- rawAssetStorage.find(msg.assetId.collect { case id: RawAssetId => id }.get).toCancellable
+      rawAsset <- rawAssetStorage.find(msg.assetId.collect { case id: UploadAssetId => id }.get).toCancellable
       result <- rawAsset match {
         case None =>
           CancellableFuture.successful(Left(internalError(s"no asset found for msg: $msg")))
-        case Some(asset) if asset.status == AssetUploadStatus.Cancelled =>
+        case Some(asset) if asset.status == UploadAssetStatus.Cancelled =>
           CancellableFuture.successful(Left(ErrorResponse.Cancelled))
         case Some(asset) =>
           verbose(s"Sending asset: $asset")

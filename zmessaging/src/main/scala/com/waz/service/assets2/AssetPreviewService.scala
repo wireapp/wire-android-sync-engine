@@ -22,5 +22,5 @@ import com.waz.service.assets2.Asset.General
 import scala.concurrent.Future
 
 trait AssetPreviewService {
-  def extractPreview(rawAsset: RawAsset[General], content: CanExtractMetadata): Future[Content]
+  def extractPreview(rawAsset: UploadAsset[General], content: CanExtractMetadata): Future[Content]
 }

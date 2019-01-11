@@ -18,7 +18,7 @@
 package com.waz.service.assets2
 
 import android.util.Base64
-import com.waz.model.{AssetIdGeneral, MessageId, Mime, RawAssetId}
+import com.waz.model.{AssetIdGeneral, MessageId, Mime, UploadAssetId}
 import com.waz.sync.client.AssetClient2.Retention
 
 trait Codec[From, To] {
@@ -83,7 +83,7 @@ trait StorageCodecs {
       case NotReady => RawPreviewNotReady
       case WithoutPreview => RawPreviewEmpty
       case str if str.startsWith(NotUploadedPrefix) =>
-        RawPreviewNotUploaded(RawAssetId(str.substring(NotUploadedPrefix.length)))
+        RawPreviewNotUploaded(UploadAssetId(str.substring(NotUploadedPrefix.length)))
       case str if str.startsWith(UploadedPrefix) =>
         RawPreviewUploaded(AssetId(str.substring(UploadedPrefix.length)))
     }
@@ -113,51 +113,51 @@ trait StorageCodecs {
     }
   }
 
-  implicit val AssetUploadStatusCodec: Codec[AssetUploadStatus, Int] = new Codec[AssetUploadStatus, Int] {
+  implicit val AssetUploadStatusCodec: Codec[UploadAssetStatus, Int] = new Codec[UploadAssetStatus, Int] {
     val NotStarted = 1
     val InProgress = 2
     val Done       = 3
     val Cancelled  = 4
     val Failed     = 5
 
-    override def serialize(value: AssetUploadStatus): Int = value match {
-      case AssetUploadStatus.NotStarted => NotStarted
-      case AssetUploadStatus.InProgress => InProgress
+    override def serialize(value: UploadAssetStatus): Int = value match {
+      case UploadAssetStatus.NotStarted => NotStarted
+      case UploadAssetStatus.InProgress => InProgress
       case AssetStatus.Done             => Done
-      case AssetUploadStatus.Cancelled  => Cancelled
-      case AssetUploadStatus.Failed     => Failed
+      case UploadAssetStatus.Cancelled  => Cancelled
+      case UploadAssetStatus.Failed     => Failed
     }
 
-    override def deserialize(value: Int): AssetUploadStatus = value match {
-      case NotStarted => AssetUploadStatus.NotStarted
-      case InProgress => AssetUploadStatus.InProgress
+    override def deserialize(value: Int): UploadAssetStatus = value match {
+      case NotStarted => UploadAssetStatus.NotStarted
+      case InProgress => UploadAssetStatus.InProgress
       case Done       => AssetStatus.Done
-      case Cancelled  => AssetUploadStatus.Cancelled
-      case Failed     => AssetUploadStatus.Failed
+      case Cancelled  => UploadAssetStatus.Cancelled
+      case Failed     => UploadAssetStatus.Failed
     }
   }
 
-  implicit val AssetDownloadStatusCodec: Codec[AssetDownloadStatus, Int] = new Codec[AssetDownloadStatus, Int] {
+  implicit val AssetDownloadStatusCodec: Codec[DownloadAssetStatus, Int] = new Codec[DownloadAssetStatus, Int] {
     val NotStarted = 1
     val InProgress = 2
     val Done       = 3
     val Cancelled  = 4
     val Failed     = 5
 
-    override def serialize(value: AssetDownloadStatus): Int = value match {
-      case AssetDownloadStatus.NotStarted => NotStarted
-      case AssetDownloadStatus.InProgress => InProgress
+    override def serialize(value: DownloadAssetStatus): Int = value match {
+      case DownloadAssetStatus.NotStarted => NotStarted
+      case DownloadAssetStatus.InProgress => InProgress
       case AssetStatus.Done               => Done
-      case AssetDownloadStatus.Cancelled  => Cancelled
-      case AssetDownloadStatus.Failed     => Failed
+      case DownloadAssetStatus.Cancelled  => Cancelled
+      case DownloadAssetStatus.Failed     => Failed
     }
 
-    override def deserialize(value: Int): AssetDownloadStatus = value match {
-      case NotStarted => AssetDownloadStatus.NotStarted
-      case InProgress => AssetDownloadStatus.InProgress
+    override def deserialize(value: Int): DownloadAssetStatus = value match {
+      case NotStarted => DownloadAssetStatus.NotStarted
+      case InProgress => DownloadAssetStatus.InProgress
       case Done       => AssetStatus.Done
-      case Cancelled  => AssetDownloadStatus.Cancelled
-      case Failed     => AssetDownloadStatus.Failed
+      case Cancelled  => DownloadAssetStatus.Cancelled
+      case Failed     => DownloadAssetStatus.Failed
     }
   }
 
@@ -165,7 +165,7 @@ trait StorageCodecs {
 
   implicit val MessageIdCodec: Codec[MessageId, String] = Codec.create(_.str, MessageId.apply)
 
-  implicit val RawAssetIdCodec: Codec[RawAssetId, String] = Codec.create(_.str, RawAssetId.apply)
+  implicit val RawAssetIdCodec: Codec[UploadAssetId, String] = Codec.create(_.str, UploadAssetId.apply)
 
   implicit val AssetIdGeneralCodec: Codec[AssetIdGeneral, String] = {
     import io.circe.generic.auto._

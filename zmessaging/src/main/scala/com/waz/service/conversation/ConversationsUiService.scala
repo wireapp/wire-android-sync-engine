@@ -166,7 +166,7 @@ class ConversationsUiServiceImpl(selfUserId:      UserId,
       retention  <- messages.retentionPolicy2(conversation)
 
       rr <- readReceiptSettings(convId)
-      rawAsset   <- assets.createAndSaveRawAsset(content, AES_CBC_Encryption.random, public = false, retention, Some(messageId)).logFailure()
+      rawAsset   <- assets.createAndSaveRawAsset(content, AES_CBC_Encryption.random, public = false, retention, Some(messageId))
       message    <- messages.addAssetMessage(convId, messageId, rawAsset, rr, exp)
       _          <- updateLastRead(message)
       _          <- Future.successful(tracking.assetContribution(AssetId(rawAsset.id.str), selfUserId)) //TODO Maybe we can track raw assets contribution separately?
@@ -439,7 +439,7 @@ class ConversationsUiServiceImpl(selfUserId:      UserId,
     } yield resp
 
   //TODO Refactor this. Maybe move some part of this method into UI project
-  private def checkSize(convId: ConvId, rawAsset: RawAsset[General], message: MessageData, confirmation: WifiWarningConfirmation) = {
+  private def checkSize(convId: ConvId, rawAsset: UploadAsset[General], message: MessageData, confirmation: WifiWarningConfirmation) = {
     val isAssetLarge = rawAsset.size > LargeAssetWarningThresholdInBytes
     val isAssetTooLarge: Boolean = rawAsset.details match {
       case _: Video => false

@@ -19,31 +19,31 @@ package com.waz.service.assets2
 
 import android.content.Context
 import com.waz.db.{ColumnBuilders, Dao}
-import com.waz.model.RawAssetId
+import com.waz.model.UploadAssetId
 import com.waz.service.assets2.Asset._
-import com.waz.service.assets2.RawAssetStorage.RawAssetDao
+import com.waz.service.assets2.UploadAssetStorage.UploadAssetDao
 import com.waz.utils.TrimmingLruCache.Fixed
 import com.waz.utils.wrappers.{DB, DBCursor}
 import com.waz.utils.{CachedStorage2, CirceJSONSupport, DbStorage2, InMemoryStorage2, ReactiveStorage2, ReactiveStorageImpl2, TrimmingLruCache}
 
 import scala.concurrent.ExecutionContext
 
-trait RawAssetStorage extends ReactiveStorage2[RawAssetId, RawAsset[RawGeneral]]
+trait UploadAssetStorage extends ReactiveStorage2[UploadAssetId, UploadAsset[UploadGeneral]]
 
-class RawAssetStorageImpl(context: Context, db: DB)(implicit ec: ExecutionContext)
+class UploadAssetStorageImpl(context: Context, db: DB)(implicit ec: ExecutionContext)
     extends ReactiveStorageImpl2(
       new CachedStorage2(
-        new DbStorage2(RawAssetDao)(ec, db),
-        new InMemoryStorage2[RawAssetId, RawAsset[RawGeneral]](new TrimmingLruCache(context, Fixed(8)))(ec)
+        new DbStorage2(UploadAssetDao)(ec, db),
+        new InMemoryStorage2[UploadAssetId, UploadAsset[UploadGeneral]](new TrimmingLruCache(context, Fixed(8)))(ec)
       )(ec)
     )
-    with RawAssetStorage
+    with UploadAssetStorage
 
-object RawAssetStorage {
+object UploadAssetStorage {
 
-  object RawAssetDao
-      extends Dao[RawAsset[RawGeneral], RawAssetId]
-      with ColumnBuilders[RawAsset[RawGeneral]]
+  object UploadAssetDao
+      extends Dao[UploadAsset[UploadGeneral], UploadAssetId]
+      with ColumnBuilders[UploadAsset[UploadGeneral]]
       with StorageCodecs
       with CirceJSONSupport {
 
@@ -65,7 +65,7 @@ object RawAssetStorage {
 
     override val idCol = Id
     override val table = Table(
-      "RawAssets",
+      "UploadAssets",
       Id,
       Source,
       Sha,
@@ -80,22 +80,22 @@ object RawAssetStorage {
       AssetId
     )
 
-    override def apply(implicit cursor: DBCursor): RawAsset[RawGeneral] =
-      RawAsset(Id,
-               Source,
-               Name,
-               Sha,
-               Mime,
-               Preview,
-               Uploaded,
-               Size,
-               Retention,
-               Public,
-               Encryption,
-               EncryptionSalt,
-               Details,
-               UploadStatus,
-               AssetId)
+    override def apply(implicit cursor: DBCursor): UploadAsset[UploadGeneral] =
+      UploadAsset(Id,
+        Source,
+        Name,
+        Sha,
+        Mime,
+        Preview,
+        Uploaded,
+        Size,
+        Retention,
+        Public,
+        Encryption,
+        EncryptionSalt,
+        Details,
+        UploadStatus,
+        AssetId)
 
   }
 
