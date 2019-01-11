@@ -100,8 +100,8 @@ class ConversationsServiceImpl(teamId:          Option[TeamId],
     case Some(convId) => convsStorage.get(convId).flatMap {
       case Some(conv) if conv.accessRole.isEmpty =>
         for {
-          syncId        <- sync.syncConversations(Set(conv.id))
-          _             <- syncReqService.await(syncId)
+          syncIds        <- sync.syncConversations(Set(conv.id))
+          _             <- syncReqService.await(syncIds)
           Some(updated) <- content.convById(conv.id)
         } yield if (updated.access.contains(Access.CODE)) sync.syncConvLink(conv.id)
 
@@ -173,8 +173,8 @@ class ConversationsServiceImpl(teamId:          Option[TeamId],
           sync.syncConversations(Set(conv.id)).map(Option(_))
         else
           Future.successful(None)
-        syncId <- users.syncIfNeeded(userIds.toSet)
-        _ <- syncId.fold(Future.successful(()))(sId => syncReqService.await(sId).map(_ => ()))
+        syncIds <- users.syncIfNeeded(userIds.toSet)
+        _ <- syncReqService.await(syncIds).map(_ => ())
         _ <- membersStorage.add(conv.id, userIds)
         _ <- if (userIds.contains(selfUserId)) content.setConvActive(conv.id, active = true) else successful(None)
         _ <- convSync.fold(Future.successful(()))(sId => syncReqService.await(sId).map(_ => ()))

@@ -153,7 +153,7 @@ class ConnectionServiceSpec extends AndroidFreeSpec with Inside {
         }.toSet)
       }
 
-      (sync.syncUsers _).expects(Set(otherUser.id)).returning(Future.successful(SyncId()))
+      (sync.syncUsers _).expects(Set(otherUser.id)).returning(Future.successful(Set(SyncId())))
       (usersStorage.listAll _).expects(*).returning(Future.successful(Vector(otherUser)))
       (convsStorage.getByRemoteIds2 _).expects(Set(remoteId)).twice().returning(Future.successful(Map.empty))
       (convsStorage.updateLocalIds _).expects(Map.empty[ConvId, ConvId]).returning(Future.successful(Set.empty))
@@ -234,7 +234,7 @@ class ConnectionServiceSpec extends AndroidFreeSpec with Inside {
     (messagesService.addDeviceStartMessages _).expects(*, *).anyNumberOfTimes().onCall{ (convs: Seq[ConversationData], selfUserId: UserId) =>
       Future.successful(convs.map(conv => MessageData(MessageId(), conv.id, Message.Type.STARTED_USING_DEVICE, selfUserId)).toSet)
     }
-    (sync.syncUsers _).expects(*).anyNumberOfTimes().returns(Future.successful(SyncId()))
+    (sync.syncUsers _).expects(*).anyNumberOfTimes().returns(Future.successful(Set(SyncId())))
     new ConnectionServiceImpl(selfUserId, teamId, push, convs, convsStorage, members, messagesService, messagesStorage, users, usersStorage, sync)
   }
 }

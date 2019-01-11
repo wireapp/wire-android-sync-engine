@@ -54,7 +54,7 @@ trait UserService {
   def getSelfUser: Future[Option[UserData]]
   def getOrCreateUser(id: UserId): Future[UserData]
   def updateUserData(id: UserId, updater: UserData => UserData): Future[Option[(UserData, UserData)]]
-  def syncIfNeeded(userIds: Set[UserId], olderThan: FiniteDuration = SyncIfOlderThan): Future[Option[SyncId]]
+  def syncIfNeeded(userIds: Set[UserId], olderThan: FiniteDuration = SyncIfOlderThan): Future[Set[SyncId]]
   def updateConnectionStatus(id: UserId, status: UserData.ConnectionStatus, time: Option[RemoteInstant] = None, message: Option[String] = None): Future[Option[UserData]]
   def updateUsers(entries: Seq[UserSearchEntry]): Future[Set[UserData]]
   def acceptedOrBlockedUsers: Signal[Map[UserId, UserData]]
@@ -210,14 +210,14 @@ class UserServiceImpl(selfUserId:        UserId,
    * Schedules user data sync if user with given id doesn't exist or has old timestamp.
   */
 
-  override def syncIfNeeded(userIds: Set[UserId], olderThan: FiniteDuration = SyncIfOlderThan): Future[Option[SyncId]] =
+  override def syncIfNeeded(userIds: Set[UserId], olderThan: FiniteDuration = SyncIfOlderThan): Future[Set[SyncId]] =
     usersStorage.listAll(userIds).flatMap { found =>
       val newIds = userIds -- found.map(_.id)
       val offset = LocalInstant.Now - olderThan
       val existing = found.filter(u => !u.isConnected && (u.teamId.isEmpty || u.teamId != teamId) && u.syncTimestamp.forall(_.isBefore(offset)))
       val toSync = newIds ++ existing.map(_.id)
       verbose(l"syncIfNeeded for users; new: (${newIds.size}) + existing: (${existing.size}) = all: (${toSync.size})")
-      if (toSync.nonEmpty) sync.syncUsers(toSync).map(Some(_))(Threading.Background) else Future.successful(None)
+      if (toSync.nonEmpty) sync.syncUsers(toSync) else Future.successful(Set.empty[SyncId])
     }
 
   override def updateSyncedUsers(users: Seq[UserInfo], syncTime: LocalInstant = LocalInstant.Now): Future[Set[UserData]] = {

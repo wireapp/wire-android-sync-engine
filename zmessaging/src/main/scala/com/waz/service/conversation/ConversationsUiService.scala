@@ -416,7 +416,7 @@ class ConversationsUiServiceImpl(selfUserId:      UserId,
           }
           RichFuture.traverseSequential(msgs.groupBy(_.userId).toSeq)( { case (u, ms) if ms.nonEmpty =>
             sync.postReceipt(convId, ms.map(_.id), u, ReceiptType.Read)
-          })
+          }).map(_.flatten)
         }
       }
     }

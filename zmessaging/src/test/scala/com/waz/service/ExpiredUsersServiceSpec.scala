@@ -69,7 +69,7 @@ class ExpiredUsersServiceSpec extends AndroidFreeSpec {
       println(s"us: $us")
       if (!us.contains(wirelessId)) fail("Called sync for wrong user")
       finished ! {}
-      Future.successful(SyncId())
+      Future.successful(Set(SyncId()))
     }
 
     result(finished.next)
@@ -139,7 +139,7 @@ class ExpiredUsersServiceSpec extends AndroidFreeSpec {
     (sync.syncUsers _).expects(*).once().onCall { (us: Set[UserId]) =>
       if (!us.contains(wirelessUser.id)) fail("Called sync for wrong user")
       finished ! {}
-      Future.successful(SyncId())
+      Future.successful(Set(SyncId()))
     }
 
     result(finished.next)
