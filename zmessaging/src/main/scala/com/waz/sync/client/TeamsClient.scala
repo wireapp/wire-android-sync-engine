@@ -41,12 +41,11 @@ class TeamsClientImpl(implicit
                       httpClient: HttpClient,
                       authRequestInterceptor: AuthRequestInterceptor) extends TeamsClient with CirceJSONSupport {
 
-  import HttpClient.AutoDerivation._
   import HttpClient.dsl._
+  import HttpClient.AutoDerivation._
   import TeamsClient._
   import com.waz.threading.Threading.Implicits.Background
 
-  //TODO Remove after assets refactoring
   private implicit val errorResponseDeserializer: RawBodyDeserializer[ErrorResponse] =
     objectFromCirceJsonRawBodyDeserializer[ErrorResponse]
 
@@ -62,8 +61,6 @@ class TeamsClientImpl(implicit
   }
 
   override def getTeamData(id: TeamId): ErrorOrResponse[TeamData] = {
-    implicit val deserializer: RawBodyDeserializer[TeamData] = teamDataDeserializer
-
     Request.Get(relativePath = teamPath(id))
       .withResultType[TeamData]
       .withErrorType[ErrorResponse]
@@ -99,7 +96,6 @@ object TeamsClient {
 
   case class TeamBindingResponse(teams: Seq[(TeamData, Boolean)], hasMore: Boolean)
 
-  //TODO Remove after assets refactoring
   object TeamBindingResponse {
     def unapply(response: ResponseContent): Option[(Seq[(TeamData, Boolean)], Boolean)] =
       response match {
@@ -117,7 +113,6 @@ object TeamsClient {
 
   case class Permissions(self: Long, copy: Long)
 
-  //TODO Remove after assets refactoring
   val teamDataDeserializer: RawBodyDeserializer[TeamData] = {
     import HttpClient.AutoDerivation._
     RawBodyDeserializer[(TeamData, Boolean)].map(_._1)
