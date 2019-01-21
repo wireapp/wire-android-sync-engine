@@ -21,7 +21,9 @@ import com.waz.ZIntegrationSpec
 
 class PushTokenClientSpec extends ZIntegrationSpec {
 
-  //TODO reintroduce test when AuthRequestInterceptor2 is introduced
+  import com.waz.AuthenticationConfig._
+
+  //TODO reintroduce test when AuthRequestInterceptor2 is used
 //  lazy val client = new PushTokenClientImpl()
 
 //  scenario("get push tokens for user") {
