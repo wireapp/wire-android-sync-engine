@@ -23,7 +23,7 @@ import com.waz.specs.AndroidFreeSpec
 import com.waz.sync.client.TeamsClient.TeamMembers
 import com.waz.utils.CirceJSONSupport
 
-//TODO Replace with integration test when AuthRequestInterceptor2 will be used
+//TODO Replace with integration test when AuthRequestInterceptor2 is introduced
 class TeamsClientSpec extends AndroidFreeSpec with CirceJSONSupport {
 
   feature("permissions bitmask") {
