@@ -24,6 +24,7 @@ import com.waz.content.Preferences.Preference.PrefCodec
 import com.waz.content.Preferences.{PrefKey, Preference}
 import com.waz.log.ZLog2._
 import com.waz.media.manager.context.IntensityLevel
+import com.waz.model.AccountDataOld.Permission
 import com.waz.model.KeyValueData.KeyValueDataDao
 import com.waz.model._
 import com.waz.model.otr.ClientId
@@ -101,6 +102,10 @@ object Preferences {
         override val default = defaultVal
       }
 
+      //TODO Some kind of imap function. In any case revisit all this PrefCodecs
+      def create[A,B](enc: A => B, dec: B => A, defaultVal: A)(implicit codec: PrefCodec[B]): PrefCodec[A] =
+        apply(enc andThen codec.encode, codec.decode _ andThen dec, defaultVal)
+
       implicit lazy val StrCodec     = apply[String] (identity,       identity,                   "")
       implicit lazy val IntCodec     = apply[Int]    (String.valueOf, java.lang.Integer.parseInt, 0)
       implicit lazy val LongCodec    = apply[Long]   (String.valueOf, java.lang.Long.parseLong,   0)
@@ -144,6 +149,9 @@ object Preferences {
         case "LimitReached"    => LimitReached
         case id                => Registered(ClientId(id))
       }, Unregistered)
+
+      implicit lazy val PermissionsCodec: PrefCodec[Set[Permission]] =
+        create(AccountDataOld.encodeBitmask, AccountDataOld.decodeBitmask, Set.empty)
 
       implicit lazy val EmailAddressCodec = apply[EmailAddress](_.str, EmailAddress(_), EmailAddress(""))
       implicit lazy val PhoneNumberCodec = apply[PhoneNumber](_.str, PhoneNumber(_), PhoneNumber(""))
@@ -397,8 +405,8 @@ object UserPreferences {
 
   lazy val SelfClient                       = PrefKey[ClientRegistrationState]("self_client")
   lazy val PrivateMode                      = PrefKey[Boolean]("private_mode")
-  lazy val SelfPermissions                  = PrefKey[Long]("self_permissions")
-  lazy val CopyPermissions                  = PrefKey[Long]("copy_permissions")
+  lazy val SelfPermissions                  = PrefKey[Set[Permission]]("self_permissions")
+  lazy val CopyPermissions                  = PrefKey[Set[Permission]]("copy_permissions")
 
   lazy val PendingEmail                     = PrefKey[Option[EmailAddress]]("pending_email")
   lazy val PendingPassword                  = PrefKey[Boolean]("pending_password") //true if the user needs to set a password
