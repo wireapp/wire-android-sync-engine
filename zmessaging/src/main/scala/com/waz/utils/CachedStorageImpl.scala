@@ -108,6 +108,7 @@ class DbStorage2[K, V <: Identifiable[K]](dao: StorageDao[K, V])
                       override val ec: ExecutionContext,
                       db: DB) extends Storage2[K,V] {
 
+  def loadAll: Future[Seq[V]] = Future(dao.list) //TODO Should we add this method to the Storage2 contract?
   override def loadAll(keys: Set[K]): Future[Seq[V]] = Future(dao.getAll(keys))
   override def saveAll(values: Iterable[V]): Future[Unit] = Future(dao.insertOrReplace(values))
   override def deleteAllByKey(keys: Set[K]): Future[Unit] = Future(dao.deleteEvery(keys))

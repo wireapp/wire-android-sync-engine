@@ -29,9 +29,10 @@ import com.waz.model.ConversationData.ConversationDataDao
 import com.waz.model.ConversationMemberData.ConversationMemberDataDao
 import com.waz.model.EditHistory.EditHistoryDao
 import com.waz.model.ErrorData.ErrorDataDao
+import com.waz.model.GenericContent.EncryptionAlgorithm
 import com.waz.model.KeyValueData.KeyValueDataDao
 import com.waz.model.Liking.LikingDao
-import com.waz.model.MessageContentIndexDao
+import com.waz.model.{AssetData, AssetMetaData, MessageContentIndexDao}
 import com.waz.model.MessageData.MessageDataDao
 import com.waz.model.MsgDeletion.MsgDeletionDao
 import com.waz.model.NotificationData.NotificationDataDao
@@ -41,11 +42,18 @@ import com.waz.model.SearchQueryCache.SearchQueryCacheDao
 import com.waz.model.UserData.UserDataDao
 import com.waz.model.otr.UserClients.UserClientsDao
 import com.waz.model.sync.SyncJob.SyncJobDao
+import com.waz.service.push.ReceivedPushData.ReceivedPushDataDao
+import com.waz.threading.Threading
 import com.waz.service.assets2.AssetStorageImpl.AssetDao
-import com.waz.service.assets2.DownloadAssetStorage.DownloadAssetDao
 import com.waz.service.assets2.UploadAssetStorage.UploadAssetDao
 import com.waz.service.push.ReceivedPushData.ReceivedPushDataDao
 import com.waz.service.tracking.TrackingService
+import com.waz.service.assets2.DownloadAssetStorage.DownloadAssetDao
+import com.waz.utils.DbStorage2
+import com.waz.ZLog.ImplicitTag._
+
+import scala.concurrent.Await
+import scala.util.{Success, Try}
 
 class ZMessagingDB(context: Context, dbName: String, tracking: TrackingService) extends DaoDB(context.getApplicationContext, dbName, null, DbVersion, daos, migrations, tracking) {
 
@@ -282,9 +290,63 @@ object ZMessagingDB {
     },
     Migration(113, 114) { db =>
       db.execSQL("ALTER TABLE Messages ADD COLUMN asset_id TEXT DEFAULT null")
+      import scala.concurrent.duration._
+      import com.waz.service.assets2._
+      import com.waz.model.AssetData.{AssetDataDao => OldAssetDao}
+      import com.waz.service.assets2.AssetStorageImpl.{AssetDao => NewAssetDao}
+
       db.execSQL(UploadAssetDao.table.createSql)
       db.execSQL(DownloadAssetDao.table.createSql)
-      db.execSQL(AssetDao.table.createSql)
+      db.execSQL(NewAssetDao.table.createSql)
+
+      db.execSQL("ALTER TABLE Messages ADD COLUMN asset_id TEXT DEFAULT null")
+      db.execSQL("UPDATE Messages SET asset_id = id WHERE asset_id = null")
+
+      val newAssetsStorage = new DbStorage2(NewAssetDao)(Threading.Background, db)
+      val oldAssetsStorage = new DbStorage2(OldAssetDao)(Threading.Background, db)
+
+      def convertAsset(old: AssetData): Try[Asset[AssetDetails]] = Try {
+        Asset(
+          id = old.id,
+          token = old.token,
+          sha = old.sha.get,
+          mime = old.mime,
+          encryption = old.encryption match {
+            case Some(EncryptionAlgorithm.AES_CBC) => AES_CBC_Encryption(AESKey2(old.otrKey.get.bytes))
+            case Some(EncryptionAlgorithm.AES_GCM) => throw new IllegalArgumentException("We do not support AES GCM encryption!")
+            case _ => NoEncryption
+          },
+          localSource = None, //we can not trust old information about local sources
+          preview = old.previewId,
+          name = old.name.getOrElse(s"old_asset_${System.currentTimeMillis()}"),
+          size = old.size,
+          details = old.metaData match {
+            case Some(data: AssetMetaData.Video) =>
+              VideoDetails(data.dimensions, data.duration)
+            case Some(data: AssetMetaData.Audio) =>
+              AudioDetails(data.duration, Loudness(data.loudness.map(_.levels.map(_.toByte)).getOrElse(Vector.empty)))
+            case Some(data: AssetMetaData.Image) =>
+              ImageDetails(data.dimensions)
+            case Some(AssetMetaData.Empty) =>
+              BlobDetails
+            case None =>
+              BlobDetails
+          },
+          convId = old.convId
+        )
+      }
+
+      import Threading.Implicits.Background
+      val movingAssets = for {
+        oldAssets <- oldAssetsStorage.loadAll
+        newAssets = oldAssets.view.map(convertAsset).collect { case Success(asset) => asset }
+        _ <- newAssetsStorage.saveAll(newAssets)
+      } yield ()
+
+      Await.ready(movingAssets, 30.seconds)
+
+      //TODO I think that we should do it in another migration, because we may lose all assets if something will go wrong
+      //db.execSQL("DROP TABLE Assets")
     }
   )
 }
