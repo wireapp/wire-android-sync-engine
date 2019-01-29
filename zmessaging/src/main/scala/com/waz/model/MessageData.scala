@@ -350,7 +350,7 @@ object MessageData extends ((MessageId, ConvId, Message.Type, UserId, Seq[Messag
     case Message.Type.MESSAGE_TIMER        => "MessageTimer"
   }
 
-  implicit object MessageDataDao extends Dao[MessageData, MessageId]  {
+  implicit object MessageDataDao extends Dao[MessageData, MessageId] with StorageCodecs {
     import com.waz.db._
 
     val Id = id[MessageId]('_id, "PRIMARY KEY").apply(_.id)

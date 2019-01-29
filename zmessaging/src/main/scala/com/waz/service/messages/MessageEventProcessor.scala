@@ -108,7 +108,7 @@ class MessageEventProcessor(selfUserId:          UserId,
   }
 
   private def updatedAssets(id: Uid, content: Any): Seq[(GeneralAsset, Option[GeneralAsset])] = {
-    verbose(l"update asset for event: $id, content: $content")
+    verbose(l"update asset for event: $id")
 
     content match {
 

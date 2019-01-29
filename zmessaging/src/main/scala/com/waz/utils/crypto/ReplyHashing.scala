@@ -48,8 +48,8 @@ class ReplyHashingImpl(storage: AssetsStorage) extends ReplyHashing {
   override def hashMessages(msgs: Seq[MessageData]): Future[Map[MessageId, Sha256]] = {
     val (assetMsgs, otherMsgs) = msgs.partition(m => ReplyHashing.assetTypes.contains(m.msgType))
     for {
-      assets     <- storage.getAll(assetMsgs.map(_.assetId))
-      assetPairs =  assetMsgs.map(m => m -> assets.find(_.exists(_.id == m.assetId)).flatMap(_.flatMap(_.remoteId)))
+      assets     <- storage.getAll(assetMsgs.map(_.assetId).collect { case Some(x: AssetId) => x })
+      assetPairs =  assetMsgs.map(m => m -> assets.find(_.exists(a => m.assetId.contains(a))).flatMap(_.flatMap(_.remoteId)))
       assetShas  <- Future.sequence(assetPairs.map {
                       case (m, Some(rId)) => Future.successful(m.id -> hashAsset(rId, m.time))
                       case (m, None)      => Future.failed(new MissingAssetException(s"Failed to find asset with id ${m.assetId}"))
