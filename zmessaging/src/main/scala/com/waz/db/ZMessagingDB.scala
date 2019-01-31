@@ -302,6 +302,8 @@ object ZMessagingDB {
       db.execSQL("ALTER TABLE Messages ADD COLUMN asset_id TEXT DEFAULT null")
       db.execSQL("UPDATE Messages SET asset_id = id WHERE asset_id = null")
 
+      //TODO: Migrate users' pictures ids
+
       val newAssetsStorage = new DbStorage2(NewAssetDao)(Threading.Background, db)
       val oldAssetsStorage = new DbStorage2(OldAssetDao)(Threading.Background, db)
 

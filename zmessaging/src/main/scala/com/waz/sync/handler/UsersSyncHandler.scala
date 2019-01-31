@@ -23,7 +23,7 @@ import com.waz.api.impl.ErrorResponse
 import com.waz.content.UsersStorage
 import com.waz.model._
 import com.waz.service.UserService
-import com.waz.service.assets.AssetService
+import com.waz.service.assets2.AssetService
 import com.waz.service.images.ImageAssetGenerator
 import com.waz.sync.SyncResult
 import com.waz.sync.client.AssetClient.Retention
@@ -94,25 +94,26 @@ class UsersSyncHandler(assetSync: AssetSyncHandler,
       .map(SyncResult(_))
   }
 
-  private def postSelfPicture(id: UserId, assetId: AssetId): Future[SyncResult] = for {
-    Some(asset) <- assets.getAssetData(assetId)
-    preview     <- imageGenerator.generateSmallProfile(asset).future
-    _           <- assets.mergeOrCreateAsset(preview) //needs to be in storage for other steps to find it
-    res         <- assetSync.uploadAssetData(preview.id, public = true, retention = Retention.Eternal).future flatMap {
-      case Right(uploadedPreview) =>
-        assetSync.uploadAssetData(assetId, public = true, retention = Retention.Eternal).future flatMap {
-          case Right(uploaded) => for {
-            _     <- assets.getAssetData(assetId)
-            res   <- updatedSelfToSyncResult(usersClient.updateSelf(UserInfo(id, picture = Some(Seq(uploadedPreview, uploaded)))))
-          } yield res
-
-          case Left(err) =>
-            Future.successful(SyncResult(err))
-        }
-      case Left(err) =>
-        Future.successful(SyncResult(err))
-    }
-  } yield res
+  private def postSelfPicture(id: UserId, assetId: AssetId): Future[SyncResult] = Future.successful(SyncResult.Success) //TODO: do
+//    for {
+//    Some(asset) <- assets.getAssetData(assetId)
+//    preview     <- imageGenerator.generateSmallProfile(asset).future
+//    _           <- assets.mergeOrCreateAsset(preview) //needs to be in storage for other steps to find it
+//    res         <- assetSync.uploadAssetData(preview.id, public = true, retention = Retention.Eternal).future flatMap {
+//      case Right(uploadedPreview) =>
+//        assetSync.uploadAssetData(assetId, public = true, retention = Retention.Eternal).future flatMap {
+//          case Right(uploaded) => for {
+//            _     <- assets.getAssetData(assetId)
+//            res   <- updatedSelfToSyncResult(usersClient.updateSelf(UserInfo(id, picture = Some(Seq(uploadedPreview, uploaded)))))
+//          } yield res
+//
+//          case Left(err) =>
+//            Future.successful(SyncResult(err))
+//        }
+//      case Left(err) =>
+//        Future.successful(SyncResult(err))
+//    }
+//  } yield res
 
   def deleteAccount(): Future[SyncResult] =
     usersClient.deleteAccount().map(SyncResult(_))

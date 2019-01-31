@@ -388,7 +388,7 @@ object MessageData extends ((MessageId, ConvId, Message.Type, UserId, Seq[Messag
     }
 
     override def apply(implicit cursor: DBCursor): MessageData =
-      MessageData(Id, Conv, Type, User, Content, Protos, FirstMessage, Members, Recipient, Email, Name, State, Time, LocalTime, EditTime, Ephemeral, ExpiryTime, Expired, Duration, None, Quote.map(QuoteContent(_, QuoteValidity, None)), ForceReadReceipts)
+      MessageData(Id, Conv, Type, User, Content, Protos, FirstMessage, Members, Recipient, Email, Name, State, Time, LocalTime, EditTime, Ephemeral, ExpiryTime, Expired, Duration, AssetId, Quote.map(QuoteContent(_, QuoteValidity, None)), ForceReadReceipts)
 
     def deleteForConv(id: ConvId)(implicit db: DB) = delete(Conv, id)
 

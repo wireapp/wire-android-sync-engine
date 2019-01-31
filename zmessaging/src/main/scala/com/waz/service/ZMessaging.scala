@@ -90,7 +90,7 @@ class StorageModule(context: Context, val userId: UserId, globalPreferences: Glo
   lazy val usersStorage:      UsersStorage            = wire[UsersStorageImpl]
   lazy val otrClientsStorage: OtrClientsStorage       = wire[OtrClientsStorageImpl]
   lazy val membersStorage                             = wire[MembersStorageImpl]
-  lazy val assetsStorage :    AssetsStorage           = wire[AssetsStorageImpl]
+  lazy val oldAssetStorage:      AssetsStorage        = wire[AssetsStorageImpl]
   lazy val reactionsStorage                           = wire[ReactionsStorageImpl]
   lazy val notifStorage:      NotificationStorage     = wire[NotificationStorageImpl]
   lazy val convsStorage:      ConversationStorage     = wire[ConversationStorageImpl]
@@ -102,7 +102,7 @@ class StorageModule(context: Context, val userId: UserId, globalPreferences: Glo
   lazy val db2: DB = DB(db.dbHelper.getWritableDatabase)
   lazy val inProgressAssetStorage: assets2.DownloadAssetStorage = new assets2.DownloadAssetStorageImpl(context, db2)(Threading.BlockingIO)
   lazy val rawAssetStorage: assets2.UploadAssetStorage   = new assets2.UploadAssetStorageImpl(context, db2)(Threading.BlockingIO)
-  lazy val assetStorage: assets2.AssetStorage         = new assets2.AssetStorageImpl(context, db2, Threading.BlockingIO)
+  lazy val assetsStorage: assets2.AssetStorage         = new assets2.AssetStorageImpl(context, db2, Threading.BlockingIO)
 
 }
 
@@ -171,7 +171,7 @@ class ZMessaging(val teamId: Option[TeamId], val clientId: ClientId, account: Ac
   def otrClientsStorage = storage.otrClientsStorage
   def membersStorage    = storage.membersStorage
   def assetsStorage     = storage.assetsStorage
-  def assetStorage                    = storage.assetStorage
+  def oldAssetStorage                    = storage.oldAssetStorage
   def rawAssetStorage               = storage.rawAssetStorage
   def reactionsStorage  = storage.reactionsStorage
   def notifStorage      = storage.notifStorage
@@ -213,7 +213,7 @@ class ZMessaging(val teamId: Option[TeamId], val clientId: ClientId, account: Ac
   lazy val convsContent: ConversationsContentUpdaterImpl = wire[ConversationsContentUpdaterImpl]
   lazy val messagesContent: MessagesContentUpdater = wire[MessagesContentUpdater]
 
-  lazy val assetLoader: AssetLoader                   = new AssetLoaderImpl(context, Some(assetsStorage), network, assetClient, audioTranscader, videoTranscoder, cache, imageCache, bitmapDecoder, tracking)(urlCreator, authRequestInterceptor)
+  lazy val assetLoader: AssetLoader                   = new AssetLoaderImpl(context, Some(oldAssetStorage), network, assetClient, audioTranscader, videoTranscoder, cache, imageCache, bitmapDecoder, tracking)(urlCreator, authRequestInterceptor)
   lazy val imageLoader: ImageLoader                   = wire[ImageLoaderImpl]
 
   lazy val push: PushService                          = wire[PushServiceImpl]
@@ -225,7 +225,7 @@ class ZMessaging(val teamId: Option[TeamId], val clientId: ClientId, account: Ac
   lazy val userSearch                                 = wire[UserSearchService]
   lazy val assetGenerator                             = wire[ImageAssetGenerator]
   lazy val assetMetaData                              = wire[com.waz.service.assets.MetaDataService]
-  lazy val assets: AssetService                       = wire[AssetServiceImpl]
+  lazy val oldAssets: AssetService                    = wire[AssetServiceImpl]
   lazy val users: UserService                         = wire[UserServiceImpl]
   lazy val conversations: ConversationsService        = wire[ConversationsServiceImpl]
   lazy val convOrder: ConversationOrderEventsService  = wire[ConversationOrderEventsService]
@@ -293,7 +293,7 @@ class ZMessaging(val teamId: Option[TeamId], val clientId: ClientId, account: Ac
     IoUtils.createDirectory(rawCacheDirectory)
 
     new assets2.AssetServiceImpl(
-      storage.assetStorage,
+      storage.assetsStorage,
       storage.rawAssetStorage,
       storage.inProgressAssetStorage,
       assets2Module.assetDetailsService,

@@ -20,6 +20,7 @@ package com.waz.sync.client
 import java.io.{BufferedOutputStream, File, FileOutputStream, InputStream}
 import java.security.{DigestOutputStream, MessageDigest}
 
+import com.waz.ZLog.ImplicitTag.implicitLogTag
 import com.waz.api.impl.ErrorResponse
 import com.waz.cache.{Expiration, LocalData}
 import com.waz.service.assets2.NoEncryption
@@ -47,6 +48,12 @@ trait AssetClient2 {
   def loadAssetContent(asset: Asset[General], callback: Option[ProgressCallback]): ErrorOrResponse[FileWithSha]
   def uploadAsset(metadata: Metadata, asset: AssetContent, callback: Option[ProgressCallback]): ErrorOrResponse[UploadResponse2]
   def deleteAsset(assetId: AssetId): ErrorOrResponse[Boolean]
+
+  /**
+    * Loads a public asset with no checksum/encryption/name/size/mime.
+    * Usually reserved for profile pictures.
+    */
+  def loadPublicAssetContent(assetId: AssetId, convId: Option[ConvId], callback: Option[ProgressCallback]): ErrorOrResponse[InputStream]
 }
 
 class AssetClient2Impl(implicit
@@ -67,6 +74,8 @@ class AssetClient2Impl(implicit
       FileWithSha(tempFile, Sha256(out.getMessageDigest.digest()))
     }
 
+  private implicit def inputStreamBodyDeserializer: RawBodyDeserializer[InputStream] = RawBodyDeserializer.create(_.data())
+
   override def loadAssetContent(asset: Asset[General], callback: Option[ProgressCallback]): ErrorOrResponse[FileWithSha] = {
     val assetPath = (asset.convId, asset.encryption) match {
       case (None, _)                     => s"/assets/v3/${asset.id.str}"
@@ -81,6 +90,22 @@ class AssetClient2Impl(implicit
       )
       .withDownloadCallback(callback)
       .withResultType[FileWithSha]
+      .withErrorType[ErrorResponse]
+      .executeSafe
+  }
+  override def loadPublicAssetContent(assetId: AssetId,
+                                      convId: Option[ConvId],
+                                      callback: Option[ProgressCallback]): ErrorOrResponse[InputStream] = {
+    val assetPath = convId.fold(
+      s"/assets/v3/${assetId.str}"
+    ) { cId =>
+      s"/conversations/${cId.str}/assets/${assetId.str}"
+    }
+
+    Request
+      .Get(relativePath = assetPath)
+      .withDownloadCallback(callback)
+      .withResultType[InputStream]
       .withErrorType[ErrorResponse]
       .executeSafe
   }

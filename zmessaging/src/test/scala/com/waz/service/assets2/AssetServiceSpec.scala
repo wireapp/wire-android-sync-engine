@@ -25,18 +25,18 @@ import com.waz.ZLog.ImplicitTag._
 import com.waz.service.assets2.Asset.General
 import com.waz.api.impl.ErrorResponse
 import com.waz.model.errors.NotFoundLocal
-import com.waz.model.{AssetId, Mime, UploadAssetId, Sha256}
+import com.waz.model.{AssetId, Mime, Sha256, UploadAssetId}
 import com.waz.service.assets2.Asset.UploadGeneral
 import com.waz.sync.client.AssetClient2.{FileWithSha, Retention}
 import com.waz.sync.client.{AssetClient2, AssetClient2Impl}
 import com.waz.threading.CancellableFuture
 import com.waz.utils.{IoUtils, ReactiveStorageImpl2, UnlimitedInMemoryStorage, returning}
-import com.waz.{FilesystemUtils, ZIntegrationMockSpec}
+import com.waz.{AuthenticationConfig, FilesystemUtils, ZIntegrationMockSpec}
 
 import scala.concurrent.Future
 import scala.util.{Failure, Random, Success}
 
-class AssetServiceSpec extends ZIntegrationMockSpec {
+class AssetServiceSpec extends ZIntegrationMockSpec with AuthenticationConfig {
 
   private val assetStorage        = mock[AssetStorage]
   private val inProgressAssetStorage   = mock[DownloadAssetStorage]
@@ -230,7 +230,6 @@ class AssetServiceSpec extends ZIntegrationMockSpec {
     }
 
     scenario("upload asset to backend and download it back. check sha") {
-      import com.waz.AuthenticationConfig._
 
       val encryption = AES_CBC_Encryption.random
 
@@ -251,7 +250,7 @@ class AssetServiceSpec extends ZIntegrationMockSpec {
       for {
         _ <- Future.successful(())
         client = new AssetClient2Impl
-        rawAssetStorage = new ReactiveStorageImpl2(new UnlimitedInMemoryStorage[UploadAssetId, UploadAsset[UploadGeneral]](_.id)) with UploadAssetStorage
+        rawAssetStorage = new ReactiveStorageImpl2(new UnlimitedInMemoryStorage[UploadAssetId, UploadAsset[UploadGeneral]]()) with UploadAssetStorage
         assetService = service(rawAssetStorage, client)
 
         rawAsset <- assetService.createAndSaveRawAsset(contentForUpload, encryption, public = false, Retention.Persistent, None)
@@ -261,6 +260,10 @@ class AssetServiceSpec extends ZIntegrationMockSpec {
         encryptedContent = IoUtils.toByteArray(rawAsset.encryption.encrypt(new ByteArrayInputStream(testAssetContent), rawAsset.encryptionSalt))
         encryptedSha = Sha256.calculate(new ByteArrayInputStream(encryptedContent)).get
       } yield {
+
+        implicit val AssetResponseShow: LogShow[Either[ErrorResponse, FileWithSha]] = LogShow.create(_.toString)
+        implicit val StringShow: LogShow[String] = LogShow.create(_.toString)
+
         debug(l"Download asset response: $assetContent")
         assetContent shouldBe an[Right[ErrorResponse, FileWithSha]]
         val fileWithSha = assetContent.right.get

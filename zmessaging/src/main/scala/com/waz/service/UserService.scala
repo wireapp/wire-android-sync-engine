@@ -25,8 +25,8 @@ import com.waz.model.UserData.ConnectionStatus
 import com.waz.model.{AccentColor, _}
 import com.waz.service.EventScheduler.Stage
 import com.waz.service.UserService._
-import com.waz.service.assets.AssetService
 import com.waz.service.assets.AssetService.RawAssetInput
+import com.waz.service.assets2.{AssetService, AssetStorage}
 import com.waz.service.conversation.SelectedConversationService
 import com.waz.service.push.PushService
 import com.waz.sync.SyncServiceHandle
@@ -92,7 +92,7 @@ class UserServiceImpl(selfUserId:        UserId,
                       assets:            AssetService,
                       usersClient:       UsersClient,
                       sync:              SyncServiceHandle,
-                      assetsStorage:     AssetsStorage,
+                      assetsStorage:     AssetStorage,
                       credentialsClient: CredentialsUpdateClient,
                       selectedConv:      SelectedConversationService) extends UserService {
 
@@ -188,7 +188,7 @@ class UserServiceImpl(selfUserId:        UserId,
           verbose(l"User has v2 picture - re-uploading as v3")
           for {
             _ <- sync.postSelfPicture(v2profilePic.map(_.id))
-            _ <- assetsStorage.updateAsset(pic.id, _.copy(convId = None)) //mark assets as v3
+            _ <- assetsStorage.update(pic.id, _.copy(convId = None)) //mark assets as v3
             _ <- usersClient.updateSelf(info).future
           } yield (())
         }.flatMap (_ => updateSyncedUsers(Seq(info)) map { _.headOption })
@@ -234,7 +234,8 @@ class UserServiceImpl(selfUserId:        UserId,
                    case Some(info) if info.ssoId.isDefined => accsStorage.update(info.id, _.copy(ssoId = info.ssoId))
                    case _ => Future.successful(Option.empty[(AccountData, AccountData)])
                  }
-      _       <- assets.updateAssets(users.flatMap(_.picture.getOrElse(Seq.empty[AssetData])))
+      userPics = users.flatMap(_.picture).flatten
+      //_       <- Future.traverse(userPics)(aId => assets.loadContent(aId))
       updated <- usersStorage.updateOrCreateAll(users.map(info => info.id -> updateOrCreate(info))(breakOut))
     } yield updated
   }
@@ -308,11 +309,11 @@ class UserServiceImpl(selfUserId:        UserId,
     usersStorage.updateAll2(availabilities.keySet, u => availabilities.get(u.id).fold(u)(av => u.copy(availability = av)))
   }
 
-  override def updateSelfPicture(input: RawAssetInput) =
-    assets.addAsset(input, isProfilePic = true).flatMap {
-      case Some(a) => updateAndSync(_.copy(picture = Some(a.id)), _ => sync.postSelfPicture(Some(a.id)))
-      case _ => Future.successful({})
-    }
+  override def updateSelfPicture(input: RawAssetInput) = Future.successful({}) //TODO: DOOOO
+//    assets.addAsset(input, isProfilePic = true).flatMap {
+//      case Some(a) => updateAndSync(_.copy(picture = Some(a.id)), _ => sync.postSelfPicture(Some(a.id)))
+//      case _ => Future.successful({})
+//    }
 
   private def updateAndSync(updater: UserData => UserData, sync: UserData => Future[_]) =
     updateUserData(selfUserId, updater).flatMap({

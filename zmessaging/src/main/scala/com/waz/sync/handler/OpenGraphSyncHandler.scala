@@ -24,6 +24,7 @@ import com.waz.ZLog._
 import com.waz.api.Message
 import com.waz.api.Message.Part
 import com.waz.api.impl.ErrorResponse
+import com.waz.api.impl.ErrorResponse.internalError
 import com.waz.content._
 import com.waz.model.GenericContent.{Asset, LinkPreview, Text}
 import com.waz.model.GenericMessage.TextMessage
@@ -42,7 +43,6 @@ import com.waz.sync.otr.OtrSyncHandler
 import com.waz.threading.CancellableFuture
 import com.waz.utils.RichFuture
 import com.waz.utils.wrappers.URI
-import com.waz.api.impl.ErrorResponse.{Cancelled, internalError}
 
 import scala.concurrent.Future
 
@@ -50,7 +50,6 @@ class OpenGraphSyncHandler(convs:           ConversationStorage,
                            messages:        MessagesStorage,
                            otrService:      OtrServiceImpl,
                            assetSync:       AssetSyncHandler,
-                           assetsStorage:   AssetsStorage,
                            assets:          AssetService,
                            otrSync:         OtrSyncHandler,
                            client:          OpenGraphClient,

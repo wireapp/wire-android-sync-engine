@@ -59,6 +59,8 @@ trait AssetService {
                             public: Boolean,
                             retention: Retention,
                             messageId: Option[MessageId]): Future[UploadAsset[General]]
+  def loadPublicContentById(assetId: AssetId, convId: Option[ConvId], callback: Option[ProgressCallback] = None): CancellableFuture[InputStream]
+  def loadUploadContentById(uploadAssetId: UploadAssetId, callback: Option[ProgressCallback] = None): CancellableFuture[InputStream]
 }
 
 class AssetServiceImpl(assetsStorage: AssetStorage,
@@ -103,9 +105,9 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
   override def uploadProgress(id: UploadAssetId): Signal[Progress] =
     assetStatusSignal(id).collect { case (_, Some(progress)) => progress }
 
-  override def cancelUpload(id: UploadAssetId): Unit = ()
+  override def cancelUpload(id: UploadAssetId): Unit = () //TODO
 
-  override def cancelDownload(id: DownloadAssetId): Unit = ()
+  override def cancelDownload(id: DownloadAssetId): Unit = () //TODO
 
   override def getAsset(id: AssetId): Future[Asset[General]] =
     assetsStorage.get(id)
@@ -177,6 +179,21 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
       }
       .toCancellable
   }
+
+  override def loadPublicContentById(assetId: AssetId, convId: Option[ConvId], callback: Option[ProgressCallback] = None): CancellableFuture[InputStream] =
+    assetClient.loadPublicAssetContent(assetId, convId, callback).flatMap{
+      case Left(err) => CancellableFuture.failed(err)
+      case Right(i) => CancellableFuture.successful(i)
+    }
+
+  override def loadUploadContentById(uploadAssetId: UploadAssetId, callback: Option[ProgressCallback] = None): CancellableFuture[InputStream] =
+    uploadAssetStorage.get(uploadAssetId).flatMap { asset =>
+      (asset.assetId, asset.localSource) match {
+        case (Some(aId), _) => loadContentById(aId, callback)
+        case (_, Some(ls)) => Future.fromTry(uriHelper.openInputStream(ls.uri))
+        case _ => CancellableFuture.failed(NotFoundLocal(""))
+      }
+    }.toCancellable
 
   override def loadContentById(assetId: AssetId, callback: Option[ProgressCallback] = None): CancellableFuture[InputStream] =
     assetsStorage.get(assetId).flatMap(asset => loadContent(asset, callback)).toCancellable

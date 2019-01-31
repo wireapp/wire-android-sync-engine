@@ -85,6 +85,7 @@ object UserInfo {
     def getAssets(implicit js: JSONObject): Option[AssetData] = fromArray(js, "assets") flatMap { assets =>
       Seq.tabulate(assets.length())(assets.getJSONObject).map { js =>
         AssetData(
+          id = decodeAssetId('key)(js),
           remoteId = decodeOptRAssetId('key)(js),
           metaData = Some(AssetMetaData.Image(Dim2(0, 0), Image.Tag(decodeString('size)(js))))
         )

@@ -109,7 +109,7 @@ class AccountManager(val userId:   UserId,
       for {
         _ <- storage.userPrefs(CrashesAndAnalyticsRequestShown) := false //new login/registration, we need to ask for permission to send analytics
         _ <- storage.usersStorage.updateOrCreate(u.id, _.updated(u, withSearchKey = false), UserData(u, withSearchKey = false)) //no search key to avoid transliteration loading
-        _ <- storage.assetsStorage.insertAll(u.picture.getOrElse(Seq.empty)) //TODO https://github.com/wireapp/android-project/issues/58
+        //_ <- storage.assetsStorage.saveAll(u.picture.getOrElse(Seq.empty)) //TODO https://github.com/wireapp/android-project/issues/58
       } yield {})
     _ <- isLogin.fold2(Future.successful({}), storage.userPrefs(IsLogin) := _)
   } yield {}

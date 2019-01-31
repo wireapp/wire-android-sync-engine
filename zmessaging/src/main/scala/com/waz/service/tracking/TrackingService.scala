@@ -117,7 +117,7 @@ class TrackingServiceImpl(curAccount: => Signal[Option[UserId]], zmsProvider: Zm
       for {
         Some(msg)   <- z.messagesStorage.get(MessageId(assetId.str))
         Some(conv)  <- z.convsContent.convById(msg.convId)
-        Some(asset) <- z.assetsStorage.get(assetId)
+        asset       <- z.assetsStorage.get(assetId)
         userIds     <- z.membersStorage.activeMembers(conv.id).head
         users       <- z.usersStorage.listAll(userIds.toSeq)
         isGroup     <- z.conversations.isGroupConversation(conv.id)

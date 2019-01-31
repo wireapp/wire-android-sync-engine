@@ -315,7 +315,7 @@ class MessagesSyncHandler(selfUserId: UserId,
     } yield ()
   }
 
-  def postAssetStatus(cid: ConvId, mid: MessageId, expiration: Option[FiniteDuration], status: Syncable): Future[SyncResult] = ???
+  def postAssetStatus(cid: ConvId, mid: MessageId, expiration: Option[FiniteDuration], status: Syncable): Future[SyncResult] = ??? //TODO
 //  {
 //    def post(conv: ConversationData, asset: AssetData): ErrorOr[Unit] =
 //      if (asset.status != status) successful(Left(internalError(s"asset $asset should have status $status")))

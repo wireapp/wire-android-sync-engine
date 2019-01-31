@@ -19,7 +19,6 @@ package com.waz.utils.crypto
 
 import java.nio.ByteBuffer
 
-import com.waz.content.AssetsStorage
 import com.waz.model._
 import com.waz.ZLog.ImplicitTag.implicitLogTag
 import com.waz.ZLog.verbose
@@ -31,6 +30,7 @@ import java.lang.Long.BYTES
 import java.lang.Math.round
 
 import com.waz.api.Message.Type._
+import com.waz.service.assets2.AssetStorage
 
 trait ReplyHashing {
   def hashMessage(m: MessageData): Future[Sha256]
@@ -39,7 +39,7 @@ trait ReplyHashing {
   class MissingAssetException(message: String) extends Exception(message)
 }
 
-class ReplyHashingImpl(storage: AssetsStorage) extends ReplyHashing {
+class ReplyHashingImpl(storage: AssetStorage) extends ReplyHashing {
 
   import com.waz.threading.Threading.Implicits.Background
 
@@ -48,8 +48,8 @@ class ReplyHashingImpl(storage: AssetsStorage) extends ReplyHashing {
   override def hashMessages(msgs: Seq[MessageData]): Future[Map[MessageId, Sha256]] = {
     val (assetMsgs, otherMsgs) = msgs.partition(m => ReplyHashing.assetTypes.contains(m.msgType))
     for {
-      assets     <- storage.getAll(assetMsgs.map(_.assetId).collect { case Some(x: AssetId) => x })
-      assetPairs =  assetMsgs.map(m => m -> assets.find(_.exists(a => m.assetId.contains(a))).flatMap(_.flatMap(_.remoteId)))
+      assets     <- storage.loadAll(assetMsgs.map(_.assetId).collect { case Some(x: AssetId) => x }.toSet)
+      assetPairs =  assetMsgs.map(m => m -> assets.find(a => m.assetId.contains(a)).map(_.id))
       assetShas  <- Future.sequence(assetPairs.map {
                       case (m, Some(rId)) => Future.successful(m.id -> hashAsset(rId, m.time))
                       case (m, None)      => Future.failed(new MissingAssetException(s"Failed to find asset with id ${m.assetId}"))
@@ -68,7 +68,7 @@ class ReplyHashingImpl(storage: AssetsStorage) extends ReplyHashing {
     } yield (assetShas ++ otherShas).toMap
   }
 
-  protected[crypto] def hashAsset(assetId: RAssetId, timestamp: RemoteInstant): Sha256 = hashTextReply(assetId.str, timestamp)
+  protected[crypto] def hashAsset(assetId: AssetId, timestamp: RemoteInstant): Sha256 = hashTextReply(assetId.str, timestamp)
 
   protected[crypto] def hashTextReply(content: String, timestamp: RemoteInstant): Sha256 = {
     val bytes =
