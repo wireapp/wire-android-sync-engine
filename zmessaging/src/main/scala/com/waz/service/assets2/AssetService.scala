@@ -302,6 +302,7 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
     } yield rawAsset
   }
 
+  //TODO Sha256, Sha256 encrypted, size encrypted, md5 can be calculate at once by Streams composition
   private def createRawAsset(contentForUpload: ContentForUpload,
                              targetEncryption: Encryption,
                              public: Boolean,
@@ -311,53 +312,67 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
     val rawAssetId = UploadAssetId()
     val encryptionSalt = targetEncryption.randomSalt
 
-    def extractMime: Future[Mime] = contentForUpload.content match {
-      case Content.Uri(uri) => Future.fromTry(uriHelper.extractMime(uri))
-      case Content.File(mime, _) => Future.successful(mime)
-      case Content.Bytes(mime, _) => Future.successful(mime)
-    }
-
-    def extractContent: Future[CanExtractMetadata] = contentForUpload.content match {
-      case content: Content.Uri => Future.successful(content)
-      case content: Content.File => Future.successful(content)
-      case Content.Bytes(mime, bytes) =>
-        for {
-          _ <- rawContentCache.putBytes(rawAssetId, bytes)
-          file <- rawContentCache.get(rawAssetId)
-        } yield Content.File(mime, file)
+    def prepareContent(content: Content): Future[CanExtractMetadata] = {
+      content match {
+        case content: Content.Uri => Future.successful(content)
+        case Content.File(mime, file) =>
+          for {
+            _ <- rawContentCache.put(rawAssetId, file, removeOriginal = true)
+            cacheFile <- rawContentCache.get(rawAssetId)
+          } yield Content.File(mime, cacheFile)
+        case Content.Bytes(mime, bytes) =>
+          for {
+            _ <- rawContentCache.putBytes(rawAssetId, bytes)
+            file <- rawContentCache.get(rawAssetId)
+          } yield Content.File(mime, file)
+        case Content.AsBlob(content) => prepareContent(content)
+      }
     }
 
     def createLocalSource: Future[Option[LocalSource]] =
       (for {
-        uri <- OptionT.fromOption(Some(contentForUpload.content).collect { case Content.Uri(uri) => uri })
+        uri <- OptionT.fromOption(Some(contentForUpload.content).collect {
+          case Content.Uri(uri) => uri
+          case Content.AsBlob(Content.Uri(uri)) => uri
+        })
         is <- OptionT.liftF(Future.fromTry(uriHelper.openInputStream(uri)))
-        //as part of optimization can be moved away from this method
         sha <- OptionT.liftF(Future.fromTry(Sha256.calculate(is)))
       } yield LocalSource(uri, sha)).value
 
-    //as part of optimization can be moved away from this method
-    def calculateEncryptedSize: Future[Long] =
+    def extractMime(content: CanExtractMetadata): Future[Mime] = content match {
+      case Content.Uri(uri) => Future.fromTry(uriHelper.extractMime(uri))
+      case Content.File(mime, _) => Future.successful(mime)
+    }
+
+    def extractSize(content: CanExtractMetadata): Future[Long] = content match {
+      case Content.Uri(uri) => Future.fromTry(uriHelper.extractSize(uri))
+      case Content.File(_, file) =>  Future.successful(file.length())
+    }
+
+    def openInputStream(content: CanExtractMetadata): Future[InputStream] = content match {
+      case Content.Uri(uri) => Future.fromTry(uriHelper.openInputStream(uri))
+      case Content.File(_, file) => Future.successful(new FileInputStream(file))
+    }
+
+    def calculateEncryptedSize(content: CanExtractMetadata): Future[Long] =
       for {
-        size <- contentForUpload.content match {
-          case Content.Uri(uri) => Future.fromTry(uriHelper.extractSize(uri))
-          case Content.File(_, file) => Future.successful(file.length())
-          case Content.Bytes(_, bytes) => Future.successful(bytes.length.toLong)
-        }
+        size <- extractSize(content)
       } yield targetEncryption.sizeAfterEncryption(size, encryptionSalt)
 
     def calculateEncryptedSha(content: CanExtractMetadata): Future[Sha256] =
       for {
-        is <- content match {
-          case Content.Uri(uri) => Future.fromTry(uriHelper.openInputStream(uri))
-          case Content.File(_, file) => Future.successful(new FileInputStream(file))
-        }
+        is <- openInputStream(content)
         sha <- Future.fromTry(Sha256.calculate(targetEncryption.encrypt(is, encryptionSalt)))
       } yield sha
 
     for {
-      ((mime, content), localSource) <- extractMime zip extractContent zip createLocalSource
-      (details, encryptedSha) <- assetDetailsService.extract(mime, content) zip calculateEncryptedSha(content)
-      encryptedSize <- calculateEncryptedSize
+      content <- prepareContent(contentForUpload.content)
+      ((mime, localSource), encryptedSha) <- extractMime(content) zip createLocalSource zip calculateEncryptedSha(content)
+      details <- contentForUpload.content match {
+        case _: Content.AsBlob => Future.successful(BlobDetails)
+        case _                 => assetDetailsService.extract(mime, content)
+      }
+      encryptedSize <- calculateEncryptedSize(content)
     } yield UploadAsset(
       id = rawAssetId,
       localSource = localSource,
