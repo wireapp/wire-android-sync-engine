@@ -36,13 +36,16 @@ sealed trait Content {
     case Content.Bytes(_, bytes) => Try { new ByteArrayInputStream(bytes) }
     case Content.Uri(uri) => uriHelper.openInputStream(uri)
     case Content.File(_, file) => Try { new FileInputStream(file) }
+    case Content.AsBlob(content) => content.openInputStream(uriHelper)
   }
 }
 
+//TODO Maybe rename this to 'PreparedContent' ?
 sealed trait CanExtractMetadata extends Content
 
 object Content {
   case class Bytes(mime: Mime, bytes: Array[Byte]) extends Content
+  case class AsBlob(content: Content)              extends Content
   case class Uri(uri: URI)                         extends CanExtractMetadata
   case class File(mime: Mime, file: java.io.File)  extends CanExtractMetadata
 }
