@@ -369,11 +369,6 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
       case Content.File(mime, _) => Future.successful(mime)
     }
 
-    def extractSize(content: CanExtractMetadata): Future[Long] = content match {
-      case Content.Uri(uri) => Future.fromTry(uriHelper.extractSize(uri))
-      case Content.File(_, file) =>  Future.successful(file.length())
-    }
-
     def openInputStream(content: CanExtractMetadata): Future[InputStream] = content match {
       case Content.Uri(uri) => Future.fromTry(uriHelper.openInputStream(uri))
       case Content.File(_, file) => Future.successful(new FileInputStream(file))
@@ -381,7 +376,10 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
 
     def calculateEncryptedSize(content: CanExtractMetadata): Future[Long] =
       for {
-        size <- extractSize(content)
+        size <- content match {
+          case Content.Uri(uri) => Future.fromTry(uriHelper.extractSize(uri))
+          case Content.File(_, file) =>  Future.successful(file.length())
+        }
       } yield targetEncryption.sizeAfterEncryption(size, encryptionSalt)
 
     def calculateEncryptedSha(content: CanExtractMetadata): Future[Sha256] =
