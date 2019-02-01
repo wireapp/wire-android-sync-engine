@@ -27,6 +27,7 @@ import com.waz.content.Preferences.PrefKey
 import com.waz.log.InternalLog.LogLevel.{Debug, Error, Info, Verbose, Warn}
 import com.waz.model.AccountData.Password
 import com.waz.model.GenericContent.Location
+import com.waz.model.UserInfo.ProfilePicture
 import com.waz.model._
 import com.waz.model.otr.{Client, ClientId, UserClients}
 import com.waz.model.sync.ReceiptType
@@ -221,6 +222,7 @@ object ZLog2 {
     implicit val DownloadAssetIdShow: LogShow[DownloadAssetId] = logShowWithHash
     implicit val UploadAssetIdShow: LogShow[UploadAssetId] = logShowWithHash
     implicit val AssetIdGeneral: LogShow[AssetIdGeneral] = logShowWithHash
+    implicit val PublicAssetId: LogShow[PublicAssetId] = logShowWithHash
     implicit val AccountIdShow:  LogShow[AccountId]  = logShowWithHash
     implicit val MessageIdShow:  LogShow[MessageId]  = logShowWithHash
     implicit val ConvIdShow:     LogShow[ConvId]     = logShowWithHash
@@ -246,6 +248,7 @@ object ZLog2 {
     implicit val PrefKeyLogShow: LogShow[PrefKey[_]]      = logShowWithToString
     implicit val PropertyKeyLogShow: LogShow[PropertyKey] = logShowWithToString
     implicit val ReadReceiptSettingsShow: LogShow[ReadReceiptSettings] = logShowWithToString
+    implicit val TagLogShow: LogShow[AssetMetaData.Image.Tag] = logShowWithToString
 
     implicit val RawAssetInputLogShow: LogShow[RawAssetInput] =
       createFrom {
@@ -383,6 +386,11 @@ object ZLog2 {
     }
 
     implicit val ReceiptType: LogShow[ReceiptType] = logShowWithToString
+
+    implicit val ProfilePicture: LogShow[ProfilePicture] = LogShow.createFrom { p =>
+      import p._
+      l"ProfilePicture($id, $tag)"
+    }
   }
 
   trait CanBeShown {

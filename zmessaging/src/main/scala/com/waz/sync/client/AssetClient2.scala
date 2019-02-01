@@ -53,7 +53,7 @@ trait AssetClient2 {
     * Loads a public asset with no checksum/encryption/name/size/mime.
     * Usually reserved for profile pictures.
     */
-  def loadPublicAssetContent(assetId: AssetId, convId: Option[ConvId], callback: Option[ProgressCallback]): ErrorOrResponse[InputStream]
+  def loadPublicAssetContent(assetId: PublicAssetId, convId: Option[ConvId], callback: Option[ProgressCallback]): ErrorOrResponse[InputStream]
 }
 
 class AssetClient2Impl(implicit
@@ -93,7 +93,7 @@ class AssetClient2Impl(implicit
       .withErrorType[ErrorResponse]
       .executeSafe
   }
-  override def loadPublicAssetContent(assetId: AssetId,
+  override def loadPublicAssetContent(assetId: PublicAssetId,
                                       convId: Option[ConvId],
                                       callback: Option[ProgressCallback]): ErrorOrResponse[InputStream] = {
     val assetPath = convId.fold(

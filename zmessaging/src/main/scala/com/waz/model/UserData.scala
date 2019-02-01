@@ -36,7 +36,7 @@ case class UserData(override val id:       UserId,
                     email:                 Option[EmailAddress]  = None,
                     phone:                 Option[PhoneNumber]   = None,
                     trackingId:            Option[TrackingId]    = None,
-                    picture:               Option[AssetId]       = None,
+                    picture:               Option[PublicAssetId] = None,
                     accent:                Int                   = 0, // accent color id
                     searchKey:             SearchKey,
                     connection:            ConnectionStatus      = ConnectionStatus.Unconnected,
@@ -173,7 +173,7 @@ object UserData {
     import JsonDecoder._
     override def apply(implicit js: JSONObject): UserData = UserData(
       id = 'id, teamId = decodeOptTeamId('teamId), name = 'name, email = decodeOptEmailAddress('email), phone = decodeOptPhoneNumber('phone),
-      trackingId = decodeOptId[TrackingId]('trackingId), picture = decodeOptAssetId('assetId), accent = decodeInt('accent), searchKey = SearchKey('name),
+      trackingId = decodeOptId[TrackingId]('trackingId), picture = decodeOptString('assetId).map(PublicAssetId(_)), accent = decodeInt('accent), searchKey = SearchKey('name),
       connection = ConnectionStatus('connection), connectionLastUpdated = RemoteInstant.ofEpochMilli(decodeLong('connectionLastUpdated)), connectionMessage = decodeOptString('connectionMessage),
       conversation = decodeOptRConvId('rconvId), relation = Relation.withId('relation),
       syncTimestamp = decodeOptLocalInstant('syncTimestamp), 'displayName, Verification.valueOf('verified), deleted = 'deleted,
@@ -217,7 +217,7 @@ object UserData {
     val Email = opt(emailAddress('email))(_.email)
     val Phone = opt(phoneNumber('phone))(_.phone)
     val TrackingId = opt(id[TrackingId]('tracking_id))(_.trackingId)
-    val Picture = opt(id[AssetId]('picture))(_.picture)
+    val Picture = opt(id[PublicAssetId]('picture))(_.picture)
     val Accent = int('accent)(_.accent)
     val SKey = text[SearchKey]('skey, _.asciiRepresentation, SearchKey.unsafeRestore)(_.searchKey)
     val Conn = text[ConnectionStatus]('connection, _.code, ConnectionStatus(_))(_.connection)

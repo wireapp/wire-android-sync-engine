@@ -166,6 +166,19 @@ object AssetId {
   }
 }
 
+case class PublicAssetId(str: String) extends AssetIdGeneral {
+  override def toString: String = str
+}
+
+object PublicAssetId {
+  def apply(): PublicAssetId = Id.random()
+
+  implicit object Id extends Id[PublicAssetId] {
+    override def random() = PublicAssetId(Uid().toString)
+    override def decode(str: String) = PublicAssetId(str)
+  }
+}
+
 case class CacheKey(str: String) {
   override def toString: String = str
 }

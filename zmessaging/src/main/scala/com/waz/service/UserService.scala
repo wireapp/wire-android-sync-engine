@@ -181,17 +181,18 @@ class UserServiceImpl(selfUserId:        UserId,
   def syncSelfNow: Future[Option[UserData]] = Serialized.future("syncSelfNow", selfUserId) {
     usersClient.loadSelf().future.flatMap {
       case Right(info) =>
-        //TODO Dean - remove after v2 transition time
-        val v2profilePic = info.mediumPicture.filter(_.convId.isDefined)
-
-        v2profilePic.fold(Future.successful(())){ pic =>
-          verbose(l"User has v2 picture - re-uploading as v3")
-          for {
-            _ <- sync.postSelfPicture(v2profilePic.map(_.id))
-            _ <- assetsStorage.update(pic.id, _.copy(convId = None)) //mark assets as v3
-            _ <- usersClient.updateSelf(info).future
-          } yield (())
-        }.flatMap (_ => updateSyncedUsers(Seq(info)) map { _.headOption })
+        //TODO: Do we still need this?
+//        val v2profilePic = info.mediumPicture.filter(_.convId.isDefined)
+//
+//        v2profilePic.fold(Future.successful(())){ pic =>
+//          verbose(l"User has v2 picture - re-uploading as v3")
+//          for {
+//            _ <- sync.postSelfPicture(v2profilePic.map(_.id))
+//            _ <- assetsStorage.update(pic.id, _.copy(convId = None)) //mark assets as v3
+//            _ <- usersClient.updateSelf(info).future
+//          } yield (())
+//        }.flatMap (_ => )
+        updateSyncedUsers(Seq(info)) map { _.headOption }
       case Left(err) =>
         error(l"loadSelf() failed: $err")
         Future.successful(None)

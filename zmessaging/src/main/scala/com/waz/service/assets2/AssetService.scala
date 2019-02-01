@@ -47,6 +47,11 @@ trait AssetService {
 
   def getAsset(id: AssetId): Future[Asset[General]]
 
+  /**
+    * Tries to find the public asset in the local storage (like a profile picture to upload for example)
+    */
+  def getPublicAsset(id: PublicAssetId): Future[Option[Asset[General]]]
+
   def save(asset: GeneralAsset): Future[Unit]
   def delete(id: AssetIdGeneral): Future[Unit]
 
@@ -59,7 +64,7 @@ trait AssetService {
                             public: Boolean,
                             retention: Retention,
                             messageId: Option[MessageId]): Future[UploadAsset[General]]
-  def loadPublicContentById(assetId: AssetId, convId: Option[ConvId], callback: Option[ProgressCallback] = None): CancellableFuture[InputStream]
+  def loadPublicContentById(assetId: PublicAssetId, convId: Option[ConvId], callback: Option[ProgressCallback] = None): CancellableFuture[InputStream]
   def loadUploadContentById(uploadAssetId: UploadAssetId, callback: Option[ProgressCallback] = None): CancellableFuture[InputStream]
 }
 
@@ -111,6 +116,9 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
 
   override def getAsset(id: AssetId): Future[Asset[General]] =
     assetsStorage.get(id)
+
+  def getPublicAsset(id: PublicAssetId): Future[Option[Asset[General]]] =
+    assetsStorage.find(AssetId(id.toString))
 
   override def save(asset: GeneralAsset): Future[Unit] = asset match {
     case a: Asset[General] => assetsStorage.save(a)
@@ -180,7 +188,7 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
       .toCancellable
   }
 
-  override def loadPublicContentById(assetId: AssetId, convId: Option[ConvId], callback: Option[ProgressCallback] = None): CancellableFuture[InputStream] =
+  override def loadPublicContentById(assetId: PublicAssetId, convId: Option[ConvId], callback: Option[ProgressCallback] = None): CancellableFuture[InputStream] =
     assetClient.loadPublicAssetContent(assetId, convId, callback).flatMap{
       case Left(err) => CancellableFuture.failed(err)
       case Right(i) => CancellableFuture.successful(i)

@@ -94,9 +94,9 @@ class UsersSyncHandler(assetSync: AssetSyncHandler,
       .map(SyncResult(_))
   }
 
-  private def postSelfPicture(id: UserId, assetId: AssetId): Future[SyncResult] = Future.successful(SyncResult.Success) //TODO: do
+  private def postSelfPicture(id: UserId, assetId: PublicAssetId): Future[SyncResult] = Future.successful(SyncResult.Success) //TODO: do
 //    for {
-//    Some(asset) <- assets.getAssetData(assetId)
+//    Some(asset) <- assets.getPublicAsset(assetId)
 //    preview     <- imageGenerator.generateSmallProfile(asset).future
 //    _           <- assets.mergeOrCreateAsset(preview) //needs to be in storage for other steps to find it
 //    res         <- assetSync.uploadAssetData(preview.id, public = true, retention = Retention.Eternal).future flatMap {
