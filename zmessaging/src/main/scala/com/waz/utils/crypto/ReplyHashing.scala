@@ -49,7 +49,7 @@ class ReplyHashingImpl(storage: AssetStorage) extends ReplyHashing {
     val (assetMsgs, otherMsgs) = msgs.partition(m => ReplyHashing.assetTypes.contains(m.msgType))
     for {
       assets     <- storage.loadAll(assetMsgs.map(_.assetId).collect { case Some(x: AssetId) => x }.toSet)
-      assetPairs =  assetMsgs.map(m => m -> assets.find(a => m.assetId.contains(a)).map(_.id))
+      assetPairs =  assetMsgs.map(m => m -> assets.find(a => m.assetId.contains(a.id)).map(_.id))
       assetShas  <- Future.sequence(assetPairs.map {
                       case (m, Some(rId)) => Future.successful(m.id -> hashAsset(rId, m.time))
                       case (m, None)      => Future.failed(new MissingAssetException(s"Failed to find asset with id ${m.assetId}"))

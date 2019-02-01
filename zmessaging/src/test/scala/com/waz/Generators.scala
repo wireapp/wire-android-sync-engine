@@ -27,6 +27,7 @@ import com.waz.model.ConversationData.{ConversationType, UnreadCount}
 import com.waz.model.GenericContent.{EncryptionAlgorithm, Text}
 import com.waz.model.SearchQuery.{Recommended, TopPeople}
 import com.waz.model.UserData.ConnectionStatus
+import com.waz.model.UserInfo.ProfilePicture
 import com.waz.model._
 import com.waz.model.messages.media._
 import com.waz.model.otr.ClientId
@@ -89,7 +90,7 @@ object Generators {
     email                 <- arbitrary[Option[EmailAddress]]
     phone                 <- arbitrary[Option[PhoneNumber]]
     trackingId            <- arbitrary[Option[TrackingId]]
-    picture               <- arbitrary[Option[AssetId]]
+    picture               <- arbitrary[Option[PublicAssetId]]
     accent                <- arbitrary[Int]
     searchKey             = SearchKey(name)
     connection            <- arbitrary[ConnectionStatus]
@@ -240,6 +241,7 @@ object Generators {
   implicit lazy val arbRAssetDataId: Arbitrary[RAssetId] = Arbitrary(sideEffect(RAssetId()))
   implicit lazy val arbAssetIdGeneral: Arbitrary[AssetIdGeneral] = Arbitrary(sideEffect(AssetId()))
   implicit lazy val arbAssetId: Arbitrary[AssetId]       = Arbitrary(sideEffect(AssetId()))
+  implicit lazy val arbPublicAssetId: Arbitrary[PublicAssetId]       = Arbitrary(sideEffect(PublicAssetId()))
   implicit lazy val arbSyncId: Arbitrary[SyncId]         = Arbitrary(sideEffect(SyncId()))
   implicit lazy val arbGcmId: Arbitrary[PushToken]           = Arbitrary(sideEffect(PushToken()))
   implicit lazy val arbMessageId: Arbitrary[MessageId]   = Arbitrary(sideEffect(MessageId()))
@@ -273,6 +275,8 @@ object Generators {
   implicit lazy val arbDim2: Arbitrary[Dim2] = Arbitrary(for (w <- genDimension; h <- genDimension) yield Dim2(w, h))
   lazy val genDimension = chooseNum(0, 10000)
   implicit lazy val arbSearchQuery: Arbitrary[SearchQuery] = Arbitrary(frequency((1, Gen.const(TopPeople)), (3, Gen.alphaStr.map(Recommended))))
+  implicit lazy val arbTag: Arbitrary[AssetMetaData.Image.Tag] = Arbitrary(oneOf(AssetMetaData.Image.Tag.Preview, AssetMetaData.Image.Tag.Medium, AssetMetaData.Image.Tag.Empty))
+  implicit lazy val profilePicture: Arbitrary[ProfilePicture] = Arbitrary(resultOf(ProfilePicture))
 
   implicit def optGen[T](implicit gen: Gen[T]): Gen[Option[T]] = frequency((1, Gen.const(None)), (2, gen.map(Some(_))))
 
@@ -281,7 +285,7 @@ object Generators {
     name <- optGen(alphaNumStr)
     email <- arbitrary[Option[EmailAddress]]
     phone <- arbitrary[Option[PhoneNumber]]
-    picture <- arbitrary[Option[AssetData]]
+    picture <- arbitrary[Option[ProfilePicture]]
     trackingId <- arbitrary[Option[TrackingId]]
     accent <- arbitrary[Option[Int]]
   } yield UserInfo(userId, name.map(Name), accent, email, phone, Some(picture.toSeq), trackingId))
