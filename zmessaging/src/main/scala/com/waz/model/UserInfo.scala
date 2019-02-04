@@ -125,13 +125,21 @@ object UserInfo {
 
   def encodeAsset(assets: Seq[ProfilePicture]): JSONArray = {
     val arr = new json.JSONArray()
-    assets.map { pic =>
+    assets
+      .map { pic =>
+        val size = pic.tag match {
+          case Preview => "preview"
+          case Medium  => "complete"
+          case _       => ""
+        }
+
         JsonEncoder { o =>
-          o.put("size", pic.tag.toString)
+          o.put("size", size)
           o.put("key", pic.id.str)
           o.put("type", "image")
         }
-    }.foreach(arr.put)
+      }
+      .foreach(arr.put)
     arr
   }
 

@@ -31,7 +31,7 @@ import com.waz.model._
 import com.waz.model.otr.{Client, ClientId}
 import com.waz.service.AccountManager.ClientRegistrationState.{LimitReached, PasswordMissing, Registered, Unregistered}
 import com.waz.service.UserService.UnsplashUrl
-import com.waz.service.assets.AssetService.RawAssetInput.UriInput
+import com.waz.service.assets2.Content
 import com.waz.service.otr.OtrService.SessionId
 import com.waz.service.tracking.LoggedOutEvent
 import com.waz.sync.client.InvitationClient.ConfirmedTeamInvitation
@@ -39,7 +39,7 @@ import com.waz.sync.client.{InvitationClientImpl, OtrClientImpl}
 import com.waz.threading.{CancellableFuture, SerialDispatchQueue}
 import com.waz.utils._
 import com.waz.utils.events.Signal
-import com.waz.utils.wrappers.Context
+import com.waz.utils.wrappers.{Context, URI}
 import com.waz.znet2.http.ResponseCode
 import com.waz.sync.client.ErrorOr
 import com.waz.sync.client.ErrorOrResponse
@@ -151,7 +151,7 @@ class AccountManager(val userId:   UserId,
     hasClient = exists
   }
 
-  def addUnsplashPicture(): Future[Unit] = zmessaging.flatMap(_.users.updateSelfPicture(UriInput(UnsplashUrl)))
+  def addUnsplashPicture(): Future[Unit] = zmessaging.flatMap(_.users.updateSelfPicture(Content.Uri(URI.toJava(UnsplashUrl))))
 
   def fingerprintSignal(uId: UserId, cId: ClientId): Signal[Option[Array[Byte]]] =
     for {

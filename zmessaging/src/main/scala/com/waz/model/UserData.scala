@@ -36,7 +36,7 @@ case class UserData(override val id:       UserId,
                     email:                 Option[EmailAddress]  = None,
                     phone:                 Option[PhoneNumber]   = None,
                     trackingId:            Option[TrackingId]    = None,
-                    picture:               Option[PublicAssetId] = None,
+                    picture:               Option[AssetIdGeneral] = None,
                     accent:                Int                   = 0, // accent color id
                     searchKey:             SearchKey,
                     connection:            ConnectionStatus      = ConnectionStatus.Unconnected,
@@ -191,7 +191,7 @@ object UserData {
       v.email foreach (o.put("email", _))
       v.phone foreach (o.put("phone", _))
       v.trackingId foreach (id => o.put("trackingId", id.str))
-      v.picture foreach (id => o.put("assetId", id.str))
+      v.picture foreach (id => o.put("assetId", AssetIdGeneral.encode(id)))
       o.put("accent", v.accent)
       o.put("connection", v.connection.code)
       o.put("connectionLastUpdated", v.connectionLastUpdated.toEpochMilli)
@@ -217,7 +217,7 @@ object UserData {
     val Email = opt(emailAddress('email))(_.email)
     val Phone = opt(phoneNumber('phone))(_.phone)
     val TrackingId = opt(id[TrackingId]('tracking_id))(_.trackingId)
-    val Picture = opt(id[PublicAssetId]('picture))(_.picture)
+    val Picture = opt(id[AssetIdGeneral]('picture))(_.picture)
     val Accent = int('accent)(_.accent)
     val SKey = text[SearchKey]('skey, _.asciiRepresentation, SearchKey.unsafeRestore)(_.searchKey)
     val Conn = text[ConnectionStatus]('connection, _.code, ConnectionStatus(_))(_.connection)

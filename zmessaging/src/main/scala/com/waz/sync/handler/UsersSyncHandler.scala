@@ -17,16 +17,17 @@
  */
 package com.waz.sync.handler
 
-import com.waz.ZLog._
 import com.waz.ZLog.ImplicitTag._
+import com.waz.ZLog._
 import com.waz.api.impl.ErrorResponse
 import com.waz.content.UsersStorage
+import com.waz.model.AssetMetaData.Image.Tag
+import com.waz.model.UserInfo.ProfilePicture
 import com.waz.model._
 import com.waz.service.UserService
 import com.waz.service.assets2.AssetService
 import com.waz.service.images.ImageAssetGenerator
 import com.waz.sync.SyncResult
-import com.waz.sync.client.AssetClient.Retention
 import com.waz.sync.client.UsersClient
 import com.waz.sync.otr.OtrSyncHandler
 import com.waz.threading.Threading
@@ -82,7 +83,16 @@ class UsersSyncHandler(assetSync: AssetSyncHandler,
   def postSelfPicture(): Future[SyncResult] =
     userService.getSelfUser flatMap {
       case Some(userData) => userData.picture match {
-        case Some(assetId) => postSelfPicture(userData.id, assetId)
+        case Some(assetId: UploadAssetId) =>
+          for {
+            uploadedPic <- assets.uploadAsset(assetId).map(r => PublicAssetId(r.id.str))
+            //TODO post a smaller preview?
+            updateInfo = UserInfo(userData.id, picture = Some(Seq(ProfilePicture(uploadedPic, Tag.Medium), ProfilePicture(uploadedPic, Tag.Preview))))
+            _ <- usersStorage.update(userData.id, _.updated(updateInfo))
+            _ <- usersClient.updateSelf(updateInfo)
+          } yield SyncResult.Success
+
+        case Some(_)       => Future.successful(SyncResult.Success)
         case None          => updatedSelfToSyncResult(usersClient.updateSelf(UserInfo(userData.id, picture = None)))
       }
       case _ => Future.successful(SyncResult.Retry())
@@ -93,27 +103,6 @@ class UsersSyncHandler(assetSync: AssetSyncHandler,
     otrSync.broadcastMessage(GenericMessage(Uid(), GenericContent.AvailabilityStatus(availability)))
       .map(SyncResult(_))
   }
-
-  private def postSelfPicture(id: UserId, assetId: PublicAssetId): Future[SyncResult] = Future.successful(SyncResult.Success) //TODO: do
-//    for {
-//    Some(asset) <- assets.getPublicAsset(assetId)
-//    preview     <- imageGenerator.generateSmallProfile(asset).future
-//    _           <- assets.mergeOrCreateAsset(preview) //needs to be in storage for other steps to find it
-//    res         <- assetSync.uploadAssetData(preview.id, public = true, retention = Retention.Eternal).future flatMap {
-//      case Right(uploadedPreview) =>
-//        assetSync.uploadAssetData(assetId, public = true, retention = Retention.Eternal).future flatMap {
-//          case Right(uploaded) => for {
-//            _     <- assets.getAssetData(assetId)
-//            res   <- updatedSelfToSyncResult(usersClient.updateSelf(UserInfo(id, picture = Some(Seq(uploadedPreview, uploaded)))))
-//          } yield res
-//
-//          case Left(err) =>
-//            Future.successful(SyncResult(err))
-//        }
-//      case Left(err) =>
-//        Future.successful(SyncResult(err))
-//    }
-//  } yield res
 
   def deleteAccount(): Future[SyncResult] =
     usersClient.deleteAccount().map(SyncResult(_))

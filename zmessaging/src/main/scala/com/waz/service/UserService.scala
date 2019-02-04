@@ -25,11 +25,11 @@ import com.waz.model.UserData.ConnectionStatus
 import com.waz.model.{AccentColor, _}
 import com.waz.service.EventScheduler.Stage
 import com.waz.service.UserService._
-import com.waz.service.assets.AssetService.RawAssetInput
-import com.waz.service.assets2.{AssetService, AssetStorage}
+import com.waz.service.assets2._
 import com.waz.service.conversation.SelectedConversationService
 import com.waz.service.push.PushService
 import com.waz.sync.SyncServiceHandle
+import com.waz.sync.client.AssetClient2.Retention
 import com.waz.sync.client.UserSearchClient.UserSearchEntry
 import com.waz.sync.client.{CredentialsUpdateClient, ErrorOr, UsersClient}
 import com.waz.threading.{CancellableFuture, SerialDispatchQueue, Threading}
@@ -78,7 +78,7 @@ trait UserService {
   def updateAvailability(availability: Availability): Future[Unit]
 
   def storeAvailabilities(availabilities: Map[UserId, Availability]): Future[Seq[(UserData, UserData)]]
-  def updateSelfPicture(input: RawAssetInput): Future[Unit]
+  def updateSelfPicture(content: Content): Future[Unit]
 }
 
 class UserServiceImpl(selfUserId:        UserId,
@@ -310,11 +310,12 @@ class UserServiceImpl(selfUserId:        UserId,
     usersStorage.updateAll2(availabilities.keySet, u => availabilities.get(u.id).fold(u)(av => u.copy(availability = av)))
   }
 
-  override def updateSelfPicture(input: RawAssetInput) = Future.successful({}) //TODO: DOOOO
-//    assets.addAsset(input, isProfilePic = true).flatMap {
-//      case Some(a) => updateAndSync(_.copy(picture = Some(a.id)), _ => sync.postSelfPicture(Some(a.id)))
-//      case _ => Future.successful({})
-//    }
+  override def updateSelfPicture(content: Content) = {
+    val asset = assets.createAndSaveRawAsset(ContentForUpload("profile-picture", content) , NoEncryption, public = true, Retention.Eternal, None)
+    asset.flatMap { a =>
+      updateAndSync(_.copy(picture = Some(a.id)), _ => sync.postSelfPicture(None))
+    }
+  }
 
   private def updateAndSync(updater: UserData => UserData, sync: UserData => Future[_]) =
     updateUserData(selfUserId, updater).flatMap({

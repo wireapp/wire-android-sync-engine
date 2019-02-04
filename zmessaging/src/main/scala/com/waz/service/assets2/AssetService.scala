@@ -47,11 +47,6 @@ trait AssetService {
 
   def getAsset(id: AssetId): Future[Asset[General]]
 
-  /**
-    * Tries to find the public asset in the local storage (like a profile picture to upload for example)
-    */
-  def getPublicAsset(id: PublicAssetId): Future[Option[Asset[General]]]
-
   def save(asset: GeneralAsset): Future[Unit]
   def delete(id: AssetIdGeneral): Future[Unit]
 
