@@ -134,6 +134,11 @@ object IoUtils {
     else readFully(is, buffer, offset + read, count - read)
   }
 
+  def readFully(is: InputStream, buffer: Array[Byte] = this.buffer.get()): Unit =
+    withResource(is) { in =>
+      while (in.read(buffer) != -1) { }
+    }
+
   def asString(in: InputStream) = new String(toByteArray(in), "utf8")
 
   def withResource[I : Resource, O](in: I)(op: I => O): O = try op(in) finally implicitly[Resource[I]].close(in)

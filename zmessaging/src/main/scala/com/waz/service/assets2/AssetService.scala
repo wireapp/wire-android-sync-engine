@@ -17,10 +17,9 @@
  */
 package com.waz.service.assets2
 
-import java.io.{FileInputStream, InputStream}
+import java.io.InputStream
+import java.security.{DigestInputStream, MessageDigest}
 
-import cats.data.OptionT
-import cats.instances.future._
 import com.waz.ZLog.ImplicitTag._
 import com.waz.ZLog._
 import com.waz.model._
@@ -29,12 +28,14 @@ import com.waz.service.assets2.Asset.{General, UploadGeneral, Video}
 import com.waz.sync.client.AssetClient2.{AssetContent, Metadata, Retention, UploadResponse2}
 import com.waz.sync.client.{AssetClient2, ErrorOrResponse}
 import com.waz.threading.CancellableFuture
+import com.waz.utils.IoUtils
 import com.waz.utils.events.Signal
+import com.waz.utils.streams.CountInputStream
 import com.waz.znet2.http.HttpClient._
 import com.waz.znet2.http.ResponseCode
 
 import scala.concurrent.{ExecutionContext, Future}
-import scala.util.Failure
+import scala.util.{Failure, Try}
 
 trait AssetService {
   def assetSignal(id: AssetIdGeneral): Signal[GeneralAsset]
@@ -141,7 +142,7 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
           CancellableFuture.failed(NetworkError(err))
         case Right(fileWithSha) if fileWithSha.sha256 != asset.sha =>
           debug(s"Loaded file size ${fileWithSha.file.length()}")
-          CancellableFuture.failed(ValidationError(s"SHA256 is not equal. Expected: ${asset.sha} Actual: ${fileWithSha.sha256} AssetId: ${asset.id}"))
+          CancellableFuture.failed(new ValidationError(s"SHA256 is not equal. Expected: ${asset.sha} Actual: ${fileWithSha.sha256} AssetId: ${asset.id}"))
         case Right(fileWithSha) =>
           contentCache.put(asset.id, fileWithSha.file, removeOriginal = true)
             .flatMap(_ => contentCache.getStream(asset.id).map(asset.encryption.decrypt(_)))
@@ -173,7 +174,7 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
       .flatMap(is => Future.fromTry(Sha256.calculate(is)))
       .flatMap { sha =>
         if (localSource.sha == sha) Future.fromTry(openInputStream())
-        else Future.failed(ValidationError(s"SHA256 is not equal. Expected: ${localSource.sha} Actual: $sha AssetId: ${asset.id}"))
+        else Future.failed(new ValidationError(s"SHA256 is not equal. Expected: ${localSource.sha} Actual: $sha AssetId: ${asset.id}"))
       }
       .recoverWith { case err =>
         debug(s"Can not load content from file system. ${err.getMessage}")
@@ -237,15 +238,16 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
       }
     }
 
-    def doUpload(rawAsset: UploadAsset[General]): ErrorOrResponse[UploadResponse2] = {
-      val metadata = Metadata(rawAsset.public, rawAsset.retention)
+    def doUpload(asset: UploadAsset[General]): ErrorOrResponse[UploadResponse2] = {
+      val metadata = Metadata(asset.public, asset.retention)
       val content = AssetContent(
-        rawAsset.mime,
-        () => getRawAssetContent(rawAsset).map(rawAsset.encryption.encrypt(_, rawAsset.encryptionSalt)),
-        Some(rawAsset.size)
+        asset.mime,
+        asset.md5,
+        () => getRawAssetContent(asset).map(asset.encryption.encrypt(_, asset.encryptionSalt)),
+        Some(asset.size)
       )
       val uploadCallback: ProgressCallback = (p: Progress) => {
-        uploadAssetStorage.save(rawAsset.copy(uploaded = p.progress))
+        uploadAssetStorage.save(asset.copy(uploaded = p.progress))
         ()
       }
       assetClient.uploadAsset(metadata, content, Some(uploadCallback))
@@ -350,52 +352,46 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
       }
     }
 
-    def createLocalSource: Future[Option[LocalSource]] =
-      (for {
-        uri <- OptionT.fromOption(Some(contentForUpload.content).collect {
-          case Content.Uri(uri) => uri
-          case Content.AsBlob(Content.Uri(uri)) => uri
-        })
-        is <- OptionT.liftF(Future.fromTry(uriHelper.openInputStream(uri)))
-        sha <- OptionT.liftF(Future.fromTry(Sha256.calculate(is)))
-      } yield LocalSource(uri, sha)).value
 
-    def extractMime(content: CanExtractMetadata): Future[Mime] = content match {
-      case Content.Uri(uri) => Future.fromTry(uriHelper.extractMime(uri))
-      case Content.File(mime, _) => Future.successful(mime)
-    }
+    def extractLocalSourceAndEncryptedHashesAndSize(content: CanExtractMetadata): Try[(Option[LocalSource], Sha256, MD5, Long)] = {
+      val sha256DigestWithUri = content match {
+        case Content.Uri(uri) => Some(MessageDigest.getInstance("SHA-256") -> uri)
+        case _ => None
+      }
+      val sha256EncryptedDigest = MessageDigest.getInstance("SHA-256")
+      val md5EncryptedDigest = MessageDigest.getInstance("MD5")
 
-    def openInputStream(content: CanExtractMetadata): Future[InputStream] = content match {
-      case Content.Uri(uri) => Future.fromTry(uriHelper.openInputStream(uri))
-      case Content.File(_, file) => Future.successful(new FileInputStream(file))
-    }
-
-    def calculateEncryptedSize(content: CanExtractMetadata): Future[Long] =
       for {
-        size <- content match {
-          case Content.Uri(uri) => Future.fromTry(uriHelper.extractSize(uri))
-          case Content.File(_, file) =>  Future.successful(file.length())
-        }
-      } yield targetEncryption.sizeAfterEncryption(size, encryptionSalt)
+        source <- content.openInputStream(uriHelper)
 
-    def calculateEncryptedSha(content: CanExtractMetadata): Future[Sha256] =
-      for {
-        is <- openInputStream(content)
-        sha <- Future.fromTry(Sha256.calculate(targetEncryption.encrypt(is, encryptionSalt)))
-      } yield sha
+        stream1 = sha256DigestWithUri.fold(source) { case (digest, _) => new DigestInputStream(source, digest) }
+        stream2 = targetEncryption.encrypt(stream1, encryptionSalt)
+        stream3 = new DigestInputStream(stream2, sha256EncryptedDigest)
+        stream4 = new DigestInputStream(stream3, md5EncryptedDigest)
+        stream5 = new CountInputStream(stream4)
+
+        _ = IoUtils.readFully(stream5)
+
+        localSource = sha256DigestWithUri.map { case (digest, uri) => LocalSource(uri, Sha256(digest.digest())) }
+        encryptedSha = Sha256(sha256EncryptedDigest.digest())
+        encryptedMd5 = MD5(md5EncryptedDigest.digest())
+        encryptedSize = stream5.getBytesRead
+      } yield (localSource, encryptedSha, encryptedMd5, encryptedSize)
+    }
 
     for {
       content <- prepareContent(contentForUpload.content)
-      ((mime, localSource), encryptedSha) <- extractMime(content) zip createLocalSource zip calculateEncryptedSha(content)
+      (localSource, encryptedSha, encryptedMd5, encryptedSize) <- Future.fromTry(extractLocalSourceAndEncryptedHashesAndSize(content))
+      mime <- Future.fromTry(content.getMime(uriHelper))
       details <- contentForUpload.content match {
         case _: Content.AsBlob => Future.successful(BlobDetails)
         case _                 => assetDetailsService.extract(mime, content)
       }
-      encryptedSize <- calculateEncryptedSize(content)
     } yield UploadAsset(
       id = rawAssetId,
       localSource = localSource,
       name = contentForUpload.name,
+      md5 = encryptedMd5,
       sha = encryptedSha,
       mime = mime,
       preview = RawPreviewNotReady,

@@ -22,14 +22,11 @@ import java.security.{DigestOutputStream, MessageDigest}
 
 import com.waz.ZLog.ImplicitTag.implicitLogTag
 import com.waz.api.impl.ErrorResponse
-import com.waz.cache.{Expiration, LocalData}
-import com.waz.service.assets2.NoEncryption
+import com.waz.cache.Expiration
 import com.waz.model._
-import com.waz.service.assets2.Asset
 import com.waz.service.assets2.Asset.General
-import com.waz.utils.crypto.AESUtils
-import com.waz.threading.CancellableFuture
-import com.waz.utils.{CirceJSONSupport, IoUtils}
+import com.waz.service.assets2.{Asset, NoEncryption}
+import com.waz.utils.{CirceJSONSupport, IoUtils, SafeBase64}
 import com.waz.znet2.http.HttpClient.AutoDerivation._
 import com.waz.znet2.http.HttpClient.ProgressCallback
 import com.waz.znet2.http.HttpClient.dsl._
@@ -39,8 +36,8 @@ import com.waz.znet2.http._
 import io.circe.Encoder
 import org.threeten.bp.Instant
 
-import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
+import scala.concurrent.{Await, Future}
 
 trait AssetClient2 {
   import com.waz.sync.client.AssetClient2._
@@ -117,17 +114,15 @@ class AssetClient2Impl(implicit
     }
 
   override def uploadAsset(metadata: Metadata, content: AssetContent, callback: Option[ProgressCallback]): ErrorOrResponse[UploadResponse2] =
-    CancellableFuture.lift(content.data().map(md5)).flatMap { md5String => //TODO Move this calculation to RawAsset
-      Request
-        .Post(
-          relativePath = AssetsV3Path,
-          body = MultipartBodyMixed(Part(metadata), Part(content, Headers("Content-MD5" -> md5String)))
-        )
-        .withUploadCallback(callback)
-        .withResultType[UploadResponse2]
-        .withErrorType[ErrorResponse]
-        .executeSafe
-    }
+    Request
+      .Post(
+        relativePath = AssetsV3Path,
+        body = MultipartBodyMixed(Part(metadata), Part(content, Headers("Content-MD5" -> SafeBase64.encode(content.md5.bytes))))
+      )
+      .withUploadCallback(callback)
+      .withResultType[UploadResponse2]
+      .withErrorType[ErrorResponse]
+      .executeSafe
 
   override def deleteAsset(assetId: AssetId): ErrorOrResponse[Boolean] = {
     Request.Delete(relativePath = s"$AssetsV3Path/${assetId.str}")
@@ -142,7 +137,7 @@ object AssetClient2 {
 
   case class FileWithSha(file: File, sha256: Sha256)
 
-  case class AssetContent(mime: Mime, data: () => Future[InputStream], dataLength: Option[Long])
+  case class AssetContent(mime: Mime, md5: MD5, data: () => Future[InputStream], dataLength: Option[Long])
 
   case class UploadResponse2(key: AssetId, expires: Option[Instant], token: Option[AssetToken])
 
@@ -175,12 +170,5 @@ object AssetClient2 {
       case (Some(c), None)    => s"/conversations/${c.str}/assets/${rId.str}"
       case (Some(c), Some(_)) => s"/conversations/${c.str}/otr/assets/${rId.str}"
     }
-
-  /**
-    * Computes base64 encoded md5 sum of image data.
-    */
-  def md5(data: LocalData): String = md5(data.inputStream)
-
-  def md5(is: InputStream): String = AESUtils.base64(IoUtils.md5(is))
 
 }
