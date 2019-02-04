@@ -19,6 +19,7 @@ package com.waz.log
 
 import java.io.File
 import java.net.URI
+import java.text.DecimalFormat
 
 import android.net.Uri
 import com.waz.ZLog.LogTag
@@ -141,6 +142,7 @@ object ZLog2 {
     implicit val BPDurationShow:     LogShow[bp.Duration]    = logShowWithToString
     implicit val ThrowableShow:      LogShow[Throwable]      = logShowWithToString
     implicit val ShowStringLogShow:  LogShow[ShowString]     = logShowWithToString
+    implicit val SizeLogShow:        LogShow[Size]           = logShowWithToString
 
     implicit val Sha256LogShow: LogShow[Sha256] = create(_.hexString, _.str)
 
@@ -441,5 +443,16 @@ object ZLog2 {
 
 //  @deprecated("Only for legacy support. Will be removed after migration", " ")
   def showString(str: String): ShowString = new ShowString(str)
+
+  class Size(val value: Long) extends AnyVal {
+    override def toString: String = {
+      if (value <= 0) return "0B"
+      val units       = Array[String]("B", "kB", "MB", "GB", "TB")
+      val digitGroups = (Math.log10(value) / Math.log10(1024)).toInt
+      new DecimalFormat("#,##0.#").format(value / Math.pow(1024, digitGroups)) + " " + units(digitGroups)
+    }
+  }
+
+  def asSize(value: Long): Size = new Size(value)
 
 }

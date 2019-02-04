@@ -65,3 +65,9 @@ object Sha256 {
   def calculate(is: InputStream): Try[Sha256] = Try { Sha256(IoUtils.sha256(is)) }
 
 }
+
+class MD5(val bytes: Array[Byte]) extends AnyVal
+
+object MD5 {
+  def apply(bytes: Array[Byte]): MD5 = new MD5(bytes)
+}

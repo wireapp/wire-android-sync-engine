@@ -18,7 +18,7 @@
 package com.waz.service.assets2
 
 import android.util.Base64
-import com.waz.model.{AssetIdGeneral, MessageId, Mime, UploadAssetId}
+import com.waz.model._
 import com.waz.sync.client.AssetClient2.Retention
 
 trait Codec[From, To] {
@@ -173,6 +173,8 @@ trait StorageCodecs {
   }
 
   implicit val Sha256Codec: Codec[Sha256, Array[Byte]] = Codec.create(_.bytes, Sha256.apply)
+
+  implicit val Md5Codec: Codec[MD5, Array[Byte]] = Codec.create(_.bytes, MD5.apply)
 
   implicit val AssetTokenCodec: Codec[AssetToken, String] = Codec.create(_.str, AssetToken.apply)
 

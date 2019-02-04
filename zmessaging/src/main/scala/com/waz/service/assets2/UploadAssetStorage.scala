@@ -51,6 +51,7 @@ object UploadAssetStorage {
     val Source         = asText(_.localSource)('source)
     val Name           = text(_.name)('name)
     val Sha            = asBlob(_.sha)('sha)
+    val Md5            = asBlob(_.md5)('md5)
     val Mime           = asText(_.mime)('mime)
     val Preview        = asText(_.preview)('preview)
     val Uploaded       = long(_.uploaded)('uploaded)
@@ -70,6 +71,7 @@ object UploadAssetStorage {
       Source,
       Name,
       Sha,
+      Md5,
       Mime,
       Preview,
       Uploaded,
@@ -87,6 +89,7 @@ object UploadAssetStorage {
         Source,
         Name,
         Sha,
+        Md5,
         Mime,
         Preview,
         Uploaded,

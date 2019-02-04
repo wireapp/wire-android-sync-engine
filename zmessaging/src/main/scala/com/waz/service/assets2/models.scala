@@ -17,27 +17,43 @@
  */
 package com.waz.service.assets2
 
-import java.io.{ByteArrayInputStream, FileInputStream, InputStream}
+import java.io.{ ByteArrayInputStream, FileInputStream, InputStream }
 import java.net.URI
 
-import com.waz.model.GenericContent.Asset.{Original, Preview}
+import com.waz.model.GenericContent.Asset.{ Original, Preview }
 import com.waz.model._
-import com.waz.model.GenericContent.{Asset => GenericAsset}
+import com.waz.model.GenericContent.{ Asset => GenericAsset }
 import com.waz.model.nano.Messages
 import com.waz.model.nano.Messages.Asset.RemoteData
 import com.waz.sync.client.AssetClient2.Retention
 import com.waz.utils.Identifiable
 import org.threeten.bp.Duration
 
-import scala.util.Try
+import scala.util.{ Success, Try }
 
 sealed trait Content {
+
   def openInputStream(uriHelper: UriHelper): Try[InputStream] = this match {
     case Content.Bytes(_, bytes) => Try { new ByteArrayInputStream(bytes) }
-    case Content.Uri(uri) => uriHelper.openInputStream(uri)
-    case Content.File(_, file) => Try { new FileInputStream(file) }
+    case Content.Uri(uri)        => uriHelper.openInputStream(uri)
+    case Content.File(_, file)   => Try { new FileInputStream(file) }
     case Content.AsBlob(content) => content.openInputStream(uriHelper)
   }
+
+  def getSize(uriHelper: UriHelper): Try[Long] = this match {
+    case Content.Bytes(_, bytes) => Success(bytes.length)
+    case Content.Uri(uri)        => uriHelper.extractSize(uri)
+    case Content.File(_, file)   => Try { file.length() }
+    case Content.AsBlob(content) => content.getSize(uriHelper)
+  }
+
+  def getMime(uriHelper: UriHelper): Try[Mime] = this match {
+    case Content.Bytes(mime, _)  => Success(mime)
+    case Content.Uri(uri)        => uriHelper.extractMime(uri)
+    case Content.File(mime, _)   => Success(mime)
+    case Content.AsBlob(content) => content.getMime(uriHelper)
+  }
+
 }
 
 //TODO Maybe rename this to 'PreparedContent' ?
@@ -62,10 +78,10 @@ case class ContentForUpload(name: String, content: Content)
 case class LocalSource(uri: URI, sha: Sha256)
 
 sealed trait RawPreview
-case object RawPreviewNotReady                           extends RawPreview
-case object RawPreviewEmpty                              extends RawPreview
+case object RawPreviewNotReady                              extends RawPreview
+case object RawPreviewEmpty                                 extends RawPreview
 case class RawPreviewNotUploaded(rawAssetId: UploadAssetId) extends RawPreview
-case class RawPreviewUploaded(assetId: AssetId)          extends RawPreview
+case class RawPreviewUploaded(assetId: AssetId)             extends RawPreview
 
 sealed trait GeneralAsset {
   def id: AssetIdGeneral
@@ -76,22 +92,24 @@ sealed trait GeneralAsset {
 }
 
 case class UploadAsset[+T <: UploadAssetDetails](
-                                                  id: UploadAssetId,
-                                                  localSource: Option[LocalSource],
-                                                  name: String,
-                                                  sha: Sha256,
-                                                  mime: Mime,
-                                                  preview: RawPreview,
-                                                  uploaded: Long,
-                                                  size: Long,
-                                                  retention: Retention,
-                                                  public: Boolean,
-                                                  encryption: Encryption,
-                                                  encryptionSalt: Option[Salt],
-                                                  details: T,
-                                                  status: UploadAssetStatus,
-                                                  assetId: Option[AssetId]
-) extends GeneralAsset with Identifiable[UploadAssetId]
+    id: UploadAssetId,
+    localSource: Option[LocalSource],
+    name: String,
+    sha: Sha256,
+    md5: MD5,
+    mime: Mime,
+    preview: RawPreview,
+    uploaded: Long,
+    size: Long,
+    retention: Retention,
+    public: Boolean,
+    encryption: Encryption,
+    encryptionSalt: Option[Salt],
+    details: T,
+    status: UploadAssetStatus,
+    assetId: Option[AssetId]
+) extends GeneralAsset
+    with Identifiable[UploadAssetId]
 
 sealed trait AssetStatus
 object AssetStatus {
@@ -127,22 +145,24 @@ case class Asset[+T <: AssetDetails](
     details: T,
     @deprecated
     convId: Option[RConvId]
-) extends GeneralAsset with Identifiable[AssetId]
+) extends GeneralAsset
+    with Identifiable[AssetId]
 
 case class DownloadAsset(
-                          id: DownloadAssetId,
-                          mime: Mime,
-                          name: String,
-                          preview: Option[AssetId],
-                          details: AssetDetails,
-                          downloaded: Long,
-                          size: Long,
-                          status: DownloadAssetStatus
-) extends GeneralAsset with Identifiable[DownloadAssetId]
+    id: DownloadAssetId,
+    mime: Mime,
+    name: String,
+    preview: Option[AssetId],
+    details: AssetDetails,
+    downloaded: Long,
+    size: Long,
+    status: DownloadAssetStatus
+) extends GeneralAsset
+    with Identifiable[DownloadAssetId]
 
 object DownloadAsset {
 
-  def create(asset: GenericAsset): DownloadAsset = {
+  def create(asset: GenericAsset): DownloadAsset =
     DownloadAsset(
       id = DownloadAssetId(),
       mime = Mime(asset.original.mimeType),
@@ -153,42 +173,41 @@ object DownloadAsset {
       size = asset.original.size,
       status = DownloadAssetStatus.NotStarted
     )
-  }
 
 }
 
 object Asset {
   type UploadGeneral = UploadAssetDetails
-  type NotReady   = DetailsNotReady.type
-  type General    = AssetDetails
-  type Blob       = BlobDetails.type
-  type Image      = ImageDetails
-  type Audio      = AudioDetails
-  type Video      = VideoDetails
+  type NotReady      = DetailsNotReady.type
+  type General       = AssetDetails
+  type Blob          = BlobDetails.type
+  type Image         = ImageDetails
+  type Audio         = AudioDetails
+  type Video         = VideoDetails
 
   def extractEncryption(remote: RemoteData): Encryption = remote.encryption match {
     case Messages.AES_GCM => AES_CBC_Encryption(AESKey2(remote.otrKey))
     case Messages.AES_CBC => AES_CBC_Encryption(AESKey2(remote.otrKey))
-    case _ => NoEncryption
+    case _                => NoEncryption
   }
 
-  def extractDetails(either: Either[Original, Preview]): AssetDetails = {
+  def extractDetails(either: Either[Original, Preview]): AssetDetails =
     if (either.fold(_.hasImage, _.hasImage)) {
       val image = either.fold(_.getImage, _.getImage)
       ImageDetails(Dim2(image.width, image.height))
-    } else either match {
-      case Left(original) if original.hasAudio =>
-        val audio = original.getAudio
-        AudioDetails(Duration.ofMillis(audio.durationInMillis), Loudness(audio.normalizedLoudness.toVector))
-      case Left(original) if original.hasVideo =>
-        val video = original.getVideo
-        VideoDetails(Dim2(video.width, video.height), Duration.ofMillis(video.durationInMillis))
-      case _ =>
-        BlobDetails
-    }
-  }
+    } else
+      either match {
+        case Left(original) if original.hasAudio =>
+          val audio = original.getAudio
+          AudioDetails(Duration.ofMillis(audio.durationInMillis), Loudness(audio.normalizedLoudness.toVector))
+        case Left(original) if original.hasVideo =>
+          val video = original.getVideo
+          VideoDetails(Dim2(video.width, video.height), Duration.ofMillis(video.durationInMillis))
+        case _ =>
+          BlobDetails
+      }
 
-  def create(asset: DownloadAsset, remote: RemoteData): Asset[General] = {
+  def create(asset: DownloadAsset, remote: RemoteData): Asset[General] =
     Asset(
       id = AssetId(remote.assetId),
       token = if (remote.assetToken.isEmpty) None else Some(AssetToken(remote.assetToken)),
@@ -202,7 +221,6 @@ object Asset {
       details = asset.details,
       convId = None
     )
-  }
 
   def create(preview: Preview): Asset[General] = {
     val remote = preview.remote

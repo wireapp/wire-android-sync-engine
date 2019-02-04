@@ -22,6 +22,7 @@ import java.io.{ByteArrayInputStream, ByteArrayOutputStream}
 import com.waz.TestData
 import com.waz.specs.ZSpec
 import com.waz.utils.IoUtils
+import com.waz.utils.streams.LoggingInputStream
 
 class LoggingInputStreamSpec extends ZSpec {
 

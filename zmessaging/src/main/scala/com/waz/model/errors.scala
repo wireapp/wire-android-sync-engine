@@ -20,6 +20,8 @@ package com.waz.model
 import com.waz.api.impl.ErrorResponse
 import com.waz.threading.CancellableFuture
 
+import com.waz.log.ZLog2.asSize
+
 import scala.concurrent.{ ExecutionContext, Future }
 
 object errors {
@@ -61,12 +63,16 @@ object errors {
 
   abstract class LogicError(override val description: String, override val cause: Option[Throwable])
       extends ZError(description, cause)
-  case class ValidationError(override val description: String, override val cause: Option[Throwable] = None)
-      extends LogicError(description, cause)
   case class FailedExpectationsError(override val description: String, override val cause: Option[Throwable] = None)
     extends LogicError(description, cause)
   case class NotSupportedError(override val description: String, override val cause: Option[Throwable] = None)
     extends LogicError(description, cause)
+
+  class ValidationError(override val description: String, override val cause: Option[Throwable] = None)
+    extends LogicError(description, cause)
+
+  case class AssetContentTooLargeError(contentSize: Long, allowedSize: Long)
+    extends ValidationError(s"Asset content too large. Max allowed size: ${asSize(allowedSize)}. Actual size: ${asSize(contentSize)}", None)
 
   case class FileSystemError(override val description: String, override val cause: Option[Throwable] = None)
     extends ZError(description, cause)
