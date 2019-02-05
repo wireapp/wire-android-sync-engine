@@ -281,30 +281,31 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
     } yield asset
   }
 
-  override def createAndSavePreview(rawAsset: UploadAsset[General]): Future[UploadAsset[General]] = {
-    def shouldAssetContainPreview: Boolean = rawAsset.details match {
+  override def createAndSavePreview(uploadAsset: UploadAsset[General]): Future[UploadAsset[General]] = {
+    def shouldAssetContainPreview: Boolean = uploadAsset.details match {
       case _: Video => true
       case _ => false
     }
 
-    def getRawAssetContent: Future[CanExtractMetadata] = rawAsset.localSource match {
+    def getRawAssetContent: Future[CanExtractMetadata] = uploadAsset.localSource match {
       case Some(LocalSource(uri, _)) => Future.successful(Content.Uri(uri))
-      case None => rawContentCache.get(rawAsset.id).map(Content.File(rawAsset.mime, _))
+      case None => rawContentCache.get(uploadAsset.id).map(Content.File(uploadAsset.mime, _))
     }
 
     if (shouldAssetContainPreview) {
       for {
         rawAssetContent <- getRawAssetContent
-        content <- previewService.extractPreview(rawAsset, rawAssetContent)
-        previewName = s"preview_for_${rawAsset.id.str}"
+        content <- previewService.extractPreview(uploadAsset, rawAssetContent)
+        previewName = s"preview_for_${ uploadAsset.id.str}"
         contentForUpload = ContentForUpload(previewName, content)
-        previewRawAsset <- createRawAsset(contentForUpload, rawAsset.encryption, rawAsset.public, rawAsset.retention)
-        updatedRawAsset = rawAsset.copy(preview = RawPreviewNotUploaded(previewRawAsset.id))
-        _ <- uploadAssetStorage.save(updatedRawAsset)
-      } yield updatedRawAsset
+        previewUploadAsset <- createRawAsset(contentForUpload, uploadAsset.encryption, uploadAsset.public, uploadAsset.retention)
+        updatedUploadAsset = uploadAsset.copy(preview = RawPreviewNotUploaded(previewUploadAsset.id))
+        _ <- uploadAssetStorage.save(previewUploadAsset)
+        _ <- uploadAssetStorage.save(updatedUploadAsset)
+      } yield updatedUploadAsset
     } else {
       for {
-        updatedRawAsset <- Future.successful(rawAsset.copy(preview = RawPreviewEmpty))
+        updatedRawAsset <- Future.successful(uploadAsset.copy(preview = RawPreviewEmpty))
         _ <- uploadAssetStorage.save(updatedRawAsset)
       } yield updatedRawAsset
     }

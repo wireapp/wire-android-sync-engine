@@ -68,6 +68,7 @@ object UploadAssetStorage {
       "UploadAssets",
       Id,
       Source,
+      Name,
       Sha,
       Mime,
       Preview,
@@ -77,6 +78,7 @@ object UploadAssetStorage {
       Public,
       Encryption,
       Details,
+      UploadStatus,
       AssetId
     )
 
