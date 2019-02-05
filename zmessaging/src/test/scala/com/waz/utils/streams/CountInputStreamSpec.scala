@@ -15,28 +15,26 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-package com.waz.log
+package com.waz.utils.streams
 
 import java.io.{ByteArrayInputStream, ByteArrayOutputStream}
 
 import com.waz.TestData
 import com.waz.specs.ZSpec
 import com.waz.utils.IoUtils
-import com.waz.utils.streams.LoggingInputStream
 
-class LoggingInputStreamSpec extends ZSpec {
+class CountInputStreamSpec extends ZSpec {
 
-  feature("LoggingInputStream") {
+  feature("CountInputStream") {
 
-    scenario("properly log all content") {
+    scenario("properly calculate content size") {
       val testContent = TestData.bytes(1024)
-      val logStream = new ByteArrayOutputStream()
       val targetStream = new ByteArrayOutputStream()
-      val loggedStream = new LoggingInputStream(new ByteArrayInputStream(testContent), logStream)
+      val countStream = new CountInputStream(new ByteArrayInputStream(testContent))
 
-      IoUtils.copy(loggedStream, targetStream)
+      IoUtils.copy(countStream, targetStream)
 
-      logStream.toByteArray shouldBe targetStream.toByteArray
+      countStream.getBytesRead shouldBe testContent.length
     }
 
   }

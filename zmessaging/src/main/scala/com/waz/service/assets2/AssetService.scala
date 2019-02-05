@@ -318,10 +318,13 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
                                      public: Boolean,
                                      retention: Retention,
                                      messageId: Option[MessageId] = None): Future[UploadAsset[General]] = {
+    val t0 = System.nanoTime()
     for {
       rawAsset <- createRawAsset(content, targetEncryption, public, retention, messageId)
       _ = debug(s"Raw asset created: $rawAsset")
       _ <- uploadAssetStorage.save(rawAsset)
+      t1 = System.nanoTime()
+      _ = println("Asset creation time: " + (t1 - t0) + " ns")
     } yield rawAsset
   }
 
