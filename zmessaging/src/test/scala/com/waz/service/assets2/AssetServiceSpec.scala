@@ -268,8 +268,6 @@ class AssetServiceSpec extends ZIntegrationMockSpec with AuthenticationConfig {
         assetContent shouldBe an[Right[ErrorResponse, FileWithSha]]
         val fileWithSha = assetContent.right.get
 
-        debug(l"")
-
         debug(l"Initial content : ${testAssetContent.mkString(",")}")
         debug(l"Expected content: ${encryptedContent.mkString(",")}")
 

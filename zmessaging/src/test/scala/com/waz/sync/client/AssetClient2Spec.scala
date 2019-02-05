@@ -23,11 +23,11 @@ import com.waz.{AuthenticationConfig, ZIntegrationSpec}
 import com.waz.ZLog.ImplicitTag._
 import com.waz.ZLog.verbose
 import com.waz.api.impl.ErrorResponse
-import com.waz.model.{AssetId, Mime, Sha256}
+import com.waz.model.{AssetId, MD5, Mime, Sha256}
 import com.waz.service.assets2.{Asset, BlobDetails, NoEncryption}
 import com.waz.sync.client.AssetClient.FileWithSha
 import com.waz.sync.client.AssetClient2.{AssetContent, Metadata, Retention, UploadResponse2}
-import com.waz.utils.returning
+import com.waz.utils.{IoUtils, returning}
 
 import scala.concurrent.Future
 import scala.util.Random
@@ -36,10 +36,12 @@ import scala.util.Random
 class AssetClient2Spec extends ZIntegrationSpec with AuthenticationConfig {
 
   private lazy val assetClient = new AssetClient2Impl()
+
   private val testAssetContent = returning(Array.ofDim[Byte](1024))(Random.nextBytes)
+  private val testAssetContentMd5 = MD5(IoUtils.md5(new ByteArrayInputStream(testAssetContent)))
   private val testAssetMetadata = Metadata(retention = Retention.Volatile)
   private val testAssetMime = Mime.Default
-  private val testRawAsset = AssetContent(testAssetMime, () => Future.successful(new ByteArrayInputStream(testAssetContent)), Some(testAssetContent.length))
+  private val testRawAsset = AssetContent(testAssetMime, testAssetContentMd5, () => Future.successful(new ByteArrayInputStream(testAssetContent)), Some(testAssetContent.length))
 
   private def createBlobAsset(response: UploadResponse2): Asset[BlobDetails.type] = {
     Asset(
