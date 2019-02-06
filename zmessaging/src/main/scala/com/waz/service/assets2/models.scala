@@ -249,7 +249,10 @@ object Asset {
       size = uploadAsset.size,
       encryption = uploadAsset.encryption,
       localSource = uploadAsset.localSource,
-      preview = None,
+      preview = uploadAsset.preview match {
+        case RawPreviewUploaded(aId) => Some(aId)
+        case _ => None
+      },
       details = uploadAsset.details,
       convId = None
     )

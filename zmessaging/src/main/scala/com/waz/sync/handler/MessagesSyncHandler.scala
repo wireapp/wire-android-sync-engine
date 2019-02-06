@@ -241,27 +241,27 @@ class MessagesSyncHandler(selfUserId: UserId,
         case _ => postAssetMessage(GenericMessage(msg.id.uid, msg.ephemeral, Proto.Asset(rawAsset, None, expectsReadConfirmation = msg.expectsRead.contains(true))), rawAsset.id)
       }
 
-    def sendWithV3(rawAsset: UploadAsset[UploadGeneral]): CancellableFuture[RemoteInstant] = {
+    def sendWithV3(uploadAssetOriginal: UploadAsset[UploadGeneral]): CancellableFuture[RemoteInstant] = {
       for {
-        rawAssetWithMetadata <- rawAsset.details match {
-          case details: General => CancellableFuture.successful(rawAsset.copy(details = details))
+        rawAssetWithMetadata <- uploadAssetOriginal.details match {
+          case details: General => CancellableFuture.successful(uploadAssetOriginal.copy(details = details))
           case details => CancellableFuture.failed(FailedExpectationsError(s"We expect that metadata already extracted. Got $details"))
         }
         time <- postOriginal(rawAssetWithMetadata)
-        updatedRawAsset <- rawAsset.preview match {
+        uploadAssetOriginal <- uploadAssetOriginal.preview match {
           case RawPreviewNotReady => assets.createAndSavePreview(rawAssetWithMetadata).toCancellable
           case _ => CancellableFuture.successful(rawAssetWithMetadata)
         }
-        previewAsset <- updatedRawAsset.preview match {
-          case RawPreviewNotUploaded(rawAssetId) =>
+        previewAsset <- uploadAssetOriginal.preview match {
+          case RawPreviewNotUploaded(uploadAssetPreviewId) =>
             for {
-              previewAsset <- assets.uploadAsset(rawAssetId)
+              previewAsset <- assets.uploadAsset(uploadAssetPreviewId)
               proto = GenericMessage(
                 msg.id.uid,
                 msg.ephemeral,
-                Proto.Asset(updatedRawAsset, Some(previewAsset), expectsReadConfirmation = false)
+                Proto.Asset(uploadAssetOriginal, Some(previewAsset), expectsReadConfirmation = false)
               )
-              _ <- postAssetMessage(proto, rawAssetId)
+              _ <- postAssetMessage(proto, uploadAssetOriginal.id)
             } yield Some(previewAsset)
           case RawPreviewUploaded(assetId) =>
             assetStorage.get(assetId).map(Some.apply).toCancellable
@@ -270,7 +270,11 @@ class MessagesSyncHandler(selfUserId: UserId,
           case RawPreviewNotReady =>
             CancellableFuture.failed(FailedExpectationsError("We should never get not ready preview in this place"))
         }
-        asset <- assets.uploadAsset(updatedRawAsset.id)
+        _ <- (previewAsset match {
+          case Some(p) => rawAssetStorage.update(uploadAssetOriginal.id, _.copy(preview = RawPreviewUploaded(p.id)))
+          case None => Future.successful(())
+        }).toCancellable
+        asset <- assets.uploadAsset(uploadAssetOriginal.id)
         proto = GenericMessage(
           msg.id.uid,
           msg.ephemeral,
