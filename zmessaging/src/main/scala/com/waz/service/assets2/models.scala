@@ -250,7 +250,7 @@ object Asset {
       encryption = uploadAsset.encryption,
       localSource = uploadAsset.localSource,
       preview = uploadAsset.preview match {
-        case RawPreviewUploaded(aId) => Some(aId)
+        case RawPreviewUploaded(aId) => Some(assetId)
         case _ => None
       },
       details = uploadAsset.details,

@@ -276,7 +276,7 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
     for {
       _ <- CancellableFuture.lift(Future.successful(()), actionsOnCancellation())
       rawAsset <- loadRawAsset.toCancellable
-      _ <- uploadAssetStorage.update(rawAsset.id, _.copy(uploaded = 0, status = UploadAssetStatus.InProgress)).toCancellable
+      Some((_, rawAsset: UploadAsset[General])) <- uploadAssetStorage.update(rawAsset.id, _.copy(uploaded = 0, status = UploadAssetStatus.InProgress)).toCancellable
       uploadResult <- doUpload(rawAsset)
       asset <- handleUploadResult(uploadResult, rawAsset).toCancellable
       _ <- encryptAssetContentAndMoveToCache(asset).toCancellable
