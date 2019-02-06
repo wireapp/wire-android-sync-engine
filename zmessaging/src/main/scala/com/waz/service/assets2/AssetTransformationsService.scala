@@ -21,21 +21,24 @@ import java.io.{InputStream, OutputStream}
 
 import com.waz.model.Mime
 import com.waz.service.assets2.Asset.General
-import AssetTransformationService._
+import AssetTransformationsService._
 
-trait AssetTransformationService {
+import com.waz.log.ZLog2._
+import com.waz.ZLog.ImplicitTag._
+
+trait AssetTransformationsService {
   def getTransformations(mime: Mime, details: AssetDetails): List[Transformation]
 }
 
-object AssetTransformationService {
+object AssetTransformationsService {
 
   trait Transformation {
-    def apply(initial: InputStream, transformed: OutputStream): Unit
+    def apply(initial: InputStream, transformed: OutputStream): Mime
   }
 
   object Transformation {
-    def create(f: (InputStream, OutputStream) => Unit): Transformation = new Transformation {
-      override def apply(initial: InputStream, transformed: OutputStream): Unit = f(initial, transformed)
+    def create(f: (InputStream, OutputStream) => Mime): Transformation = new Transformation {
+      override def apply(initial: InputStream, transformed: OutputStream): Mime = f(initial, transformed)
     }
   }
 
@@ -45,7 +48,7 @@ object AssetTransformationService {
 
 }
 
-class AssetTransformationServiceImpl(handlers: List[Handler]) extends AssetTransformationService {
+class AssetTransformationsServiceImpl(handlers: List[Handler]) extends AssetTransformationsService {
 
   override def getTransformations(mime: Mime, details: AssetDetails): List[Transformation] = {
     handlers.map(_.createTransformation(mime, details)).collect { case Some(t) => t }
@@ -76,7 +79,11 @@ class ImageDownscalingCompressing(imageRecoder: ImageRecoder) extends Handler {
           case _ => Mime.Image.Jpg
         }
 
-        Transformation.create(imageRecoder.recode(dim, targetMime, MaxImageDimension, _, _))
+        verbose(l"Creating asset image downscaling and compression transformation. $mime -> $targetMime")
+        Transformation.create { (in, out) =>
+          imageRecoder.recode(dim, targetMime, MaxImageDimension, in, out)
+          targetMime
+        }
       }
   }
 

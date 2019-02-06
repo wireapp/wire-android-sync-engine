@@ -17,26 +17,26 @@
  */
 package com.waz.service.assets2
 
-import com.waz.model.Mime
+import com.waz.model.TeamId
 import com.waz.model.errors.AssetContentTooLargeError
 
-import scala.util.{Failure, Success, Try}
+import scala.util.{Success, Try}
 
-//class AssetPoliciesServiceImpl(uriHelper: UriHelper, contentCache: RawAssetContentCache) {
-//
-//  def validate(content: Content): Try[Unit] = {
-//    for {
-//      mime <- content.getMime(uriHelper)
-//      size <- content.getSize(uriHelper)
-//
-//      shouldCheckSize = content match {
-//        case _: Content.AsBlob => true
-//        //we do not check size on case of an image asset because we downscale images
-//        case _ => !Mime.Image.supported.contains(mime) && mime != Mime.Image.Gif
-//      }
-//      _ <- if (shouldCheckSize && size > maxAssetSize()) Failure(AssetContentTooLargeError(size, maxAssetSize()))
-//      else Success(())
-//    } yield ()
-//  }
-//
-//}
+trait AssetRestrictionsService {
+  def validate(content: Content): Try[Unit]
+}
+
+class AssetRestrictionsServiceImpl(uriHelper: UriHelper, teamId: Option[TeamId]) extends AssetRestrictionsService {
+
+  private val maxAllowedAssetSize: Long =
+    if (teamId.isEmpty) 25 * 1024 * 1024
+    else 100 * 1024 * 1024
+
+  override def validate(content: Content): Try[Unit] = {
+    for {
+      size <- content.getSize(uriHelper)
+      _ <- if (size > maxAllowedAssetSize) Try(AssetContentTooLargeError(size, maxAllowedAssetSize)) else Success(())
+    } yield ()
+  }
+
+}
