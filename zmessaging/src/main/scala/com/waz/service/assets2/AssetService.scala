@@ -17,7 +17,7 @@
  */
 package com.waz.service.assets2
 
-import java.io.InputStream
+import java.io.{FileOutputStream, InputStream}
 import java.security.{DigestInputStream, MessageDigest}
 
 import com.waz.ZLog.ImplicitTag._
@@ -69,6 +69,8 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
                        downloadAssetStorage: DownloadAssetStorage,
                        assetDetailsService: AssetDetailsService,
                        previewService: AssetPreviewService,
+                       transformations: AssetTransformationsService,
+                       restrictions: AssetRestrictionsService,
                        uriHelper: UriHelper,
                        contentCache: AssetContentCache,
                        rawContentCache: RawAssetContentCache,
@@ -195,7 +197,7 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
       (asset.assetId, asset.localSource) match {
         case (Some(aId), _) => loadContentById(aId, callback)
         case (_, Some(ls)) => Future.fromTry(uriHelper.openInputStream(ls.uri))
-        case _ => CancellableFuture.failed(NotFoundLocal(""))
+        case _ => rawContentCache.getStream(uploadAssetId)
       }
     }.toCancellable
 
@@ -335,7 +337,7 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
                              retention: Retention,
                              messageId: Option[MessageId] = None): Future[UploadAsset[General]] = {
 
-    val rawAssetId = UploadAssetId()
+    val assetId = UploadAssetId()
     val encryptionSalt = targetEncryption.randomSalt
 
     def prepareContent(content: Content): Future[CanExtractMetadata] = {
@@ -343,18 +345,22 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
         case content: Content.Uri => Future.successful(content)
         case Content.File(mime, file) =>
           for {
-            _ <- rawContentCache.put(rawAssetId, file, removeOriginal = true)
-            cacheFile <- rawContentCache.get(rawAssetId)
+            _ <- rawContentCache.put(assetId, file, removeOriginal = true)
+            cacheFile <- rawContentCache.get(assetId)
           } yield Content.File(mime, cacheFile)
         case Content.Bytes(mime, bytes) =>
           for {
-            _ <- rawContentCache.putBytes(rawAssetId, bytes)
-            file <- rawContentCache.get(rawAssetId)
+            _ <- rawContentCache.putBytes(assetId, bytes)
+            file <- rawContentCache.get(assetId)
           } yield Content.File(mime, file)
         case Content.AsBlob(content) => prepareContent(content)
       }
     }
 
+    def extractDetails(content: CanExtractMetadata, mime: Mime): Future[AssetDetails] = contentForUpload.content match {
+      case _: Content.AsBlob => Future.successful(BlobDetails)
+      case _                 => assetDetailsService.extract(mime, content)
+    }
 
     def extractLocalSourceAndEncryptedHashesAndSize(content: CanExtractMetadata): Try[(Option[LocalSource], Sha256, MD5, Long)] = {
       val sha256DigestWithUri = content match {
@@ -383,20 +389,31 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
     }
 
     for {
-      content <- prepareContent(contentForUpload.content)
-      (localSource, encryptedSha, encryptedMd5, encryptedSize) <- Future.fromTry(extractLocalSourceAndEncryptedHashesAndSize(content))
-      mime <- Future.fromTry(content.getMime(uriHelper))
-      details <- contentForUpload.content match {
-        case _: Content.AsBlob => Future.successful(BlobDetails)
-        case _                 => assetDetailsService.extract(mime, content)
+      initialContent <- prepareContent(contentForUpload.content)
+      initialMime <- Future.fromTry(initialContent.getMime(uriHelper))
+      initialDetails <- extractDetails(initialContent, initialMime)
+      ts = transformations.getTransformations(initialMime, initialDetails)
+      //TODO Handle not only the first transformation
+      (transformedContent, transformedMime, transformedDetails) <- ts.headOption match {
+        case Some(transformation) => for {
+          cacheFile <- rawContentCache.createEmptyFile(assetId)
+          is <- Future.fromTry(initialContent.openInputStream(uriHelper))
+          mime = transformation(is, new FileOutputStream(cacheFile))
+          content = Content.File(mime, cacheFile)
+          details <- extractDetails(content, mime)
+        } yield (content, mime, details)
+        case _ =>
+          Future.successful((initialContent, initialMime, initialDetails))
       }
+      _ <- Future.fromTry(restrictions.validate(transformedContent))
+      (localSource, encryptedSha, encryptedMd5, encryptedSize) <- Future.fromTry(extractLocalSourceAndEncryptedHashesAndSize(transformedContent))
     } yield UploadAsset(
-      id = rawAssetId,
+      id = assetId,
       localSource = localSource,
       name = contentForUpload.name,
       md5 = encryptedMd5,
       sha = encryptedSha,
-      mime = mime,
+      mime = transformedMime,
       preview = RawPreviewNotReady,
       uploaded = 0,
       size = encryptedSize,
@@ -404,7 +421,7 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
       public = public,
       encryption = targetEncryption,
       encryptionSalt = encryptionSalt,
-      details = details,
+      details = transformedDetails,
       status = UploadAssetStatus.NotStarted,
       assetId = None
     )

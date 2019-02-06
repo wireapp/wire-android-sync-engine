@@ -42,6 +42,8 @@ class AssetServiceSpec extends ZIntegrationMockSpec with AuthenticationConfig {
   private val inProgressAssetStorage   = mock[DownloadAssetStorage]
   private val rawAssetStorage     = mock[UploadAssetStorage]
   private val assetDetailsService = mock[AssetDetailsService]
+  private val restrictionsService      = mock[AssetRestrictionsService]
+  private val transformationsService      = mock[AssetTransformationsService]
   private val previewService      = mock[AssetPreviewService]
   private val cache               = mock[AssetContentCache]
   private val rawCache            = mock[RawAssetContentCache]
@@ -79,6 +81,8 @@ class AssetServiceSpec extends ZIntegrationMockSpec with AuthenticationConfig {
       inProgressAssetStorage,
       assetDetailsService,
       previewService,
+      transformationsService,
+      restrictionsService,
       uriHelperMock,
       cache,
       rawCache,
