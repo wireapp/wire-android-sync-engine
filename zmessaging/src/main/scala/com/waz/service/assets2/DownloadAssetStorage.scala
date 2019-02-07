@@ -51,13 +51,13 @@ object DownloadAssetStorage {
     val Name           = text(_.name)('name)
     val Preview        = asText(_.preview)('preview)
     val Details        = asText(_.details)('details)
-    val UploadStatus   = asInt(_.status)('status)
+    val Status         = asInt(_.status)('status)
 
     override val idCol = Id
-    override val table = Table("DownloadAssets", Id, Mime, Name, Preview, Details, Downloaded, Size, UploadStatus)
+    override val table = Table("DownloadAssets", Id, Mime, Name, Preview, Details, Downloaded, Size, Status)
 
     override def apply(implicit cursor: DBCursor): DownloadAsset =
-      DownloadAsset(Id, Mime, Name, Preview, Details, Downloaded, Size, UploadStatus)
+      DownloadAsset(Id, Mime, Name, Preview, Details, Downloaded, Size, Status)
 
   }
 

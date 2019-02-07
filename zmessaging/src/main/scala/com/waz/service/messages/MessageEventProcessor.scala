@@ -78,19 +78,19 @@ class MessageEventProcessor(selfUserId:          UserId,
 
   case class EventAndLocalData(event: MessageEvent, message: Option[MessageData], asset: Option[DownloadAsset])
 
-  def localDataForEvent(event: MessageEvent): Future[EventAndLocalData] = {
-    event match {
-      case GenericMessageEvent(_, _, _, c) => storage.get(MessageId(c.messageId)).flatMap {
-        case Some(message) => message.assetId match {
-          case Some(dId: DownloadAssetId) => downloadAssetStorage.get(dId)
-            .map(a => EventAndLocalData(event, Some(message), Some(a)))
-          case _ => Future.successful(EventAndLocalData(event, Some(message), None))
-        }
-        case _ => Future.successful(EventAndLocalData(event, None, None))
+  def localDataForEvent(event: MessageEvent): Future[EventAndLocalData] =
+    for {
+      message <- event match {
+        case GenericMessageEvent(_, _, _, c) => storage.get(MessageId(c.messageId))
+        case _                               => Future.successful(None)
       }
-      case _ => Future.successful(EventAndLocalData(event, None, None))
-    }
-  }
+
+      asset <- message.flatMap(_.assetId) match {
+        case Some(dId: DownloadAssetId) => downloadAssetStorage.find(dId)
+        case _                          => Future.successful(None)
+      }
+
+    } yield EventAndLocalData(event, message, asset)
 
   def localDataForEvents(events: Seq[MessageEvent]): Future[Seq[EventAndLocalData]] =
     Future.traverse(events)(localDataForEvent)
