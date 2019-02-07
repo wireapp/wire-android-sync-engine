@@ -17,19 +17,19 @@
  */
 package com.waz.service.assets2
 
-import java.io.{ ByteArrayInputStream, FileInputStream, InputStream }
+import java.io.{ByteArrayInputStream, FileInputStream, InputStream}
 import java.net.URI
 
-import com.waz.model.GenericContent.Asset.{ Original, Preview }
+import com.waz.model.GenericContent.Asset.{Original, Preview}
 import com.waz.model._
-import com.waz.model.GenericContent.{ Asset => GenericAsset }
+import com.waz.model.GenericContent.{Asset => GenericAsset}
 import com.waz.model.nano.Messages
 import com.waz.model.nano.Messages.Asset.RemoteData
 import com.waz.sync.client.AssetClient2.Retention
 import com.waz.utils.Identifiable
 import org.threeten.bp.Duration
 
-import scala.util.{ Success, Try }
+import scala.util.{Success, Try}
 
 sealed trait Content {
 
@@ -162,17 +162,38 @@ case class DownloadAsset(
 
 object DownloadAsset {
 
-  def create(asset: GenericAsset): DownloadAsset =
+  def create(asset: GenericAsset): DownloadAsset = {
+    val original = Option(asset.original)
+
+    val (mime, size, detailsInput) = original match {
+      case Some(o) => (o.mimeType, o.size, Left(o))
+      case _ => (asset.preview.mimeType, asset.preview.size, Right(asset.preview))
+    }
+
     DownloadAsset(
       id = DownloadAssetId(),
-      mime = Mime(asset.original.mimeType),
-      name = asset.original.name,
-      preview = if (asset.preview == null) None else Some(AssetId(asset.preview.remote.assetId)),
-      details = Asset.extractDetails(Left(asset.original)),
+      mime = Mime(mime),
+      name = original.map(_.name).getOrElse(""),
+      preview = Option(asset.preview).flatMap(p => Option(p.remote)).map(r=> AssetId(r.assetId)),
+      details = Asset.extractDetails(detailsInput),
       downloaded = 0,
-      size = asset.original.size,
-      status = DownloadAssetStatus.NotStarted
+      size = size,
+      status = getStatus(asset)
     )
+  }
+
+  def getStatus(proto: GenericAsset): DownloadAssetStatus = {
+    proto.getStatusCase match {
+      case Messages.Asset.UPLOADED_FIELD_NUMBER => AssetStatus.Done
+      case Messages.Asset.NOT_UPLOADED_FIELD_NUMBER =>
+        proto.getNotUploaded match {
+          case Messages.Asset.CANCELLED => DownloadAssetStatus.Cancelled
+          case Messages.Asset.FAILED => DownloadAssetStatus.Failed
+          case _ => DownloadAssetStatus.InProgress
+        }
+      case _ => DownloadAssetStatus.InProgress
+    }
+  }
 
 }
 

@@ -174,6 +174,7 @@ class ZMessaging(val teamId: Option[TeamId], val clientId: ClientId, account: Ac
   def assetsStorage     = storage.assetsStorage
   def oldAssetStorage                    = storage.oldAssetStorage
   def rawAssetStorage               = storage.rawAssetStorage
+  def downloadAssetStorage               = storage.inProgressAssetStorage
   def reactionsStorage  = storage.reactionsStorage
   def notifStorage      = storage.notifStorage
   def convsStorage      = storage.convsStorage
