@@ -24,9 +24,8 @@ import com.waz.content.MessagesStorage
 import com.waz.log.ZLog2._
 import com.waz.model.GenericContent.{Asset, Calling, Cleared, DeliveryReceipt, Ephemeral, Knock, LastRead, Location, MsgDeleted, MsgEdit, MsgRecall, Reaction, Text}
 import com.waz.model._
-import com.waz.model.nano.Messages
 import com.waz.service.EventScheduler
-import com.waz.service.assets2.{DownloadAssetStatus, AssetService, GeneralAsset, DownloadAsset, Asset => Asset2}
+import com.waz.service.assets2.{AssetService, AssetStatus, DownloadAsset, DownloadAssetStatus, DownloadAssetStorage, GeneralAsset, Asset => Asset2}
 import com.waz.service.conversation.{ConversationsContentUpdater, ConversationsService}
 import com.waz.service.otr.OtrService
 import com.waz.service.otr.VerificationStateUpdater.{ClientAdded, ClientUnverified, MemberAdded, VerificationChange}
@@ -45,7 +44,8 @@ class MessageEventProcessor(selfUserId:          UserId,
                             msgsService:         MessagesService,
                             convsService:        ConversationsService,
                             convs:               ConversationsContentUpdater,
-                            otr:                 OtrService) {
+                            otr:                 OtrService,
+                            downloadAssetStorage: DownloadAssetStorage) {
 
   import MessageEventProcessor._
   import Threading.Implicits.Background
@@ -76,7 +76,28 @@ class MessageEventProcessor(selfUserId:          UserId,
     } yield standard ++ updatedQuotes
   }
 
+  case class EventAndLocalData(event: MessageEvent, message: Option[MessageData], asset: Option[DownloadAsset])
+
+  def localDataForEvent(event: MessageEvent): Future[EventAndLocalData] = {
+    event match {
+      case GenericMessageEvent(_, _, _, c) => storage.get(MessageId(c.messageId)).flatMap {
+        case Some(message) => message.assetId match {
+          case Some(dId: DownloadAssetId) => downloadAssetStorage.get(dId)
+            .map(a => EventAndLocalData(event, Some(message), Some(a)))
+          case _ => Future.successful(EventAndLocalData(event, Some(message), None))
+        }
+        case _ => Future.successful(EventAndLocalData(event, None, None))
+      }
+      case _ => Future.successful(EventAndLocalData(event, None, None))
+    }
+  }
+
+  def localDataForEvents(events: Seq[MessageEvent]): Future[Seq[EventAndLocalData]] =
+    Future.traverse(events)(localDataForEvent)
+
   private[service] def processEvents(conv: ConversationData, isGroup: Boolean, events: Seq[MessageEvent]): Future[Set[MessageData]] = {
+    verbose(l"processEvents: ${conv.id} isGroup:$isGroup ${events.map(_.from)}")
+
     val toProcess = events.filter {
       case GenericMessageEvent(_, _, _, msg) if GenericMessage.isBroadcastMessage(msg) => false
       case e => conv.cleared.forall(_.isBefore(e.time))
@@ -91,12 +112,10 @@ class MessageEventProcessor(selfUserId:          UserId,
       case _ => true
     }.map(_.from).toSet
 
-
-    val modifications = toProcess.map(createModifications(conv, isGroup, _))
-    val msgs = modifications collect { case m if m.message != MessageData.Empty => m.message }
-    verbose(l"messages from events: ${msgs.map(m => m.id -> m.msgType)}")
-
     for {
+      eventData <- localDataForEvents(toProcess)
+      modifications = eventData.map(eald => createModifications(conv, isGroup, eald))
+      msgs = modifications.collect { case m if m.message != MessageData.Empty => m.message }
       _     <- convsService.addUnexpectedMembersToConv(conv.id, potentiallyUnexpectedMembers)
       res   <- content.addMessages(conv.id, msgs)
       _     <- Future.traverse(modifications.flatMap(_.assets))(assets.save)
@@ -107,14 +126,16 @@ class MessageEventProcessor(selfUserId:          UserId,
     } yield res
   }
 
-  private def updatedAssets(id: Uid, content: Any): Seq[(GeneralAsset, Option[GeneralAsset])] = {
+  private def updatedAssets(id: Uid, content: Any, downloadAsset: Option[DownloadAsset]): Seq[(GeneralAsset, Option[GeneralAsset])] = {
     verbose(l"update asset for event: $id")
 
     content match {
 
       case asset: Asset if asset.hasUploaded =>
-        val asset2 = Asset2.create(DownloadAsset.create(asset), asset.getUploaded)
         val preview = Option(asset.preview).map(Asset2.create)
+        val updatedDownloadAsset = downloadAsset.map(da => da.copy(preview = preview.map(_.id).orElse(da.preview), status = AssetStatus.Done))
+        val asset2 = Asset2.create(updatedDownloadAsset.getOrElse(DownloadAsset.create(asset)), asset.getUploaded)
+
         verbose(l"Received asset v3 with preview")
         List((asset2, preview))
 
@@ -127,31 +148,33 @@ class MessageEventProcessor(selfUserId:          UserId,
             (asset, Option.empty[GeneralAsset])
           }
 
-      case asset: Asset if asset.getStatusCase == Messages.Asset.FAILED && asset.original.hasImage =>
+      case asset: Asset if DownloadAsset.getStatus(asset) == DownloadAssetStatus.Failed && asset.original.hasImage =>
         verbose(l"Received a message about a failed image upload: $id. Dropping")
         List.empty
 
-      case asset: Asset if asset.getStatusCase == Messages.Asset.CANCELLED =>
+      case asset: Asset if DownloadAsset.getStatus(asset) == DownloadAssetStatus.Cancelled =>
         verbose(l"Uploader cancelled asset: $id")
         val asset2 = DownloadAsset.create(asset)
         List((asset2, None))
 
       case asset: Asset =>
-        val asset2 = DownloadAsset.create(asset)
         val preview = Option(asset.preview).map(Asset2.create)
+        val updatedDownloadAsset = downloadAsset.map(da => da.copy(preview = preview.map(_.id).orElse(da.preview), status = DownloadAsset.getStatus(asset)))
+        val asset2 = updatedDownloadAsset.getOrElse(DownloadAsset.create(asset))
         verbose(l"Received asset without remote data - we will expect another update")
         List((asset2, preview))
 
       case Ephemeral(_, content) =>
-        updatedAssets(id, content)
+        updatedAssets(id, content, downloadAsset)
 
       case _ =>
         List.empty
     }
   }
 
-  private def createModifications(conv: ConversationData, isGroup: Boolean, event: MessageEvent): EventModifications = {
+  private def createModifications(conv: ConversationData, isGroup: Boolean, eventAndLocalData: EventAndLocalData): EventModifications = {
     val convId = conv.id
+    val event = eventAndLocalData.event
 
     def forceReceiptMode: Option[Int] = conv.receiptMode.filter(_ => isGroup)
 
@@ -168,7 +191,8 @@ class MessageEventProcessor(selfUserId:          UserId,
       case Reaction(_, _) => MessageData.Empty
       case asset: Asset if asset.original == null =>
         MessageData(id, convId, Message.Type.UNKNOWN, from, time = time, localTime = event.localTime, protos = Seq(proto), forceReadReceipts = forceReceiptMode)
-      case asset: Asset if asset.getStatusCase == Messages.Asset.CANCELLED => MessageData.Empty
+      case asset: Asset if DownloadAsset.getStatus(asset) == DownloadAssetStatus.Cancelled =>
+        MessageData.Empty
       case asset: Asset if asset.original.hasVideo =>
         MessageData(id, convId, Message.Type.VIDEO_ASSET, from, time = time, localTime = event.localTime, protos = Seq(proto), forceReadReceipts = forceReceiptMode)
       case asset: Asset if asset.original.hasAudio =>
@@ -233,7 +257,7 @@ class MessageEventProcessor(selfUserId:          UserId,
       case GenericMessageEvent(_, time, from, proto) =>
         val sanitized @ GenericMessage(uid, msgContent) = sanitize(proto)
         val id = MessageId(uid.str)
-        val assets = updatedAssets(uid, sanitized.getAsset)
+        val assets = updatedAssets(uid, sanitized.getAsset, eventAndLocalData.asset)
         val message = content(id, msgContent, from, time, sanitized).copy(assetId = assets.headOption.map(_._1.id))
         EventModifications(message, assets)
       case _: CallMessageEvent =>

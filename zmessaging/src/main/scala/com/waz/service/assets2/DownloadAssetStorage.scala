@@ -54,7 +54,7 @@ object DownloadAssetStorage {
     val UploadStatus   = asInt(_.status)('status)
 
     override val idCol = Id
-    override val table = Table("DownloadAssets", Id, Mime, Preview, Size, Details)
+    override val table = Table("DownloadAssets", Id, Mime, Name, Preview, Details, Downloaded, Size, UploadStatus)
 
     override def apply(implicit cursor: DBCursor): DownloadAsset =
       DownloadAsset(Id, Mime, Name, Preview, Details, Downloaded, Size, UploadStatus)
