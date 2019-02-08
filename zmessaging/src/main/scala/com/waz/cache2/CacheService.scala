@@ -82,7 +82,7 @@ abstract class BaseFileCache[K] extends FileCache[K] {
         if (!file.renameTo(targetFile)) {
           debug("Renaming failed. Falling back to copy.")
           copy()
-          targetFile.delete()
+          file.delete()
         }
       } else copy()
 
