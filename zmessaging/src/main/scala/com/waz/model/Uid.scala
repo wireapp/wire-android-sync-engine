@@ -135,6 +135,7 @@ object AssetIdGeneral {
   implicit object Id extends Id[AssetIdGeneral] {
     override def random() = AssetId()
     override def decode(str: String) = AssetIdGeneral.decode(str)
+    override def encode(id: AssetIdGeneral): String = AssetIdGeneral.encode(id)
   }
 
 }
