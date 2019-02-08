@@ -28,6 +28,8 @@ trait GeneralFileCache extends FileCache[String]
 class GeneralFileCacheImpl(val cacheDirectory: File)
                           (implicit val ec: ExecutionContext) extends SimpleFileCache[String] with GeneralFileCache {
 
+  if (!cacheDirectory.exists() && !cacheDirectory.isDirectory) cacheDirectory.mkdir()
+
   override protected def createFileName(key: String): String = key
 
 }
