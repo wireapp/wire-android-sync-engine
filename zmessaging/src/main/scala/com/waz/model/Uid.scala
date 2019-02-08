@@ -128,7 +128,7 @@ object AssetIdGeneral {
   def decode(str: String): AssetIdGeneral = {
     if (str.startsWith(RawAssetPrefix)) UploadAssetId(str.substring(RawAssetPrefix.length))
     else if (str.startsWith(InProgressAssetPrefix)) DownloadAssetId(str.substring(InProgressAssetPrefix.length))
-    else if (str.startsWith(PublicAssetPrefix)) DownloadAssetId(str.substring(PublicAssetPrefix.length))
+    else if (str.startsWith(PublicAssetPrefix)) PublicAssetId(str.substring(PublicAssetPrefix.length))
     else AssetId(str)
   }
 
