@@ -41,7 +41,7 @@ import com.waz.sync.client._
 import com.waz.threading.Threading
 import com.waz.ui.MemoryImageCache
 import com.waz.ui.MemoryImageCache.{Entry, Key}
-import com.waz.utils.Cache
+import com.waz.utils.{Cache, IoUtils}
 import com.waz.utils.wrappers.{Context, GoogleApi}
 import com.waz.znet2.HttpClientOkHttpImpl
 import com.waz.znet2.http.Request.UrlCreator
@@ -163,8 +163,11 @@ class GlobalModuleImpl(val context:                 AContext,
 
   lazy val accountsStorage:     AccountStorage                   = wire[AccountStorageImpl]
 
+  val generalCacheDir = new File(context.getExternalCacheDir, s"general_cache")
+  IoUtils.createDirectory(generalCacheDir )
+
   lazy val generalFileCache =
-    new GeneralFileCacheImpl(new File(context.getExternalCacheDir, s"general_cache"))(Threading.BlockingIO)
+    new GeneralFileCacheImpl(generalCacheDir)(Threading.BlockingIO)
 
   lazy val teamsStorage:        TeamsStorage                     = wire[TeamsStorageImpl]
   lazy val recordingAndPlayback                                  = wire[GlobalRecordAndPlayService]
