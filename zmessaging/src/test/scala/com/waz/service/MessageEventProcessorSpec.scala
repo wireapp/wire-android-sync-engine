@@ -78,6 +78,7 @@ class MessageEventProcessorSpec extends AndroidFreeSpec with Inside {
       (storage.updateOrCreateAll _).expects(*).onCall { updaters: Map[MessageId, Option[MessageData] => MessageData] =>
         Future.successful(updaters.values.map(_.apply(None)).toSet)
       }
+      (storage.get _).expects(*).once().returns(Future.successful(None))
 
       val processor = getProcessor
       inside(result(processor.processEvents(conv, isGroup = false, Seq(event))).head) {

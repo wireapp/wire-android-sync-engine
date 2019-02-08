@@ -250,6 +250,8 @@ class AssetServiceSpec extends ZIntegrationMockSpec with AuthenticationConfig {
       (cache.putStream _).expects(*, *).anyNumberOfTimes().returns(Future.successful(()))
       (assetStorage.save _).expects(*).anyNumberOfTimes().returns(Future.successful(()))
       (rawCache.remove _).expects(*).anyNumberOfTimes().returns(Future.successful(()))
+      (transformationsService.getTransformations _).expects(*, *).once().returns(List())
+      (restrictionsService.validate _).expects(*).once().returns(Success(()))
 
       for {
         _ <- Future.successful(())
