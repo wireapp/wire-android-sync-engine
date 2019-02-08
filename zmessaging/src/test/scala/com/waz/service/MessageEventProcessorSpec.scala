@@ -24,7 +24,7 @@ import com.waz.model.ConversationData.ConversationType
 import com.waz.model.GenericContent.Text
 import com.waz.model._
 import com.waz.model.otr.UserClients
-import com.waz.service.assets2.AssetService
+import com.waz.service.assets2.{AssetService, DownloadAssetStorage}
 import com.waz.service.conversation.{ConversationsContentUpdater, ConversationsService}
 import com.waz.service.messages.{MessageEventProcessor, MessagesContentUpdater, MessagesService}
 import com.waz.service.otr.OtrService
@@ -53,6 +53,7 @@ class MessageEventProcessorSpec extends AndroidFreeSpec with Inside {
   val convs             = mock[ConversationsContentUpdater]
   val otr               = mock[OtrService]
   val convsService      = mock[ConversationsService]
+  val downloadStorage   = mock[DownloadAssetStorage]
   val prefs             = new TestGlobalPreferences()
 
   val messagesInStorage = Signal[Seq[MessageData]](Seq.empty)
@@ -193,7 +194,7 @@ class MessageEventProcessorSpec extends AndroidFreeSpec with Inside {
     //often repeated mocks
     (deletions.getAll _).expects(*).anyNumberOfTimes().returning(Future.successful(Seq.empty))
 
-    new MessageEventProcessor(selfUserId, storage, content, assets, replyHashing, msgsService, convsService, convs, otr)
+    new MessageEventProcessor(selfUserId, storage, content, assets, replyHashing, msgsService, convsService, convs, otr, downloadStorage)
   }
 
 }
