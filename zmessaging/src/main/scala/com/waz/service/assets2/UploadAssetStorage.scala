@@ -79,6 +79,7 @@ object UploadAssetStorage {
       Retention,
       Public,
       Encryption,
+      EncryptionSalt,
       Details,
       UploadStatus,
       AssetId
