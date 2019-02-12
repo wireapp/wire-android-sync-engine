@@ -22,7 +22,6 @@ import java.io.{InputStream, OutputStream}
 import com.waz.model.Mime
 import com.waz.service.assets2.Asset.General
 import AssetTransformationsService._
-
 import com.waz.log.ZLog2._
 import com.waz.ZLog.ImplicitTag._
 
@@ -33,12 +32,12 @@ trait AssetTransformationsService {
 object AssetTransformationsService {
 
   trait Transformation {
-    def apply(initial: InputStream, transformed: OutputStream): Mime
+    def apply(initial: () => InputStream, transformed: () => OutputStream): Mime
   }
 
   object Transformation {
-    def create(f: (InputStream, OutputStream) => Mime): Transformation = new Transformation {
-      override def apply(initial: InputStream, transformed: OutputStream): Mime = f(initial, transformed)
+    def create(f: (() => InputStream, () => OutputStream) => Mime): Transformation = new Transformation {
+      override def apply(initial: () => InputStream, transformed: () => OutputStream): Mime = f(initial, transformed)
     }
   }
 

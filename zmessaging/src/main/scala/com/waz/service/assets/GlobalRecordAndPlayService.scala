@@ -210,7 +210,7 @@ class GlobalRecordAndPlayService(cache: CacheService, context: Context, fileCach
 
   def record(key: AssetMediaKey, maxAllowedDuration: FiniteDuration): Future[(Instant, Future[RecordingResult])] = {
     def record(): Future[Next] = withAudioFocus() {
-      fileCache.createEmptyFile(CacheKey.fromAssetId(key.id).str) map { file =>
+      fileCache. createEmptyFile(CacheKey.fromAssetId(key.id).str) map { file =>
         verbose(s"started recording in file: $file")
         val promisedResult = Promise[RecordingResult]
         withCleanupOnFailure {

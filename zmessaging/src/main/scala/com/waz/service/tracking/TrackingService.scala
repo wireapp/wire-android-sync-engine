@@ -58,6 +58,20 @@ trait TrackingService {
   def trackCallState(userId: UserId, callInfo: CallInfo): Future[Unit]
 }
 
+class DummyTrackingService extends TrackingService {
+  override def events: EventStream[(Option[ZMessaging], TrackingEvent)] = EventStream()
+  override def track(event: TrackingEvent, userId: Option[UserId]): Future[Unit] = Future.successful(())
+  override def contribution(action: ContributionEvent.Action): Future[Unit] = Future.successful(())
+  override def assetContribution(assetId: AssetId, userId: UserId): Future[Unit] = Future.successful(())
+  override def exception(e: Throwable, description: String, userId: Option[UserId])(implicit tag: LogTag): Future[Unit] = Future.successful(())
+  override def crash(e: Throwable): Future[Unit] = Future.successful(())
+  override def integrationAdded(integrationId: IntegrationId, convId: ConvId, method: IntegrationAdded.Method): Future[Unit] = Future.successful(())
+  override def integrationRemoved(integrationId: IntegrationId): Future[Unit] = Future.successful(())
+  override def historyBackedUp(isSuccess: Boolean): Future[Unit] = Future.successful(())
+  override def historyRestored(isSuccess: Boolean): Future[Unit] = Future.successful(())
+  override def trackCallState(userId: UserId, callInfo: CallInfo): Future[Unit] = Future.successful(())
+}
+
 object TrackingService {
 
   type ZmsProvider = Option[UserId] => Future[Option[ZMessaging]]

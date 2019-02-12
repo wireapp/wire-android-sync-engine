@@ -396,9 +396,10 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
       //TODO Handle not only the first transformation
       (transformedContent, transformedMime, transformedDetails) <- ts.headOption match {
         case Some(transformation) => for {
-          cacheFile <- rawContentCache.createEmptyFile(assetId)
-          is <- Future.fromTry(initialContent.openInputStream(uriHelper))
-          mime = transformation(is, new FileOutputStream(cacheFile))
+          cacheFile <- rawContentCache.getOrCreateEmpty(assetId)
+          mime <- Future { transformation(() =>
+            initialContent.openInputStream(uriHelper).get, () => new FileOutputStream(cacheFile))
+          }
           content = Content.File(mime, cacheFile)
           details <- extractDetails(content, mime)
         } yield (content, mime, details)

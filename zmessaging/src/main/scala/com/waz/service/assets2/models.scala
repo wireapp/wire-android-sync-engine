@@ -21,8 +21,8 @@ import java.io.{ByteArrayInputStream, FileInputStream, InputStream}
 import java.net.URI
 
 import com.waz.model.GenericContent.Asset.{Original, Preview}
-import com.waz.model._
 import com.waz.model.GenericContent.{Asset => GenericAsset}
+import com.waz.model._
 import com.waz.model.nano.Messages
 import com.waz.model.nano.Messages.Asset.RemoteData
 import com.waz.sync.client.AssetClient2.Retention
