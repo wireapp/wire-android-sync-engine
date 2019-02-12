@@ -82,6 +82,7 @@ public class CountInputStream extends InputStream {
 
     public void close() throws IOException {
         is.close();
+        System.out.println("INPUT STREAM " + is + " HAS BEEN CLOSED");
     }
 
 }

@@ -42,6 +42,7 @@ trait FileCache[K] {
   def findBytes(key: K): Future[Option[Array[Byte]]]
 
   def get(key: K): Future[File]
+  def getOrCreateEmpty(key: K): Future[File]
   def getStream(key: K): Future[InputStream]
   def getBytes(key: K): Future[Array[Byte]]
 
@@ -110,6 +111,11 @@ abstract class BaseFileCache[K] extends FileCache[K] {
 
   override def get(key: K): Future[File] =
     failedIfEmpty(key, find(key))
+
+  override def getOrCreateEmpty(key: K): Future[File] = get(key).recoverWith {
+    case _: NotFoundLocal => createEmptyFile(key)
+    case err => Future.failed(err)
+  }
 
   override def findStream(key: K): Future[Option[InputStream]] =
     find(key).map(_.map(new FileInputStream(_)))
