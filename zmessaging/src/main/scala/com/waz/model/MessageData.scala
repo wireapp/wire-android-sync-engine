@@ -472,6 +472,11 @@ object MessageData extends ((MessageId, ConvId, Message.Type, UserId, Seq[Messag
     def findByType(conv: ConvId, tpe: Message.Type)(implicit db: DB) =
       iterating(db.query(table.name, null, s"${Conv.name} = '$conv' AND ${Type.name} = '${Type(tpe)}'", null, null, null, s"${Time.name} ASC"))
 
+    def findByTypes(types: Set[Message.Type])(implicit db: DB) = {
+      val typesString = types.map(t => s"'${Type(t)}'").mkString("(", "," , ")")
+      list(db.query(table.name, null, s"${Type.name} IN $typesString", null, null, null, s"${Time.name} ASC"))
+    }
+
     def findQuotesOf(msgId: MessageId)(implicit db: DB) = list(db.query(table.name, null, s"${Quote.name} = '$msgId'", null, null, null, null))
 
     def msgIndexCursorFiltered(conv: ConvId, types: Seq[TypeFilter], limit: Option[Int] = None)(implicit db: DB): DBCursor = {

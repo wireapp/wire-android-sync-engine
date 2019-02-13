@@ -19,6 +19,7 @@ package com.waz.db
 
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
+import com.waz.api.Message
 import com.waz.content.PropertiesDao
 import com.waz.db.ZMessagingDB.{DbVersion, daos, migrations}
 import com.waz.db.migrate._
@@ -29,10 +30,8 @@ import com.waz.model.ConversationData.ConversationDataDao
 import com.waz.model.ConversationMemberData.ConversationMemberDataDao
 import com.waz.model.EditHistory.EditHistoryDao
 import com.waz.model.ErrorData.ErrorDataDao
-import com.waz.model.GenericContent.EncryptionAlgorithm
 import com.waz.model.KeyValueData.KeyValueDataDao
 import com.waz.model.Liking.LikingDao
-import com.waz.model.{AssetData, AssetMetaData, MessageContentIndexDao}
 import com.waz.model.MessageData.MessageDataDao
 import com.waz.model.MsgDeletion.MsgDeletionDao
 import com.waz.model.NotificationData.NotificationDataDao
@@ -40,19 +39,15 @@ import com.waz.model.PushNotificationEvents.PushNotificationEventsDao
 import com.waz.model.ReadReceipt.ReadReceiptDao
 import com.waz.model.SearchQueryCache.SearchQueryCacheDao
 import com.waz.model.UserData.UserDataDao
+import com.waz.model._
 import com.waz.model.otr.UserClients.UserClientsDao
 import com.waz.model.sync.SyncJob.SyncJobDao
-import com.waz.service.push.ReceivedPushData.ReceivedPushDataDao
-import com.waz.threading.Threading
 import com.waz.service.assets2.AssetStorageImpl.AssetDao
+import com.waz.service.assets2.DownloadAssetStorage.DownloadAssetDao
 import com.waz.service.assets2.UploadAssetStorage.UploadAssetDao
 import com.waz.service.push.ReceivedPushData.ReceivedPushDataDao
 import com.waz.service.tracking.TrackingService
-import com.waz.service.assets2.DownloadAssetStorage.DownloadAssetDao
-import com.waz.utils.DbStorage2
-import com.waz.ZLog.ImplicitTag._
 
-import scala.concurrent.Await
 import scala.util.{Success, Try}
 
 class ZMessagingDB(context: Context, dbName: String, tracking: TrackingService) extends DaoDB(context.getApplicationContext, dbName, null, DbVersion, daos, migrations, tracking) {
@@ -66,7 +61,7 @@ class ZMessagingDB(context: Context, dbName: String, tracking: TrackingService) 
 }
 
 object ZMessagingDB {
-  val DbVersion = 113
+  val DbVersion = 114
 
   lazy val daos = Seq (
     UserDataDao, SearchQueryCacheDao, AssetDataDao, ConversationDataDao,
@@ -289,38 +284,32 @@ object ZMessagingDB {
       db.execSQL("UPDATE KeyValues SET value = 'true' WHERE key = 'should_sync_conversations_1'")
     },
     Migration(113, 114) { db =>
-      db.execSQL("ALTER TABLE Messages ADD COLUMN asset_id TEXT DEFAULT null")
-      import scala.concurrent.duration._
-      import com.waz.service.assets2._
       import com.waz.model.AssetData.{AssetDataDao => OldAssetDao}
       import com.waz.service.assets2.AssetStorageImpl.{AssetDao => NewAssetDao}
+      import com.waz.service.assets2._
 
+      //Create new tables
       db.execSQL(UploadAssetDao.table.createSql)
       db.execSQL(DownloadAssetDao.table.createSql)
       db.execSQL(NewAssetDao.table.createSql)
 
-      db.execSQL("ALTER TABLE Messages ADD COLUMN asset_id TEXT DEFAULT null")
-      db.execSQL("UPDATE Messages SET asset_id = id WHERE asset_id = null")
+      //Remove old assetId from user's profile pictures and sync to get the remote id instead
+      db.execSQL("UPDATE Users SET picture = null")
+      db.execSQL("UPDATE KeyValues SET value = 'true' WHERE key = 'should_sync_users'")
 
-      //TODO: Migrate users' pictures ids
-
-      val newAssetsStorage = new DbStorage2(NewAssetDao)(Threading.Background, db)
-      val oldAssetsStorage = new DbStorage2(OldAssetDao)(Threading.Background, db)
-
+      //Convert old assets to new assets (public assets won't be converted)
       def convertAsset(old: AssetData): Try[Asset[AssetDetails]] = Try {
+        val encryption = old.otrKey.map(k => AES_CBC_Encryption(AESKey2(k.bytes)))
+
         Asset(
-          id = old.id,
+          id = old.remoteId.map(rid => AssetId(rid.str)).getOrElse(old.id),
           token = old.token,
           sha = old.sha.get,
           mime = old.mime,
-          encryption = old.encryption match {
-            case Some(EncryptionAlgorithm.AES_CBC) => AES_CBC_Encryption(AESKey2(old.otrKey.get.bytes))
-            case Some(EncryptionAlgorithm.AES_GCM) => throw new IllegalArgumentException("We do not support AES GCM encryption!")
-            case _ => NoEncryption
-          },
+          encryption = encryption.getOrElse(NoEncryption),
           localSource = None, //we can not trust old information about local sources
           preview = old.previewId,
-          name = old.name.getOrElse(s"old_asset_${System.currentTimeMillis()}"),
+          name = old.name.getOrElse(s"old_asset_${old.id.str}"),
           size = old.size,
           details = old.metaData match {
             case Some(data: AssetMetaData.Video) =>
@@ -338,18 +327,27 @@ object ZMessagingDB {
         )
       }
 
-      import Threading.Implicits.Background
-      val movingAssets = for {
-        oldAssets <- oldAssetsStorage.loadAll
-        newAssets = oldAssets.view.map(convertAsset).collect { case Success(asset) => asset }
-        _ <- newAssetsStorage.saveAll(newAssets)
-      } yield ()
+      val oldAssets = OldAssetDao.list(db)
+      val newAssets = oldAssets.map(convertAsset).collect { case Success(asset) => asset }
 
-      Await.ready(movingAssets, 30.seconds)
+      newAssets.foreach { na =>
+        NewAssetDao.insertOrIgnore(na)(db)
+      }
 
-      //TODO I think that we should do it in another migration, because we may lose all assets if something will go wrong
-      //db.execSQL("DROP TABLE Assets")
+      // Add asset_id to the message data, referencing the new assets
+      db.execSQL(s"ALTER TABLE ${MessageDataDao.table.name} ADD COLUMN ${MessageDataDao.AssetId.name} TEXT DEFAULT null")
+
+      val messages = MessageDataDao.findByTypes(Set(Message.Type.ANY_ASSET, Message.Type.VIDEO_ASSET, Message.Type.AUDIO_ASSET, Message.Type.ASSET))(db)
+
+      messages.foreach { m =>
+        m.protos.lastOption match {
+          case Some(GenericMessage(_, a @ GenericContent.Asset(_, _))) if a.getUploaded != null =>
+            val newMessage = m.copy(assetId = Option(AssetId(a.getUploaded.assetId)))
+            MessageDataDao.insertOrReplace(newMessage)(db)
+          case _ =>
+            m
+        }
+      }
     }
   )
 }
-

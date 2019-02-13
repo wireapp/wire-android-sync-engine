@@ -106,7 +106,7 @@ class UserServiceImpl(selfUserId:        UserId,
   } if (shouldSync) {
     verbose(l"Syncing user data to get team ids")
     usersStorage.list()
-      .flatMap(users => sync.syncUsers(users.map(_.id).toSet - selfUserId))
+      .flatMap(users => sync.syncUsers(users.map(_.id).toSet))
       .flatMap(_ => shouldSyncUsers := false)
     }
 
