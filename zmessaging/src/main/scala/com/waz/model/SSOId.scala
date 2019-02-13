@@ -17,7 +17,6 @@
  */
 package com.waz.model
 
-import com.waz.log.ZLog2.LogShow
 import com.waz.utils.{JsonDecoder, JsonEncoder}
 import com.waz.utils.JsonDecoder.{decodeOptObject, decodeString}
 import org.json.JSONObject
@@ -41,7 +40,7 @@ object SSOId {
     override def apply(implicit js: JSONObject): SSOId = decodeSSOId(js)
   }
 
-  implicit lazy val Encoder: JsonEncoder[SSOId] = new JsonEncoder[SSOId] {
+  implicit object Encoder extends JsonEncoder[SSOId] {
     override def apply(ssoId: SSOId): JSONObject = JsonEncoder { o =>
       o.put("subject", ssoId.subject)
       o.put("tenant", ssoId.tenant)

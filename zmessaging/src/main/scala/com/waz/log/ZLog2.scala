@@ -245,6 +245,7 @@ object ZLog2 {
     implicit val ReadReceiptSettingsShow: LogShow[ReadReceiptSettings] = logShowWithToString
 
     implicit val SSOIdShow: LogShow[SSOId] = create(id => s"SSOId(subject: ${sha2(id.subject)}, tenant:${sha2(id.tenant)})")
+    implicit val ManagedByShow: LogShow[ManagedBy] = create(id => s"ManagedBy($id)")
 
     implicit val RawAssetInputLogShow: LogShow[RawAssetInput] =
       createFrom {
