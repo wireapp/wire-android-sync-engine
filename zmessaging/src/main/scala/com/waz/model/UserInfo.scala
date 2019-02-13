@@ -17,12 +17,12 @@
  */
 package com.waz.model
 
-import com.waz.model.ManagedBy
 import com.waz.log.ZLog2._
 import com.waz.model.AssetMetaData.Image
 import com.waz.model.AssetMetaData.Image.Tag
 import com.waz.model.AssetMetaData.Image.Tag.{Medium, Preview}
 import com.waz.model.AssetStatus.UploadDone
+import com.waz.model.ManagedBy.ManagedBy
 import com.waz.model.UserInfo.Service
 import com.waz.utils.{JsonDecoder, JsonEncoder}
 import org.json

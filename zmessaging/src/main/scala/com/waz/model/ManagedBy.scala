@@ -28,6 +28,7 @@ object ManagedBy {
     case u => Unknown(u)
   }
 
+  sealed trait ManagedBy extends Product with Serializable
   case object Wire extends ManagedBy {
     override def toString: String = "wire"
   }
@@ -40,7 +41,4 @@ object ManagedBy {
 
   def decodeOptManagedBy(s: Symbol)(implicit js: JSONObject): Option[ManagedBy] = decodeOptString(s).map(ManagedBy(_))
 }
-
-sealed trait ManagedBy extends Product with Serializable
-
 

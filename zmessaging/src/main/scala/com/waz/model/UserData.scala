@@ -21,6 +21,7 @@ import com.waz.api.Verification
 import com.waz.db.Col._
 import com.waz.db.Dao
 import com.waz.model
+import com.waz.model.ManagedBy.ManagedBy
 import com.waz.model.UserData.ConnectionStatus
 import com.waz.service.SearchKey
 import com.waz.sync.client.UserSearchClient.UserSearchEntry
@@ -239,17 +240,17 @@ object UserData {
     val ProviderId = opt(id[ProviderId]('provider_id))(_.providerId)
     val IntegrationId = opt(id[IntegrationId]('integration_id))(_.integrationId)
     val ExpiresAt = opt(remoteTimestamp('expires_at))(_.expiresAt)
-    val ManagedBy = opt(text('managed_by))(_.managedBy.map(_.toString))
+    val Managed = opt(text[ManagedBy]('managed_by, _.toString, ManagedBy(_)))(_.managedBy)
 
     override val idCol = Id
     override val table = Table(
       "Users", Id, TeamId, Name, Email, Phone, TrackingId, Picture, Accent, SKey, Conn, ConnTime, ConnMessage,
-      Conversation, Rel, Timestamp, DisplayName, Verified, Deleted, AvailabilityStatus, Handle, ProviderId, IntegrationId, ExpiresAt, ManagedBy
+      Conversation, Rel, Timestamp, DisplayName, Verified, Deleted, AvailabilityStatus, Handle, ProviderId, IntegrationId, ExpiresAt, Managed
     )
 
     override def apply(implicit cursor: DBCursor): UserData = new UserData(
       Id, TeamId, Name, Email, Phone, TrackingId, Picture, Accent, SKey, Conn, RemoteInstant.ofEpochMilli(ConnTime.getTime), ConnMessage,
-      Conversation, Rel, Timestamp, DisplayName, Verified, Deleted, AvailabilityStatus, Handle, ProviderId, IntegrationId, ExpiresAt, ManagedBy.map(model.ManagedBy(_))
+      Conversation, Rel, Timestamp, DisplayName, Verified, Deleted, AvailabilityStatus, Handle, ProviderId, IntegrationId, ExpiresAt, Managed
     )
 
     override def onCreate(db: DB): Unit = {
