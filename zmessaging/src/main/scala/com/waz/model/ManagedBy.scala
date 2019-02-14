@@ -28,14 +28,14 @@ object ManagedBy {
     case u => Unknown(u)
   }
 
-  sealed trait ManagedBy extends Product with Serializable
-  case object Wire extends ManagedBy {
+  sealed trait ManagedBy
+  final case object Wire extends ManagedBy {
     override def toString: String = "wire"
   }
-  case object SCIM extends ManagedBy {
+  final case object SCIM extends ManagedBy {
     override def toString: String = "scim"
   }
-  sealed case class Unknown(str: String) extends ManagedBy {
+  final case class Unknown(str: String) extends ManagedBy {
     override def toString: String = str
   }
 

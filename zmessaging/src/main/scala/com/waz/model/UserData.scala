@@ -62,7 +62,7 @@ case class UserData(override val id:       UserId,
   def isAcceptedOrPending = connection == ConnectionStatus.Accepted || connection == ConnectionStatus.PendingFromOther || connection == ConnectionStatus.PendingFromUser
   def isVerified = verified == Verification.VERIFIED
   def isAutoConnect = isConnected && ! isSelf && connectionMessage.isEmpty
-  def isReadOnlyProfile = managedBy.nonEmpty && !managedBy.contains(ManagedBy.Wire)
+  def isReadOnlyProfile = managedBy.exists(_ != ManagedBy.Wire) //if none or "Wire", then it's not read only.
   lazy val isWireBot = integrationId.nonEmpty
 
   def getDisplayName = if (displayName.isEmpty) name else displayName
