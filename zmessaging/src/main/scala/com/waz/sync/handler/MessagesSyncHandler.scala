@@ -21,27 +21,26 @@ import com.waz.ZLog.ImplicitTag._
 import com.waz.ZLog._
 import com.waz.api.Message
 import com.waz.api.impl.ErrorResponse
-import com.waz.api.impl.ErrorResponse.{Cancelled, internalError}
+import com.waz.api.impl.ErrorResponse.internalError
 import com.waz.cache.CacheService
 import com.waz.content.{MembersStorage, MessagesStorage}
 import com.waz.model.AssetData.{ProcessingTaskKey, UploadTaskKey}
-import com.waz.model.AssetStatus.Syncable
 import com.waz.model.GenericContent.{Ephemeral, Knock, Location, MsgEdit}
 import com.waz.model.GenericMessage.TextMessage
 import com.waz.model._
+import com.waz.model.errors._
 import com.waz.model.sync.ReceiptType
-import com.waz.service.{ErrorsService, Timeouts}
 import com.waz.service.assets2.Asset.{General, Image, UploadGeneral}
 import com.waz.service.assets2.{AssetService, _}
-import com.waz.service.conversation.{ConversationOrderEventsService, ConversationsContentUpdater}
+import com.waz.service.conversation.ConversationsContentUpdater
 import com.waz.service.messages.{MessagesContentUpdater, MessagesService}
 import com.waz.service.otr.OtrClientsService
 import com.waz.service.tracking.TrackingService
+import com.waz.service.{ErrorsService, Timeouts}
 import com.waz.sync.SyncHandler.RequestInfo
 import com.waz.sync.SyncResult.Failure
-import com.waz.sync.client.{ErrorOr, ErrorOrResponse}
+import com.waz.sync.client.ErrorOrResponse
 import com.waz.sync.otr.OtrSyncHandler
-import com.waz.sync.queue.ConvLock
 import com.waz.sync.{SyncResult, SyncServiceHandle}
 import com.waz.threading.CancellableFuture
 import com.waz.utils._
@@ -62,7 +61,7 @@ class MessagesSyncHandler(selfUserId: UserId,
                           sync:       SyncServiceHandle,
                           assets:     AssetService,
                           assetStorage: AssetStorage,
-                          rawAssetStorage: UploadAssetStorage,
+                          uploadAssetStorage: UploadAssetStorage,
                           cache:      CacheService,
                           members:    MembersStorage,
                           tracking:   TrackingService,
@@ -271,7 +270,7 @@ class MessagesSyncHandler(selfUserId: UserId,
             CancellableFuture.failed(FailedExpectationsError("We should never get not ready preview in this place"))
         }
         _ <- (previewAsset match {
-          case Some(p) => rawAssetStorage.update(uploadAssetOriginal.id, _.copy(preview = RawPreviewUploaded(p.id)))
+          case Some(p) => uploadAssetStorage.update(uploadAssetOriginal.id, _.copy(preview = RawPreviewUploaded(p.id)))
           case None => Future.successful(())
         }).toCancellable
         asset <- assets.uploadAsset(uploadAssetOriginal.id)
@@ -287,7 +286,7 @@ class MessagesSyncHandler(selfUserId: UserId,
     //want to wait until asset meta and preview data is loaded before we send any messages
     for {
       _ <- AssetProcessing.get(ProcessingTaskKey(msg.assetId.get))
-      rawAsset <- rawAssetStorage.find(msg.assetId.collect { case id: UploadAssetId => id }.get).toCancellable
+      rawAsset <- uploadAssetStorage.find(msg.assetId.collect { case id: UploadAssetId => id }.get).toCancellable
       result <- rawAsset match {
         case None =>
           CancellableFuture.successful(Left(internalError(s"no asset found for msg: $msg")))
@@ -319,22 +318,31 @@ class MessagesSyncHandler(selfUserId: UserId,
     } yield ()
   }
 
-  def postAssetStatus(cid: ConvId, mid: MessageId, expiration: Option[FiniteDuration], status: Syncable): Future[SyncResult] = ??? //TODO
-//  {
-//    def post(conv: ConversationData, asset: AssetData): ErrorOr[Unit] =
-//      if (asset.status != status) successful(Left(internalError(s"asset $asset should have status $status")))
-//      else status match {
-//        case UploadCancelled => otrSync.postOtrMessage(conv.id, GenericMessage(mid.uid, expiration, Proto.Asset(asset))).flatMapRight(_ => storage.remove(mid))
-//        case UploadFailed if asset.isImage => successful(Left(internalError(s"upload failed for image $asset")))
-//        case UploadFailed => otrSync.postOtrMessage(conv.id, GenericMessage(mid.uid, expiration, Proto.Asset(asset))).mapRight(_ => ())
-//      }
-//
-//    for {
-//      conv   <- convs.storage.get(cid) or internalError(s"conversation $cid not found")
-//      msg    <- storage.get(mid) or internalError(s"message $mid not found")
-//      aid    = msg.right.map(_.assetId)
-//      asset  <- aid.flatMapFuture(id => assets.getAssetData(id).or(internalError(s"asset $id not found")))
-//      result <- conv.flatMapFuture(c => asset.flatMapFuture(a => post(c, a)))
-//    } yield result.fold(SyncResult(_), _ => SyncResult.Success)
-//  }
+  def postAssetStatus(cid: ConvId, mid: MessageId, expiration: Option[FiniteDuration], statusToPost: UploadAssetStatus): Future[SyncResult] = {
+    val result = for {
+      (conv, msg) <- convs.storage.get(cid).map(_.get) zip storage.get(mid).map(_.get)
+      uploadAsset <- msg.assetId match {
+        case Some(id: UploadAssetId) => uploadAssetStorage.get(id)
+        case _ => Future.failed(FailedExpectationsError(s"We expect not uploaded asset id. Got ${msg.assetId}."))
+      }
+      uploadAssetPreview <- uploadAsset.preview match {
+        case RawPreviewUploaded(id) => assetStorage.find(id)
+        case _ => Future.successful(None)
+      }
+      genericAsset <- uploadAsset.status match {
+        case assetStatus if assetStatus == statusToPost =>
+          Future.successful(Proto.Asset(uploadAsset.asInstanceOf[UploadAsset[General]], uploadAssetPreview, expectsReadConfirmation = false))
+        case assetStatus =>
+          Future.failed(FailedExpectationsError(s"We expect uploaded asset status $statusToPost. Got $assetStatus."))
+      }
+      message = GenericMessage(mid.uid, expiration, genericAsset)
+      _ <- otrSync.postOtrMessage(conv.id, message)
+      _ <- statusToPost match {
+        case UploadAssetStatus.Cancelled => storage.remove(msg.id)
+        case _ => Future.successful(())
+      }
+    } yield ()
+
+    result.modelToEither.map(_.fold(SyncResult.apply, _ => SyncResult.Success))
+  }
 }
