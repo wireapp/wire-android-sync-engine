@@ -88,7 +88,7 @@ case class UserData(override val id:       UserId,
     expiresAt = user.expiresAt.orElse(expiresAt),
     teamId = user.teamId.orElse(teamId),
     managedBy = user.managedBy.orElse(managedBy),
-    fields = if(user.fields.isEmpty) fields else user.fields.get
+    fields = user.fields.getOrElse(fields)
   )
 
   def updated(user: UserSearchEntry): UserData = copy(
