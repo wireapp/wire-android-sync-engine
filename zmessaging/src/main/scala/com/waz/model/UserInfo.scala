@@ -117,7 +117,7 @@ object UserInfo {
       val privateMode = decodeOptBoolean('privateMode)
       val ssoId = SSOId.decodeOptSSOId('sso_id)
       val managedBy = ManagedBy.decodeOptManagedBy('managed_by)
-      val fields = UserField.decodeUserFields('fields)
+      val fields = UserField.decodeOptUserFields('fields)
       UserInfo(
         id, 'name, accentId, 'email, 'phone, Some(pic), decodeOptString('tracking_id) map (TrackingId(_)),
         deleted = 'deleted, handle = 'handle, privateMode = privateMode, service = decodeOptService('service),

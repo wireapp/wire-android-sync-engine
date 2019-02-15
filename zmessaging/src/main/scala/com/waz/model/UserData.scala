@@ -56,7 +56,7 @@ case class UserData(override val id:       UserId,
                     integrationId:         Option[IntegrationId]  = None,
                     expiresAt:             Option[RemoteInstant]  = None,
                     managedBy:             Option[ManagedBy]      = None,
-                    fields:                Option[Seq[UserField]] = None) extends Identifiable[UserId] {
+                    fields:                Seq[UserField]         = Seq.empty) extends Identifiable[UserId] {
 
   def isConnected = ConnectionStatus.isConnected(connection)
   def hasEmailOrPhone = email.isDefined || phone.isDefined
@@ -88,7 +88,7 @@ case class UserData(override val id:       UserId,
     expiresAt = user.expiresAt.orElse(expiresAt),
     teamId = user.teamId.orElse(teamId),
     managedBy = user.managedBy.orElse(managedBy),
-    fields = user.fields.orElse(fields)
+    fields = if(user.fields.isEmpty) fields else user.fields.get
   )
 
   def updated(user: UserSearchEntry): UserData = copy(
@@ -214,7 +214,7 @@ object UserData {
       v.integrationId.foreach { iId => o.put("integrationId", iId.str) }
       v.expiresAt.foreach(v => o.put("expires_at", v))
       v.managedBy.foreach(o.put("managed_by", _))
-      v.fields.foreach(v => o.put("fields", JsonEncoder.arr(v.seq)))
+      o.put("fields", JsonEncoder.arr(v.fields))
     }
   }
 
@@ -243,7 +243,7 @@ object UserData {
     val IntegrationId = opt(id[IntegrationId]('integration_id))(_.integrationId)
     val ExpiresAt = opt(remoteTimestamp('expires_at))(_.expiresAt)
     val Managed = opt(text[ManagedBy]('managed_by, _.toString, ManagedBy(_)))(_.managedBy)
-    val Fields = opt(json[Seq[UserField]]('fields))(_.fields)
+    val Fields = json[Seq[UserField]]('fields)(UserField.userFieldsDecoder, UserField.userFieldsEncoder)(_.fields)
 
     override val idCol = Id
     override val table = Table(
