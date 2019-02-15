@@ -27,10 +27,38 @@ import scala.concurrent.ExecutionContext
 
 object HttpClient {
 
-  type ProgressCallback = Progress => Unit
-
   case class Progress(progress: Long, total: Option[Long]) {
     val isCompleted: Boolean = total.forall(_ == progress)
+  }
+
+  trait ProgressFilter {
+    def needPublishProgress(progress: Long, total: Option[Long]): Boolean
+  }
+
+  object ProgressFilter {
+
+    def steps(n: Long, totalBytes: Long): ProgressFilter = new ProgressFilter {
+      private val stepSize: Long = totalBytes / n
+      @volatile var lastStep: Long = 0
+      override def needPublishProgress(progress: Long, total: Option[Long]): Boolean = {
+        val step = progress / stepSize
+        if (step - lastStep >= 1) {
+          lastStep = step
+          true
+        } else false
+      }
+    }
+
+  }
+
+  trait ProgressCallback {
+    def updated(progress: Long, total: Option[Long]): Unit
+  }
+
+  class FilteredProgressCallback(filter: ProgressFilter, callback: ProgressCallback) extends ProgressCallback {
+    override final def updated(progress: Long, total: Option[Long]): Unit = {
+      if (filter.needPublishProgress(progress, total)) callback.updated(progress, total)
+    }
   }
 
   case class ErrorResponse(response: Response[Body]) extends Throwable

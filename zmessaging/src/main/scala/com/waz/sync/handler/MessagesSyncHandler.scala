@@ -320,6 +320,7 @@ class MessagesSyncHandler(selfUserId: UserId,
 
   def postAssetStatus(cid: ConvId, mid: MessageId, expiration: Option[FiniteDuration], statusToPost: UploadAssetStatus): Future[SyncResult] = {
     val result = for {
+      //TODO Use new storage to avoid explicit 'Option.get'
       (conv, msg) <- convs.storage.get(cid).map(_.get) zip storage.get(mid).map(_.get)
       uploadAsset <- msg.assetId match {
         case Some(id: UploadAssetId) => uploadAssetStorage.get(id)

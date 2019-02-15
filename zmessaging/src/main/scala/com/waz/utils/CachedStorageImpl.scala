@@ -22,7 +22,7 @@ import com.waz.ZLog._
 import com.waz.content.Database
 import com.waz.db.DaoIdOps
 import com.waz.model.errors.NotFoundLocal
-import com.waz.threading.{SerialDispatchQueue, Threading}
+import com.waz.threading.SerialDispatchQueue
 import com.waz.utils.ContentChange.{Added, Removed, Updated}
 import com.waz.utils.events._
 import com.waz.utils.wrappers.DB
@@ -76,7 +76,9 @@ trait Storage2[K, V <: Identifiable[K]] {
     find(key).flatMap {
       case None => Future.successful(None)
       case Some(value) =>
+        import com.waz.ZLog.ImplicitTag._
         val updated = updater(value)
+        verbose(s"Updating db row: $updated")
         save(updated).map(_ => Some(value -> updated))
     }
 }

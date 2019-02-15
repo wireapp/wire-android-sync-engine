@@ -34,6 +34,7 @@ import com.waz.model.otr.ClientId
 import com.waz.model.sync.SyncRequest._
 import com.waz.model.sync.{SyncJob, SyncRequest}
 import com.waz.service.SearchKey
+import com.waz.service.assets2.UploadAssetStatus
 import com.waz.service.messages.MessageAndLikes
 import com.waz.sync.client.AuthenticationManager.AccessToken
 import com.waz.sync.client.OpenGraphClient.{OpenGraphData, OpenGraphImage}
@@ -155,6 +156,7 @@ object Generators {
   implicit lazy val arbAssetStatus: Arbitrary[AssetStatus] = Arbitrary(frequency((2, oneOf[AssetStatus](AssetStatus.UploadNotStarted,
     AssetStatus.UploadInProgress, AssetStatus.UploadCancelled, AssetStatus.UploadFailed, AssetStatus.UploadDone, AssetStatus.DownloadFailed))))
   implicit lazy val arbSyncableAssetStatus: Arbitrary[AssetStatus.Syncable] = Arbitrary(oneOf(AssetStatus.UploadCancelled, AssetStatus.UploadFailed))
+  implicit lazy val arbUploadAssetStatus: Arbitrary[UploadAssetStatus] = Arbitrary(oneOf(UploadAssetStatus.Cancelled, UploadAssetStatus.InProgress))
   implicit lazy val arbAssetToken: Arbitrary[AssetToken] = Arbitrary(resultOf(AssetToken))
   implicit lazy val arbOtrKey: Arbitrary[AESKey] = Arbitrary(sideEffect(AESKey()))
   implicit lazy val arbSha256: Arbitrary[Sha256] = Arbitrary(arbitrary[Array[Byte]].map(b => Sha256(sha2(b))))
