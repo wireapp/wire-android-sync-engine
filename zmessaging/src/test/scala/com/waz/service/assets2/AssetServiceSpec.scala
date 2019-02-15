@@ -27,6 +27,7 @@ import com.waz.api.impl.ErrorResponse
 import com.waz.model.errors.NotFoundLocal
 import com.waz.model.{AssetId, Mime, Sha256, UploadAssetId}
 import com.waz.service.assets2.Asset.UploadGeneral
+import com.waz.sync.SyncServiceHandle
 import com.waz.sync.client.AssetClient2.{FileWithSha, Retention}
 import com.waz.sync.client.{AssetClient2, AssetClient2Impl}
 import com.waz.threading.CancellableFuture
@@ -49,6 +50,7 @@ class AssetServiceSpec extends ZIntegrationMockSpec with AuthenticationConfig {
   private val rawCache            = mock[RawAssetContentCache]
   private val client              = mock[AssetClient2]
   private val uriHelperMock       = mock[UriHelper]
+  private val syncHandle          = mock[SyncServiceHandle]
 
   private val testAssetContent = returning(Array.ofDim[Byte](128))(Random.nextBytes)
 
@@ -86,7 +88,8 @@ class AssetServiceSpec extends ZIntegrationMockSpec with AuthenticationConfig {
       uriHelperMock,
       cache,
       rawCache,
-      client
+      client,
+      syncHandle
     )
 
   feature("Assets") {

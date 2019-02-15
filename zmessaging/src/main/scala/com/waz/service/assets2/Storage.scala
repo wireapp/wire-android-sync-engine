@@ -21,12 +21,18 @@ import android.util.Base64
 import com.waz.model._
 import com.waz.sync.client.AssetClient2.Retention
 
-trait Codec[From, To] {
+trait Serializer[From, To] {
   def serialize(value: From): To
+}
+
+trait Deserializer[From, To] {
   def deserialize(value: To): From
 }
 
+trait Codec[From, To] extends Serializer[From, To] with Deserializer[From, To]
+
 object Codec {
+  def apply[From, To](implicit codec: Codec[From, To]): Codec[From, To] = codec
   def create[From, To](to: From => To, from: To => From): Codec[From, To] =
     new Codec[From, To] {
       override def serialize(value: From): To   = to(value)

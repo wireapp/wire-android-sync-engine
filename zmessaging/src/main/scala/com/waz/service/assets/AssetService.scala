@@ -196,7 +196,9 @@ class AssetServiceImpl(storage:         AssetsStorage,
     storage.updateAsset(id, { a => if (a.status > UploadInProgress) a else a.copy(status = status) }) flatMap {
       case Some(_) =>
         messages.get(MessageId(id.str)) flatMap {
-          case Some(m) => sync.postAssetStatus(m.id, m.convId, m.ephemeral, status)
+          case Some(m) =>
+            //sync.postAssetStatus(m.id, m.convId, m.ephemeral, status)
+            Future.successful(())
           case None =>
             warn(l"No message found for asset upload: $id")
             Future.successful(())

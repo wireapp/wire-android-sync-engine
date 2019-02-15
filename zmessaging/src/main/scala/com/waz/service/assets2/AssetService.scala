@@ -22,13 +22,17 @@ import java.security.{DigestInputStream, MessageDigest}
 
 import com.waz.ZLog.ImplicitTag._
 import com.waz.ZLog._
-import com.waz.model._
+import com.waz.log.ZLog2.warn
+import com.waz.model.AssetData.{ProcessingTaskKey, UploadTaskKey}
+import com.waz.model.AssetStatus.UploadCancelled
+import com.waz.model.{AssetStatus, _}
 import com.waz.model.errors._
 import com.waz.service.assets2.Asset.{General, UploadGeneral, Video}
+import com.waz.sync.SyncServiceHandle
 import com.waz.sync.client.AssetClient2.{AssetContent, Metadata, Retention, UploadResponse2}
 import com.waz.sync.client.{AssetClient2, ErrorOrResponse}
 import com.waz.threading.CancellableFuture
-import com.waz.utils.IoUtils
+import com.waz.utils.{AssetProcessing, Cancellable, IoUtils}
 import com.waz.utils.events.Signal
 import com.waz.utils.streams.CountInputStream
 import com.waz.znet2.http.HttpClient._
@@ -43,7 +47,7 @@ trait AssetService {
   def downloadProgress(id: DownloadAssetId): Signal[Progress]
   def uploadProgress(id: UploadAssetId): Signal[Progress]
 
-  def cancelUpload(id: UploadAssetId): Unit
+  def cancelUpload(id: UploadAssetId, message: MessageData): Future[Unit]
   def cancelDownload(id: DownloadAssetId): Unit
 
   def getAsset(id: AssetId): Future[Asset[General]]
@@ -74,7 +78,8 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
                        uriHelper: UriHelper,
                        contentCache: AssetContentCache,
                        rawContentCache: RawAssetContentCache,
-                       assetClient: AssetClient2)
+                       assetClient: AssetClient2,
+                       sync: SyncServiceHandle)
                       (implicit ec: ExecutionContext) extends AssetService {
 
 
@@ -108,7 +113,18 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
   override def uploadProgress(id: UploadAssetId): Signal[Progress] =
     assetStatusSignal(id).collect { case (_, Some(progress)) => progress }
 
-  override def cancelUpload(id: UploadAssetId): Unit = () //TODO
+  override def cancelUpload(id: UploadAssetId, message: MessageData): Future[Unit] = {
+    import scala.concurrent.duration._
+    for {
+      _ <- Cancellable.cancel(UploadTaskKey(id))
+      _ <- CancellableFuture.timeout(3.seconds).future
+      _ <- uploadAssetStorage.update(id, asset => {
+        if (asset.status == AssetStatus.Done) asset
+        else asset.copy(status = UploadAssetStatus.Cancelled)
+      })
+      _ <- sync.postAssetStatus(message.id, message.convId, message.ephemeral, UploadAssetStatus.Cancelled)
+    } yield ()
+  }
 
   override def cancelDownload(id: DownloadAssetId): Unit = () //TODO
 
@@ -248,10 +264,15 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
         () => getRawAssetContent(asset).map(asset.encryption.encrypt(_, asset.encryptionSalt)),
         Some(asset.size)
       )
-      val uploadCallback: ProgressCallback = (p: Progress) => {
-        uploadAssetStorage.save(asset.copy(uploaded = p.progress))
-        ()
-      }
+      val uploadCallback: ProgressCallback = new FilteredProgressCallback(
+        ProgressFilter.steps(100, asset.size),
+        new ProgressCallback {
+          override def updated(progress: Long, total: Option[Long]): Unit = {
+            uploadAssetStorage.update(asset.id, _.copy(uploaded = progress))
+            ()
+          }
+        }
+      )
       assetClient.uploadAsset(metadata, content, Some(uploadCallback))
     }
 
@@ -330,7 +351,6 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
     } yield rawAsset
   }
 
-  //TODO Sha256, Sha256 encrypted, size encrypted, md5 can be calculate at once by Streams composition
   private def createRawAsset(contentForUpload: ContentForUpload,
                              targetEncryption: Encryption,
                              public: Boolean,

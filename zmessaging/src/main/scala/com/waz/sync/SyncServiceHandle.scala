@@ -27,6 +27,7 @@ import com.waz.model.sync.SyncJob.Priority
 import com.waz.model.sync._
 import com.waz.model.{AccentColor, Availability, _}
 import com.waz.service._
+import com.waz.service.assets2.UploadAssetStatus
 import com.waz.sync.SyncResult.Failure
 import com.waz.threading.Threading
 import org.threeten.bp.Instant
@@ -57,7 +58,7 @@ trait SyncServiceHandle {
   def postMessage(id: MessageId, conv: ConvId, editTime: RemoteInstant): Future[SyncId]
   def postDeleted(conv: ConvId, msg: MessageId): Future[SyncId]
   def postRecalled(conv: ConvId, currentMsgId: MessageId, recalledMsgId: MessageId): Future[SyncId]
-  def postAssetStatus(id: MessageId, conv: ConvId, exp: Option[FiniteDuration], status: AssetStatus.Syncable): Future[SyncId]
+  def postAssetStatus(id: MessageId, conv: ConvId, exp: Option[FiniteDuration], status: UploadAssetStatus): Future[SyncId]
   def postLiking(id: ConvId, liking: Liking): Future[SyncId]
   def postConnection(user: UserId, name: Name, message: String): Future[SyncId]
   def postConnectionStatus(user: UserId, status: ConnectionStatus): Future[SyncId]
@@ -138,7 +139,7 @@ class AndroidSyncServiceHandle(account: UserId, service: SyncRequestService, tim
   def postMessage(id: MessageId, conv: ConvId, time: RemoteInstant) = addRequest(PostMessage(conv, id, time), forceRetry = true)
   def postDeleted(conv: ConvId, msg: MessageId) = addRequest(PostDeleted(conv, msg))
   def postRecalled(conv: ConvId, msg: MessageId, recalled: MessageId) = addRequest(PostRecalled(conv, msg, recalled))
-  def postAssetStatus(id: MessageId, conv: ConvId, exp: Option[FiniteDuration], status: AssetStatus.Syncable) = addRequest(PostAssetStatus(conv, id, exp, status))
+  def postAssetStatus(id: MessageId, conv: ConvId, exp: Option[FiniteDuration], status: UploadAssetStatus) = addRequest(PostAssetStatus(conv, id, exp, status))
   def postAddressBook(ab: AddressBook) = addRequest(PostAddressBook(ab))
   def postConnection(user: UserId, name: Name, message: String) = addRequest(PostConnection(user, name, message))
   def postConnectionStatus(user: UserId, status: ConnectionStatus) = addRequest(PostConnectionStatus(user, Some(status)))
