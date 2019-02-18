@@ -154,7 +154,7 @@ class MessageEventProcessor(selfUserId:          UserId,
 
       case asset: Asset if DownloadAsset.getStatus(asset) == DownloadAssetStatus.Cancelled =>
         verbose(l"Uploader cancelled asset: $id")
-        val asset2 = DownloadAsset.create(asset)
+        val asset2 = downloadAsset.map(_.copy(status = DownloadAssetStatus.Cancelled)).getOrElse(DownloadAsset.create(asset))
         List((asset2, None))
 
       case asset: Asset =>
