@@ -213,6 +213,7 @@ object ZLog2 {
     implicit val PlaybackRouteLogShow:      LogShow[PlaybackRoute]                         = LogShow.create(_.name())
     implicit val VerificationLogShow:       LogShow[Verification]                          = LogShow.create(_.name())
     implicit val NotificationTypeLogShow:   LogShow[NotificationsHandler.NotificationType] = LogShow.create(_.name())
+    implicit val MediaProviderLogShow:      LogShow[MediaProvider]                         = LogShow.create(_.name())
 
     //wire types
     implicit val UidShow:        LogShow[Uid]        = logShowWithHash
