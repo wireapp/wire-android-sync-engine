@@ -20,7 +20,6 @@ package com.waz.sync.client
 import java.io.{BufferedOutputStream, File, FileOutputStream, InputStream}
 import java.security.{DigestOutputStream, MessageDigest}
 
-import com.waz.ZLog.ImplicitTag.implicitLogTag
 import com.waz.api.impl.ErrorResponse
 import com.waz.cache.Expiration
 import com.waz.model._
@@ -50,7 +49,7 @@ trait AssetClient2 {
     * Loads a public asset with no checksum/encryption/name/size/mime.
     * Usually reserved for profile pictures.
     */
-  def loadPublicAssetContent(assetId: PublicAssetId, convId: Option[ConvId], callback: Option[ProgressCallback]): ErrorOrResponse[InputStream]
+  def loadPublicAssetContent(assetId: AssetId, convId: Option[ConvId], callback: Option[ProgressCallback]): ErrorOrResponse[InputStream]
 }
 
 class AssetClient2Impl(implicit
@@ -90,7 +89,7 @@ class AssetClient2Impl(implicit
       .withErrorType[ErrorResponse]
       .executeSafe
   }
-  override def loadPublicAssetContent(assetId: PublicAssetId,
+  override def loadPublicAssetContent(assetId: AssetId,
                                       convId: Option[ConvId],
                                       callback: Option[ProgressCallback]): ErrorOrResponse[InputStream] = {
     val assetPath = convId.fold(

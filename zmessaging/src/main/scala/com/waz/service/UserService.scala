@@ -21,7 +21,7 @@ import com.waz.ZLog.ImplicitTag._
 import com.waz.log.ZLog2._
 import com.waz.content._
 import com.waz.model.AccountData.Password
-import com.waz.model.UserData.ConnectionStatus
+import com.waz.model.UserData.{ConnectionStatus, Picture}
 import com.waz.model.{AccentColor, _}
 import com.waz.service.EventScheduler.Stage
 import com.waz.service.UserService._
@@ -311,10 +311,11 @@ class UserServiceImpl(selfUserId:        UserId,
   }
 
   override def updateSelfPicture(content: Content) = {
-    val asset = assets.createAndSaveRawAsset(ContentForUpload("profile-picture", content) , NoEncryption, public = true, Retention.Eternal, None)
-    asset.flatMap { a =>
-      updateAndSync(_.copy(picture = Some(a.id)), _ => sync.postSelfPicture(None))
-    }
+    val contentForUpload = ContentForUpload("profile-picture", content)
+    for {
+      asset <- assets.createAndSaveRawAsset(contentForUpload, NoEncryption, public = true, Retention.Eternal, None)
+      _ <- updateAndSync(_.copy(picture = Some(Picture.NotUploaded(asset.id))), _ => sync.postSelfPicture(None))
+    } yield ()
   }
 
   private def updateAndSync(updater: UserData => UserData, sync: UserData => Future[_]) =

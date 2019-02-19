@@ -22,19 +22,17 @@ import java.security.{DigestInputStream, MessageDigest}
 
 import com.waz.ZLog.ImplicitTag._
 import com.waz.ZLog._
-import com.waz.log.ZLog2.warn
-import com.waz.model.AssetData.{ProcessingTaskKey, UploadTaskKey}
-import com.waz.model.AssetStatus.UploadCancelled
-import com.waz.model.{AssetStatus, _}
+import com.waz.model.AssetData.UploadTaskKey
+import com.waz.model._
 import com.waz.model.errors._
 import com.waz.service.assets2.Asset.{General, UploadGeneral, Video}
 import com.waz.sync.SyncServiceHandle
 import com.waz.sync.client.AssetClient2.{AssetContent, Metadata, Retention, UploadResponse2}
 import com.waz.sync.client.{AssetClient2, ErrorOrResponse}
 import com.waz.threading.CancellableFuture
-import com.waz.utils.{AssetProcessing, Cancellable, IoUtils}
 import com.waz.utils.events.Signal
 import com.waz.utils.streams.CountInputStream
+import com.waz.utils.{Cancellable, IoUtils}
 import com.waz.znet2.http.HttpClient._
 import com.waz.znet2.http.ResponseCode
 
@@ -64,7 +62,7 @@ trait AssetService {
                             public: Boolean,
                             retention: Retention,
                             messageId: Option[MessageId]): Future[UploadAsset[General]]
-  def loadPublicContentById(assetId: PublicAssetId, convId: Option[ConvId], callback: Option[ProgressCallback] = None): CancellableFuture[InputStream]
+  def loadPublicContentById(assetId: AssetId, convId: Option[ConvId], callback: Option[ProgressCallback] = None): CancellableFuture[InputStream]
   def loadUploadContentById(uploadAssetId: UploadAssetId, callback: Option[ProgressCallback] = None): CancellableFuture[InputStream]
 }
 
@@ -130,9 +128,6 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
 
   override def getAsset(id: AssetId): Future[Asset[General]] =
     assetsStorage.get(id)
-
-  def getPublicAsset(id: PublicAssetId): Future[Option[Asset[General]]] =
-    assetsStorage.find(AssetId(id.toString))
 
   override def save(asset: GeneralAsset): Future[Unit] = asset match {
     case a: Asset[General] => assetsStorage.save(a)
@@ -202,7 +197,7 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
       .toCancellable
   }
 
-  override def loadPublicContentById(assetId: PublicAssetId, convId: Option[ConvId], callback: Option[ProgressCallback] = None): CancellableFuture[InputStream] =
+  override def loadPublicContentById(assetId: AssetId, convId: Option[ConvId], callback: Option[ProgressCallback] = None): CancellableFuture[InputStream] =
     assetClient.loadPublicAssetContent(assetId, convId, callback).flatMap{
       case Left(err) => CancellableFuture.failed(err)
       case Right(i) => CancellableFuture.successful(i)

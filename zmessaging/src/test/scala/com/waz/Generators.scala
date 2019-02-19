@@ -26,6 +26,7 @@ import com.waz.model.AssetMetaData.Image.Tag.{Medium, Preview}
 import com.waz.model.ConversationData.{ConversationType, UnreadCount}
 import com.waz.model.GenericContent.{EncryptionAlgorithm, Text}
 import com.waz.model.SearchQuery.{Recommended, TopPeople}
+import com.waz.model.UserData.Picture
 import com.waz.model.UserData.ConnectionStatus
 import com.waz.model.UserInfo.ProfilePicture
 import com.waz.model._
@@ -91,7 +92,7 @@ object Generators {
     email                 <- arbitrary[Option[EmailAddress]]
     phone                 <- arbitrary[Option[PhoneNumber]]
     trackingId            <- arbitrary[Option[TrackingId]]
-    picture               <- arbitrary[Option[PublicAssetId]]
+    picture               <- arbitrary[Option[Picture]]
     accent                <- arbitrary[Int]
     searchKey             = SearchKey(name)
     connection            <- arbitrary[ConnectionStatus]
@@ -243,7 +244,7 @@ object Generators {
   implicit lazy val arbRAssetDataId: Arbitrary[RAssetId] = Arbitrary(sideEffect(RAssetId()))
   implicit lazy val arbAssetIdGeneral: Arbitrary[AssetIdGeneral] = Arbitrary(sideEffect(AssetId()))
   implicit lazy val arbAssetId: Arbitrary[AssetId]       = Arbitrary(sideEffect(AssetId()))
-  implicit lazy val arbPublicAssetId: Arbitrary[PublicAssetId]       = Arbitrary(sideEffect(PublicAssetId()))
+  implicit lazy val arbPublicAssetId: Arbitrary[Picture]       = Arbitrary(sideEffect(Picture.Uploaded(AssetId())))
   implicit lazy val arbSyncId: Arbitrary[SyncId]         = Arbitrary(sideEffect(SyncId()))
   implicit lazy val arbGcmId: Arbitrary[PushToken]           = Arbitrary(sideEffect(PushToken()))
   implicit lazy val arbMessageId: Arbitrary[MessageId]   = Arbitrary(sideEffect(MessageId()))

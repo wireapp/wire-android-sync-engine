@@ -17,8 +17,6 @@
  */
 package com.waz.model
 
-import java.nio.ByteBuffer
-import java.nio.charset.Charset
 import java.net.URL
 import java.nio.ByteBuffer
 import java.nio.charset.Charset
@@ -376,7 +374,7 @@ object MessageData extends ((MessageId, ConvId, Message.Type, UserId, Seq[Messag
     val Quote         = opt(id[MessageId]('quote))(_.quote.map(_.message))
     val QuoteValidity = bool('quote_validity)(_.quote.exists(_.validity))
     val ForceReadReceipts = opt(int('force_read_receipts))(_.forceReadReceipts)
-    val AssetId = opt(text('asset_id, AssetIdGeneralCodec.serialize, AssetIdGeneralCodec.deserialize))(_.assetId)
+    val AssetId = opt(text('asset_id, GeneralAssetIdCodec.serialize, GeneralAssetIdCodec.deserialize))(_.assetId)
 
     override val idCol = Id
 

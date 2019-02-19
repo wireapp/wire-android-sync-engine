@@ -112,33 +112,33 @@ object AccountId extends (String => AccountId) {
 
 sealed trait AssetIdGeneral
 
-object AssetIdGeneral {
-  private val RawAssetPrefix = "raw_"
-  private val InProgressAssetPrefix = "in_progress_"
-  private val PublicAssetPrefix = "public_"
-
-  //TODO Use 'Codecs' concept instead of such methods
-  def encode(id: AssetIdGeneral): String = id match {
-    case AssetId(str) => str
-    case UploadAssetId(str) => RawAssetPrefix + str
-    case DownloadAssetId(str) => InProgressAssetPrefix + str
-    case PublicAssetId(str) => PublicAssetPrefix + str
-  }
-
-  def decode(str: String): AssetIdGeneral = {
-    if (str.startsWith(RawAssetPrefix)) UploadAssetId(str.substring(RawAssetPrefix.length))
-    else if (str.startsWith(InProgressAssetPrefix)) DownloadAssetId(str.substring(InProgressAssetPrefix.length))
-    else if (str.startsWith(PublicAssetPrefix)) PublicAssetId(str.substring(PublicAssetPrefix.length))
-    else AssetId(str)
-  }
-
-  implicit object Id extends Id[AssetIdGeneral] {
-    override def random() = AssetId()
-    override def decode(str: String) = AssetIdGeneral.decode(str)
-    override def encode(id: AssetIdGeneral): String = AssetIdGeneral.encode(id)
-  }
-
-}
+//object AssetIdGeneral {
+//  private val RawAssetPrefix = "raw_"
+//  private val InProgressAssetPrefix = "in_progress_"
+//  private val PublicAssetPrefix = "public_"
+//
+//  //TODO Use 'Codecs' concept instead of such methods
+//  def encode(id: AssetIdGeneral): String = id match {
+//    case AssetId(str) => str
+//    case UploadAssetId(str) => RawAssetPrefix + str
+//    case DownloadAssetId(str) => InProgressAssetPrefix + str
+//    case PublicAssetId(str) => PublicAssetPrefix + str
+//  }
+//
+//  def decode(str: String): AssetIdGeneral = {
+//    if (str.startsWith(RawAssetPrefix)) UploadAssetId(str.substring(RawAssetPrefix.length))
+//    else if (str.startsWith(InProgressAssetPrefix)) DownloadAssetId(str.substring(InProgressAssetPrefix.length))
+//    else if (str.startsWith(PublicAssetPrefix)) PublicAssetId(str.substring(PublicAssetPrefix.length))
+//    else AssetId(str)
+//  }
+//
+//  implicit object Id extends Id[AssetIdGeneral] {
+//    override def random() = AssetId()
+//    override def decode(str: String) = AssetIdGeneral.decode(str)
+//    override def encode(id: AssetIdGeneral): String = AssetIdGeneral.encode(id)
+//  }
+//
+//}
 
 case class DownloadAssetId(str: String) extends AssetIdGeneral
 
@@ -172,19 +172,6 @@ object AssetId {
   implicit object Id extends Id[AssetId] {
     override def random() = AssetId(Uid().toString)
     override def decode(str: String) = AssetId(str)
-  }
-}
-
-case class PublicAssetId(str: String) extends AssetIdGeneral {
-  override def toString: String = str
-}
-
-object PublicAssetId {
-  def apply(): PublicAssetId = Id.random()
-
-  implicit object Id extends Id[PublicAssetId] {
-    override def random() = PublicAssetId(Uid().toString)
-    override def decode(str: String) = PublicAssetId(str)
   }
 }
 

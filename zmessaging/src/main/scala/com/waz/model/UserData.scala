@@ -21,12 +21,12 @@ import com.waz.api.Verification
 import com.waz.db.Col._
 import com.waz.db.Dao
 import com.waz.model
-import com.waz.model.UserData.ConnectionStatus
+import com.waz.model.UserData.{ConnectionStatus, Picture}
 import com.waz.service.SearchKey
+import com.waz.service.assets2.StorageCodecs
 import com.waz.sync.client.UserSearchClient.UserSearchEntry
 import com.waz.utils._
 import com.waz.utils.wrappers.{DB, DBCursor}
-import org.json.JSONObject
 
 import scala.concurrent.duration._
 
@@ -36,7 +36,7 @@ case class UserData(override val id:       UserId,
                     email:                 Option[EmailAddress]  = None,
                     phone:                 Option[PhoneNumber]   = None,
                     trackingId:            Option[TrackingId]    = None,
-                    picture:               Option[AssetIdGeneral] = None,
+                    picture:               Option[UserData.Picture] = None,
                     accent:                Int                   = 0, // accent color id
                     searchKey:             SearchKey,
                     connection:            ConnectionStatus      = ConnectionStatus.Unconnected,
@@ -72,7 +72,7 @@ case class UserData(override val id:       UserId,
     accent = user.accentId.getOrElse(accent),
     trackingId = user.trackingId.orElse(trackingId),
     searchKey = SearchKey(if (withSearchKey) user.name.getOrElse(name).str else ""),
-    picture = user.mediumPicture.map(_.id).orElse(picture),
+    picture = user.mediumPicture.map(p => Picture.Uploaded(p.id)).orElse(picture),
     deleted = user.deleted,
     handle = user.handle match {
       case Some(h) if !h.toString.isEmpty => Some(h)
@@ -127,6 +127,12 @@ object UserData {
 
   lazy val Empty = UserData(UserId("EMPTY"), "")
 
+  trait Picture
+  object Picture {
+    case class NotUploaded(id: UploadAssetId) extends Picture
+    case class Uploaded(id: AssetId)          extends Picture
+  }
+
   type ConnectionStatus = com.waz.api.User.ConnectionStatus
   object ConnectionStatus {
     import com.waz.api.User.ConnectionStatus._
@@ -165,59 +171,18 @@ object UserData {
   def apply(user: UserInfo): UserData = apply(user, withSearchKey = true)
 
   def apply(user: UserInfo, withSearchKey: Boolean): UserData =
-    UserData(user.id, None, user.name.getOrElse(Name.Empty), user.email, user.phone, user.trackingId, user.mediumPicture.map(_.id),
+    UserData(user.id, None, user.name.getOrElse(Name.Empty), user.email, user.phone, user.trackingId, user.mediumPicture.map(p => Picture.Uploaded(p.id)),
       user.accentId.getOrElse(AccentColor.defaultColor.id), SearchKey(if (withSearchKey) user.name.getOrElse(Name.Empty).str else ""), deleted = user.deleted,
       handle = user.handle, providerId = user.service.map(_.provider), integrationId = user.service.map(_.id))
 
-  implicit lazy val Decoder: JsonDecoder[UserData] = new JsonDecoder[UserData] {
-    import JsonDecoder._
-    override def apply(implicit js: JSONObject): UserData = UserData(
-      id = 'id, teamId = decodeOptTeamId('teamId), name = 'name, email = decodeOptEmailAddress('email), phone = decodeOptPhoneNumber('phone),
-      trackingId = decodeOptId[TrackingId]('trackingId), picture = decodeOptString('assetId).map(PublicAssetId(_)), accent = decodeInt('accent), searchKey = SearchKey('name),
-      connection = ConnectionStatus('connection), connectionLastUpdated = RemoteInstant.ofEpochMilli(decodeLong('connectionLastUpdated)), connectionMessage = decodeOptString('connectionMessage),
-      conversation = decodeOptRConvId('rconvId), relation = Relation.withId('relation),
-      syncTimestamp = decodeOptLocalInstant('syncTimestamp), 'displayName, Verification.valueOf('verified), deleted = 'deleted,
-      availability = Availability(decodeInt('activityStatus)), handle = decodeOptHandle('handle),
-      providerId = decodeOptId[ProviderId]('providerId), integrationId = decodeOptId[IntegrationId]('integrationId),
-      expiresAt = decodeOptISOInstant('expires_at).map(RemoteInstant(_))
-    )
-  }
-
-  implicit lazy val Encoder: JsonEncoder[UserData] = new JsonEncoder[UserData] {
-    override def apply(v: UserData): JSONObject = JsonEncoder { o =>
-      o.put("id", v.id.str)
-      v.teamId foreach (id => o.put("teamId", id.str))
-      o.put("name", v.name)
-      v.email foreach (o.put("email", _))
-      v.phone foreach (o.put("phone", _))
-      v.trackingId foreach (id => o.put("trackingId", id.str))
-      v.picture foreach (id => o.put("assetId", AssetIdGeneral.encode(id)))
-      o.put("accent", v.accent)
-      o.put("connection", v.connection.code)
-      o.put("connectionLastUpdated", v.connectionLastUpdated.toEpochMilli)
-      v.connectionMessage foreach (o.put("connectionMessage", _))
-      v.conversation foreach (id => o.put("rconvId", id.str))
-      o.put("relation", v.relation.id)
-      v.syncTimestamp.foreach(v => o.put("syncTimestamp", v.toEpochMilli))
-      o.put("displayName", v.displayName)
-      o.put("verified", v.verified.name)
-      o.put("deleted", v.deleted)
-      o.put("availability", v.availability.id)
-      v.handle foreach(u => o.put("handle", u.string))
-      v.providerId.foreach { pId => o.put("providerId", pId.str) }
-      v.integrationId.foreach { iId => o.put("integrationId", iId.str) }
-      v.expiresAt.foreach(v => o.put("expires_at", v))
-    }
-  }
-
-  implicit object UserDataDao extends Dao[UserData, UserId] {
+  implicit object UserDataDao extends Dao[UserData, UserId] with StorageCodecs {
     val Id = id[UserId]('_id, "PRIMARY KEY").apply(_.id)
     val TeamId = opt(id[TeamId]('teamId))(_.teamId)
     val Name = text[model.Name]('name, _.str, model.Name(_))(_.name)
     val Email = opt(emailAddress('email))(_.email)
     val Phone = opt(phoneNumber('phone))(_.phone)
     val TrackingId = opt(id[TrackingId]('tracking_id))(_.trackingId)
-    val Picture = opt(id[AssetIdGeneral]('picture))(_.picture)
+    val Picture = opt(text[UserData.Picture]('picture, UserPictureCodec.serialize, UserPictureCodec.deserialize))(_.picture)
     val Accent = int('accent)(_.accent)
     val SKey = text[SearchKey]('skey, _.asciiRepresentation, SearchKey.unsafeRestore)(_.searchKey)
     val Conn = text[ConnectionStatus]('connection, _.code, ConnectionStatus(_))(_.connection)
