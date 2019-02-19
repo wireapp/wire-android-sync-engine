@@ -54,7 +54,7 @@ object UserInfo {
 
   case class Service(id: IntegrationId, provider: ProviderId)
 
-  case class ProfilePicture(id: PublicAssetId, tag: Tag)
+  case class ProfilePicture(id: AssetId, tag: Tag)
 
   def decodeService(s: Symbol)(implicit js: JSONObject): Service = Service(decodeId[IntegrationId]('id), decodeId[ProviderId]('provider))
 
@@ -86,7 +86,7 @@ object UserInfo {
 
     def getAssets(implicit js: JSONObject): Seq[ProfilePicture] = fromArray(js, "assets").map { assets =>
       Seq.tabulate(assets.length())(assets.getJSONObject).map { js =>
-        val id = PublicAssetId(decodeString('key)(js))
+        val id = AssetId(decodeString('key)(js))
         val tag = Image.Tag(decodeString('size)(js))
         ProfilePicture(id, tag)
       }

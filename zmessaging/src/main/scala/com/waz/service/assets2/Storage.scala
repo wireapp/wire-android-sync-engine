@@ -18,6 +18,7 @@
 package com.waz.service.assets2
 
 import android.util.Base64
+import com.waz.model.UserData.Picture
 import com.waz.model._
 import com.waz.sync.client.AssetClient2.Retention
 
@@ -29,7 +30,10 @@ trait Deserializer[From, To] {
   def deserialize(value: To): From
 }
 
-trait Codec[From, To] extends Serializer[From, To] with Deserializer[From, To]
+trait Codec[From, To] extends Serializer[From, To] with Deserializer[From, To] {
+  def imap[B](from: B => From, to: From => B): Codec[B, To] =
+    Codec.create(from andThen serialize, deserialize _ andThen to)
+}
 
 object Codec {
   def apply[From, To](implicit codec: Codec[From, To]): Codec[From, To] = codec
@@ -173,11 +177,6 @@ trait StorageCodecs {
 
   implicit val RawAssetIdCodec: Codec[UploadAssetId, String] = Codec.create(_.str, UploadAssetId.apply)
 
-  implicit val AssetIdGeneralCodec: Codec[AssetIdGeneral, String] = {
-    import io.circe.generic.auto._
-    JsonCodec[AssetIdGeneral]
-  }
-
   implicit val Sha256Codec: Codec[Sha256, Array[Byte]] = Codec.create(_.bytes, Sha256.apply)
 
   implicit val Md5Codec: Codec[MD5, Array[Byte]] = Codec.create(_.bytes, MD5.apply)
@@ -187,6 +186,31 @@ trait StorageCodecs {
   implicit val URICodec: Codec[URI, String] = Codec.create(_.toString, new URI(_))
 
   implicit val MimeCodec: Codec[Mime, String] = Codec.create(_.str, Mime.apply)
+
+  implicit val GeneralAssetIdCodec: Codec[AssetIdGeneral, String] = new Codec[AssetIdGeneral, String] {
+    private val RawAssetPrefix = "raw_"
+    private val InProgressAssetPrefix = "in_progress_"
+
+    override def deserialize(value: String): AssetIdGeneral = {
+      if (value.startsWith(RawAssetPrefix)) UploadAssetId(value.substring(RawAssetPrefix.length))
+      else if (value.startsWith(InProgressAssetPrefix)) DownloadAssetId(value.substring(InProgressAssetPrefix.length))
+      else AssetId(value)
+    }
+
+    override def serialize(value: AssetIdGeneral): String = value match {
+      case AssetId(str) => str
+      case UploadAssetId(str) => RawAssetPrefix + str
+      case DownloadAssetId(str) => InProgressAssetPrefix + str
+    }
+  }
+
+  implicit val UserPictureCodec: Codec[Picture, String] = Codec[AssetIdGeneral, String].imap({
+    case Picture.NotUploaded(id) => id
+    case Picture.Uploaded(id) => id
+  }, {
+    case id: AssetId => Picture.Uploaded(id)
+    case id: UploadAssetId => Picture.NotUploaded(id)
+  })
 
   implicit def JsonCodec[T: Encoder: Decoder]: Codec[T, String] =
     Codec.create(_.asJson.noSpaces, str => decode[T](str).right.get)

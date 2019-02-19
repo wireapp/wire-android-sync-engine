@@ -85,9 +85,9 @@ class UsersSyncHandler(assetSync: AssetSyncHandler,
       case Some(userData) => userData.picture match {
         case Some(assetId: UploadAssetId) =>
           for {
-            uploadedPic <- assets.uploadAsset(assetId).map(r => PublicAssetId(r.id.str)).future
+            uploadedPicId <- assets.uploadAsset(assetId).map(r => r.id).future
             //TODO post a smaller preview?
-            updateInfo = UserInfo(userData.id, picture = Some(Seq(ProfilePicture(uploadedPic, Tag.Medium), ProfilePicture(uploadedPic, Tag.Preview))))
+            updateInfo = UserInfo(userData.id, picture = Some(Seq(ProfilePicture(uploadedPicId, Tag.Medium), ProfilePicture(uploadedPicId, Tag.Preview))))
             _ <- usersStorage.update(userData.id, _.updated(updateInfo))
             _ <- usersClient.updateSelf(updateInfo)
           } yield SyncResult.Success
