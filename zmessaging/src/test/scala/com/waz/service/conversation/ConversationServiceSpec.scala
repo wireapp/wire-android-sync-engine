@@ -132,7 +132,7 @@ class ConversationServiceSpec extends AndroidFreeSpec {
     result(service.convStateEventProcessingStage.apply(rConvId, events))
   }
 
-  scenario("Does not archive conversation when the user is removed") {
+  scenario("Does not archive conversation when the user is removed by someone else") {
 
     // GIVEN
     val convData = ConversationData(
@@ -148,6 +148,38 @@ class ConversationServiceSpec extends AndroidFreeSpec {
 
     val events = Seq(
       MemberLeaveEvent(rConvId, RemoteInstant.ofEpochSec(10000), UserId(), Seq(selfUserId))
+    )
+
+    (convoContentMock.convByRemoteId _).expects(*).anyNumberOfTimes().onCall { id: RConvId =>
+      Future.successful(Some(convData))
+    }
+    (membersMock.remove (_: ConvId, _: Iterable[UserId])).expects(*, *)
+      .anyNumberOfTimes().returning(Future.successful(Set[ConversationMemberData]()))
+    (convoContentMock.setConvActive _).expects(*, *).anyNumberOfTimes().returning(Future.successful(()))
+
+    // EXPECT
+    (convoContentMock.updateConversationState _).expects(*, *).never()
+
+    // WHEN
+    result(service.convStateEventProcessingStage.apply(rConvId, events))
+  }
+
+  scenario("Does not archive conversation when the user is not the one being removed") {
+
+    // GIVEN
+    val convData = ConversationData(
+      convId,
+      rConvId,
+      Some(Name("name")),
+      UserId(),
+      ConversationType.Group,
+      lastEventTime = RemoteInstant.Epoch,
+      archived = false,
+      muted = MuteSet.AllMuted
+    )
+
+    val events = Seq(
+      MemberLeaveEvent(rConvId, RemoteInstant.ofEpochSec(10000), selfUserId, Seq(UserId()))
     )
 
     (convoContentMock.convByRemoteId _).expects(*).anyNumberOfTimes().onCall { id: RConvId =>
