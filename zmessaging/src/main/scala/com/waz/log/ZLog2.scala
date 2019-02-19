@@ -35,6 +35,7 @@ import com.waz.model.sync.ReceiptType
 import com.waz.service.{PlaybackRoute, PropertyKey}
 import com.waz.service.assets.AssetService.RawAssetInput
 import com.waz.service.assets.AssetService.RawAssetInput.{BitmapInput, ByteInput, UriInput, WireAssetInput}
+import com.waz.service.assets.GlobalRecordAndPlayService.PCMContent
 import com.waz.service.assets2.{Asset, AssetDetails}
 import com.waz.service.call.Avs.AvsClosedReason.reasonString
 import com.waz.service.call.Avs.VideoState
@@ -303,7 +304,6 @@ object ZLog2 {
         l"MessageData(id: $id | convId: $convId | msgType: $msgType | userId: $userId | state: $state | time: $time | localTime: $localTime)"
       }
 
-
     implicit val MessageContentLogShow: LogShow[MessageContent] =
       LogShow.createFrom { m =>
         import m._
@@ -341,6 +341,11 @@ object ZLog2 {
            |AssetData: id: $id | mime: $mime | sizeInBytes: $sizeInBytes | status: $status | source: $source
            |  rId: $remoteId| token: $token | otrKey: $otrKey | preview: $previewId
         """.stripMargin
+      }
+
+    implicit val PCMContentShow: LogShow[PCMContent] =
+      LogShow.createFrom { p =>
+        l"PCMContent(file: ${p.file})"
       }
 
     implicit val NotificationDataLogShow: LogShow[NotificationData] =
@@ -381,6 +386,12 @@ object ZLog2 {
            | pushToken: $pushToken
            | password: $password
            | ssoId: $ssoId)"""
+      }
+
+    implicit val ThreadShow: LogShow[Thread] =
+      LogShow.create { t =>
+        import t._
+        s"Thread(id: $getId, name: $getName, priority: $getPriority, state: $getState)"
       }
 
     //Events
