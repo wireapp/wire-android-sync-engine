@@ -23,6 +23,7 @@ import java.net.URI
 import android.net.Uri
 import com.waz.ZLog.LogTag
 import com.waz.api.{MessageContent => _, _}
+import com.waz.cache2.CacheService.{AES_CBC_Encryption, Encryption, NoEncryption}
 import com.waz.content.Preferences.PrefKey
 import com.waz.log.InternalLog.LogLevel.{Debug, Error, Info, Verbose, Warn}
 import com.waz.model.AccountData.Password
@@ -34,6 +35,7 @@ import com.waz.model.sync.ReceiptType
 import com.waz.service.{PlaybackRoute, PropertyKey}
 import com.waz.service.assets.AssetService.RawAssetInput
 import com.waz.service.assets.AssetService.RawAssetInput.{BitmapInput, ByteInput, UriInput, WireAssetInput}
+import com.waz.service.assets2.{Asset, AssetDetails}
 import com.waz.service.call.Avs.AvsClosedReason.reasonString
 import com.waz.service.call.Avs.VideoState
 import com.waz.service.call.CallInfo
@@ -264,6 +266,12 @@ object ZLog2 {
         case HandleCredentials(handle, password)     => l"HandleCredentials($handle, $password)"
       }
 
+    implicit val EncryptionShow: LogShow[Encryption] =
+      LogShow.createFrom {
+        case NoEncryption => l"NoEncryption"
+        case AES_CBC_Encryption(key) => l"AES_CBC_Encryption($key)"
+      }
+
     implicit val CookieShow: LogShow[Cookie] = create(
       c => s"Cookie(${c.str.take(10)}, exp: ${c.expiry}, isValid: ${c.isValid})",
       c => s"Cookie(${c.str}, exp: ${c.expiry}, isValid: ${c.isValid})"
@@ -318,6 +326,12 @@ object ZLog2 {
       createFrom { m =>
         import m._
         l"Mention(userId: $userId, start: $start, length: $length)"
+      }
+
+    implicit val AssetLogShow: LogShow[Asset[AssetDetails]] =
+      LogShow.createFrom { a =>
+        import a._
+        l"Asset(id: $id | token: $token | sha: $sha | encryption: $encryption | localSource: $localSource | preview: $preview | details: $details | convId: $convId)"
       }
 
     implicit val AssetDataLogShow: LogShow[AssetData] =
