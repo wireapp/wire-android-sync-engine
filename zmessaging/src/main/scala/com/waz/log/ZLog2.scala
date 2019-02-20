@@ -35,7 +35,8 @@ import com.waz.model.sync.ReceiptType
 import com.waz.service.{PlaybackRoute, PropertyKey}
 import com.waz.service.assets.AssetService.RawAssetInput
 import com.waz.service.assets.AssetService.RawAssetInput.{BitmapInput, ByteInput, UriInput, WireAssetInput}
-import com.waz.service.assets.GlobalRecordAndPlayService.PCMContent
+import com.waz.service.assets.{GlobalRecordAndPlayService, Player}
+import com.waz.service.assets.GlobalRecordAndPlayService.{AssetMediaKey, Idle, PCMContent, Paused, Playing, Recording, UnauthenticatedContent, UriMediaKey}
 import com.waz.service.assets2.{Asset, AssetDetails}
 import com.waz.service.call.Avs.AvsClosedReason.reasonString
 import com.waz.service.call.Avs.VideoState
@@ -343,11 +344,6 @@ object ZLog2 {
         """.stripMargin
       }
 
-    implicit val PCMContentShow: LogShow[PCMContent] =
-      LogShow.createFrom { p =>
-        l"PCMContent(file: ${p.file})"
-      }
-
     implicit val NotificationDataLogShow: LogShow[NotificationData] =
       LogShow.createFrom { n =>
         import n._
@@ -392,6 +388,40 @@ object ZLog2 {
       LogShow.create { t =>
         import t._
         s"Thread(id: $getId, name: $getName, priority: $getPriority, state: $getState)"
+      }
+
+    // Global Record and Play Service
+
+    implicit val StateLogShow: LogShow[GlobalRecordAndPlayService.State] =
+      LogShow.createFrom {
+        case Idle => l"Idle"
+        case Playing(player, key) => l"Playing(player: $player, key: $key)"
+        case Paused(player, key, playhead, transient) => l"Paused(player: $player, key: $key, playhead: $playhead, transient: $transient)"
+        case Recording(_, key, start, entry, promisedAsset) => l"Recording(key: $key, start: $start, entry: $entry)"
+      }
+
+    implicit val PlayerLogShow: LogShow[Player] = LogShow.create(_.getClass.getName)
+
+    implicit val MediaKeyLogShow: LogShow[GlobalRecordAndPlayService.MediaKey] =
+      LogShow.createFrom {
+        case AssetMediaKey(id) => l"AssetMediaKey(id: $id)"
+        case UriMediaKey(uri) => l"UriMediaKey(uri: $uri)"
+      }
+
+    implicit val ErrorLogShow: LogShow[GlobalRecordAndPlayService.Error] =
+      LogShow.create { e =>
+        s"Error(message: ${e.message})"
+      }
+
+    implicit val MediaPointerLogShow: LogShow[GlobalRecordAndPlayService.MediaPointer] =
+      LogShow.createFrom { p =>
+        l"MediaPointer(content: ${p.content}, playhead: ${p.playhead})"
+      }
+
+    implicit val ContentLogShow: LogShow[GlobalRecordAndPlayService.Content] =
+      LogShow.createFrom {
+        case UnauthenticatedContent(uri) => l"UnauthenticatedContent(uri: $uri)"
+        case PCMContent(file) => l"PCMContent(file: $file)"
       }
 
     //Events
