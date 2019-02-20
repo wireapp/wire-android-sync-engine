@@ -43,6 +43,7 @@ import com.waz.service.call.Avs.AvsClosedReason.reasonString
 import com.waz.service.call.Avs.VideoState
 import com.waz.service.call.CallInfo
 import com.waz.service.otr.OtrService.SessionId
+import com.waz.sync.SyncResult
 import com.waz.sync.client.AuthenticationManager.{AccessToken, Cookie}
 import com.waz.utils.{sha2, wrappers}
 import org.json.JSONObject
@@ -448,6 +449,13 @@ object ZLog2 {
     implicit val SyncRequestLogShow: LogShow[SyncRequest] =
       LogShow.createFrom { r =>
         l"SyncRequest(cmd: ${r.cmd})"
+      }
+
+    implicit val SyncResultLogShow: LogShow[SyncResult] =
+      LogShow.createFrom {
+        case SyncResult.Success => l"Success"
+        case SyncResult.Failure(error) => l"Failure(error: $error)"
+        case SyncResult.Retry(error) => l"Retry(error: $error)"
       }
 
     implicit val SyncCommandLogShow: LogShow[SyncCommand] = LogShow.create(_.name())
