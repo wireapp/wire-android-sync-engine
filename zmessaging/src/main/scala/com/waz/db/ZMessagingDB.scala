@@ -61,7 +61,7 @@ class ZMessagingDB(context: Context, dbName: String, tracking: TrackingService) 
 }
 
 object ZMessagingDB {
-  val DbVersion = 114
+  val DbVersion = 115
 
   lazy val daos = Seq (
     UserDataDao, SearchQueryCacheDao, AssetDataDao, ConversationDataDao,
@@ -284,6 +284,9 @@ object ZMessagingDB {
       db.execSQL("UPDATE KeyValues SET value = 'true' WHERE key = 'should_sync_conversations_1'")
     },
     Migration(113, 114) { db =>
+       db.execSQL("ALTER TABLE Users ADD COLUMN managed_by TEXT DEFAULT null")
+    },
+    Migration(114, 115) { db =>
       import com.waz.model.AssetData.{AssetDataDao => OldAssetDao}
       import com.waz.service.assets2.AssetStorageImpl.{AssetDao => NewAssetDao}
       import com.waz.service.assets2._

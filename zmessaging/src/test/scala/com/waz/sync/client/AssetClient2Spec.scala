@@ -28,11 +28,13 @@ import com.waz.service.assets2.{Asset, BlobDetails, NoEncryption}
 import com.waz.sync.client.AssetClient.FileWithSha
 import com.waz.sync.client.AssetClient2.{AssetContent, Metadata, Retention, UploadResponse2}
 import com.waz.utils.{IoUtils, returning}
+import org.scalatest.Ignore
 
 import scala.concurrent.Future
 import scala.util.Random
 
 //TODO Think about tests resources cleanup
+@Ignore
 class AssetClient2Spec extends ZIntegrationSpec with AuthenticationConfig {
 
   private lazy val assetClient = new AssetClient2Impl()

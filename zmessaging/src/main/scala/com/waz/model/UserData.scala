@@ -22,6 +22,7 @@ import com.waz.db.Col._
 import com.waz.db.Dao
 import com.waz.model
 import com.waz.model.UserData.{ConnectionStatus, Picture}
+import com.waz.model.ManagedBy.ManagedBy
 import com.waz.service.SearchKey
 import com.waz.service.assets2.StorageCodecs
 import com.waz.sync.client.UserSearchClient.UserSearchEntry
@@ -52,7 +53,8 @@ case class UserData(override val id:       UserId,
                     handle:                Option[Handle]        = None,
                     providerId:            Option[ProviderId]    = None,
                     integrationId:         Option[IntegrationId] = None,
-                    expiresAt:             Option[RemoteInstant] = None) extends Identifiable[UserId] {
+                    expiresAt:             Option[RemoteInstant] = None,
+                    managedBy:             Option[ManagedBy]     = None) extends Identifiable[UserId] {
 
   def isConnected = ConnectionStatus.isConnected(connection)
   def hasEmailOrPhone = email.isDefined || phone.isDefined
@@ -60,6 +62,7 @@ case class UserData(override val id:       UserId,
   def isAcceptedOrPending = connection == ConnectionStatus.Accepted || connection == ConnectionStatus.PendingFromOther || connection == ConnectionStatus.PendingFromUser
   def isVerified = verified == Verification.VERIFIED
   def isAutoConnect = isConnected && ! isSelf && connectionMessage.isEmpty
+  def isReadOnlyProfile = managedBy.exists(_ != ManagedBy.Wire) //if none or "Wire", then it's not read only.
   lazy val isWireBot = integrationId.nonEmpty
 
   def getDisplayName = if (displayName.isEmpty) name else displayName
@@ -78,10 +81,11 @@ case class UserData(override val id:       UserId,
       case Some(h) if !h.toString.isEmpty => Some(h)
       case _ => handle
     },
-    providerId = user.service.map(_.provider),
-    integrationId = user.service.map(_.id),
-    expiresAt = user.expiresAt,
-    teamId = user.teamId.orElse(teamId)
+    providerId = user.service.map(_.provider).orElse(providerId),
+    integrationId = user.service.map(_.id).orElse(integrationId),
+    expiresAt = user.expiresAt.orElse(expiresAt),
+    teamId = user.teamId.orElse(teamId),
+    managedBy = user.managedBy.orElse(managedBy)
   )
 
   def updated(user: UserSearchEntry): UserData = copy(
@@ -170,11 +174,8 @@ object UserData {
 
   def apply(user: UserInfo): UserData = apply(user, withSearchKey = true)
 
-  def apply(user: UserInfo, withSearchKey: Boolean): UserData =
-    UserData(user.id, None, user.name.getOrElse(Name.Empty), user.email, user.phone, user.trackingId, user.mediumPicture.map(p => Picture.Uploaded(p.id)),
-      user.accentId.getOrElse(AccentColor.defaultColor.id), SearchKey(if (withSearchKey) user.name.getOrElse(Name.Empty).str else ""), deleted = user.deleted,
-      handle = user.handle, providerId = user.service.map(_.provider), integrationId = user.service.map(_.id))
-
+  def apply(user: UserInfo, withSearchKey: Boolean): UserData = UserData(user.id, user.name.getOrElse(Name.Empty)).updated(user, withSearchKey)
+  
   implicit object UserDataDao extends Dao[UserData, UserId] with StorageCodecs {
     val Id = id[UserId]('_id, "PRIMARY KEY").apply(_.id)
     val TeamId = opt(id[TeamId]('teamId))(_.teamId)
@@ -199,16 +200,17 @@ object UserData {
     val ProviderId = opt(id[ProviderId]('provider_id))(_.providerId)
     val IntegrationId = opt(id[IntegrationId]('integration_id))(_.integrationId)
     val ExpiresAt = opt(remoteTimestamp('expires_at))(_.expiresAt)
+    val Managed = opt(text[ManagedBy]('managed_by, _.toString, ManagedBy(_)))(_.managedBy)
 
     override val idCol = Id
     override val table = Table(
       "Users", Id, TeamId, Name, Email, Phone, TrackingId, Picture, Accent, SKey, Conn, ConnTime, ConnMessage,
-      Conversation, Rel, Timestamp, DisplayName, Verified, Deleted, AvailabilityStatus, Handle, ProviderId, IntegrationId, ExpiresAt
+      Conversation, Rel, Timestamp, DisplayName, Verified, Deleted, AvailabilityStatus, Handle, ProviderId, IntegrationId, ExpiresAt, Managed
     )
 
     override def apply(implicit cursor: DBCursor): UserData = new UserData(
       Id, TeamId, Name, Email, Phone, TrackingId, Picture, Accent, SKey, Conn, RemoteInstant.ofEpochMilli(ConnTime.getTime), ConnMessage,
-      Conversation, Rel, Timestamp, DisplayName, Verified, Deleted, AvailabilityStatus, Handle, ProviderId, IntegrationId, ExpiresAt
+      Conversation, Rel, Timestamp, DisplayName, Verified, Deleted, AvailabilityStatus, Handle, ProviderId, IntegrationId, ExpiresAt, Managed
     )
 
     override def onCreate(db: DB): Unit = {
