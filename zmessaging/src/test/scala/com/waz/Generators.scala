@@ -242,7 +242,7 @@ object Generators {
   implicit lazy val arbUserId: Arbitrary[UserId]         = Arbitrary(sideEffect(UserId()))
   implicit lazy val arbTeamId: Arbitrary[TeamId]         = Arbitrary(sideEffect(TeamId()))
   implicit lazy val arbRAssetDataId: Arbitrary[RAssetId] = Arbitrary(sideEffect(RAssetId()))
-  implicit lazy val arbAssetIdGeneral: Arbitrary[AssetIdGeneral] = Arbitrary(sideEffect(AssetId()))
+  implicit lazy val arbAssetIdGeneral: Arbitrary[GeneralAssetId] = Arbitrary(sideEffect(AssetId()))
   implicit lazy val arbAssetId: Arbitrary[AssetId]       = Arbitrary(sideEffect(AssetId()))
   implicit lazy val arbPublicAssetId: Arbitrary[Picture]       = Arbitrary(sideEffect(Picture.Uploaded(AssetId())))
   implicit lazy val arbSyncId: Arbitrary[SyncId]         = Arbitrary(sideEffect(SyncId()))

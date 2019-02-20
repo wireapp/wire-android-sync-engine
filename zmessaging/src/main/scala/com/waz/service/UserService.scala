@@ -313,7 +313,7 @@ class UserServiceImpl(selfUserId:        UserId,
   override def updateSelfPicture(content: Content) = {
     val contentForUpload = ContentForUpload("profile-picture", content)
     for {
-      asset <- assets.createAndSaveRawAsset(contentForUpload, NoEncryption, public = true, Retention.Eternal, None)
+      asset <- assets.createAndSaveUploadAsset(contentForUpload, NoEncryption, public = true, Retention.Eternal, None)
       _ <- updateAndSync(_.copy(picture = Some(Picture.NotUploaded(asset.id))), _ => sync.postSelfPicture(None))
     } yield ()
   }

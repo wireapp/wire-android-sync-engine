@@ -47,7 +47,7 @@ class AssetServiceSpec extends ZIntegrationMockSpec with AuthenticationConfig {
   private val transformationsService      = mock[AssetTransformationsService]
   private val previewService      = mock[AssetPreviewService]
   private val cache               = mock[AssetContentCache]
-  private val rawCache            = mock[RawAssetContentCache]
+  private val rawCache            = mock[UploadAssetContentCache]
   private val client              = mock[AssetClient2]
   private val uriHelperMock       = mock[UriHelper]
   private val syncHandle          = mock[SyncServiceHandle]
@@ -262,7 +262,7 @@ class AssetServiceSpec extends ZIntegrationMockSpec with AuthenticationConfig {
         rawAssetStorage = new ReactiveStorageImpl2(new UnlimitedInMemoryStorage[UploadAssetId, UploadAsset[UploadGeneral]]()) with UploadAssetStorage
         assetService = service(rawAssetStorage, client)
 
-        rawAsset <- assetService.createAndSaveRawAsset(contentForUpload, encryption, public = false, Retention.Persistent, None)
+        rawAsset <- assetService.createAndSaveUploadAsset(contentForUpload, encryption, public = false, Retention.Persistent, None)
         asset <- assetService.uploadAsset(rawAsset.id)
         assetContent <- client.loadAssetContent(asset, None)
 

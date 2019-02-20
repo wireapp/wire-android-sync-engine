@@ -110,37 +110,9 @@ object AccountId extends (String => AccountId) {
   }
 }
 
-sealed trait AssetIdGeneral
+sealed trait GeneralAssetId
 
-//object AssetIdGeneral {
-//  private val RawAssetPrefix = "raw_"
-//  private val InProgressAssetPrefix = "in_progress_"
-//  private val PublicAssetPrefix = "public_"
-//
-//  //TODO Use 'Codecs' concept instead of such methods
-//  def encode(id: AssetIdGeneral): String = id match {
-//    case AssetId(str) => str
-//    case UploadAssetId(str) => RawAssetPrefix + str
-//    case DownloadAssetId(str) => InProgressAssetPrefix + str
-//    case PublicAssetId(str) => PublicAssetPrefix + str
-//  }
-//
-//  def decode(str: String): AssetIdGeneral = {
-//    if (str.startsWith(RawAssetPrefix)) UploadAssetId(str.substring(RawAssetPrefix.length))
-//    else if (str.startsWith(InProgressAssetPrefix)) DownloadAssetId(str.substring(InProgressAssetPrefix.length))
-//    else if (str.startsWith(PublicAssetPrefix)) PublicAssetId(str.substring(PublicAssetPrefix.length))
-//    else AssetId(str)
-//  }
-//
-//  implicit object Id extends Id[AssetIdGeneral] {
-//    override def random() = AssetId()
-//    override def decode(str: String) = AssetIdGeneral.decode(str)
-//    override def encode(id: AssetIdGeneral): String = AssetIdGeneral.encode(id)
-//  }
-//
-//}
-
-case class DownloadAssetId(str: String) extends AssetIdGeneral
+case class DownloadAssetId(str: String) extends GeneralAssetId
 
 object DownloadAssetId {
   def apply(): DownloadAssetId = Id.random()
@@ -151,7 +123,7 @@ object DownloadAssetId {
   }
 }
 
-case class UploadAssetId(str: String) extends AssetIdGeneral
+case class UploadAssetId(str: String) extends GeneralAssetId
 
 object UploadAssetId {
   def apply(): UploadAssetId = Id.random()
@@ -162,7 +134,7 @@ object UploadAssetId {
   }
 }
 
-case class AssetId(str: String) extends AssetIdGeneral {
+case class AssetId(str: String) extends GeneralAssetId {
   override def toString: String = str
 }
 

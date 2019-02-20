@@ -308,7 +308,7 @@ class ZMessaging(val teamId: Option[TeamId], val clientId: ClientId, account: Ac
         directorySizeThreshold = 1024 * 1024 * 200L,
         sizeCheckingInterval = 30.seconds
       )(Threading.BlockingIO, EventContext.Global),
-      new RawAssetContentCacheImpl(rawCacheDirectory)(Threading.BlockingIO),
+      new UploadAssetContentCacheImpl(rawCacheDirectory)(Threading.BlockingIO),
       asset2Client,
       sync
     )

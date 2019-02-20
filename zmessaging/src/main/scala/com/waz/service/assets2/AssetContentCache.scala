@@ -43,10 +43,10 @@ class AssetContentCacheImpl(val cacheDirectory: File, val directorySizeThreshold
   * Cache by itself should not contain any auto cleanup logic.
   * So remove cache entries as soon as you can.
   */
-trait RawAssetContentCache extends FileCache[UploadAssetId]
+trait UploadAssetContentCache extends FileCache[UploadAssetId]
 
-class RawAssetContentCacheImpl(val cacheDirectory: File)
-                              (implicit val ec: ExecutionContext) extends SimpleFileCache[UploadAssetId] with RawAssetContentCache {
+class UploadAssetContentCacheImpl(val cacheDirectory: File)
+                                 (implicit val ec: ExecutionContext) extends SimpleFileCache[UploadAssetId] with UploadAssetContentCache {
 
   override protected def createFileName(key: UploadAssetId): String = key.str
 }
