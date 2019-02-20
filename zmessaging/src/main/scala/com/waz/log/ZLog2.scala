@@ -32,7 +32,7 @@ import com.waz.model.GenericContent.Location
 import com.waz.model.ManagedBy.ManagedBy
 import com.waz.model.{SSOId, _}
 import com.waz.model.otr.{Client, ClientId, UserClients}
-import com.waz.model.sync.ReceiptType
+import com.waz.model.sync.{ReceiptType, SyncCommand, SyncJob, SyncRequest}
 import com.waz.service.{PlaybackRoute, PropertyKey}
 import com.waz.service.assets.AssetService.RawAssetInput
 import com.waz.service.assets.AssetService.RawAssetInput.{BitmapInput, ByteInput, UriInput, WireAssetInput}
@@ -426,6 +426,32 @@ object ZLog2 {
         case UnauthenticatedContent(uri) => l"UnauthenticatedContent(uri: $uri)"
         case PCMContent(file) => l"PCMContent(file: $file)"
       }
+
+    // Sync Job
+
+    implicit val SyncJobLogShow: LogShow[SyncJob] =
+      LogShow.createFrom { j =>
+        import j._
+        l"""SyncJob(
+            | id: $id
+            | request: $request
+            | dependsOn: $dependsOn
+            | priority: $priority
+            | timestamp: $timestamp
+            | startTime: $startTime
+            | attempts: $attempts
+            | offline: $offline
+            | state: $state
+            | error: ${j.error})"""
+      }
+
+    implicit val SyncRequestLogShow: LogShow[SyncRequest] =
+      LogShow.createFrom { r =>
+        l"SyncRequest(cmd: ${r.cmd})"
+      }
+
+    implicit val SyncCommandLogShow: LogShow[SyncCommand] = LogShow.create(_.name())
+    implicit val SyncStateLogShow: LogShow[SyncState] = LogShow.create(_.name())
 
     //Events
     implicit val EventLogShow: LogShow[Event] = logShowWithHash
