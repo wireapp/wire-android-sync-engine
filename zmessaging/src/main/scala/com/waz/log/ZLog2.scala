@@ -22,6 +22,7 @@ import java.net.URI
 
 import android.net.Uri
 import com.waz.ZLog.LogTag
+import com.waz.api.impl.ErrorResponse
 import com.waz.api.{MessageContent => _, _}
 import com.waz.cache2.CacheService.{AES_CBC_Encryption, Encryption, NoEncryption}
 import com.waz.content.Preferences.PrefKey
@@ -389,6 +390,8 @@ object ZLog2 {
         import t._
         s"Thread(id: $getId, name: $getName, priority: $getPriority, state: $getState)"
       }
+
+    implicit val ErrorResponseLogShow: LogShow[ErrorResponse] = LogShow.create(_.toString)
 
     // Global Record and Play Service
 
