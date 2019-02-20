@@ -64,7 +64,7 @@ case class MessageData(override val id: MessageId              = MessageId(),
                        expiryTime:      Option[LocalInstant]   = None, // local expiration time
                        expired:         Boolean                = false,
                        duration:        Option[FiniteDuration] = None, //for successful calls and message_timer changes
-                       assetId:         Option[AssetIdGeneral] = None,
+                       assetId:         Option[GeneralAssetId] = None,
                        quote:             Option[QuoteContent]   = None,
                        forceReadReceipts: Option[Int]    = None
                       ) extends Identifiable[MessageId] {
@@ -304,7 +304,7 @@ object MessageContent extends ((Message.Part.Type, String, Option[MediaAssetData
 
 object MessageData extends ((MessageId, ConvId, Message.Type, UserId, Seq[MessageContent], Seq[GenericMessage], Boolean,
   Set[UserId], Option[UserId], Option[String], Option[Name], Message.Status, RemoteInstant, LocalInstant, RemoteInstant,
-  Option[FiniteDuration], Option[LocalInstant], Boolean, Option[FiniteDuration], Option[AssetIdGeneral], Option[QuoteContent],
+  Option[FiniteDuration], Option[LocalInstant], Boolean, Option[FiniteDuration], Option[GeneralAssetId], Option[QuoteContent],
   Option[Int]) => MessageData) {
 
   val Empty = new MessageData(MessageId(""), ConvId(""), Message.Type.UNKNOWN, UserId(""))

@@ -223,7 +223,7 @@ object ZLog2 {
     implicit val RAssetIdShow:   LogShow[RAssetId]   = logShowWithHash
     implicit val DownloadAssetIdShow: LogShow[DownloadAssetId] = logShowWithHash
     implicit val UploadAssetIdShow: LogShow[UploadAssetId] = logShowWithHash
-    implicit val AssetIdGeneral: LogShow[AssetIdGeneral] = logShowWithHash
+    implicit val AssetIdGeneral: LogShow[GeneralAssetId] = logShowWithHash
     implicit val AccountIdShow:  LogShow[AccountId]  = logShowWithHash
     implicit val MessageIdShow:  LogShow[MessageId]  = logShowWithHash
     implicit val ConvIdShow:     LogShow[ConvId]     = logShowWithHash

@@ -233,9 +233,9 @@ object AssetData {
     if (isTeam) MaxTeamAssetSizeInBytes
     else MaxNoTeamAssetSizeInBytes
 
-  case class ProcessingTaskKey(id: AssetIdGeneral)
+  case class ProcessingTaskKey(id: GeneralAssetId)
 
-  case class UploadTaskKey(id: AssetIdGeneral)
+  case class UploadTaskKey(id: GeneralAssetId)
 
   implicit object AssetDataDao extends Dao[AssetData, AssetId] {
     val Id    = id[AssetId]('_id, "PRIMARY KEY").apply(_.id)

@@ -20,6 +20,7 @@ package com.waz.service.assets2
 import android.util.Base64
 import com.waz.model.UserData.Picture
 import com.waz.model._
+import com.waz.model.errors.FailedExpectationsError
 import com.waz.sync.client.AssetClient2.Retention
 
 trait Serializer[From, To] {
@@ -76,26 +77,26 @@ trait StorageCodecs {
     }
   }
 
-  implicit val RawPreviewCodec: Codec[RawPreview, String] = new Codec[RawPreview, String] {
+  implicit val RawPreviewCodec: Codec[Preview, String] = new Codec[Preview, String] {
     val NotReady = "not_ready"
     val WithoutPreview = "without"
     val NotUploadedPrefix = "not_uploaded__"
     val UploadedPrefix = "uploaded__"
 
-    override def serialize(value: RawPreview): String = value match {
-      case RawPreviewNotReady => NotReady
-      case RawPreviewEmpty => WithoutPreview
-      case RawPreviewNotUploaded(rawAssetId) => NotUploadedPrefix + rawAssetId.str
-      case RawPreviewUploaded(assetId) => UploadedPrefix + assetId.str
+    override def serialize(value: Preview): String = value match {
+      case Preview.NotReady => NotReady
+      case Preview.Empty => WithoutPreview
+      case Preview.NotUploaded(rawAssetId) => NotUploadedPrefix + rawAssetId.str
+      case Preview.Uploaded(assetId) => UploadedPrefix + assetId.str
     }
 
-    override def deserialize(value: String): RawPreview = value match {
-      case NotReady => RawPreviewNotReady
-      case WithoutPreview => RawPreviewEmpty
+    override def deserialize(value: String): Preview = value match {
+      case NotReady => Preview.NotReady
+      case WithoutPreview => Preview.Empty
       case str if str.startsWith(NotUploadedPrefix) =>
-        RawPreviewNotUploaded(UploadAssetId(str.substring(NotUploadedPrefix.length)))
+        Preview.NotUploaded(UploadAssetId(str.substring(NotUploadedPrefix.length)))
       case str if str.startsWith(UploadedPrefix) =>
-        RawPreviewUploaded(AssetId(str.substring(UploadedPrefix.length)))
+        Preview.Uploaded(AssetId(str.substring(UploadedPrefix.length)))
     }
   }
 
@@ -187,29 +188,30 @@ trait StorageCodecs {
 
   implicit val MimeCodec: Codec[Mime, String] = Codec.create(_.str, Mime.apply)
 
-  implicit val GeneralAssetIdCodec: Codec[AssetIdGeneral, String] = new Codec[AssetIdGeneral, String] {
+  implicit val GeneralAssetIdCodec: Codec[GeneralAssetId, String] = new Codec[GeneralAssetId, String] {
     private val RawAssetPrefix = "raw_"
     private val InProgressAssetPrefix = "in_progress_"
 
-    override def deserialize(value: String): AssetIdGeneral = {
+    override def deserialize(value: String): GeneralAssetId = {
       if (value.startsWith(RawAssetPrefix)) UploadAssetId(value.substring(RawAssetPrefix.length))
       else if (value.startsWith(InProgressAssetPrefix)) DownloadAssetId(value.substring(InProgressAssetPrefix.length))
       else AssetId(value)
     }
 
-    override def serialize(value: AssetIdGeneral): String = value match {
+    override def serialize(value: GeneralAssetId): String = value match {
       case AssetId(str) => str
       case UploadAssetId(str) => RawAssetPrefix + str
       case DownloadAssetId(str) => InProgressAssetPrefix + str
     }
   }
 
-  implicit val UserPictureCodec: Codec[Picture, String] = Codec[AssetIdGeneral, String].imap({
+  implicit val UserPictureCodec: Codec[Picture, String] = Codec[GeneralAssetId, String].imap({
     case Picture.NotUploaded(id) => id
     case Picture.Uploaded(id) => id
   }, {
     case id: AssetId => Picture.Uploaded(id)
     case id: UploadAssetId => Picture.NotUploaded(id)
+    case id => throw FailedExpectationsError(s"We do not expect asset id of type ${id.getClass.getSimpleName}. Asset id: $id.")
   })
 
   implicit def JsonCodec[T: Encoder: Decoder]: Codec[T, String] =

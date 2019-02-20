@@ -20,7 +20,6 @@ package com.waz.service.assets2
 import java.io.{ByteArrayInputStream, FileInputStream, InputStream}
 import java.net.URI
 
-import com.waz.model.GenericContent.Asset.{Original, Preview}
 import com.waz.model.GenericContent.{Asset => GenericAsset}
 import com.waz.model._
 import com.waz.model.nano.Messages
@@ -56,14 +55,16 @@ sealed trait Content {
 
 }
 
-//TODO Maybe rename this to 'PreparedContent' ?
-sealed trait CanExtractMetadata extends Content
+/**
+  * Main purpose of this trait is to mark content which can be used in [[AssetDetails]] extraction process
+  */
+sealed trait PreparedContent extends Content
 
 object Content {
   case class Bytes(mime: Mime, bytes: Array[Byte]) extends Content
   case class AsBlob(content: Content)              extends Content
-  case class Uri(uri: URI)                         extends CanExtractMetadata
-  case class File(mime: Mime, file: java.io.File)  extends CanExtractMetadata
+  case class Uri(uri: URI)                         extends PreparedContent
+  case class File(mime: Mime, file: java.io.File)  extends PreparedContent
 }
 
 /**
@@ -77,14 +78,16 @@ case class ContentForUpload(name: String, content: Content)
 
 case class LocalSource(uri: URI, sha: Sha256)
 
-sealed trait RawPreview
-case object RawPreviewNotReady                              extends RawPreview
-case object RawPreviewEmpty                                 extends RawPreview
-case class RawPreviewNotUploaded(rawAssetId: UploadAssetId) extends RawPreview
-case class RawPreviewUploaded(assetId: AssetId)             extends RawPreview
+sealed trait Preview
+object Preview {
+  case object NotReady                              extends Preview
+  case object Empty                                 extends Preview
+  case class NotUploaded(rawAssetId: UploadAssetId) extends Preview
+  case class Uploaded(assetId: AssetId)             extends Preview
+}
 
 sealed trait GeneralAsset {
-  def id: AssetIdGeneral
+  def id: GeneralAssetId
   def mime: Mime
   def name: String
   def size: Long
@@ -92,22 +95,22 @@ sealed trait GeneralAsset {
 }
 
 case class UploadAsset[+T <: UploadAssetDetails](
-    id: UploadAssetId,
-    localSource: Option[LocalSource],
-    name: String,
-    sha: Sha256,
-    md5: MD5,
-    mime: Mime,
-    preview: RawPreview,
-    uploaded: Long,
-    size: Long,
-    retention: Retention,
-    public: Boolean,
-    encryption: Encryption,
-    encryptionSalt: Option[Salt],
-    details: T,
-    status: UploadAssetStatus,
-    assetId: Option[AssetId]
+                                                  id: UploadAssetId,
+                                                  localSource: Option[LocalSource],
+                                                  name: String,
+                                                  sha: Sha256,
+                                                  md5: MD5,
+                                                  mime: Mime,
+                                                  preview: Preview,
+                                                  uploaded: Long,
+                                                  size: Long,
+                                                  retention: Retention,
+                                                  public: Boolean,
+                                                  encryption: Encryption,
+                                                  encryptionSalt: Option[Salt],
+                                                  details: T,
+                                                  status: UploadAssetStatus,
+                                                  assetId: Option[AssetId]
 ) extends GeneralAsset
     with Identifiable[UploadAssetId]
 
@@ -145,8 +148,7 @@ case class Asset[+T <: AssetDetails](
     details: T,
     @deprecated
     convId: Option[RConvId]
-) extends GeneralAsset
-    with Identifiable[AssetId]
+) extends GeneralAsset with Identifiable[AssetId]
 
 case class DownloadAsset(
     id: DownloadAssetId,
@@ -157,8 +159,7 @@ case class DownloadAsset(
     downloaded: Long,
     size: Long,
     status: DownloadAssetStatus
-) extends GeneralAsset
-    with Identifiable[DownloadAssetId]
+) extends GeneralAsset with Identifiable[DownloadAssetId]
 
 object DownloadAsset {
 
@@ -198,6 +199,8 @@ object DownloadAsset {
 }
 
 object Asset {
+  import com.waz.model.GenericContent.Asset.{Original => GOriginal, Preview => GPreview}
+
   type UploadGeneral = UploadAssetDetails
   type NotReady      = DetailsNotReady.type
   type General       = AssetDetails
@@ -212,7 +215,7 @@ object Asset {
     case _                => NoEncryption
   }
 
-  def extractDetails(either: Either[Original, Preview]): AssetDetails =
+  def extractDetails(either: Either[GOriginal, GPreview]): AssetDetails =
     if (either.fold(_.hasImage, _.hasImage)) {
       val image = either.fold(_.getImage, _.getImage)
       ImageDetails(Dim2(image.width, image.height))
@@ -243,7 +246,7 @@ object Asset {
       convId = None
     )
 
-  def create(preview: Preview): Asset[General] = {
+  def create(preview: GPreview): Asset[General] = {
     val remote = preview.remote
     Asset(
       id = AssetId(remote.assetId),
@@ -271,7 +274,7 @@ object Asset {
       encryption = uploadAsset.encryption,
       localSource = uploadAsset.localSource,
       preview = uploadAsset.preview match {
-        case RawPreviewUploaded(aId) => Some(assetId)
+        case Preview.Uploaded(previewId) => Some(previewId)
         case _ => None
       },
       details = uploadAsset.details,
@@ -290,8 +293,10 @@ case class AudioDetails(duration: Duration, loudness: Loudness) extends AssetDet
 case class VideoDetails(dimensions: Dim2, duration: Duration)   extends AssetDetails
 
 sealed trait ImageTag
-case object Preview extends ImageTag
-case object Medium  extends ImageTag
-case object Empty   extends ImageTag
+object ImageTag {
+  case object Preview extends ImageTag
+  case object Medium  extends ImageTag
+  case object Empty   extends ImageTag
+}
 
 case class Loudness(levels: Vector[Byte])
