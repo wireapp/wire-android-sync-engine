@@ -341,8 +341,8 @@ object ZLog2 {
       LogShow.createFrom { c =>
         import c._
         l"""
-           |AssetData: id: $id | mime: $mime | sizeInBytes: $sizeInBytes | status: $status | source: $source
-           |  rId: $remoteId| token: $token | otrKey: $otrKey | preview: $previewId
+           |AssetData(id: $id | mime: $mime | sizeInBytes: $sizeInBytes | status: $status | source: $source
+           |  rId: $remoteId | token: $token | otrKey: $otrKey | preview: $previewId)
         """.stripMargin
       }
 
