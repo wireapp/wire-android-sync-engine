@@ -237,6 +237,7 @@ object ZLog2 {
     implicit val CacheKeyShow:   LogShow[CacheKey]   = logShowWithHash
     implicit val AssetTokenShow: LogShow[AssetToken] = logShowWithHash
 
+    implicit val RedactedStringShow: LogShow[RedactedString] = create(_ => "<redacted>", _.value)
     implicit val PasswordShow: LogShow[Password] = create(_ => "********") //Also don't show in debug mode (e.g. Internal)
 
     implicit val NameShow:              LogShow[Name]             = logShowWithHash
@@ -544,7 +545,11 @@ object ZLog2 {
     override def toString: LogTag = value
   }
 
+  // Use to hide string content only in public logs.
+  class RedactedString(val value: String)
+
 //  @deprecated("Only for legacy support. Will be removed after migration", " ")
   def showString(str: String): ShowString = new ShowString(str)
+  def redactedString(str: String): RedactedString = new RedactedString(str)
 
 }
