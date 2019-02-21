@@ -319,8 +319,6 @@ object ZLog2 {
         """.stripMargin
       }
 
-    LogShow[Map[UserId, Option[LocalInstant]]]
-
     implicit val VideoStateLogShow: LogShow[VideoState] = logShowWithToString
     implicit val CallInfoLogShow: LogShow[CallInfo] =
       LogShow.createFrom { n =>
