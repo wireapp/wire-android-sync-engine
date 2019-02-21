@@ -19,6 +19,7 @@ package com.waz.log
 
 import java.io.File
 import java.net.URI
+import java.util.Locale
 
 import android.net.Uri
 import com.waz.ZLog.LogTag
@@ -386,12 +387,6 @@ object ZLog2 {
            | ssoId: $ssoId)"""
       }
 
-    implicit val ThreadShow: LogShow[Thread] =
-      LogShow.create { t =>
-        import t._
-        s"Thread(id: $getId, name: $getName, priority: $getPriority, state: $getState)"
-      }
-
     implicit val ErrorResponseLogShow: LogShow[ErrorResponse] = LogShow.create(_.toString)
 
     // Global Record and Play Service
@@ -490,7 +485,18 @@ object ZLog2 {
     }
 
     implicit val ReceiptType: LogShow[ReceiptType] = logShowWithToString
+
+    // System Types
+
+    implicit val ThreadLogShow: LogShow[Thread] =
+      LogShow.create { t =>
+        import t._
+        s"Thread(id: $getId, name: $getName, priority: $getPriority, state: $getState)"
+      }
+
+    implicit val LocaleLogShow: LogShow[Locale] = logShowWithHash
   }
+
 
   trait CanBeShown {
     def showSafe: String
