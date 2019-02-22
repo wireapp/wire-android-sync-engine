@@ -322,6 +322,12 @@ object ZLog2 {
         l"UserData(id: $id | teamId: $teamId | name: $name | displayName: $displayName | email: $email | phone: $phone | handle: $handle | deleted: $deleted)"
       }
 
+    implicit val UserInfoLogShow: LogShow[UserInfo] =
+      LogShow.createFrom { u =>
+        import u._
+        l"UserInfo: id: $id | email: $email: | phone: $phone: | picture: $picture: | deleted: $deleted: | handle: $handle: | expiresAt: $expiresAt: | ssoId: $ssoId | managedBy: $managedBy"
+      }
+
     implicit val ConvDataLogShow: LogShow[ConversationData] =
       LogShow.createFrom { c =>
         import c._
