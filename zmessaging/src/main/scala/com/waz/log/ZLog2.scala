@@ -31,6 +31,7 @@ import com.waz.log.InternalLog.LogLevel.{Debug, Error, Info, Verbose, Warn}
 import com.waz.model.AccountData.Password
 import com.waz.model.GenericContent.Location
 import com.waz.model.ManagedBy.ManagedBy
+import com.waz.model.messages.media.{ArtistData, TrackData}
 import com.waz.model.{SSOId, _}
 import com.waz.model.otr.{Client, ClientId, UserClients}
 import com.waz.model.sync.{ReceiptType, SyncCommand, SyncJob, SyncRequest}
@@ -346,6 +347,30 @@ object ZLog2 {
            |AssetData(id: $id | mime: $mime | sizeInBytes: $sizeInBytes | status: $status | source: $source
            |  rId: $remoteId | token: $token | otrKey: $otrKey | preview: $previewId)
         """.stripMargin
+      }
+
+    implicit val TrackDataLogShow: LogShow[TrackData] =
+      LogShow.createFrom { d =>
+        import d._
+        l"""
+            |TrackData(
+            | provider: $provider,
+            | title: ${redactedString(title)},
+            | artist: $artist,
+            | linkUrl: ${new URI(linkUrl)},
+            | artwork: $artwork,
+            | duration: $duration,
+            | streamable: $streamable,
+            | streamUrl: ${streamUrl.map(new URI(_))},
+            | previewUrl: ${previewUrl.map(new URI(_))},
+            | expires: $expires)
+          """.stripMargin
+
+      }
+
+    implicit val ArtistDataLogShow: LogShow[ArtistData] =
+      LogShow.createFrom { d =>
+        l"ArtistData(name: ${redactedString(d.name)}, avatar: ${d.avatar})"
       }
 
     implicit val NotificationDataLogShow: LogShow[NotificationData] =
