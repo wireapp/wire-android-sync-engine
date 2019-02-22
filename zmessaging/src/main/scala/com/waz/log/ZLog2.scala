@@ -151,6 +151,8 @@ object ZLog2 {
     implicit val ThrowableShow:      LogShow[Throwable]      = logShowWithToString
     implicit val ShowStringLogShow:  LogShow[ShowString]     = logShowWithToString
 
+    implicit val RedactedStringShow: LogShow[RedactedString] = create(_ => "<redacted>", _.value)
+
     implicit val Sha256LogShow: LogShow[Sha256] = create(_.hexString, _.str)
 
     implicit val enumShow: LogShow[Enum[_]] = LogShow.create((enumValue: Enum[_]) => enumValue.name())
@@ -198,7 +200,7 @@ object ZLog2 {
         t => (showA.showSafe(t._1), showB.showSafe(t._2), showC.showSafe(t._3)).toString(),
         t => (showA.showUnsafe(t._1), showB.showUnsafe(t._2), showC.showUnsafe(t._3)).toString()
       )
-    
+
     //wire types
     implicit val UidShow:        LogShow[Uid]        = logShowWithHash
     implicit val UserIdShow:     LogShow[UserId]     = logShowWithHash
@@ -214,7 +216,6 @@ object ZLog2 {
     implicit val CacheKeyShow:   LogShow[CacheKey]   = logShowWithHash
     implicit val AssetTokenShow: LogShow[AssetToken] = logShowWithHash
 
-    implicit val RedactedStringShow: LogShow[RedactedString] = create(_ => "<redacted>", _.value)
     implicit val PasswordShow: LogShow[Password] = create(_ => "********") //Also don't show in debug mode (e.g. Internal)
 
     implicit val NameShow:              LogShow[Name]             = logShowWithHash
@@ -347,7 +348,6 @@ object ZLog2 {
             | previewUrl: ${previewUrl.map(new URI(_))},
             | expires: $expires)
           """.stripMargin
-
       }
 
     implicit val ArtistDataLogShow: LogShow[ArtistData] =
@@ -370,6 +370,7 @@ object ZLog2 {
       }
 
     implicit val VideoStateLogShow: LogShow[VideoState] = logShowWithToString
+
     implicit val CallInfoLogShow: LogShow[CallInfo] =
       LogShow.createFrom { n =>
         import n._
@@ -446,7 +447,7 @@ object ZLog2 {
             | attempts: $attempts
             | offline: $offline
             | state: $state
-            | error: ${j.error})"""
+            | error: ${j.error})""".stripMargin
       }
 
     implicit val SyncRequestLogShow: LogShow[SyncRequest] =
@@ -465,7 +466,9 @@ object ZLog2 {
     implicit val SyncStateLogShow: LogShow[SyncState] = LogShow.create(_.name())
 
     //Events
+
     implicit val EventLogShow: LogShow[Event] = logShowWithHash
+
     implicit val OtrErrorLogShow: LogShow[OtrError] =
       LogShow.createFrom {
         case Duplicate => l"Duplicate"
@@ -473,6 +476,7 @@ object ZLog2 {
         case IdentityChangedError(from, sender) => l"IdentityChangedError(from: $from | sender: $sender)"
         case UnknownOtrErrorEvent(json) => l"UnknownOtrErrorEvent(json: $json)"
       }
+
     implicit val OtrErrorEventLogShow: LogShow[OtrErrorEvent] =
       LogShow.createFrom { e =>
         import e._
@@ -480,6 +484,7 @@ object ZLog2 {
       }
 
     //Protos
+
     implicit val GenericMessageLogShow: LogShow[GenericMessage] = LogShow.create { m =>
       m.getContentCase
       s"GenericMessage(messageId: ${sha2(m.messageId)} | contentCase: ${m.getContentCase})"
@@ -558,5 +563,4 @@ object ZLog2 {
 //  @deprecated("Only for legacy support. Will be removed after migration", " ")
   def showString(str: String): ShowString = new ShowString(str)
   def redactedString(str: String): RedactedString = new RedactedString(str)
-
 }
