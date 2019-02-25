@@ -263,7 +263,7 @@ object SyncRequest {
 
     override def toString = s"SyncUser(${users.size} users: ${users.take(5)}...)"
 
-    override def merge(req: SyncRequest) = mergeHelper[SyncUser](req) { other =>
+    override def merge(req: SyncRequest): MergeResult[SyncRequest.SyncUser] = mergeHelper[SyncUser](req) { other =>
       if (other.users.subsetOf(users)) Merged(this)
       else {
         val union = users ++ other.users
@@ -275,6 +275,26 @@ object SyncRequest {
 
     override def isDuplicateOf(req: SyncRequest): Boolean = req match {
       case SyncUser(us) => users.subsetOf(us)
+      case _ => false
+    }
+  }
+
+  case class SyncRichInfo(users: Set[UserId]) extends BaseRequest(Cmd.SyncRichMedia) {
+
+    override def toString = s"SyncRichInfo(${users.size} users: ${users.take(5)}...)"
+
+    override def merge(req: SyncRequest): MergeResult[SyncRequest.SyncRichInfo] = mergeHelper[SyncRichInfo](req) { other =>
+      if (other.users.subsetOf(users)) Merged(this)
+      else {
+        val union = users ++ other.users
+        if (union.size <= UsersClient.IdsCountThreshold) Merged(SyncRichInfo(union))
+        else if (union.size == users.size + other.users.size) Unchanged
+        else Updated(other.copy(other.users -- users))
+      }
+    }
+
+    override def isDuplicateOf(req: SyncRequest): Boolean = req match {
+      case SyncRichInfo(us) => users.subsetOf(us)
       case _ => false
     }
   }

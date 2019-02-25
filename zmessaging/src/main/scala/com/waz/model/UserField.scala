@@ -25,6 +25,9 @@ case class UserField(key: String, value: String)
 object UserField {
   import com.waz.utils.JsonDecoder._
 
+  private val key: Symbol = 'type
+  private val value: Symbol = 'value
+
   def decodeOptUserFields(s: Symbol)(implicit js: JSONObject): Option[Seq[UserField]] =
     opt(s, js => userFieldsDecoder(js))
 
@@ -37,7 +40,7 @@ object UserField {
 
   implicit val userFieldDecoder: JsonDecoder[UserField] = new JsonDecoder[UserField] {
     override def apply(implicit js: JSONObject): UserField =
-      UserField(decodeString('key), decodeString('value))
+      UserField(decodeString(key), decodeString(value))
   }
 
   implicit val userFieldsEncoder: JsonEncoder[Seq[UserField]] = new JsonEncoder[Seq[UserField]] {
@@ -48,8 +51,8 @@ object UserField {
 
   implicit val userFieldEncoder: JsonEncoder[UserField] = new JsonEncoder[UserField] {
     override def apply(field: UserField): JSONObject = JsonEncoder { o =>
-      o.put("key", field.key)
-      o.put("value", field.value)
+      o.put(key.name, field.key)
+      o.put(value.name, field.value)
     }
   }
 }
