@@ -213,7 +213,6 @@ class AccountSyncHandler(accounts: AccountsService) extends SyncHandler {
           case SyncConversations                                   => zms.conversationSync.syncConversations()
           case SyncConvLink(conv)                                  => zms.conversationSync.syncConvLink(conv)
           case SyncUser(u)                                         => zms.usersSync.syncUsers(u.toSeq: _*)
-          case SyncRichInfo(u)                                     => zms.usersSync.syncRichInfo(u.toSeq:_*)
           case SyncSearchQuery(query)                              => zms.usersearchSync.syncSearchQuery(query)
           case ExactMatchHandle(query)                             => zms.usersearchSync.exactMatchHandle(query)
           case SyncRichMedia(messageId)                            => zms.richmediaSync.syncRichMedia(messageId)

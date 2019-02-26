@@ -44,18 +44,8 @@ class UsersSyncHandler(assetSync: AssetSyncHandler,
   import Threading.Implicits.Background
   private implicit val ec = EventContext.Global
 
-  def syncRichInfo(ids: UserId*): Future[SyncResult] = Future.sequence(ids.map { id =>
-    usersClient.loadRichInfo(id).future.flatMap {
-      case Right(f) =>
-        userService
-          .updateUserData(id, u => u.copy(fields = f))
-          .map(_ => SyncResult.Success)
-      case Left(error) => Future.successful(SyncResult(error))
-    }
-  }).map(_ => SyncResult.Success)
-
-  def syncUsers(ids: UserId*): Future[SyncResult] = for {
-    r <- usersClient.loadUsers(ids).future flatMap {
+  def syncUsers(ids: UserId*): Future[SyncResult] =
+    usersClient.loadUsers(ids).future flatMap {
       case Right(users) =>
         userService
           .updateSyncedUsers(users)
@@ -63,8 +53,6 @@ class UsersSyncHandler(assetSync: AssetSyncHandler,
       case Left(error) =>
         Future.successful(SyncResult(error))
     }
-    _ <- syncRichInfo(ids:_*)
-  } yield r
 
   def syncSelfUser(): Future[SyncResult] = usersClient.loadSelf().future flatMap {
     case Right(user) =>

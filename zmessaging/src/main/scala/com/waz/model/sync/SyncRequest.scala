@@ -279,26 +279,6 @@ object SyncRequest {
     }
   }
 
-  case class SyncRichInfo(users: Set[UserId]) extends BaseRequest(Cmd.SyncRichMedia) {
-
-    override def toString = s"SyncRichInfo(${users.size} users: ${users.take(5)}...)"
-
-    override def merge(req: SyncRequest): MergeResult[SyncRequest.SyncRichInfo] = mergeHelper[SyncRichInfo](req) { other =>
-      if (other.users.subsetOf(users)) Merged(this)
-      else {
-        val union = users ++ other.users
-        if (union.size <= UsersClient.IdsCountThreshold) Merged(SyncRichInfo(union))
-        else if (union.size == users.size + other.users.size) Unchanged
-        else Updated(other.copy(other.users -- users))
-      }
-    }
-
-    override def isDuplicateOf(req: SyncRequest): Boolean = req match {
-      case SyncRichInfo(us) => users.subsetOf(us)
-      case _ => false
-    }
-  }
-
   case class SyncConversation(convs: Set[ConvId]) extends BaseRequest(Cmd.SyncConversation) {
 
     override def merge(req: SyncRequest) = mergeHelper[SyncConversation](req) { other =>
