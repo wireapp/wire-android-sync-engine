@@ -2,8 +2,16 @@
 
 ### Issues
 
-Sometimes new pull requests could use more context. This helps new people to have more visibility on what is happening and also captures more information when looking through `git blame`.
+_Briefly describe the issue you have solved or implemented with this pull request. If the PR contains multiple issues, use a bullet list._
+
+### Causes
+
+_Briefly describe the causes behind the issues. This could be helpful to understand the adopted solutions behind some nasty bugs or complex issues. (Optional)_
 
 ### Solutions
 
-Add template that will be filled in with any new PR.
+_Briefly describe the solutions you have implemented for the issues explained above._
+
+## Notes
+
+_Specify here any other facts that you think are important for this issue. (Optional)_
