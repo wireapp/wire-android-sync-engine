@@ -25,7 +25,7 @@ import com.waz.model.ManagedBy.ManagedBy
 import com.waz.model.UserData.ConnectionStatus
 import com.waz.model.UserPermissions._
 import com.waz.service.SearchKey
-import com.waz.sync.client.UserSearchClient.UserSearchEntry
+import com.waz.service.UserSearchService.UserSearchEntry
 import com.waz.utils._
 import com.waz.utils.wrappers.{DB, DBCursor}
 
