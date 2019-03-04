@@ -21,9 +21,9 @@ import java.io.{FileOutputStream, InputStream}
 import java.security.{DigestInputStream, MessageDigest}
 
 import com.waz.ZLog.ImplicitTag._
-import com.waz.ZLog._
 import com.waz.model.AssetData.UploadTaskKey
 import com.waz.model._
+import com.waz.log.ZLog2._
 import com.waz.model.errors._
 import com.waz.service.assets2.Asset.{General, UploadGeneral, Video}
 import com.waz.sync.SyncServiceHandle
@@ -143,7 +143,7 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
   }
 
   private def loadFromBackend(asset: Asset[General], callback: Option[ProgressCallback]): CancellableFuture[InputStream] = {
-    verbose(s"Load asset content from backend. $asset")
+    verbose(l"Load asset content from backend. $asset")
     assetClient.loadAssetContent(asset, callback)
       .flatMap {
         case Left(err) if err.code == ResponseCode.NotFound =>
@@ -154,7 +154,7 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
         case Left(err) =>
           CancellableFuture.failed(NetworkError(err))
         case Right(fileWithSha) if fileWithSha.sha256 != asset.sha =>
-          debug(s"Loaded file size ${fileWithSha.file.length()}")
+          debug(l"Loaded file size ${fileWithSha.file.length()}")
           CancellableFuture.failed(new ValidationError(s"SHA256 is not equal. Expected: ${asset.sha} Actual: ${fileWithSha.sha256} AssetId: ${asset.id}"))
         case Right(fileWithSha) =>
           contentCache.put(asset.id, fileWithSha.file, removeOriginal = true)
@@ -162,16 +162,16 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
             .toCancellable
       }
       .recoverWith { case err =>
-        verbose(s"Can not load asset content from backend. ${err.getMessage}")
+        verbose(l"Can not load asset content from backend. ${showString(err.getMessage)}")
         CancellableFuture.failed(err)
       }
   }
 
   private def loadFromCache(asset: Asset[General], callback: Option[ProgressCallback]): CancellableFuture[InputStream] = {
-    verbose(s"Load asset content from cache. $asset")
+    verbose(l"Load asset content from cache. $asset")
     contentCache.getStream(asset.id).map(asset.encryption.decrypt(_))
       .recoverWith { case err =>
-        verbose(s"Can not load asset content from cache. $err")
+        verbose(l"Can not load asset content from cache. $err")
         Future.failed(err)
       }
       .toCancellable
@@ -180,7 +180,7 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
   private def loadFromFileSystem(asset: Asset[General],
                                  localSource: LocalSource,
                                  callback: Option[ProgressCallback]): CancellableFuture[InputStream] = {
-    verbose(s"Load asset content from file system. $asset")
+    verbose(l"Load asset content from file system. $asset")
     lazy val emptyUriError = new NoSuchElementException("Asset does not have local source property.")
     val openInputStream = () => asset.localSource.map(ls => uriHelper.openInputStream(ls.uri)).getOrElse(Failure(throw emptyUriError))
     Future.fromTry(openInputStream())
@@ -190,8 +190,8 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
         else Future.failed(new ValidationError(s"SHA256 is not equal. Expected: ${localSource.sha} Actual: $sha AssetId: ${asset.id}"))
       }
       .recoverWith { case err =>
-        debug(s"Can not load content from file system. ${err.getMessage}")
-        verbose(s"Clearing local source asset property. $asset")
+        debug(l"Can not load content from file system. ${showString(err.getMessage)}")
+        verbose(l"Clearing local source asset property. $asset")
         assetsStorage.save(asset.copy(localSource = None)).flatMap(_ => Future.failed(err))
       }
       .toCancellable
@@ -238,7 +238,7 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
     }
 
     def actionsOnCancellation(): Unit = {
-      info(s"Asset uploading cancelled: $assetId")
+      info(l"Asset uploading cancelled: $assetId")
       uploadAssetStorage.update(assetId, _.copy(status = UploadAssetStatus.Cancelled))
     }
 
@@ -339,7 +339,7 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
     val t0 = System.nanoTime()
     for {
       asset <- createUploadAsset(content, targetEncryption, public, retention, messageId)
-      _ = debug(s"Upload asset created: $asset")
+      _ = debug(l"Upload asset created: $asset")
       _ <- uploadAssetStorage.save(asset)
       t1 = System.nanoTime()
       _ = println("Asset creation time: " + (t1 - t0) + " ns")

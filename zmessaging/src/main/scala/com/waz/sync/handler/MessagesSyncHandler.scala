@@ -18,7 +18,7 @@
 package com.waz.sync.handler
 
 import com.waz.ZLog.ImplicitTag._
-import com.waz.ZLog._
+import com.waz.log.ZLog2._
 import com.waz.api.Message
 import com.waz.api.impl.ErrorResponse
 import com.waz.api.impl.ErrorResponse.internalError
@@ -120,15 +120,15 @@ class MessagesSyncHandler(selfUserId: UserId,
     }.flatMap {
       case (Some(msg), Some(conv)) =>
         postMessage(conv, msg, editTime).flatMap {
-          case Right(time) =>
-            verbose(s"postOtrMessage($msg) successful $time")
+          case Right(timeAndId) =>
+            verbose(l"postOtrMessage($msg) successful $timeAndId")
             for {
-              _ <- service.messageSent(convId, msg.id, time)
-              (prevLastTime, lastTime) <- msgContent.updateLocalMessageTimes(convId, msg.time, time)
-                .map(_.lastOption.map { case (p, c) => (p.time, c.time)}.getOrElse((msg.time, time)))
+              _ <- service.messageSent(convId, timeAndId._2, timeAndId._1)
+              (prevLastTime, lastTime) <- msgContent.updateLocalMessageTimes(convId, msg.time, timeAndId._1)
+                .map(_.lastOption.map { case (p, c) => (p.time, c.time)}.getOrElse((msg.time, timeAndId._1)))
               // update conv lastRead time if there is no unread message after the message that was just sent
               _ <- convs.storage.update(convId, c => if (!c.lastRead.isAfter(prevLastTime)) c.copy(lastRead = lastTime) else c)
-              _ <- convs.updateLastEvent(convId, time)
+              _ <- convs.updateLastEvent(convId, timeAndId._1)
             } yield SyncResult.Success
 
           case Left(error) =>
@@ -165,7 +165,13 @@ class MessagesSyncHandler(selfUserId: UserId,
         successful(Failure("postMessage failed, couldn't find either message or conversation"))
     }
 
-  private def postMessage(conv: ConversationData, msg: MessageData, reqEditTime: RemoteInstant) = {
+  /**
+    * Sends a message to the given conversation. If the message is an edit, it will also update the message
+    * in the database to the new message ID.
+    * @return either error, or the remote timestamp and the new message ID
+    */
+  private def postMessage(conv: ConversationData, msg: MessageData, reqEditTime: RemoteInstant):
+    Future[Either[ErrorResponse, (RemoteInstant, MessageId)]] = {
 
     def postTextMessage() = {
       val adjustedMsg = msg.adjustMentions(true).getOrElse(msg)
@@ -193,28 +199,28 @@ class MessagesSyncHandler(selfUserId: UserId,
     import Message.Type._
 
     msg.msgType match {
-      case _ if msg.isAssetMessage => Cancellable(UploadTaskKey(msg.assetId.get))(uploadAsset(conv, msg)).future
-      case KNOCK => otrSync.postOtrMessage(conv.id, GenericMessage(msg.id.uid, msg.ephemeral, Proto.Knock(msg.expectsRead.getOrElse(false))))
-      case TEXT | TEXT_EMOJI_ONLY => postTextMessage().map(_.map(_.time))
+      case _ if msg.isAssetMessage => Cancellable(UploadTaskKey(msg.assetId.get))(uploadAsset(conv, msg)).future.map(_.map((_, msg.id)))
+      case KNOCK => otrSync.postOtrMessage(conv.id, GenericMessage(msg.id.uid, msg.ephemeral, Proto.Knock(msg.expectsRead.getOrElse(false)))).map(_.map((_, msg.id)))
+      case TEXT | TEXT_EMOJI_ONLY => postTextMessage().map(_.map(data => (data.time, data.id)))
       case RICH_MEDIA =>
         postTextMessage().flatMap {
-          case Right(m) => sync.postOpenGraphData(conv.id, m.id, m.editTime).map(_ => Right(m.time))
+          case Right(m) => sync.postOpenGraphData(conv.id, m.id, m.editTime).map(_ => Right(m.time, m.id))
           case Left(err) => successful(Left(err))
         }
       case LOCATION =>
         msg.protos.headOption match {
           case Some(GenericMessage(id, loc: Location)) if msg.isEphemeral =>
-            otrSync.postOtrMessage(conv.id, GenericMessage(id, Ephemeral(msg.ephemeral, loc)))
+            otrSync.postOtrMessage(conv.id, GenericMessage(id, Ephemeral(msg.ephemeral, loc))).map(_.map((_, msg.id)))
           case Some(proto) =>
-            otrSync.postOtrMessage(conv.id, proto)
+            otrSync.postOtrMessage(conv.id, proto).map(_.map((_, msg.id)))
           case None =>
             successful(Left(internalError(s"Unexpected location message content: $msg")))
         }
       case tpe =>
         msg.protos.headOption match {
           case Some(proto) if !msg.isEphemeral =>
-            verbose(s"sending generic message: $proto")
-            otrSync.postOtrMessage(conv.id, proto)
+            verbose(l"sending generic message: $proto")
+            otrSync.postOtrMessage(conv.id, proto).map(_.map((_, msg.id)))
           case Some(_) =>
             successful(Left(internalError(s"Can not send generic ephemeral message: $msg")))
           case None =>
@@ -226,12 +232,11 @@ class MessagesSyncHandler(selfUserId: UserId,
   private def uploadAsset(conv: ConversationData, msg: MessageData): ErrorOrResponse[RemoteInstant] = {
     import com.waz.model.errors._
 
-    verbose(s"uploadAsset($conv, $msg)")
+    verbose(l"uploadAsset($conv, $msg)")
 
     def postAssetMessage(proto: GenericMessage, id: GeneralAssetId): CancellableFuture[RemoteInstant] = {
       for {
-        time <- otrSync.postOtrMessage(conv.id, proto).flatMap {
-          case Left(errorResponse) => Future.failed(errorResponse)
+        time <- otrSync.postOtrMessage(conv.id, proto).flatMap { case Left(errorResponse) => Future.failed(errorResponse)
           case Right(time) => Future.successful(time)
         }.toCancellable
         _ <- msgContent.updateMessage(msg.id)(_.copy(protos = Seq(proto), time = time, assetId = Some(id))).toCancellable
@@ -299,14 +304,14 @@ class MessagesSyncHandler(selfUserId: UserId,
         case Some(asset) if asset.status == UploadAssetStatus.Cancelled =>
           CancellableFuture.successful(Left(ErrorResponse.Cancelled))
         case Some(asset) =>
-          verbose(s"Sending asset: $asset")
+          verbose(l"Sending asset: $asset")
           sendWithV3(asset).map(Right.apply)
       }
     } yield result
   }
 
   private[waz] def messageSent(convId: ConvId, msg: MessageData, time: RemoteInstant) = {
-    debug(s"otrMessageSent($convId. $msg, $time)")
+    debug(l"otrMessageSent($convId. $msg, $time)")
 
     def updateLocalTimes(conv: ConvId, prevTime: RemoteInstant, time: RemoteInstant) =
       msgContent.updateLocalMessageTimes(conv, prevTime, time) flatMap { updated =>

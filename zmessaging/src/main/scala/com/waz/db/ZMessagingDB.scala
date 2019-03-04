@@ -61,7 +61,7 @@ class ZMessagingDB(context: Context, dbName: String, tracking: TrackingService) 
 }
 
 object ZMessagingDB {
-  val DbVersion = 115
+  val DbVersion = 116
 
   lazy val daos = Seq (
     UserDataDao, SearchQueryCacheDao, AssetDataDao, ConversationDataDao,
@@ -287,6 +287,9 @@ object ZMessagingDB {
        db.execSQL("ALTER TABLE Users ADD COLUMN managed_by TEXT DEFAULT null")
     },
     Migration(114, 115) { db =>
+      db.execSQL("ALTER TABLE Users ADD COLUMN fields TEXT DEFAULT null")
+    },
+    Migration(115, 116) { db =>
       import com.waz.model.AssetData.{AssetDataDao => OldAssetDao}
       import com.waz.service.assets2.AssetStorageImpl.{AssetDao => NewAssetDao}
       import com.waz.service.assets2._
@@ -351,6 +354,7 @@ object ZMessagingDB {
             m
         }
       }
+      db.execSQL("ALTER TABLE Users ADD COLUMN managed_by TEXT DEFAULT null")
     }
   )
 }
