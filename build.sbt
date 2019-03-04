@@ -11,15 +11,17 @@ import scala.util.Random
 val MajorVersion = "141"
 val MinorVersion = "0" // hotfix release
 
+lazy val buildType = sys.props.getOrElse("build_type", "dev")
+lazy val buildNumber = sys.props.getOrElse("build_number", "0")
+lazy val isRelease = buildType == "release"
+lazy val isPR = buildType == "pr"
+lazy val isDebug = !isRelease
+
 version in ThisBuild := {
-  val jobName = sys.env.get("JOB_NAME")
-  val isPR = sys.env.get("PR").fold(false)(_.toBoolean)
-  val buildNumber = sys.env.get("BUILD_NUMBER")
-  val master = jobName.exists(_.endsWith("-master"))
-  val buildNumberString = buildNumber.fold("-SNAPSHOT")("." + _)
-  if (master) MajorVersion + "." + MinorVersion + buildNumberString
-  else if (isPR) MajorVersion + buildNumber.fold("-PR")("." + _ + "-PR")
-  else MajorVersion + buildNumberString
+  val fullVersion = MajorVersion + "." + MinorVersion + "." + buildNumber
+  if (isRelease) fullVersion
+  else if (isPR) fullVersion + "-PR"
+  else fullVersion + "-DEV"
 }
 
 crossPaths in ThisBuild := false
@@ -189,7 +191,7 @@ generateZmsVersion in zmessaging := {
                   |   public static final int ZMS_MAJOR_VERSION = %s;
                   |   public static final boolean DEBUG = %b;
                   |}
-                """.stripMargin.format(version.value, MajorVersion, sys.env.get("BUILD_NUMBER").isEmpty || sys.props.getOrElse("debug", "false").toBoolean)
+                """.stripMargin.format(version.value, MajorVersion, isDebug)
   IO.write(file, content)
   Seq(file)
 }
@@ -207,7 +209,7 @@ generateDebugMode in macrosupport := {
                   |    Literal(Constant(isEnabled))
                   |  }
                   |}
-                """.stripMargin.format(sys.env.get("BUILD_NUMBER").isEmpty || sys.props.getOrElse("debug", "false").toBoolean)
+                """.stripMargin.format(isDebug)
   IO.write(file, content)
   Seq(file)
 }
@@ -229,7 +231,7 @@ lazy val publishSettings = Seq(
   publishMavenStyle := true,
   bintrayOrganization := Some("wire-android"),
   bintrayRepository := {
-    if (sys.env.get("JOB_NAME").exists(_.endsWith("-master"))) "releases" else "snapshots"
+    if (isRelease) "releases" else "snapshots"
   }
 )
 
