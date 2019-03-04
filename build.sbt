@@ -11,7 +11,14 @@ import scala.util.Random
 val MajorVersion = "141"
 val MinorVersion = "0" // hotfix release
 
-lazy val buildType = sys.props.getOrElse("build_type", "dev")
+lazy val buildType =
+  sys.props.getOrElse("build_type", "dev").toLowerCase match {
+    case "dev" => "dev"
+    case "release" => "release"
+    case "pr" => "pr"
+    case t => throw new MessageOnlyException(s"Invalid build type: '$t', " +
+      s"set the sbt flag -Dbuild_type to either 'dev', 'release' or 'pr'. ")
+  }
 lazy val buildNumber = sys.props.getOrElse("build_number", "0")
 lazy val isRelease = buildType == "release"
 lazy val isPR = buildType == "pr"
