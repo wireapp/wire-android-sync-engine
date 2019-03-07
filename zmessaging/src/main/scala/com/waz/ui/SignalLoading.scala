@@ -17,6 +17,7 @@
  */
 package com.waz.ui
 
+import com.waz.log.BasicLogging.LogTag
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.log.ZLog2._
 import com.waz.service.ZMessaging
@@ -71,7 +72,7 @@ abstract class SignalLoader[A](handle: LoaderHandle[A])(implicit ui: UiModule)
   }
 
   def destroy(): Unit = {
-    verbose(l"destroy()")(s"SignalLoader[${handle.loading.getClass.getName}]")
+    verbose(l"destroy()")(LogTag(s"SignalLoader[${handle.loading.getClass.getName}]"))
     observer.destroy()
     ref.get.foreach { handle => handle.loading.loaderHandles -= handle }
     ref.clear()
@@ -82,7 +83,7 @@ class ZmsSignalLoader[A](handle: ZmsLoaderHandle[A])(implicit ui: UiModule) exte
   override def signal = ui.currentZms flatMap { zms => verbose(l"currentZms: ${zms.map(_.selfUserId)}"); withHandle { _.asInstanceOf[ZmsLoaderHandle[A]].signal(zms) } }
 }
 
-object SignalLoader {
+object SignalLoader extends DerivedLogTag {
 
   private val queue = new ReferenceQueue[LoaderHandle[_]]
 

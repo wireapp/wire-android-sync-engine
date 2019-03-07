@@ -21,9 +21,9 @@ import java.util.Timer
 import java.util.concurrent.{Executor, ExecutorService, Executors}
 
 import android.os.{Handler, HandlerThread, Looper}
-import com.waz.ZLog.LogTag
 import com.waz.log.ZLog2._
 import com.waz.api.ZmsVersion
+import com.waz.log.BasicLogging.LogTag
 import com.waz.utils.returning
 
 import scala.concurrent.{ExecutionContext, Future, Promise, blocking}
@@ -53,12 +53,12 @@ object Threading {
   /**
    * Thread pool for non-blocking background tasks.
    */
-  val ThreadPool: DispatchQueue = new LimitedDispatchQueue(Cpus, executionContext(Executors.newCachedThreadPool())("CpuThreadPool"), "CpuThreadPool")
+  val ThreadPool: DispatchQueue = new LimitedDispatchQueue(Cpus, executionContext(Executors.newCachedThreadPool())(LogTag("CpuThreadPool")), "CpuThreadPool")
 
   /**
    * Thread pool for blocking IO tasks.
    */
-  val IOThreadPool: DispatchQueue = new LimitedDispatchQueue(Cpus, executionContext(Executors.newCachedThreadPool())("IoThreadPool"), "IoThreadPool")
+  val IOThreadPool: DispatchQueue = new LimitedDispatchQueue(Cpus, executionContext(Executors.newCachedThreadPool())(LogTag("IoThreadPool")), "IoThreadPool")
 
   val Background = ThreadPool
 

@@ -27,8 +27,8 @@ import android.content.res.Configuration
 import android.os.Build.VERSION.SDK_INT
 import android.os.Build.VERSION_CODES.{JELLY_BEAN_MR2, LOLLIPOP}
 import com.github.ghik.silencer.silent
-import com.waz.ZLog.LogTag
-import com.waz.ZLog.ImplicitTag._
+import com.waz.log.BasicLogging.LogTag
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.log.ZLog2._
 import com.waz.service.ZMessaging
 import com.waz.utils
@@ -36,7 +36,7 @@ import com.waz.utils
 import scala.annotation.tailrec
 import scala.util.Try
 
-object Locales {
+object Locales extends DerivedLogTag {
   def currentLocale =
     (for {
       context   <- Option(ZMessaging.context)
@@ -116,7 +116,7 @@ trait Transliteration {
   def transliterate(s: String): String
 }
 
-object Transliteration {
+object Transliteration extends DerivedLogTag {
   private val id = "Any-Latin; Latin-ASCII; Lower; [^\\ 0-9a-z] Remove"
   def chooseImplementation(id: String = id): Transliteration = {
     verbose(l"chooseImplementation: ${showString(id)}")
@@ -152,7 +152,7 @@ object LibcoreIndexing {
 
     private val delegate = new libcore.icu.AlphabeticIndex(locale).getImmutableIndex
 
-    verbose(l"using libcore indexing for locale $locale; buckets: ${delegate.getBucketCount}")(logTag)
+    verbose(l"using libcore indexing for locale $locale; buckets: ${delegate.getBucketCount}")
 
     override def labelFor(s: String): String = {
       val index = delegate.getBucketIndex(s)
@@ -165,7 +165,7 @@ object LibcoreIndexing {
   }
 }
 
-object FallbackIndexing {
+object FallbackIndexing extends DerivedLogTag {
   lazy val instance: Indexing = new Indexing {
     val blocks = Set(
       BASIC_LATIN,

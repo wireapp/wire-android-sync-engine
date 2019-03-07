@@ -101,7 +101,7 @@ class ConnectionsClientImpl(implicit
   }
 }
 
-object ConnectionsClient {
+object ConnectionsClient extends DerivedLogTag {
   val ConnectionsPath = "/connections"
   val PageSize = 100
 

@@ -17,14 +17,13 @@
  */
 package com.waz.service.media
 
-import com.waz.ZLog._
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model.AssetMetaData.Image.Tag.Medium
 import com.waz.model._
 import com.waz.service.media.RichMediaContentParser.GoogleMapsLocation
 import com.waz.sync.client.GoogleMapsClient
 
-object GoogleMapsMediaService {
-  private implicit val logTag: LogTag = logTagFor[YouTubeMediaService]
+object GoogleMapsMediaService extends DerivedLogTag {
 
   val MaxImageWidth = 640 // free maps api limitation
   val ImageDimensions = Dim2(MaxImageWidth, MaxImageWidth * 3 / 4)

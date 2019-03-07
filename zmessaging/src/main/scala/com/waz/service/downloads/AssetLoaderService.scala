@@ -17,12 +17,11 @@
  */
 package com.waz.service.downloads
 
-import com.waz.ZLog.ImplicitTag._
-import com.waz.ZLog.LogTag
-//import com.waz.ZLog._
 import com.waz.api.ProgressIndicator.State
 import com.waz.api.impl.ProgressIndicator.ProgressData
 import com.waz.cache.CacheEntry
+import com.waz.log.BasicLogging.LogTag
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model.{AssetData, AssetId}
 import com.waz.service.ZMessaging.clock
 import com.waz.service.downloads.AssetLoader.DownloadException
@@ -45,7 +44,7 @@ import scala.util.control.NonFatal
   * operations. This is to have a single global asset loading queue for all zms instances (and also for no instances), but
   * it still allows scoped instances of the actual loaders to be used (with their relevant credentials or lack thereof)
   */
-class AssetLoaderService {
+class AssetLoaderService extends DerivedLogTag {
   import AssetLoaderService._
   private implicit val dispatcher = new SerialDispatchQueue(name = "AssetLoaderService")
   private implicit val ev = EventContext.Global
@@ -207,7 +206,7 @@ object AssetLoaderService {
       loader.loadAsset(asset, state ! _, force)
     }
 
-    override def toString: LogTag = s"LoadEntry(${asset.id}) { force: $force, state: $state, time: $time }"
+    override def toString: String = s"LoadEntry(${asset.id}) { force: $force, state: $state, time: $time }"
 
     lazy val queuePlaceHolder: QueueEntry = QueueEntry(asset.id, time)
   }

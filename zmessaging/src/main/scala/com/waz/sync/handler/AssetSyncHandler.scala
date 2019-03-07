@@ -17,8 +17,6 @@
  */
 package com.waz.sync.handler
 
-import com.waz.ZLog.ImplicitTag._
-import com.waz.ZLog._
 import com.waz.api.impl.ErrorResponse._
 import com.waz.cache.CacheService
 import com.waz.model.AssetStatus.{UploadCancelled, UploadFailed, UploadInProgress, UploadNotStarted}

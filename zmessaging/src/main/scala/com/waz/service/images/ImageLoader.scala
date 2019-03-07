@@ -25,12 +25,10 @@ import android.graphics.BitmapFactory
 import android.media.ExifInterface
 import android.media.ExifInterface._
 import android.support.v4.content.FileProvider
-import com.waz.ZLog.LogTag
-import com.waz.ZLog.logTagFor
-import com.waz.log.ZLog2._
 import com.waz.bitmap.gif.{Gif, GifReader}
 import com.waz.bitmap.{BitmapDecoder, BitmapUtils}
 import com.waz.cache.{CacheEntry, CacheService, LocalData}
+import com.waz.log.BasicLogging.LogTag
 import com.waz.log.LogShow.SafeToLog
 import com.waz.model.AssetData.IsImage
 import com.waz.model.{Mime, _}
@@ -73,7 +71,7 @@ class ImageLoaderImpl(context:                  Context,
   import Threading.Implicits.Background
 
   protected def tag = "User"
-  private implicit val logTag: LogTag = s"${logTagFor[ImageLoader]}[$tag]"
+  private implicit val logTag: LogTag = LogTag(s"${LogTag[ImageLoader].value}[$tag]")
 
   override def hasCachedBitmap(asset: AssetData, req: BitmapRequest): Future[Boolean] = {
     val res = asset match {

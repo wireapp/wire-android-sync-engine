@@ -21,7 +21,7 @@ import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicInteger
 
 import android.os.{Handler, Looper}
-import com.waz.ZLog.LogTag
+import com.waz.log.BasicLogging.LogTag
 import com.waz.log.ZLog2._
 import com.waz.utils.crypto.ZSecureRandom
 
@@ -36,10 +36,10 @@ trait DispatchQueue extends ExecutionContext {
    * Executes a task on this queue.
    * @param task - operation to perform on this queue.
    */
-  def apply[A](task: => A)(implicit tag: LogTag = ""): CancellableFuture[A] = CancellableFuture(task)(this, tag)
+  def apply[A](task: => A)(implicit tag: LogTag = LogTag("")): CancellableFuture[A] = CancellableFuture(task)(this, tag)
 
   //TODO: this implements ExecutionContext.reportFailure, should we use different log here? or maybe do something else
-  override def reportFailure(t: Throwable): Unit = error(l"reportFailure called", t)(name)
+  override def reportFailure(t: Throwable): Unit = error(l"reportFailure called", t)(LogTag(name))
 
   //used for waiting in tests
   def hasRemainingTasks: Boolean = false

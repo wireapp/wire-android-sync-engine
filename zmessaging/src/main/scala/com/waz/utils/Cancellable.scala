@@ -68,8 +68,8 @@ object AssetProcessing extends DerivedLogTag {
 
   def cancel(key: ProcessingTaskKey)(implicit tag: LogTag) = Future {
     tasks.remove(key).foreach { task =>
-      verbose(l"canceling asset processing task: $task")
-      task.cancel()
+      verbose(l"canceling asset processing task: $task")(tag)
+      task.cancel()(tag)
     }
   }
 }

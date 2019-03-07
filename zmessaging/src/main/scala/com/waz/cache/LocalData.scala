@@ -19,7 +19,7 @@ package com.waz.cache
 
 import java.io._
 
-import com.waz.ZLog._
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.log.LogShow
 import com.waz.log.ZLog2._
 import com.waz.model.CacheKey
@@ -75,8 +75,7 @@ object LocalData {
 }
 
 //Basically masks a CacheEntryData so that it can be treated like any other form of LocalData
-class CacheEntry(val data: CacheEntryData, service: CacheService) extends LocalData {
-  private implicit val logTag: LogTag = logTagFor[CacheEntry]
+class CacheEntry(val data: CacheEntryData, service: CacheService) extends LocalData with DerivedLogTag {
 
   override def inputStream: InputStream =
     content.fold[InputStream](CacheService.inputStream(data.encKey, new FileInputStream(cacheFile)))(new ByteArrayInputStream(_))
@@ -106,7 +105,7 @@ class CacheEntry(val data: CacheEntryData, service: CacheService) extends LocalD
 
   override def delete(): Unit = service.remove(this)
 
-  override def toString: LogTag = s"CacheEntry($data)"
+  override def toString: String = s"CacheEntry($data)"
 
   def updatedWithLength(len: Long)(implicit ec: ExecutionContext): Future[CacheEntry] = service.insert(new CacheEntry(data.copy(length = Some(len)), service))
 }

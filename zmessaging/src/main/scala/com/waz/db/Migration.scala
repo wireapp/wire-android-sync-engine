@@ -18,8 +18,7 @@
 package com.waz.db
 
 import android.database.sqlite.SQLiteDatabase
-import com.waz.ZLog
-import com.waz.ZLog.LogTag
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.log.LogShow
 import com.waz.log.ZLog2._
 import com.waz.service.tracking.TrackingService
@@ -47,7 +46,7 @@ object Migration {
 
     override def apply(db: DB): Unit = migrations.foreach(_(db))
 
-    override def toString: LogTag = s"Migration from: $from to $to"
+    override def toString: String = s"Migration from: $from to $to"
   }
 
   def to(to: Int)(migrations: (DB => Unit)*): Migration = apply(AnyVersion, to)(migrations:_*)
@@ -57,9 +56,8 @@ object Migration {
  * Uses given list of migrations to migrate database from one version to another.
  * Finds shortest migration path and applies it.
  */
-class Migrations(migrations: Migration*)(implicit val tracking: TrackingService) {
+class Migrations(migrations: Migration*)(implicit val tracking: TrackingService) extends DerivedLogTag {
 
-  private implicit val logTag: LogTag = ZLog.logTagFor[Migrations]
   val toVersionMap = migrations.groupBy(_.toVersion)
 
   def plan(from: Int, to: Int): List[Migration] = {

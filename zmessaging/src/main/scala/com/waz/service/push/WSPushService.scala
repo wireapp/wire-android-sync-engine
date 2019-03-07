@@ -20,9 +20,9 @@ package com.waz.service.push
 import java.net.URL
 import java.util.concurrent.atomic.AtomicInteger
 
-import com.waz.ZLog.LogTag
 import com.waz.log.ZLog2._
 import com.waz.api.impl.ErrorResponse
+import com.waz.log.BasicLogging.LogTag
 import com.waz.model.UserId
 import com.waz.model.otr.ClientId
 import com.waz.service.ZMessaging.accountTag

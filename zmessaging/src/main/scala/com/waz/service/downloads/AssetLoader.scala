@@ -23,9 +23,6 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 import android.graphics.Bitmap
 import android.media.ExifInterface
-import com.waz.ZLog.ImplicitTag._
-import com.waz.ZLog.LogTag
-//import com.waz.ZLog.{LogTag, debug, verbose, warn}
 import com.waz.api.NetworkMode
 import com.waz.api.impl.ErrorResponse
 import com.waz.api.impl.ErrorResponse.internalError
@@ -36,6 +33,8 @@ import com.waz.cache.{CacheEntry, CacheService}
 import com.waz.content.AssetsStorage
 import com.waz.content.UserPreferences.DownloadImagesAlways
 import com.waz.content.WireContentProvider.CacheUri
+import com.waz.log.BasicLogging.LogTag
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model.AssetData.{RemoteData, WithExternalUri, WithProxy, WithRemoteData}
 import com.waz.model._
 import com.waz.service.assets.AudioTranscoder
@@ -80,7 +79,7 @@ class AssetLoaderImpl(context:         Context,
                       tracking:        TrackingService)
                      (implicit
                       urlCreator: UrlCreator,
-                      authInterceptor: RequestInterceptor) extends AssetLoader {
+                      authInterceptor: RequestInterceptor) extends AssetLoader with DerivedLogTag {
 
   private lazy val downloadAlways = Option(ZMessaging.currentAccounts).map(_.activeZms).map {
     _.flatMap {

@@ -17,8 +17,8 @@
  */
 package com.waz.sync.client
 
-import com.waz.ZLog._
 import com.waz.api.impl.ErrorResponse
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model.AccountData.Password
 import com.waz.model.{EmailAddress, Handle, PhoneNumber}
 import com.waz.threading.Threading
@@ -27,8 +27,6 @@ import com.waz.znet2.AuthRequestInterceptor
 import com.waz.znet2.http.Request.UrlCreator
 import com.waz.znet2.http._
 import org.json.JSONObject
-
-import scala.concurrent.Future
 
 trait CredentialsUpdateClient {
 
@@ -52,14 +50,12 @@ class CredentialsUpdateClientImpl(implicit
                                   urlCreator: UrlCreator,
                                   httpClient: HttpClient,
                                   authRequestInterceptor: AuthRequestInterceptor)
-  extends CredentialsUpdateClient {
+  extends CredentialsUpdateClient with DerivedLogTag {
 
   import CredentialsUpdateClientImpl._
   import HttpClient.dsl._
   import HttpClient.AutoDerivation._
   import Threading.Implicits.Background
-
-  private implicit val logTag: LogTag = logTagFor[CredentialsUpdateClientImpl]
 
   override def updateEmail(email: EmailAddress): ErrorOrResponse[Unit] = {
     Request.Put(relativePath = EmailPath, body = JsonEncoder { _.put("email", email.str) })

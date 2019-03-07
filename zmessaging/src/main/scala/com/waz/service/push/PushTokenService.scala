@@ -19,9 +19,9 @@ package com.waz.service.push
 
 import java.io.IOException
 
-import com.waz.ZLog.LogTag
 import com.waz.api.NetworkMode
 import com.waz.content.{AccountStorage, GlobalPreferences}
+import com.waz.log.BasicLogging.LogTag
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.log.ZLog2._
 import com.waz.model.otr.ClientId

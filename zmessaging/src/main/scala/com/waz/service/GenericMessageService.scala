@@ -17,9 +17,9 @@
  */
 package com.waz.service
 
-import com.waz.{ZLog, model}
-import com.waz.ZLog.LogTag
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.log.ZLog2._
+import com.waz.model
 import com.waz.model.GenericContent._
 import com.waz.model._
 import com.waz.service.conversation.{ConversationOrderEventsService, ConversationsContentUpdaterImpl}
@@ -33,9 +33,8 @@ class GenericMessageService(selfUserId: UserId,
                             convEvents: ConversationOrderEventsService,
                             reactions:  ReactionsService,
                             receipts:   ReceiptService,
-                            users:      UserService) {
+                            users:      UserService) extends DerivedLogTag {
 
-  private implicit val tag: LogTag = ZLog.logTagFor[GenericMessageService]
   import com.waz.threading.Threading.Implicits.Background
 
   val eventProcessingStage = EventScheduler.Stage[GenericMessageEvent] { (_, events) =>

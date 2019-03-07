@@ -19,7 +19,6 @@ package com.waz.sync.queue
 
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicLong}
 
-import com.waz.ZLog.LogTag
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.log.ZLog2._
 import com.waz.model.ConvId
@@ -120,7 +119,7 @@ object SyncSerializer {
       case _ => false
     }
 
-    override def toString: LogTag = s"PriorityHandle($priority, id: $id, completed: $isCompleted)"
+    override def toString: String = s"PriorityHandle($priority, id: $id, completed: $isCompleted)"
   }
 
   object PriorityHandle {

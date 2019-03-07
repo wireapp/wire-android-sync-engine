@@ -16,7 +16,7 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 package com.waz
-import com.waz.ZLog.LogTag
+import com.waz.log.BasicLogging.LogTag
 import com.waz.model.{AssetId, ConvId, IntegrationId, UserId}
 import com.waz.service.ZMessaging
 import com.waz.service.call.CallInfo

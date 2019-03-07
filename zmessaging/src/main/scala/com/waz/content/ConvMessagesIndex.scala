@@ -17,7 +17,6 @@
  */
 package com.waz.content
 
-import com.waz.ZLog.logTime
 import com.waz.api.Message.Status
 import com.waz.api.{Message, MessageFilter}
 import com.waz.content.ConvMessagesIndex._
@@ -85,7 +84,7 @@ class ConvMessagesIndex(convId: ConvId, messages: MessagesStorageImpl, selfUserI
     c foreach updateLastRead
 
     storage.read { implicit db =>
-      logTime(s"Initial load conversation entries for: $convId") {
+      logTime(l"Initial load conversation entries for: $convId") {
 
         lastLocalMessageByType ++= MessageDataDao.listLocalMessages(convId).groupBy(m => m.msgType).map {
           case (tpe, msgs) => tpe -> msgs.maxBy(_.time)

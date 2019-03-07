@@ -17,9 +17,9 @@
  */
 package com.waz.service
 
-import com.waz.ZLog.ImplicitTag._
 import com.waz.api.User.ConnectionStatus
 import com.waz.content._
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model.SearchQuery.Recommended
 import com.waz.model._
 import com.waz.service.conversation.{ConversationsService, ConversationsUiService}
@@ -35,7 +35,7 @@ import scala.collection.breakOut
 import scala.collection.generic.CanBuild
 import scala.concurrent.Future
 
-class UserSearchServiceSpec extends AndroidFreeSpec {
+class UserSearchServiceSpec extends AndroidFreeSpec with DerivedLogTag {
 
   val selfId          = UserId()
   val teamId          = Option.empty[TeamId]

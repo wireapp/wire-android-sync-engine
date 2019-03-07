@@ -261,7 +261,7 @@ class GlobalPreferences(context: Context, prefs: SharedPreferences) extends Pref
 /**
   * Per-user preference storage in user db.
   */
-class UserPreferences(context: Context, storage: ZmsDatabase) extends CachedStorageImpl[String, KeyValueData](new TrimmingLruCache(context, Fixed(128)), storage)(KeyValueDataDao, "KeyValueStorage_Cached") with Preferences {
+class UserPreferences(context: Context, storage: ZmsDatabase) extends CachedStorageImpl[String, KeyValueData](new TrimmingLruCache(context, Fixed(128)), storage)(KeyValueDataDao, LogTag("KeyValueStorage_Cached")) with Preferences {
 
   override protected implicit val dispatcher = Threading.Background
   override protected implicit val logTag = LogTag[UserPreferences]

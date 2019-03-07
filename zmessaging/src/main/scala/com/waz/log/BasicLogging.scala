@@ -22,6 +22,7 @@ import com.waz.log.LogShow.{RedactedString, ShowString, Size}
 
 import scala.language.implicitConversions
 import scala.annotation.tailrec
+import scala.reflect.ClassTag
 
 trait BasicLogging {
   import BasicLogging._
@@ -41,7 +42,7 @@ trait BasicLogging {
   def redactedString(str: String): RedactedString = new RedactedString(str)
   def asSize(value: Long): Size = new Size(value)
 
-  def logTime[A](log: Log)(body: => A)(implicit tag: LogTag): Unit = {
+  def logTime[A](log: Log)(body: => A)(implicit tag: LogTag): A = {
     val time = System.nanoTime
     try {
       body
@@ -60,8 +61,10 @@ object BasicLogging {
       implicit val logTag: LogTag = LogTag(getClass.getSimpleName)
     }
 
+    implicit val LogTagLogShow: LogShow[LogTag] = LogShow.create(_.value)
+
     def apply(value: String): LogTag = new LogTag(value)
-    def apply[T]: LogTag = new LogTag(classOf[T].getSimpleName)
+    def apply[T](implicit ct: ClassTag[T]): LogTag = new LogTag(ct.runtimeClass.getSimpleName)
   }
 
   trait CanBeShown {
@@ -91,7 +94,7 @@ object BasicLogging {
   }
 
   object Log {
-    val LogLogShow: LogShow[Log] = LogShow.create(_.buildMessageSafe, _.buildMessageUnsafe)
+    implicit val LogLogShow: LogShow[Log] = LogShow.create(_.buildMessageSafe, _.buildMessageUnsafe)
   }
 
   class LogHelper(val sc: StringContext) extends AnyVal {

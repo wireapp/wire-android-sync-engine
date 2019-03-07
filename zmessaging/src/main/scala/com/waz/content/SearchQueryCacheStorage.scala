@@ -18,6 +18,7 @@
 package com.waz.content
 
 import android.content.Context
+import com.waz.log.BasicLogging.LogTag
 import com.waz.model.{SearchQuery, SearchQueryCache}
 import com.waz.model.SearchQueryCache.SearchQueryCacheDao
 import com.waz.threading.Threading
@@ -32,7 +33,7 @@ trait SearchQueryCacheStorage extends CachedStorage[SearchQuery, SearchQueryCach
 }
 
 class SearchQueryCacheStorageImpl(context: Context, storage: Database)
-  extends CachedStorageImpl[SearchQuery, SearchQueryCache](new TrimmingLruCache(context, Fixed(20)), storage)(SearchQueryCacheDao, "SearchQueryCacheStorage")
+  extends CachedStorageImpl[SearchQuery, SearchQueryCache](new TrimmingLruCache(context, Fixed(20)), storage)(SearchQueryCacheDao, LogTag("SearchQueryCacheStorage"))
   with SearchQueryCacheStorage {
   import Threading.Implicits.Background
   def deleteBefore(i: Instant): Future[Unit] = storage(SearchQueryCacheDao.deleteBefore(i)(_)).future.flatMap(_ => deleteCached(_.timestamp.isBefore(i)))

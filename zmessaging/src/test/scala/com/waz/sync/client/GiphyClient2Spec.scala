@@ -17,15 +17,15 @@
  */
 package com.waz.sync.client
 
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.{AuthenticationConfig, ZIntegrationSpec}
-import com.waz.ZLog.ImplicitTag._
 import com.waz.log.ZLog2._
 import com.waz.utils.RichSeq
 import org.scalatest.Ignore
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class GiphyClient2Spec extends ZIntegrationSpec with AuthenticationConfig {
+class GiphyClient2Spec extends ZIntegrationSpec with AuthenticationConfig with DerivedLogTag {
 
   private lazy val giphyClient = new GiphyClientImpl2()
 

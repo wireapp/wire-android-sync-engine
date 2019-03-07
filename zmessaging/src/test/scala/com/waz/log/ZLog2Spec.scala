@@ -17,11 +17,11 @@
  */
 package com.waz.log
 
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.log.ZLog2._
-import com.waz.ZLog.ImplicitTag._
 import com.waz.specs.ZSpec
 
-class ZLog2Spec extends ZSpec {
+class ZLog2Spec extends ZSpec with DerivedLogTag {
 
   case class Person(name: String, age: Int)
 

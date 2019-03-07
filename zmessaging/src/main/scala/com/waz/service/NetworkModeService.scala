@@ -90,7 +90,7 @@ class DefaultNetworkModeService(context: Context, lifeCycle: UiLifeCycle) extend
     !isOfflineMode && !isUnknown
 }
 
-object NetworkModeService {
+object NetworkModeService extends DerivedLogTag {
 
   def isOfflineMode(mode: NetworkMode): Boolean =
     mode == NetworkMode.OFFLINE

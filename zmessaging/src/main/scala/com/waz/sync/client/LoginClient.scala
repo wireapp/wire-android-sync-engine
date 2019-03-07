@@ -186,7 +186,7 @@ class LoginClientImpl(tracking: TrackingService)
   }
 }
 
-object LoginClient {
+object LoginClient extends DerivedLogTag {
 
   case class LoginResult(accessToken: AccessToken, cookie: Option[Cookie], label: Option[Label])
 

@@ -20,7 +20,7 @@ package com.waz.specs
 import java.util.concurrent.{Executors, ThreadFactory, TimeoutException}
 
 import com.waz.SystemLogOutput
-import com.waz.ZLog.LogTag
+import com.waz.log.BasicLogging.LogTag
 import com.waz.log.ZLog2._
 import com.waz.log.{InternalLog, ZLog2}
 import com.waz.model.UserId
@@ -132,7 +132,7 @@ abstract class AndroidFreeSpec extends ZMockSpec { this: Suite =>
         override def newThread(r: Runnable) = {
           new Thread(r, Threading.testUiThreadName)
         }
-      }))(Threading.testUiThreadName)
+      }))(LogTag(Threading.testUiThreadName))
     }, Threading.testUiThreadName))
   }
 

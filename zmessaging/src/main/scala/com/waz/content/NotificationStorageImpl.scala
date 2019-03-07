@@ -18,6 +18,7 @@
 package com.waz.content
 
 import android.content.Context
+import com.waz.log.BasicLogging.LogTag
 import com.waz.model.NotificationData.NotificationDataDao
 import com.waz.model.{NotId, NotificationData}
 import com.waz.utils.TrimmingLruCache.Fixed
@@ -26,4 +27,5 @@ import com.waz.utils.{CachedStorage, CachedStorageImpl, TrimmingLruCache}
 trait NotificationStorage extends CachedStorage[NotId, NotificationData]
 
 class NotificationStorageImpl(context: Context, storage: Database)
-  extends CachedStorageImpl[NotId, NotificationData](new TrimmingLruCache(context, Fixed(128)), storage)(NotificationDataDao, "NotificationStorage") with NotificationStorage
+  extends CachedStorageImpl[NotId, NotificationData](new TrimmingLruCache(context, Fixed(128)), storage)(NotificationDataDao, LogTag("NotificationStorage"))
+    with NotificationStorage

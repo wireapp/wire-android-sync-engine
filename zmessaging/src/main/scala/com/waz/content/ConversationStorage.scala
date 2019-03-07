@@ -20,6 +20,7 @@ package com.waz.content
 import com.waz.log.ZLog2._
 import com.waz.api.Verification
 import com.waz.api.Verification.UNKNOWN
+import com.waz.log.BasicLogging.LogTag
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model.ConversationData.ConversationDataDao
 import com.waz.model.ConversationData.ConversationType.Group
@@ -48,7 +49,7 @@ trait ConversationStorage extends CachedStorage[ConvId, ConversationData] {
 }
 
 class ConversationStorageImpl(storage: ZmsDatabase)
-  extends CachedStorageImpl[ConvId, ConversationData](new UnlimitedLruCache(), storage)(ConversationDataDao, "ConversationStorage_Cached")
+  extends CachedStorageImpl[ConvId, ConversationData](new UnlimitedLruCache(), storage)(ConversationDataDao, LogTag("ConversationStorage_Cached"))
     with ConversationStorage with DerivedLogTag {
 
   import EventContext.Implicits.global

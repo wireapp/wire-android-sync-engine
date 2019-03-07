@@ -22,6 +22,7 @@ import java.util.concurrent.ConcurrentHashMap
 import android.content.Context
 import com.waz.api.impl.ErrorResponse
 import com.waz.api.{Message, MessageFilter}
+import com.waz.log.BasicLogging.LogTag
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.log.ZLog2._
 import com.waz.model.ConversationData.UnreadCount
@@ -89,7 +90,7 @@ class MessagesStorageImpl(context:     Context,
   extends CachedStorageImpl[MessageId, MessageData](
     new TrimmingLruCache[MessageId, Option[MessageData]](context, Fixed(MessagesStorage.cacheSize)),
     storage
-  )(MessageDataDao, "MessagesStorage_Cached") with MessagesStorage with DerivedLogTag {
+  )(MessageDataDao, LogTag("MessagesStorage_Cached")) with MessagesStorage with DerivedLogTag {
 
   import com.waz.utils.events.EventContext.Implicits.global
 

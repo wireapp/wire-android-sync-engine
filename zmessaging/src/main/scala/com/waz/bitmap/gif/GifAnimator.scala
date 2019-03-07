@@ -65,8 +65,8 @@ class GifAnimator(gif: Gif, reserveFrameMemory: () => Unit, frameCallback: Bitma
 
     new CancellableFuture[Unit](p) {
       override def cancel()(implicit tag: LogTag): Boolean = {
-        frameFuture.cancel()
-        super.cancel()
+        frameFuture.cancel()(tag)
+        super.cancel()(tag)
       }
     }
   }

@@ -20,7 +20,6 @@ package com.waz.threading
 import java.util.concurrent.{CountDownLatch, Executors, TimeUnit, TimeoutException}
 
 import com.waz.ZLog
-import com.waz.ZLog.LogTag
 import com.waz.specs.AndroidFreeSpec
 import com.waz.testutils.Matchers._
 import com.waz.threading.CancellableFuture.CancelException

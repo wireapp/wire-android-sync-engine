@@ -29,8 +29,8 @@ class AndroidLogOutput(override val showSafeOnly: Boolean = false) extends LogOu
   import com.waz.log.InternalLog.LogLevel._
   override def log(str: String, level: InternalLog.LogLevel, tag: LogTag, ex: Option[Throwable] = None): Unit =
     level match {
-      case Error   => ex.fold(Log.e(tag.value, str))(e => Log.e(tag, str, e))
-      case Warn    => ex.fold(Log.w(tag.value, str))(e => Log.w(tag, str, e))
+      case Error   => ex.fold(Log.e(tag.value, str))(e => Log.e(tag.value, str, e))
+      case Warn    => ex.fold(Log.w(tag.value, str))(e => Log.w(tag.value, str, e))
       case Info    => Log.i(tag.value, str)
       case Debug   => Log.d(tag.value, str)
       case Verbose => Log.v(tag.value, str)

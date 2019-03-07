@@ -21,7 +21,7 @@ import android.content.ContentResolver
 import android.database.ContentObserver
 import android.net.Uri
 import android.os.{Handler, Looper}
-import com.waz.ZLog.LogTag
+import com.waz.log.BasicLogging.LogTag
 import com.waz.threading.CancellableFuture
 
 import scala.concurrent.Promise

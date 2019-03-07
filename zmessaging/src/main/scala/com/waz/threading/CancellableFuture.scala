@@ -20,6 +20,7 @@ package com.waz.threading
 import java.util.TimerTask
 
 import com.waz.log.BasicLogging.LogTag
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.log.ZLog2._
 import com.waz.service.tracking.TrackingService.NoReporting
 import com.waz.utils.events.{BaseSubscription, EventContext}
@@ -31,7 +32,7 @@ import scala.ref.WeakReference
 import scala.util.control.NoStackTrace
 import scala.util.{Failure, Success, Try}
 
-class CancellableFuture[+A](promise: Promise[A]) extends Awaitable[A] { self =>
+class CancellableFuture[+A](promise: Promise[A]) extends Awaitable[A] with DerivedLogTag { self =>
   import com.waz.threading.CancellableFuture._
   
   val future = promise.future
@@ -173,7 +174,6 @@ class CancellableFuture[+A](promise: Promise[A]) extends Awaitable[A] { self =>
   //TODO: think on this possibility
   def withAutoCanceling(implicit eventContext: EventContext): Unit = {
     eventContext.register(new BaseSubscription(WeakReference(eventContext)) {
-      import com.waz.ZLog.ImplicitTag._
       override def onUnsubscribe(): Unit = {
         verbose(l"Cancel this future.")
         cancel()

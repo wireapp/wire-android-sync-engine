@@ -90,7 +90,7 @@ class UserSearchClientImpl(implicit
   }
 }
 
-object UserSearchClient {
+object UserSearchClient extends DerivedLogTag {
   val ContactsPath = "/search/contacts"
   val HandlesPath = "/users/handles"
 

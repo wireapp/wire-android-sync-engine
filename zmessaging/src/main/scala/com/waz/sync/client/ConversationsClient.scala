@@ -56,7 +56,7 @@ trait ConversationsClient {
 class ConversationsClientImpl(implicit
                               urlCreator: UrlCreator,
                               httpClient: HttpClient,
-                              authRequestInterceptor: AuthRequestInterceptor) extends ConversationsClient {
+                              authRequestInterceptor: AuthRequestInterceptor) extends ConversationsClient with DerivedLogTag {
 
   import ConversationsClient._
   import HttpClient.AutoDerivation._

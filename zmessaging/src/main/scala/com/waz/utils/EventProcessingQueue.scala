@@ -20,7 +20,7 @@ package com.waz.utils
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicBoolean
 
-import com.waz.ZLog.LogTag
+import com.waz.log.BasicLogging.LogTag
 import com.waz.log.ZLog2._
 import com.waz.model.Event
 import com.waz.threading.{CancellableFuture, SerialDispatchQueue, Threading}
@@ -82,7 +82,7 @@ class GroupedEventProcessingQueue[A <: Event, Key](groupBy: A => Key, processor:
 }
 
 class SerialProcessingQueue[A](processor: Seq[A] => Future[Any], name: String = "") {
-  private implicit val logTag: LogTag = name
+  private implicit val logTag: LogTag = LogTag(name)
 
   private val queue = new ConcurrentLinkedQueue[A]()
 
@@ -120,7 +120,7 @@ class ThrottledProcessingQueue[A](delay: FiniteDuration, processor: Seq[A] => Fu
   private val waiting = new AtomicBoolean(false)
   @volatile private var waitFuture: CancellableFuture[Any] = CancellableFuture.successful(())
   private var lastDispatched = 0L
-  private implicit val logTag: LogTag = name
+  private implicit val logTag: LogTag = LogTag(name)
 
   override protected def processQueue(): Future[Any] =
     if (waiting.compareAndSet(false, true)) {

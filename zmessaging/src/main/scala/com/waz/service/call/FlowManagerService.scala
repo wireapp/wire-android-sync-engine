@@ -19,11 +19,11 @@ package com.waz.service.call
 
 import android.content.Context
 import android.view.View
-import com.waz.ZLog.ImplicitTag._
 import com.waz.log.ZLog2._
 import com.waz.call._
 import com.waz.content.GlobalPreferences
 import com.waz.content.GlobalPreferences._
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model._
 import com.waz.service._
 import com.waz.service.call.FlowManagerService.VideoCaptureDevice
@@ -47,7 +47,7 @@ trait FlowManagerService {
 
 class DefaultFlowManagerService(context:      Context,
                                 globalPrefs:  GlobalPreferences,
-                                network:      NetworkModeService) extends FlowManagerService {
+                                network:      NetworkModeService) extends FlowManagerService with DerivedLogTag {
   import FlowManagerService._
 
   val avsAudioTestFlag: Long = 1 << 1

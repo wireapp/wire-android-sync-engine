@@ -24,6 +24,7 @@ import com.waz.content.MessagesStorage
 import com.waz.model.ErrorData.ErrorDataDao
 import com.waz.model._
 import com.waz.content.ZmsDatabase
+import com.waz.log.BasicLogging.LogTag
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.service.AccountsService.InForeground
 import com.waz.threading.{CancellableFuture, SerialDispatchQueue}
@@ -57,7 +58,7 @@ class ErrorsServiceImpl(userId:    UserId,
 
   private var dismissHandler: PartialFunction[ErrorData, Future[_]] = PartialFunction.empty
 
-  private val errorsStorage = new CachedStorageImpl[Uid, ErrorData](new TrimmingLruCache(context, Fixed(128)), storage)(ErrorDataDao, "ErrorStorage")
+  private val errorsStorage = new CachedStorageImpl[Uid, ErrorData](new TrimmingLruCache(context, Fixed(128)), storage)(ErrorDataDao, LogTag("ErrorStorage"))
 
   private val errors = new mutable.HashMap[Uid, ErrorData]()
 

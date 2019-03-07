@@ -19,7 +19,6 @@ package com.waz
 
 import com.waz.utils._
 import com.waz.log.ZLog2._
-import com.waz.ZLog.ImplicitTag._
 import com.waz.utils.wrappers._
 import com.waz.utils.wrappers.DB
 
@@ -112,7 +111,7 @@ package db {
     def chooseImplementation(): ReadTransactionSupport = Try(DeferredModeReadTransactionSupport.create).getOrElse(FallbackReadTransactionSupport.create)
   }
 
-  object DeferredModeReadTransactionSupport {
+  object DeferredModeReadTransactionSupport extends DerivedLogTag {
     def create: ReadTransactionSupport = new ReadTransactionSupport {
       verbose(l"using deferred mode read transactions")
 

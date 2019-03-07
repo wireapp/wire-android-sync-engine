@@ -19,11 +19,11 @@ package com.waz.sync
 
 import java.io.PrintWriter
 
-import com.waz.ZLog.ImplicitTag._
-import com.waz.ZLog.LogTag
 import com.waz.api.NetworkMode
 import com.waz.api.NetworkMode.UNKNOWN
 import com.waz.content.{Database, UserPreferences}
+import com.waz.log.BasicLogging.LogTag
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model._
 import com.waz.model.sync.{SyncJob, SyncRequest}
 import com.waz.service._
@@ -37,7 +37,7 @@ import com.waz.utils.wrappers.{Context, DB}
 
 import scala.concurrent.Future
 
-class SyncRequestServiceSpec extends AndroidFreeSpec {
+class SyncRequestServiceSpec extends AndroidFreeSpec with DerivedLogTag {
 
   import com.waz.threading.Threading.Implicits.Background
 

@@ -20,6 +20,7 @@ package com.waz.content
 import android.content.Context
 import com.waz.log.ZLog2._
 import com.waz.api.Verification
+import com.waz.log.BasicLogging.LogTag
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model.UserId
 import com.waz.model.otr.{Client, ClientId, UserClients}
@@ -41,7 +42,7 @@ trait OtrClientsStorage extends CachedStorage[UserId, UserClients] {
 }
 
 class OtrClientsStorageImpl(userId: UserId, context: Context, storage: Database)
-  extends CachedStorageImpl[UserId, UserClients](new TrimmingLruCache(context, Fixed(2000)), storage)(UserClientsDao, "OtrClientsStorage")
+  extends CachedStorageImpl[UserId, UserClients](new TrimmingLruCache(context, Fixed(2000)), storage)(UserClientsDao, LogTag("OtrClientsStorage"))
     with OtrClientsStorage
     with DerivedLogTag {
 

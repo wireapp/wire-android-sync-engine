@@ -185,7 +185,7 @@ class TrackingServiceImpl(curAccount: => Signal[Option[UserId]], zmsProvider: Zm
     }
 }
 
-object TrackingServiceImpl {
+object TrackingServiceImpl extends DerivedLogTag {
 
   import com.waz.threading.Threading.Implicits.Background
 

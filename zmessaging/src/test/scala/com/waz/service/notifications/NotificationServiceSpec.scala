@@ -23,8 +23,8 @@ import com.waz.content.{ConversationStorage, MessagesStorage, NotificationStorag
 import com.waz.model.GenericContent.{MsgDeleted, MsgEdit, MsgRecall, Reaction, Text}
 import com.waz.model.GenericMessage.TextMessage
 import com.waz.model._
-import com.waz.ZLog.ImplicitTag._
 import com.waz.api.NotificationsHandler.NotificationType.LIKE
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model.ConversationData.ConversationType
 import com.waz.service.push.{NotificationService, NotificationUiController, PushService}
 import com.waz.specs.AndroidFreeSpec
@@ -38,7 +38,7 @@ import scala.collection.Seq
 import scala.concurrent.Future
 import scala.concurrent.duration._
 
-class NotificationServiceSpec extends AndroidFreeSpec {
+class NotificationServiceSpec extends AndroidFreeSpec with DerivedLogTag {
 
   val messages      = mock[MessagesStorage]
   val storage       = mock[NotificationStorage]
