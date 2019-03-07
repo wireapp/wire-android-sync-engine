@@ -17,9 +17,9 @@
  */
 package com.waz.sync.client
 
-import com.waz.ZLog.ImplicitTag._
 import com.waz.log.ZLog2._
 import com.waz.api.impl.ErrorResponse
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model.AccountDataOld.PermissionsMasks
 import com.waz.model._
 import com.waz.utils.{CirceJSONSupport, JsonDecoder}
@@ -100,7 +100,7 @@ object TeamsClient {
   case class TeamBindingResponse(teams: Seq[(TeamData, Boolean)], hasMore: Boolean)
 
   //TODO Remove after assets refactoring
-  object TeamBindingResponse {
+  object TeamBindingResponse extends DerivedLogTag {
     def unapply(response: ResponseContent): Option[(Seq[(TeamData, Boolean)], Boolean)] =
       response match {
         case JsonObjectResponse(js) if js.has("teams") =>

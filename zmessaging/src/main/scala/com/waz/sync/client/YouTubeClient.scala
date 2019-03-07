@@ -17,10 +17,10 @@
  */
 package com.waz.sync.client
 
-import com.waz.ZLog.ImplicitTag._
 import com.waz.log.ZLog2._
 import com.waz.api.MediaProvider
 import com.waz.api.impl.ErrorResponse
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model.AssetData
 import com.waz.model.messages.media.MediaAssetData.{MediaWithImages, Thumbnail}
 import com.waz.model.messages.media._
@@ -103,7 +103,7 @@ class YouTubeClientImpl(implicit
 
 }
 
-object YouTubeClient {
+object YouTubeClient extends DerivedLogTag {
 
   val DomainNames = Set("youtube.com", "youtu.be")
   val Base = "/proxy/youtube/v3"

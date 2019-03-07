@@ -17,10 +17,10 @@
  */
 package com.waz.sync.handler
 
-import com.waz.ZLog.ImplicitTag._
 import com.waz.log.ZLog2._
 import com.waz.api.Message
 import com.waz.content.{ConversationStorage, MessagesStorage}
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model.GenericContent.Cleared
 import com.waz.model._
 import com.waz.service.UserService
@@ -37,7 +37,7 @@ class ClearedSyncHandler(selfUserId:   UserId,
                          users:        UserService,
                          msgs:         MessagesStorage,
                          convSync:     ConversationsSyncHandler,
-                         otrSync:      OtrSyncHandler) {
+                         otrSync:      OtrSyncHandler) extends DerivedLogTag {
 
   import com.waz.threading.Threading.Implicits.Background
 

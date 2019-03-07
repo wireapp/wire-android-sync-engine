@@ -21,14 +21,14 @@ import java.io.{File, InputStream}
 
 import android.graphics.BitmapFactory.Options
 import android.graphics.BitmapFactory
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.log.ZLog2._
-import com.waz.ZLog.ImplicitTag._
 import com.waz.threading.{CancellableFuture, Threading}
 import com.waz.utils._
 import com.waz.utils.wrappers.Bitmap
 import com.waz.utils.wrappers
 
-class BitmapDecoder {
+class BitmapDecoder extends DerivedLogTag {
 
   private implicit lazy val dispatcher = Threading.ImageDispatcher
 

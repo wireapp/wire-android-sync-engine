@@ -17,8 +17,8 @@
  */
 package com.waz.sync.client
 
-import com.waz.ZLog.ImplicitTag._
 import com.waz.api.impl.ErrorResponse
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.log.ZLog2._
 import com.waz.model.SearchQuery.{Recommended, RecommendedHandle, TopPeople}
 import com.waz.model._
@@ -40,7 +40,7 @@ trait UserSearchClient {
 class UserSearchClientImpl(implicit
                            urlCreator: UrlCreator,
                            httpClient: HttpClient,
-                           authRequestInterceptor: AuthRequestInterceptor) extends UserSearchClient {
+                           authRequestInterceptor: AuthRequestInterceptor) extends UserSearchClient with DerivedLogTag {
 
   import HttpClient.dsl._
   import HttpClient.AutoDerivation._

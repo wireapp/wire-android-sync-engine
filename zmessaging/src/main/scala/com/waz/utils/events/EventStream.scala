@@ -19,7 +19,7 @@ package com.waz.utils.events
 
 import java.util.UUID.randomUUID
 
-import com.waz.ZLog.ImplicitTag._
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.log.ZLog2._
 import com.waz.threading.{CancellableFuture, Threading}
 import com.waz.utils.events.Events.Subscriber
@@ -129,7 +129,9 @@ class FlatMapLatestEventStream[E, V](source: EventStream[E], f: E => EventStream
   }
 }
 
-class FutureEventStream[E, V](source: EventStream[E], f: E => Future[V]) extends ProxyEventStream[E, V](source) {
+class FutureEventStream[E, V](source: EventStream[E], f: E => Future[V])
+  extends ProxyEventStream[E, V](source) with DerivedLogTag {
+
   private val key = randomUUID()
 
   override protected[events] def onEvent(event: E, sourceContext: Option[ExecutionContext]): Unit =

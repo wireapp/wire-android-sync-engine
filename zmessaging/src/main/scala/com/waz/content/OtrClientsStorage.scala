@@ -19,8 +19,8 @@ package com.waz.content
 
 import android.content.Context
 import com.waz.log.ZLog2._
-import com.waz.ZLog.ImplicitTag._
 import com.waz.api.Verification
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model.UserId
 import com.waz.model.otr.{Client, ClientId, UserClients}
 import com.waz.model.otr.UserClients.UserClientsDao
@@ -40,7 +40,11 @@ trait OtrClientsStorage extends CachedStorage[UserId, UserClients] {
 
 }
 
-class OtrClientsStorageImpl(userId: UserId, context: Context, storage: Database) extends CachedStorageImpl[UserId, UserClients](new TrimmingLruCache(context, Fixed(2000)), storage)(UserClientsDao, "OtrClientsStorage") with OtrClientsStorage {
+class OtrClientsStorageImpl(userId: UserId, context: Context, storage: Database)
+  extends CachedStorageImpl[UserId, UserClients](new TrimmingLruCache(context, Fixed(2000)), storage)(UserClientsDao, "OtrClientsStorage")
+    with OtrClientsStorage
+    with DerivedLogTag {
+
   import com.waz.threading.Threading.Implicits.Background
 
   override def incomingClientsSignal(userId: UserId, clientId: ClientId) =

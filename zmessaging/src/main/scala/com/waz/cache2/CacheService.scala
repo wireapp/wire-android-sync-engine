@@ -20,9 +20,9 @@ package com.waz.cache2
 import java.io._
 import java.text.DecimalFormat
 
-import com.waz.ZLog.ImplicitTag._
 import com.waz.log.ZLog2._
 import com.waz.cache2.CacheService.Encryption
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model.AESKey
 import com.waz.model.errors.NotFoundLocal
 import com.waz.utils.IoUtils
@@ -98,7 +98,7 @@ class LruFileCacheServiceImpl(
     directorySizeThreshold: Long,
     sizeCheckingInterval: FiniteDuration
 )(implicit override val ec: ExecutionContext, ev: EventContext)
-    extends CacheService {
+    extends CacheService with DerivedLogTag {
 
   private val directorySize: SourceSignal[Long] = Signal()
   directorySize

@@ -17,9 +17,9 @@
  */
 package com.waz.sync.client
 
-import com.waz.ZLog.ImplicitTag._
 import com.waz.log.ZLog2._
 import com.waz.api.impl.ErrorResponse
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model.AssetMetaData.Image
 import com.waz.model.AssetMetaData.Image.Tag
 import com.waz.model._
@@ -45,7 +45,9 @@ trait IntegrationsClient {
 class IntegrationsClientImpl(implicit
                              urlCreator: UrlCreator,
                              httpClient: HttpClient,
-                             authRequestInterceptor: AuthRequestInterceptor) extends IntegrationsClient {
+                             authRequestInterceptor: AuthRequestInterceptor)
+  extends IntegrationsClient
+    with DerivedLogTag {
 
   import HttpClient.dsl._
   import HttpClient.AutoDerivation._

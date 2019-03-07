@@ -17,7 +17,7 @@
  */
 package com.waz.service.otr
 
-import com.waz.ZLog.ImplicitTag._
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.log.ZLog2._
 import com.waz.service.otr.OtrService.SessionId
 import com.waz.service.push.PushNotificationEventsStorage.PlainWriter
@@ -30,7 +30,7 @@ import com.wire.cryptobox.{CryptoBox, CryptoSession, PreKey}
 import scala.concurrent.Future
 import scala.util.Try
 
-class CryptoSessionService(cryptoBox: CryptoBoxService) {
+class CryptoSessionService(cryptoBox: CryptoBoxService) extends DerivedLogTag {
 
   implicit val dis = Threading.Background
 

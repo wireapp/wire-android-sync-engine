@@ -27,8 +27,8 @@ import com.coremedia.iso.IsoFile
 import com.coremedia.iso.boxes.{Box, TrackBox}
 import com.googlecode.mp4parser.FileDataSourceImpl
 import com.googlecode.mp4parser.util.{Matrix, Path}
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.log.ZLog2._
-import com.waz.ZLog.ImplicitTag._
 import com.waz.utils.IoUtils
 import org.robolectric.annotation.{Implementation, Implements, Resetter}
 
@@ -55,7 +55,7 @@ object ShadowMediaMetadataRetriever2 {
 }
 
 @Implements(classOf[MediaMetadataRetriever])
-class ShadowMediaMetadataRetriever2 {
+class ShadowMediaMetadataRetriever2 extends DerivedLogTag {
   import ShadowMediaMetadataRetriever2._
 
   private var meta = Map.empty[Int, String]

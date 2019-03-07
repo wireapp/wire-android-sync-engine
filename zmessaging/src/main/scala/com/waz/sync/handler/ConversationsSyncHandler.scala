@@ -17,12 +17,12 @@
  */
 package com.waz.sync.handler
 
-import com.waz.ZLog.ImplicitTag._
 import com.waz.log.ZLog2._
 import com.waz.api.ErrorType
 import com.waz.api.IConversation.{Access, AccessRole}
 import com.waz.api.impl.ErrorResponse
 import com.waz.content.{ConversationStorage, MessagesStorage}
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model._
 import com.waz.service._
 import com.waz.service.assets.AssetService
@@ -54,7 +54,7 @@ class ConversationsSyncHandler(selfUserId:          UserId,
                                errorsService:       ErrorsService,
                                assetService:        AssetService,
                                conversationsClient: ConversationsClient,
-                               genericMessages:     GenericMessageService) {
+                               genericMessages:     GenericMessageService) extends DerivedLogTag {
 
   import Threading.Implicits.Background
   import com.waz.sync.handler.ConversationsSyncHandler._

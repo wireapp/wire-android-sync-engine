@@ -17,7 +17,7 @@
  */
 package com.waz.ui
 
-import com.waz.ZLog.ImplicitTag._
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.log.ZLog2._
 import com.waz.service.ZMessaging
 import com.waz.threading.Threading
@@ -49,7 +49,8 @@ trait LoaderSubscription {
   def destroy(): Unit
 }
 
-abstract class SignalLoader[A](handle: LoaderHandle[A])(implicit ui: UiModule) extends LoaderSubscription {
+abstract class SignalLoader[A](handle: LoaderHandle[A])(implicit ui: UiModule)
+  extends LoaderSubscription with DerivedLogTag {
   import ui.eventContext
 
   ui.onStarted { _ => SignalLoader.dropQueue() }

@@ -99,7 +99,9 @@ package object db {
 }
 
 package db {
-  /** See https://www.sqlite.org/isolation.html - "Isolation And Concurrency", par. 4 and following.
+  import com.waz.log.BasicLogging.LogTag.DerivedLogTag
+
+/** See https://www.sqlite.org/isolation.html - "Isolation And Concurrency", par. 4 and following.
     * TL;DR: the Android SQLite classes fail to support WAL mode correctly, we are forced to hack our way into them
     */
   trait ReadTransactionSupport {
@@ -126,7 +128,7 @@ package db {
     }
   }
 
-  object FallbackReadTransactionSupport {
+  object FallbackReadTransactionSupport extends DerivedLogTag {
     def create: ReadTransactionSupport = new ReadTransactionSupport {
       verbose(l"using fallback support for read transactions")
       override def beginReadTransaction(db: DB): Unit = db.beginTransactionNonExclusive()

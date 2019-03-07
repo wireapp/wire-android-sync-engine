@@ -19,10 +19,10 @@ package com.waz.service
 
 import java.lang.System._
 
-import com.waz.ZLog.ImplicitTag._
 import com.waz.cache.CacheService
 import com.waz.content.GlobalPreferences
 import com.waz.content.GlobalPreferences.LastCacheCleanup
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.log.ZLog2._
 import com.waz.threading.{CancellableFuture, Threading}
 import com.waz.utils.events.EventContext
@@ -30,7 +30,7 @@ import com.waz.utils.events.EventContext
 import scala.concurrent.Future
 import scala.concurrent.duration._
 
-class CacheCleaningService(cache: CacheService, prefs: GlobalPreferences) {
+class CacheCleaningService(cache: CacheService, prefs: GlobalPreferences) extends DerivedLogTag {
   import CacheCleaningService._
   import Threading.Implicits.Background
   private implicit val ec = EventContext.Global

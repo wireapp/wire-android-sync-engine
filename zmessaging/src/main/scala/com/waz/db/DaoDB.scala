@@ -20,7 +20,7 @@ package com.waz.db
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase.CursorFactory
 import android.database.sqlite.{SQLiteDatabase, SQLiteOpenHelper}
-import com.waz.ZLog.ImplicitTag._
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.log.ZLog2._
 import com.waz.service.tracking.TrackingService
 
@@ -33,7 +33,7 @@ class DaoDB(context:    Context,
             daos:       Seq[BaseDao[_]],
             migrations: Seq[Migration],
             tracking:   TrackingService)
-  extends SQLiteOpenHelper(context, name, factory, version) {
+  extends SQLiteOpenHelper(context, name, factory, version) with DerivedLogTag {
 
   override def onConfigure(db: SQLiteDatabase): Unit = {
     super.onConfigure(db)

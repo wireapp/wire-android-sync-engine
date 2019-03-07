@@ -21,7 +21,7 @@ import java.io.IOException
 import java.nio.charset.Charset
 import java.util.concurrent.TimeUnit
 
-import com.waz.ZLog.ImplicitTag._
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.log.ZLog2._
 import okhttp3._
 import okio.Buffer
@@ -58,7 +58,8 @@ import scala.util.{Failure, Try}
   *
   * <-- END HTTP
   */
-final class OkHttpLoggingInterceptor(logBodyTypes: List[String], maxBodyStringLength: Int = 1000) extends Interceptor {
+final class OkHttpLoggingInterceptor(logBodyTypes: List[String], maxBodyStringLength: Int = 1000)
+  extends Interceptor with DerivedLogTag {
 
   private val CharsetUtf8: Charset = Charset.forName("UTF-8")
   private val truncatedBodySuffix: String = "...TRUNCATED"

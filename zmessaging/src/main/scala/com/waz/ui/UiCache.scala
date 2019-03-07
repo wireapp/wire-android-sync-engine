@@ -20,7 +20,7 @@ package com.waz.ui
 import android.support.v4.util.LruCache
 import com.waz.CacheLike
 import com.waz.ZLog._
-import com.waz.ZLog.ImplicitTag._
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.service.ZMessaging
 import com.waz.threading.Threading
 import com.waz.utils.ThrottledProcessingQueue
@@ -30,7 +30,8 @@ import scala.collection._
 import scala.concurrent.Future
 import scala.ref.{ReferenceQueue, WeakReference}
 
-class UiCache[Key, A <: AnyRef](lruSize: Int = 0)(implicit ui: UiModule) extends CacheLike[Key, A] {
+class UiCache[Key, A <: AnyRef](lruSize: Int = 0)(implicit ui: UiModule)
+  extends CacheLike[Key, A] with DerivedLogTag {
 
   val queue = new ReferenceQueue[A]
   val lru = new LruCache[Key, A](lruSize max 1)

@@ -18,7 +18,7 @@
 package com.waz.service.call
 
 import com.sun.jna.Pointer
-import com.waz.ZLog.ImplicitTag._
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.log.LogShow.SafeToLog
 import com.waz.log.ZLog2._
 import com.waz.model.{ConvId, GenericMessage, LocalInstant, UserId}
@@ -53,7 +53,7 @@ case class CallInfo(convId:             ConvId,
                     endTime:            Option[LocalInstant]              = None,
                     endReason:          Option[AvsClosedReason]           = None,
                     outstandingMsg:     Option[(GenericMessage, Pointer)] = None, //Any messages we were unable to send due to conv degradation
-                    shouldRing:         Boolean                           = true) {
+                    shouldRing:         Boolean                           = true) extends DerivedLogTag {
 
   val duration = estabTime match {
     case Some(est) => ClockSignal(1.second).map(_ => Option(between(est.instant, LocalInstant.Now.instant)))

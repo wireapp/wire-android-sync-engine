@@ -19,7 +19,7 @@ package com.waz.sync.client
 
 import java.net.URLEncoder
 
-import com.waz.ZLog.ImplicitTag._
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.log.ZLog2._
 import com.waz.model.AssetMetaData.Image.Tag
 import com.waz.model.AssetMetaData.Image.Tag.{Medium, Preview}
@@ -43,7 +43,7 @@ trait GiphyClient {
 class GiphyClientImpl(implicit
                       urlCreator: UrlCreator,
                       httpClient: HttpClient,
-                      authRequestInterceptor: AuthRequestInterceptor) extends GiphyClient {
+                      authRequestInterceptor: AuthRequestInterceptor) extends GiphyClient with DerivedLogTag {
 
   import GiphyClient._
   import HttpClient.AutoDerivation._

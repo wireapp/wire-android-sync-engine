@@ -19,14 +19,16 @@ package com.waz.utils.events
 
 import java.util.concurrent.atomic.AtomicReference
 
-import com.waz.ZLog.ImplicitTag._
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.log.ZLog2._
 import com.waz.threading.Threading
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
 
-class AggregatingSignal[A, B](source: EventStream[A], load: => Future[B], f: (B, A) => B, stashing: Boolean = true) extends Signal[B] with EventListener[A] {
+class AggregatingSignal[A, B](source: EventStream[A], load: => Future[B], f: (B, A) => B, stashing: Boolean = true)
+  extends Signal[B] with EventListener[A] with DerivedLogTag {
+
   private object valueMonitor
   private val loadId = new AtomicReference[AnyRef]
   @volatile private var stash = Vector.empty[A]

@@ -18,8 +18,8 @@
 package com.waz.service.call
 
 import com.sun.jna.Pointer
-import com.waz.ZLog.ImplicitTag._
 import com.waz.ZLog.LogTag
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.log.InternalLog
 import com.waz.log.ZLog2._
 import com.waz.model._
@@ -51,7 +51,7 @@ trait Avs {
   * Facilitates synchronous communication with AVS and also provides a wrapper around the native code which can be easily
   * mocked for testing the CallingService
   */
-class AvsImpl() extends Avs {
+class AvsImpl() extends Avs with DerivedLogTag {
 
   private implicit val dispatcher = new SerialDispatchQueue(name = "AvsWrapper")
 
@@ -196,7 +196,7 @@ class AvsImpl() extends Avs {
 
 }
 
-object Avs {
+object Avs extends DerivedLogTag {
 
   val AvsLogTag: LogTag = "AVS"
 

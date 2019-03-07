@@ -17,10 +17,10 @@
  */
 package com.waz.sync.client
 
-import com.waz.ZLog.ImplicitTag._
 import com.waz.log.ZLog2._
 import com.waz.api.IConversation.{Access, AccessRole}
 import com.waz.api.impl.ErrorResponse
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model.ConversationData.{ConversationType, Link}
 import com.waz.model._
 import com.waz.sync.client.ConversationsClient.ConversationResponse.ConversationsResult
@@ -302,7 +302,7 @@ object ConversationsClient {
 
     case class ConversationsResult(conversations: Seq[ConversationResponse], hasMore: Boolean)
     
-    object ConversationsResult {
+    object ConversationsResult extends DerivedLogTag {
 
       def unapply(response: ResponseContent): Option[(List[ConversationResponse], Boolean)] = try {
         response match {
@@ -321,7 +321,7 @@ object ConversationsClient {
     }
   }
 
-  object EventsResponse {
+  object EventsResponse extends DerivedLogTag {
     import com.waz.utils.JsonDecoder._
 
     def unapplySeq(response: ResponseContent): Option[List[ConversationEvent]] = try {

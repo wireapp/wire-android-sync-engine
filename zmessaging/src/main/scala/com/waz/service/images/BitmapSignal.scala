@@ -18,13 +18,13 @@
 package com.waz.service.images
 
 import android.graphics.{Bitmap => ABitmap}
-import com.waz.ZLog.ImplicitTag._
 import com.waz.api.NetworkMode
 import com.waz.bitmap
 import com.waz.bitmap.BitmapUtils
 import com.waz.bitmap.gif.{Gif, GifAnimator}
 import com.waz.cache.LocalData
 import com.waz.content.UserPreferences
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.log.ZLog2._
 import com.waz.model.{AssetData, AssetId, Mime}
 import com.waz.service.{DefaultNetworkModeService, NetworkModeService, ZMessaging}
@@ -42,7 +42,9 @@ import com.waz.utils.wrappers.{Bitmap, EmptyBitmap}
 
 import scala.concurrent.Future
 
-abstract class BitmapSignal(req: BitmapRequest, network: NetworkModeService, downloadImagesAlways: Signal[Boolean]) extends Signal[BitmapResult] { signal =>
+abstract class BitmapSignal(req: BitmapRequest, network: NetworkModeService, downloadImagesAlways: Signal[Boolean])
+  extends Signal[BitmapResult]
+    with DerivedLogTag { signal =>
 
   import BitmapSignal._
 

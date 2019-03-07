@@ -20,7 +20,7 @@ package com.waz.sync.queue
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicLong}
 
 import com.waz.ZLog.LogTag
-import com.waz.ZLog.ImplicitTag._
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.log.ZLog2._
 import com.waz.model.ConvId
 import com.waz.model.sync.SyncJob.Priority
@@ -30,7 +30,7 @@ import scala.collection.immutable.Queue
 import scala.collection.mutable
 import scala.concurrent.{Future, Promise}
 
-class SyncSerializer {
+class SyncSerializer extends DerivedLogTag {
   import SyncSerializer._
   private implicit val dispatcher = new SerialDispatchQueue(name = "SyncSerializer")
 

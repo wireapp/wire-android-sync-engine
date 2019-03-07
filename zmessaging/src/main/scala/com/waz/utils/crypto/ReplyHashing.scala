@@ -21,7 +21,6 @@ import java.nio.ByteBuffer
 
 import com.waz.content.AssetsStorage
 import com.waz.model._
-import com.waz.ZLog.ImplicitTag._
 import com.waz.log.ZLog2._
 import com.waz.model.GenericMessage.TextMessage
 import com.waz.utils.returning
@@ -31,6 +30,7 @@ import java.lang.Long.BYTES
 import java.lang.Math.round
 
 import com.waz.api.Message.Type._
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 
 trait ReplyHashing {
   def hashMessage(m: MessageData): Future[Sha256]
@@ -39,7 +39,7 @@ trait ReplyHashing {
   class MissingAssetException(message: String) extends Exception(message)
 }
 
-class ReplyHashingImpl(storage: AssetsStorage) extends ReplyHashing {
+class ReplyHashingImpl(storage: AssetsStorage) extends ReplyHashing with DerivedLogTag {
 
   import com.waz.threading.Threading.Implicits.Background
 

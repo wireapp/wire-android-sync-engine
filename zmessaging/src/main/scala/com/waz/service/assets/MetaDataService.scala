@@ -21,12 +21,12 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.media.MediaMetadataRetriever
 import android.media.MediaMetadataRetriever._
-import com.waz.ZLog.ImplicitTag._
 import com.waz.bitmap.BitmapUtils
 import com.waz.cache.{CacheEntry, CacheService, LocalData}
 import com.waz.content.AssetsStorage
 import com.waz.log.ZLog2._
 import com.waz.content.WireContentProvider.CacheUri
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model.AssetMetaData.Image.Tag.Medium
 import com.waz.model.AssetMetaData.{Audio, Empty}
 import com.waz.model._
@@ -41,8 +41,12 @@ import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.Try
 
-class MetaDataService(context: Context, cache: CacheService, storage: AssetsStorage, assets: => AssetService,
-                      generator: ImageAssetGenerator) {
+class MetaDataService(context: Context,
+                      cache: CacheService,
+                      storage: AssetsStorage,
+                      assets: => AssetService,
+                      generator: ImageAssetGenerator) extends DerivedLogTag {
+
   import com.waz.threading.Threading.Implicits.Background
 
   def loadMetaData(asset: AssetData, data: LocalData): CancellableFuture[Option[AssetMetaData]] = {

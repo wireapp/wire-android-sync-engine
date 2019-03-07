@@ -17,12 +17,12 @@
  */
 package com.waz.utils.crypto
 
-import com.waz.ZLog.ImplicitTag._
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.log.ZLog2._
 
 import scala.util.{Failure, Success, Try}
 
-class RandomBytes {
+class RandomBytes extends DerivedLogTag {
   RandomBytes.loadLibrary
 
   /**

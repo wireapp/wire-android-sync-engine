@@ -17,9 +17,9 @@
  */
 package com.waz.sync.client
 
-import com.waz.ZLog.ImplicitTag._
 import com.waz.log.ZLog2._
 import com.waz.api.impl.ErrorResponse
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model.UserData.ConnectionStatus
 import com.waz.model._
 import com.waz.sync.client.ConnectionsClient.PageSize
@@ -105,7 +105,7 @@ object ConnectionsClient {
   val ConnectionsPath = "/connections"
   val PageSize = 100
 
-  object ConnectionResponseExtractor {
+  object ConnectionResponseExtractor extends DerivedLogTag {
     def unapply(resp: ResponseContent): Option[UserConnectionEvent] = resp match {
       case JsonObjectResponse(js) => Try(UserConnectionEvent.Decoder(js)).toOption
       case _ =>

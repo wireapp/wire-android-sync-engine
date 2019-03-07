@@ -17,11 +17,11 @@
  */
 package com.waz.service.otr
 
-import com.waz.ZLog.ImplicitTag._
 import com.waz.log.ZLog2._
 import com.waz.api.Verification
 import com.waz.content.UserPreferences.LastSelfClientsSyncRequestedTime
 import com.waz.content._
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model._
 import com.waz.model.otr.{Client, ClientId, UserClients}
 import com.waz.service.AccountsService.Active
@@ -62,7 +62,7 @@ class OtrClientsServiceImpl(selfId:    UserId,
                             userPrefs: UserPreferences,
                             storage:   OtrClientsStorage,
                             sync:      SyncServiceHandle,
-                            accounts:  AccountsService) extends OtrClientsService {
+                            accounts:  AccountsService) extends OtrClientsService with DerivedLogTag {
 
   import com.waz.threading.Threading.Implicits.Background
   import com.waz.utils.events.EventContext.Implicits.global

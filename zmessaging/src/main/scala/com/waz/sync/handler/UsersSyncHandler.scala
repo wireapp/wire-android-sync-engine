@@ -18,7 +18,6 @@
 package com.waz.sync.handler
 
 import com.waz.log.ZLog2._
-import com.waz.ZLog.ImplicitTag._
 import com.waz.api.impl.ErrorResponse
 import com.waz.content.UsersStorage
 import com.waz.model._

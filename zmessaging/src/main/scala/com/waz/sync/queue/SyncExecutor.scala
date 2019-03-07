@@ -17,9 +17,9 @@
  */
 package com.waz.sync.queue
 
-import com.waz.ZLog.ImplicitTag._
 import com.waz.api.SyncState
 import com.waz.api.impl.ErrorResponse
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.log.ZLog2._
 import com.waz.model.UserId
 import com.waz.model.sync.SyncJob
@@ -43,7 +43,8 @@ class SyncExecutor(account:     UserId,
                    content:     SyncContentUpdater,
                    network:     NetworkModeService,
                    handler: =>  SyncHandler,
-                   tracking:    TrackingService) {
+                   tracking:    TrackingService) extends DerivedLogTag {
+
   import SyncExecutor._
   private implicit val dispatcher = new SerialDispatchQueue(name = "SyncExecutorQueue")
 

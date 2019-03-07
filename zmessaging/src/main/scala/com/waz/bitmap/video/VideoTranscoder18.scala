@@ -22,9 +22,9 @@ import java.io.File
 import android.annotation.TargetApi
 import android.content.Context
 import android.media.{MediaCodec, MediaExtractor, MediaFormat, MediaMuxer}
-import com.waz.ZLog.ImplicitTag._
 import com.waz.bitmap.video.VideoTranscoder.CodecResponse.{CodecBuffer, FormatChanged, TryAgain}
 import com.waz.bitmap.video.VideoTranscoder.{MediaCodecIterator, OutputWriter}
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.log.ZLog2._
 import com.waz.utils.{Cleanup, Managed, returning}
 
@@ -81,7 +81,7 @@ class VideoTranscoder18(context: Context) extends BaseTranscoder(context) {
 }
 
 @TargetApi(18)
-class MuxerWriter(muxer: MediaMuxer, sources: MediaCodecIterator*) extends OutputWriter {
+class MuxerWriter(muxer: MediaMuxer, sources: MediaCodecIterator*) extends OutputWriter with DerivedLogTag {
   case class SourceWithTrack(source: MediaCodecIterator, var track: Option[Int] = None, var positionMs: Long = 0)
 
   private val withTracks = sources.map { SourceWithTrack(_) }

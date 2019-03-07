@@ -21,8 +21,8 @@ import android.app.ActivityManager
 import android.content.res.Configuration
 import android.content.{ComponentCallbacks2, Context}
 import android.support.v4.util.LruCache
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.log.ZLog2._
-import com.waz.ZLog.ImplicitTag._
 import com.waz.utils.TrimmingLruCache.CacheSize
 
 trait Cache[K, V] {
@@ -68,7 +68,7 @@ object TrimmingLruCache {
   }
 }
 
-trait AutoTrimming extends ComponentCallbacks2 { self: LruCache[_, _] =>
+trait AutoTrimming extends ComponentCallbacks2 with DerivedLogTag { self: LruCache[_, _] =>
   import com.waz.utils.AutoTrimming._
 
   def context: Context

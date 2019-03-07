@@ -17,8 +17,8 @@
  */
 package com.waz.service.teams
 
-import com.waz.ZLog.ImplicitTag._
 import com.waz.content._
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.log.ZLog2._
 import com.waz.model.AccountDataOld.PermissionsMasks
 import com.waz.model.ConversationData.ConversationDataDao
@@ -60,7 +60,7 @@ class TeamsServiceImpl(selfUser:           UserId,
                        convsContent:       ConversationsContentUpdater,
                        sync:               SyncServiceHandle,
                        syncRequestService: SyncRequestService,
-                       userPrefs:          UserPreferences) extends TeamsService {
+                       userPrefs:          UserPreferences) extends TeamsService with DerivedLogTag {
 
   private implicit val dispatcher = SerialDispatchQueue()
 

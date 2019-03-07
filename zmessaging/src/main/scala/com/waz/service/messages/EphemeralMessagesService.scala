@@ -17,10 +17,10 @@
  */
 package com.waz.service.messages
 
-import com.waz.ZLog.ImplicitTag._
 import com.waz.log.ZLog2._
 import com.waz.api.Message
 import com.waz.content.{MessagesStorage, ZmsDatabase}
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model.AssetStatus.{UploadDone, UploadFailed}
 import com.waz.model.GenericContent._
 import com.waz.model.MessageData.MessageDataDao
@@ -47,7 +47,7 @@ class EphemeralMessagesService(selfUserId: UserId,
                                db:         ZmsDatabase,
                                sync:       SyncServiceHandle,
                                push:       PushService,
-                               assets:     AssetService) {
+                               assets:     AssetService) extends DerivedLogTag {
   import EphemeralMessagesService._
   import com.waz.threading.Threading.Implicits.Background
   import com.waz.utils.events.EventContext.Implicits.global

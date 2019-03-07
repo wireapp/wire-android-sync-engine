@@ -17,9 +17,9 @@
  */
 package com.waz.service.conversation
 
-import com.waz.ZLog.ImplicitTag._
 import com.waz.content.GlobalPreferences.BackendDrift
 import com.waz.content.{ConversationStorage, GlobalPreferences}
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.log.ZLog2._
 import com.waz.model._
 import com.waz.service.AccountsService.InForeground
@@ -39,7 +39,8 @@ class TypingService(userId:        UserId,
                     timeouts:      Timeouts,
                     accounts:      AccountsService,
                     sync:          SyncServiceHandle,
-                    prefs:         GlobalPreferences) {
+                    prefs:         GlobalPreferences) extends DerivedLogTag {
+
   import timeouts.typing._
 
   private implicit val ev = EventContext.Global

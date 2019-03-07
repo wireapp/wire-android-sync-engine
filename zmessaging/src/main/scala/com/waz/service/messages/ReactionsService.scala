@@ -18,8 +18,8 @@
 package com.waz.service.messages
 
 import com.waz.log.ZLog2._
-import com.waz.ZLog.ImplicitTag._
 import com.waz.content.{Likes, ReactionsStorage, ReactionsStorageImpl}
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model._
 import com.waz.service.UserService
 import com.waz.sync.SyncServiceHandle
@@ -28,7 +28,12 @@ import com.waz.utils._
 
 import scala.concurrent.Future
 
-class ReactionsService(storage: ReactionsStorage, messages: MessagesContentUpdater, sync: SyncServiceHandle, users: UserService, selfUserId: UserId) {
+class ReactionsService(storage: ReactionsStorage,
+                       messages: MessagesContentUpdater,
+                       sync: SyncServiceHandle,
+                       users: UserService,
+                       selfUserId: UserId) extends DerivedLogTag {
+
   import Threading.Implicits.Background
 
   def like(conv: ConvId, msg: MessageId): Future[Likes] = addReaction(conv, msg, Liking.Action.Like)

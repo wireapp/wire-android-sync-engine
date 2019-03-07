@@ -17,9 +17,9 @@
  */
 package com.waz.sync.client
 
-import com.waz.ZLog.ImplicitTag._
 import com.waz.log.ZLog2._
 import com.waz.api.impl.ErrorResponse
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model._
 import com.waz.model.otr.ClientId
 import com.waz.sync.client.PushNotificationsClient.LoadNotificationsResult
@@ -91,7 +91,7 @@ object PushNotificationsClient {
 
   case class LoadNotificationsResponse(notifications: Vector[PushNotificationEncoded], hasMore: Boolean, beTime: Option[Instant])
 
-  object PagedNotificationsResponse {
+  object PagedNotificationsResponse extends DerivedLogTag {
 
     import com.waz.utils.JsonDecoder._
 
@@ -119,7 +119,7 @@ object PushNotificationsClient {
     }
   }
 
-  object NotificationsResponseEncoded {
+  object NotificationsResponseEncoded extends DerivedLogTag {
     def unapplySeq(response: ResponseContent): Option[Seq[PushNotificationEncoded]] = try response match {
       case JsonObjectResponse(js) => Some(Vector(implicitly[JsonDecoder[PushNotificationEncoded]].apply(js)))
       case JsonArrayResponse(js) => Some(arrayColl[PushNotificationEncoded, Vector](js))

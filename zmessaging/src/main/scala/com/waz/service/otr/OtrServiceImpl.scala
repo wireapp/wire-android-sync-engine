@@ -19,9 +19,9 @@ package com.waz.service.otr
 
 import java.io._
 
-import com.waz.ZLog.ImplicitTag._
 import com.waz.cache.{CacheService, LocalData}
 import com.waz.content.{GlobalPreferences, MembersStorageImpl, OtrClientsStorage}
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.log.ZLog2._
 import com.waz.model.GenericContent.ClientAction.SessionReset
 import com.waz.model.GenericContent._
@@ -82,7 +82,7 @@ class OtrServiceImpl(selfUserId:     UserId,
                      metadata:       MetaDataService,
                      clientsStorage: OtrClientsStorage,
                      prefs:          GlobalPreferences,
-                     tracking:       TrackingService) extends OtrService {
+                     tracking:       TrackingService) extends OtrService with DerivedLogTag {
   import EventContext.Implicits.global
   import OtrService._
   import Threading.Implicits.Background

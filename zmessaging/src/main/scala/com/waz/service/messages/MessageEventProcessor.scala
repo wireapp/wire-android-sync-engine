@@ -18,9 +18,9 @@
 package com.waz.service.messages
 
 
-import com.waz.ZLog.ImplicitTag._
 import com.waz.api.{Message, Verification}
 import com.waz.content.MessagesStorage
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.log.ZLog2._
 import com.waz.model.AssetMetaData.Image.Tag.{Medium, Preview}
 import com.waz.model.AssetStatus.{UploadCancelled, UploadFailed}
@@ -46,7 +46,7 @@ class MessageEventProcessor(selfUserId:          UserId,
                             msgsService:         MessagesService,
                             convsService:        ConversationsService,
                             convs:               ConversationsContentUpdater,
-                            otr:                 OtrService) {
+                            otr:                 OtrService) extends DerivedLogTag {
 
   import MessageEventProcessor._
   import Threading.Implicits.Background

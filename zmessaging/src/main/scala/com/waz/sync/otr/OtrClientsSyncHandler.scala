@@ -19,10 +19,10 @@ package com.waz.sync.otr
 
 import android.content.Context
 import android.location.Geocoder
-import com.waz.ZLog.ImplicitTag._
 import com.waz.api.Verification
 import com.waz.api.impl.ErrorResponse
 import com.waz.content.OtrClientsStorage
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.log.ZLog2._
 import com.waz.model.UserId
 import com.waz.model.otr.{Client, ClientId, Location, UserClients}
@@ -53,7 +53,10 @@ class OtrClientsSyncHandlerImpl(context:    Context,
                                 netClient:  OtrClient,
                                 otrClients: OtrClientsService,
                                 storage:    OtrClientsStorage,
-                                cryptoBox:  CryptoBoxService) extends OtrClientsSyncHandler {
+                                cryptoBox:  CryptoBoxService)
+  extends OtrClientsSyncHandler
+    with DerivedLogTag {
+
   import com.waz.threading.Threading.Implicits.Background
 
   private lazy val sessions = cryptoBox.sessions

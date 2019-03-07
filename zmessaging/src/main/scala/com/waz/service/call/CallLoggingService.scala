@@ -17,7 +17,7 @@
  */
 package com.waz.service.call
 
-import com.waz.ZLog.ImplicitTag._
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.log.ZLog2._
 import com.waz.model.{ConvId, LocalInstant, UserId}
 import com.waz.service.call.Avs.AvsClosedReason._
@@ -33,7 +33,7 @@ class CallLoggingService(selfUserId:  UserId,
                          calling:     CallingService,
                          messages:    MessagesService,
                          pushService: PushService,
-                         tracking:    TrackingService)(implicit eventContext: EventContext) {
+                         tracking:    TrackingService)(implicit eventContext: EventContext) extends DerivedLogTag {
 
   private var subscribedConvs = Set.empty[ConvId]
 

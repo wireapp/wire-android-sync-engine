@@ -18,8 +18,8 @@
 package com.waz.service.media
 
 import com.waz.log.ZLog2._
-import com.waz.ZLog.ImplicitTag._
 import com.waz.api.Message
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model.messages.media.MediaAssetData
 import com.waz.model.{MessageContent, MessageData}
 import com.waz.service.assets.AssetService
@@ -30,7 +30,7 @@ import com.waz.sync.client.ErrorOr
 
 import scala.concurrent.Future
 
-class SoundCloudMediaService(client: SoundCloudClient, assets: AssetService) {
+class SoundCloudMediaService(client: SoundCloudClient, assets: AssetService) extends DerivedLogTag {
 
   import Threading.Implicits.Background
 
