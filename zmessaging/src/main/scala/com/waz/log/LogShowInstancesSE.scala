@@ -406,10 +406,6 @@ trait LogShowInstancesSE {
 
   implicit val LocaleLogShow: LogShow[Locale] = logShowWithHash
 
-
-
-  implicit val IntegrationIdLogShow: LogShow[IntegrationId] = logShowWithHash
-  implicit val ProviderIdLogShow: LogShow[ProviderId] = logShowWithHash
   implicit val MessagesCursorLogShow: LogShow[MessagesCursor] = logShowWithHash
   implicit val UserFieldLogShow: LogShow[UserField] = logShowWithHash
 
