@@ -19,7 +19,7 @@ package com.waz.log
 
 import java.io.{BufferedWriter, File, FileWriter, IOException}
 
-import com.waz.ZLog.LogTag
+import com.waz.log.BasicLogging.LogTag
 import com.waz.log.InternalLog.{LogLevel, dateTag, stackTrace}
 import com.waz.threading.{SerialDispatchQueue, Threading}
 import com.waz.utils.crypto.ZSecureRandom
@@ -34,12 +34,13 @@ class BufferedLogOutput(baseDir: String,
                         maxBufferSize: Long = BufferedLogOutput.DefMaxBufferSize,
                         maxFileSize: Long = BufferedLogOutput.DefMaxFileSize,
                         maxRollFiles: Int = BufferedLogOutput.DefMaxRollFiles) extends LogOutput {
+
   assert(maxBufferSize < maxFileSize)
   assert(maxRollFiles > 0)
 
-  override val id = "BufferedLogOutput" + ZSecureRandom.nextInt().toHexString
+  override val id: String = "BufferedLogOutput" + ZSecureRandom.nextInt().toHexString
 
-  private implicit val dispatcher = new SerialDispatchQueue(Threading.IO, id)
+  private implicit val dispatcher: SerialDispatchQueue = new SerialDispatchQueue(Threading.IO, id)
 
   private val buffer = StringBuilder.newBuilder
   private val pathRegex = s"$baseDir/${BufferedLogOutput.DefFileName}([0-9]+).log".r
@@ -66,7 +67,7 @@ class BufferedLogOutput(baseDir: String,
   def getPaths = paths.reverse // internally the first path is the youngest one, but to the outside we want to show paths from the oldest to the youngest
 
   override def log(str: String, level: LogLevel, tag: LogTag, ex: Option[Throwable] = None): Unit = this.synchronized {
-    buffer.append(s"$dateTag/$level/$tag: $str\n${ex.map(e => s"${stackTrace(e)}\n").getOrElse("")}")
+    buffer.append(s"$dateTag/$level/${tag.value}: $str\n${ex.map(e => s"${stackTrace(e)}\n").getOrElse("")}")
     if (size > maxBufferSize) flush()
   }
 

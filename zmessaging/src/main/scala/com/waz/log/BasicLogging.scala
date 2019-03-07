@@ -29,26 +29,25 @@ trait BasicLogging {
   implicit def toCanBeShown[T: LogShow](value: T): CanBeShownImpl[T] = new CanBeShownImpl[T](value)
   implicit def toLogHelper(sc: StringContext): LogHelper = new LogHelper(sc)
 
-  def error(log: Log, cause: Throwable)(implicit tag: LogTag): Unit = InternalLog.log(log, cause, Error, tag.value)
-  def error(log: Log)(implicit tag: LogTag): Unit                   = InternalLog.log(log, Error, tag.value)
-  def warn(log: Log, cause: Throwable)(implicit tag: LogTag): Unit  = InternalLog.log(log, cause, Warn, tag.value)
-  def warn(log: Log)(implicit tag: LogTag): Unit                    = InternalLog.log(log, Warn, tag.value)
-  def info(log: Log)(implicit tag: LogTag): Unit                    = InternalLog.log(log, Info, tag.value)
-  def debug(log: Log)(implicit tag: LogTag): Unit                   = InternalLog.log(log, Debug, tag.value)
-  def verbose(log: Log)(implicit tag: LogTag): Unit                 = InternalLog.log(log, Verbose, tag.value)
+  def error(log: Log, cause: Throwable)(implicit tag: LogTag): Unit = InternalLog.log(log, cause, Error, tag)
+  def error(log: Log)(implicit tag: LogTag): Unit                   = InternalLog.log(log, Error, tag)
+  def warn(log: Log, cause: Throwable)(implicit tag: LogTag): Unit  = InternalLog.log(log, cause, Warn, tag)
+  def warn(log: Log)(implicit tag: LogTag): Unit                    = InternalLog.log(log, Warn, tag)
+  def info(log: Log)(implicit tag: LogTag): Unit                    = InternalLog.log(log, Info, tag)
+  def debug(log: Log)(implicit tag: LogTag): Unit                   = InternalLog.log(log, Debug, tag)
+  def verbose(log: Log)(implicit tag: LogTag): Unit                 = InternalLog.log(log, Verbose, tag)
 
   def showString(str: String): ShowString = new ShowString(str)
   def redactedString(str: String): RedactedString = new RedactedString(str)
   def asSize(value: Long): Size = new Size(value)
 
-  def logTime(log: Log)(implicit tag: LogTag): Unit = {
-    q"""val time = System.nanoTime
-        try {
-          $body
-        } finally {
-           com.waz.log.InternalLog.verbose($message + ": " + ((System.nanoTime - time) / 1000 / 1000f) + " ms", $tag)
-        }
-        """
+  def logTime[A](log: Log)(body: => A)(implicit tag: LogTag): Unit = {
+    val time = System.nanoTime
+    try {
+      body
+    } finally {
+      verbose(l"$log : ${(System.nanoTime - time) / 1000 / 1000f} ms")
+    }
   }
 
 }
@@ -89,6 +88,10 @@ object BasicLogging {
       if (xs.hasNext) { acc.append(xs.next()); intersperse(ys, xs, acc) }
       else acc.toString()
     }
+  }
+
+  object Log {
+    val LogLogShow: LogShow[Log] = LogShow.create(_.buildMessageSafe, _.buildMessageUnsafe)
   }
 
   class LogHelper(val sc: StringContext) extends AnyVal {

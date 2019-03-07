@@ -28,6 +28,7 @@ import com.waz.api.{MessageContent => _, _}
 import com.waz.cache2.CacheService.{AES_CBC_Encryption, Encryption, NoEncryption}
 import com.waz.content.MessagesCursor
 import com.waz.content.Preferences.PrefKey
+import com.waz.log.BasicLogging.Log
 import com.waz.model.AccountData.Password
 import com.waz.model.AssetData.ProcessingTaskKey
 import com.waz.model.GenericContent.Location
@@ -405,6 +406,7 @@ trait LogShowInstancesSE {
     }
 
   implicit val LocaleLogShow: LogShow[Locale] = logShowWithHash
+
 
   implicit val MessagesCursorLogShow: LogShow[MessagesCursor] = logShowWithHash
   implicit val UserFieldLogShow: LogShow[UserField] = logShowWithHash

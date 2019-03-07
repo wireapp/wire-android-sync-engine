@@ -19,8 +19,7 @@ package com.waz.log
 
 import java.io._
 
-import com.waz.ZLog.LogTag
-import com.waz.log.BasicLogging.Log
+import com.waz.log.BasicLogging.{Log, LogTag}
 import com.waz.service.ZMessaging.clock
 
 import scala.Ordered._
@@ -70,15 +69,8 @@ object InternalLog {
   } }
 
   import LogLevel._
-  def error(msg: String, cause: Throwable, tag: LogTag): Unit = log(msg, cause, Error, tag)
-  def error(msg: String, tag: LogTag): Unit                   = log(msg, Error, tag)
-  def warn(msg: String, cause: Throwable, tag: LogTag): Unit  = log(msg, cause, Warn, tag)
-  def warn(msg: String, tag: LogTag): Unit                    = log(msg, Warn, tag)
-  def info(msg: String, tag: LogTag): Unit                    = log(msg, Info, tag)
-  def debug(msg: String, tag: LogTag): Unit                   = log(msg, Debug, tag)
-  def verbose(msg: String, tag: LogTag): Unit                 = log(msg, Verbose, tag)
 
-  def stackTrace(cause: Throwable): LogTag = Option(cause) match {
+  def stackTrace(cause: Throwable): String = Option(cause) match {
     case Some(c) => val result = new StringWriter()
                     c.printStackTrace(new PrintWriter(result))
                     result.toString
@@ -87,12 +79,6 @@ object InternalLog {
   }
 
   def dateTag = s"${clock.instant().toString}-TID:${Thread.currentThread().getId}"
-
-  private def log(msg: String, level: LogLevel, tag: LogTag): Unit =
-    outputs.values.foreach { _.log(msg, level, tag) }
-
-  private def log(msg: String, cause: Throwable, level: LogLevel, tag: LogTag): Unit =
-    outputs.values.foreach { _.log(msg, cause, level, tag) }
 
   def log(log: Log, level: LogLevel, tag: LogTag): Unit =
     writeLog(log, level, out => out.log(_, level, tag))
