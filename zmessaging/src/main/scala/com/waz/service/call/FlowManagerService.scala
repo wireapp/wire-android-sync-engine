@@ -19,7 +19,7 @@ package com.waz.service.call
 
 import android.content.Context
 import android.view.View
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.call._
 import com.waz.content.GlobalPreferences
 import com.waz.content.GlobalPreferences._

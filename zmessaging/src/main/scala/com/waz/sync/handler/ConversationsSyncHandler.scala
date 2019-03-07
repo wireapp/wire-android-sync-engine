@@ -17,7 +17,7 @@
  */
 package com.waz.sync.handler
 
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.api.ErrorType
 import com.waz.api.IConversation.{Access, AccessRole}
 import com.waz.api.impl.ErrorResponse

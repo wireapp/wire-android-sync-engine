@@ -26,7 +26,7 @@ import android.media.AudioManager.STREAM_MUSIC
 import android.media.AudioTrack
 import android.media.AudioTrack.{MODE_STREAM, OnPlaybackPositionUpdateListener, getMinBufferSize}
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.service.assets.GlobalRecordAndPlayService.{MediaPointer, PCMContent}
 import com.waz.threading.{SerialDispatchQueue, Threading}
 import libcore.io.SizeOf

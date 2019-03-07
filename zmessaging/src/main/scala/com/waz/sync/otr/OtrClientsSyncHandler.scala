@@ -23,7 +23,7 @@ import com.waz.api.Verification
 import com.waz.api.impl.ErrorResponse
 import com.waz.content.OtrClientsStorage
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.model.UserId
 import com.waz.model.otr.{Client, ClientId, Location, UserClients}
 import com.waz.service.otr.OtrService.SessionId

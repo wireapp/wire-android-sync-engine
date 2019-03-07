@@ -18,7 +18,7 @@
 package com.waz
 
 import com.waz.utils._
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.utils.wrappers._
 import com.waz.utils.wrappers.DB
 

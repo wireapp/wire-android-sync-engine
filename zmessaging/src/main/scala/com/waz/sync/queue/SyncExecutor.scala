@@ -20,7 +20,7 @@ package com.waz.sync.queue
 import com.waz.api.SyncState
 import com.waz.api.impl.ErrorResponse
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.model.UserId
 import com.waz.model.sync.SyncJob
 import com.waz.model.sync.SyncRequest.Serialized

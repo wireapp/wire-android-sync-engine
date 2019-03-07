@@ -17,7 +17,7 @@
  */
 package com.waz.service.conversation
 
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.api.IConversation.{Access, AccessRole}
 import com.waz.content._
 import com.waz.log.BasicLogging.LogTag

@@ -21,7 +21,7 @@ import java.io.PrintWriter
 
 import com.waz.api.NetworkMode
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.model.sync.SyncJob
 import com.waz.model.{ConvId, SyncId, UserId}
 import com.waz.service.AccountsService.{Active, LoggedOut}

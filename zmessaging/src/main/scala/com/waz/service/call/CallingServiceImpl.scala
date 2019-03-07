@@ -24,7 +24,7 @@ import com.waz.content.GlobalPreferences.SkipTerminatingState
 import com.waz.content.{GlobalPreferences, MembersStorage, UserPreferences}
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.log.LogShow.SafeToLog
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.model.otr.ClientId
 import com.waz.model.{ConvId, RConvId, UserId, _}
 import com.waz.permissions.PermissionsService

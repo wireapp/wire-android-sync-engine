@@ -20,7 +20,7 @@ package com.waz.service
 import java.io._
 import java.util.Locale
 
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.api.ZmsVersion
 import com.waz.api.impl.ErrorResponse
 import com.waz.api.impl.ErrorResponse.internalError

@@ -22,7 +22,7 @@ import com.waz.sync.client.{AuthenticationManager, AuthenticationManager2}
 import com.waz.threading.CancellableFuture
 import com.waz.znet2.http.HttpClient.ProgressCallback
 import com.waz.znet2.http._
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 
 class AuthRequestInterceptor(authManager: AuthenticationManager, httpClient: HttpClient, attеmptsIfAuthFailed: Int = 1)
     extends RequestInterceptor with DerivedLogTag {

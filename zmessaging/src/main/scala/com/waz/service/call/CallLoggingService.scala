@@ -18,7 +18,7 @@
 package com.waz.service.call
 
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.model.{ConvId, LocalInstant, UserId}
 import com.waz.service.call.Avs.AvsClosedReason._
 import com.waz.service.call.CallInfo.CallState._

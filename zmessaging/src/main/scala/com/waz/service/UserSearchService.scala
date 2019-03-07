@@ -19,7 +19,7 @@ package com.waz.service
 
 import com.waz.content._
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.model.SearchQuery.{Recommended, RecommendedHandle}
 import com.waz.model.UserData.{ConnectionStatus, UserDataDao}
 import com.waz.model.{SearchQuery, _}

@@ -29,7 +29,7 @@ import android.os.Build.VERSION_CODES.LOLLIPOP
 import android.provider.ContactsContract.DisplayNameSources._
 import android.provider.{BaseColumns, ContactsContract}
 import com.google.i18n.phonenumbers.PhoneNumberUtil
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.content.UserPreferences._
 import com.waz.content._
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag

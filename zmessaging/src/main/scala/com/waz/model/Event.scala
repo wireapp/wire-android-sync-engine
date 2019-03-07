@@ -20,7 +20,7 @@ package com.waz.model
 import com.waz.api.IConversation.{Access, AccessRole}
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.log.LogShow.SafeToLog
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.model.ConversationEvent.ConversationEventDecoder
 import com.waz.model.Event.EventDecoder
 import com.waz.model.UserData.ConnectionStatus

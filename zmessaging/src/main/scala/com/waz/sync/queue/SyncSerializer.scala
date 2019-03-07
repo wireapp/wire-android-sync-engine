@@ -20,7 +20,7 @@ package com.waz.sync.queue
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicLong}
 
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.model.ConvId
 import com.waz.model.sync.SyncJob.Priority
 import com.waz.threading.SerialDispatchQueue

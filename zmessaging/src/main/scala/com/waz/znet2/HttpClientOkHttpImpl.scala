@@ -22,7 +22,7 @@ import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
 
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.service.CertificatePin
 import com.waz.threading.CancellableFuture
 import com.waz.utils.crypto.AESUtils

@@ -28,7 +28,7 @@ import com.coremedia.iso.boxes.{Box, TrackBox}
 import com.googlecode.mp4parser.FileDataSourceImpl
 import com.googlecode.mp4parser.util.{Matrix, Path}
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.utils.IoUtils
 import org.robolectric.annotation.{Implementation, Implements, Resetter}
 

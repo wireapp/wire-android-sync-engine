@@ -18,7 +18,7 @@
 package com.waz.db
 
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.utils.wrappers.{DB, DBContentValues, DBCursor}
 import com.waz.utils.{Managed, returning}
 

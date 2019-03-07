@@ -19,7 +19,7 @@ package com.waz.permissions
 
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.log.LogShow.SafeToLog
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.threading.{SerialDispatchQueue, Threading}
 import com.waz.utils.events.{EventStream, RefreshingSignal, Signal}
 

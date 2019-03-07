@@ -17,7 +17,7 @@
  */
 package com.waz.model
 
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.db.Col._
 import com.waz.db.{Col, Dao, DbTranslator}
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag

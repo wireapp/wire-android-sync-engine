@@ -24,7 +24,7 @@ import android.content.Context
 import android.media._
 import android.os.Build
 import android.view.Surface
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.api.impl.ProgressIndicator.{ProgressData, ProgressReporter}
 import com.waz.bitmap.video.VideoTranscoder.CodecResponse._
 import com.waz.bitmap.video.VideoTranscoder.{CodecResponse, MediaCodecIterator}

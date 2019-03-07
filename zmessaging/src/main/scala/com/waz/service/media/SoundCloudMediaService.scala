@@ -17,7 +17,7 @@
  */
 package com.waz.service.media
 
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.api.Message
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model.messages.media.MediaAssetData

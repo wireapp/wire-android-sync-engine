@@ -17,4 +17,4 @@
  */
 package com.waz.log
 
-object ZLog2 extends BasicLogging with LogShowInstancesSE
+object LogSE extends BasicLogging with LogShowInstancesSE

@@ -21,7 +21,7 @@ import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicBoolean
 
 import com.waz.log.BasicLogging.LogTag
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.model.Event
 import com.waz.threading.{CancellableFuture, SerialDispatchQueue, Threading}
 

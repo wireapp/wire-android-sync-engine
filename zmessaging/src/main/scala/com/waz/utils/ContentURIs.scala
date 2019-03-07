@@ -20,7 +20,7 @@ package com.waz.utils
 import android.content.Context
 import android.provider.OpenableColumns._
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.model.Mime
 import com.waz.threading.Threading
 import com.waz.utils.wrappers.URI

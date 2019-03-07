@@ -173,7 +173,7 @@ class InternalLogSpec extends AndroidFreeSpec with DerivedLogTag {
         InternalLog.add(log)
         log.empty shouldEqual(true)
 
-        import com.waz.log.ZLog2._
+        import com.waz.log.LogSE._
 
         verbose(l"something")
 

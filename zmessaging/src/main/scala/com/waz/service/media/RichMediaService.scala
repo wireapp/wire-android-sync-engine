@@ -17,7 +17,7 @@
  */
 package com.waz.service.media
 
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.api.impl.ErrorResponse
 import com.waz.api.{MediaProvider, Message}
 import com.waz.content.MessagesStorage

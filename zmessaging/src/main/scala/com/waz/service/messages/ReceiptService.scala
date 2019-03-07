@@ -21,7 +21,7 @@ import com.waz.api.Message.Status.DELIVERED
 import com.waz.api.Message.Type._
 import com.waz.content.{ConversationStorage, MessagesStorage, ReadReceiptsStorage}
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.model.sync.ReceiptType
 import com.waz.model.{MessageId, ReadReceipt, UserId}
 import com.waz.service.conversation.ConversationsService

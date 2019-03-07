@@ -21,7 +21,7 @@ import java.io.File
 import java.net.URI
 import java.util.Locale
 
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import android.net.Uri
 import com.waz.api.impl.ErrorResponse
 import com.waz.api.{MessageContent => _, _}

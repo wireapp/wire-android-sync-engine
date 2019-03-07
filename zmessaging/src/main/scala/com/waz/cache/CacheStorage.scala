@@ -20,7 +20,7 @@ package com.waz.cache
 import java.io.File
 
 import android.content.Context
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.cache.CacheEntryData.CacheEntryDao
 import com.waz.cache.CacheStorage.EntryCache
 import com.waz.content.Database

@@ -22,7 +22,7 @@ import android.content.{Context, SharedPreferences}
 import com.waz.content.Preferences.Preference.PrefCodec
 import com.waz.content.Preferences.{PrefKey, Preference}
 import com.waz.log.BasicLogging.LogTag
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.media.manager.context.IntensityLevel
 import com.waz.model.KeyValueData.KeyValueDataDao
 import com.waz.model._

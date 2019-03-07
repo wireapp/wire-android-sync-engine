@@ -20,7 +20,7 @@ package com.waz.service.call
 import com.sun.jna.Pointer
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.log.LogShow.SafeToLog
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.model.{ConvId, GenericMessage, LocalInstant, UserId}
 import com.waz.service.call.Avs.AvsClosedReason.reasonString
 import com.waz.service.call.Avs.VideoState._

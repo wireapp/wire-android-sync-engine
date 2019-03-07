@@ -21,7 +21,7 @@ import android.content.Context
 import android.database.sqlite.SQLiteDatabase.CursorFactory
 import android.database.sqlite.{SQLiteDatabase, SQLiteOpenHelper}
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.service.tracking.TrackingService
 
 import scala.util.Try

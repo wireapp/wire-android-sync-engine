@@ -19,7 +19,6 @@ package com.waz.ui
 
 import android.support.v4.util.LruCache
 import com.waz.CacheLike
-import com.waz.ZLog._
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.service.ZMessaging
 import com.waz.threading.Threading

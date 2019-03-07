@@ -24,7 +24,7 @@ import com.waz.api.impl.ErrorResponse
 import com.waz.api.{Message, MessageFilter}
 import com.waz.log.BasicLogging.LogTag
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.model.ConversationData.UnreadCount
 import com.waz.model.MessageData.{MessageDataDao, MessageEntry}
 import com.waz.model._

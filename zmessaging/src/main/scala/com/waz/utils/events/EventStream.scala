@@ -20,7 +20,7 @@ package com.waz.utils.events
 import java.util.UUID.randomUUID
 
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.threading.{CancellableFuture, Threading}
 import com.waz.utils.events.Events.Subscriber
 import com.waz.utils.{Serialized, returning}

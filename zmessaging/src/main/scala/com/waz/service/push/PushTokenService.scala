@@ -23,7 +23,7 @@ import com.waz.api.NetworkMode
 import com.waz.content.{AccountStorage, GlobalPreferences}
 import com.waz.log.BasicLogging.LogTag
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.model.otr.ClientId
 import com.waz.model.{PushToken, PushTokenRemoveEvent, UserId}
 import com.waz.service.AccountsService.Active

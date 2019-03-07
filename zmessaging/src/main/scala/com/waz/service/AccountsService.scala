@@ -19,7 +19,7 @@ package com.waz.service
 
 import java.io.File
 
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.api.impl.ErrorResponse
 import com.waz.api._
 import com.waz.content.GlobalPreferences._

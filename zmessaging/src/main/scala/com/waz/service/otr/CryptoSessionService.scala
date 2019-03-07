@@ -18,7 +18,7 @@
 package com.waz.service.otr
 
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.service.otr.OtrService.SessionId
 import com.waz.service.push.PushNotificationEventsStorage.PlainWriter
 import com.waz.threading.Threading

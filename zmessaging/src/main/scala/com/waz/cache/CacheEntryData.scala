@@ -20,7 +20,7 @@ package com.waz.cache
 import java.io.File
 import java.lang.System.currentTimeMillis
 
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.db.Col._
 import com.waz.db.Dao
 import com.waz.db.DbTranslator.FileTranslator

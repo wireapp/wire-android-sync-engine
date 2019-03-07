@@ -17,7 +17,7 @@
  */
 package com.waz.service.messages
 
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.api.Message
 import com.waz.content.{MessagesStorage, ZmsDatabase}
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag

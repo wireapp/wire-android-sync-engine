@@ -20,7 +20,7 @@ package com.waz.sync.client
 import com.waz.api.impl.ErrorResponse
 import com.waz.api.{OtrClientType, Verification}
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.model.AccountData.Password
 import com.waz.model.otr._
 import com.waz.model.{RemoteInstant, UserId}

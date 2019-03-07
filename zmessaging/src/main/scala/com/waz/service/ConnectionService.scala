@@ -21,7 +21,7 @@ import com.waz.api.IConversation
 import com.waz.api.IConversation.{Access, AccessRole}
 import com.waz.content._
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.model.ConversationData.ConversationType
 import com.waz.model.UserData.ConnectionStatus
 import com.waz.model._

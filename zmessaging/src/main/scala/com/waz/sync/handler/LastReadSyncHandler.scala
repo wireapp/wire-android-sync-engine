@@ -17,7 +17,7 @@
  */
 package com.waz.sync.handler
 
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.content.ConversationStorage
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model.GenericContent.LastRead

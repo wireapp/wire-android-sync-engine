@@ -22,7 +22,7 @@ import java.io.{File, InputStream}
 import android.graphics.BitmapFactory.Options
 import android.graphics.BitmapFactory
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.threading.{CancellableFuture, Threading}
 import com.waz.utils._
 import com.waz.utils.wrappers.Bitmap

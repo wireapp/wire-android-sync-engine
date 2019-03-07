@@ -19,7 +19,7 @@ package com.waz.service
 
 import com.waz.log.BasicLogging.LogTag
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.model.{Event, RConvEvent, RConvId}
 import com.waz.threading.Threading
 import com.waz.utils._

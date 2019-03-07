@@ -23,7 +23,7 @@ import com.waz.api.impl.ErrorResponse.internalError
 import com.waz.cache.LocalData
 import com.waz.content.{ConversationStorage, MembersStorage, UsersStorage}
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.model.AssetData.RemoteData
 import com.waz.model._
 import com.waz.model.otr.ClientId

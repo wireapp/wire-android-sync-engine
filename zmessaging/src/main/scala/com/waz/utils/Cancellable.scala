@@ -19,7 +19,7 @@ package com.waz.utils
 
 import com.waz.log.BasicLogging.LogTag
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.model.AssetData
 import com.waz.model.AssetData.ProcessingTaskKey
 import com.waz.threading.{CancellableFuture, SerialDispatchQueue}

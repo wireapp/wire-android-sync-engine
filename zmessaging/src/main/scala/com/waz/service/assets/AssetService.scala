@@ -32,7 +32,7 @@ import com.waz.cache.{CacheEntry, CacheService, Expiration, LocalData}
 import com.waz.content.WireContentProvider.CacheUri
 import com.waz.content._
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.model.AssetData.{ProcessingTaskKey, UploadTaskKey}
 import com.waz.model.AssetMetaData.Image.Tag
 import com.waz.model.AssetMetaData.Image.Tag.Medium

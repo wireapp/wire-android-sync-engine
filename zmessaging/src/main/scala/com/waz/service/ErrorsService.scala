@@ -18,7 +18,7 @@
 package com.waz.service
 
 import android.content.Context
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.api.ErrorType
 import com.waz.content.MessagesStorage
 import com.waz.model.ErrorData.ErrorDataDao

@@ -28,7 +28,7 @@ import com.waz.api.{Message, TypeFilter}
 import com.waz.db.Col._
 import com.waz.db.Dao
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.model.GenericContent.{Asset, ImageAsset, Knock, LinkPreview, Location, MsgEdit, Quote, Text}
 import com.waz.model.GenericMessage.{GenericMessageContent, TextMessage}
 import com.waz.model.MessageData.MessageState

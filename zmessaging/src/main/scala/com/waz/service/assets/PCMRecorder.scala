@@ -25,7 +25,7 @@ import java.util.concurrent.atomic.AtomicReference
 import android.media.AudioRecord
 import android.media.AudioRecord._
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.log.LogShow.SafeToLog
 import com.waz.threading.Threading
 import com.waz.threading.Threading.BlockingIO

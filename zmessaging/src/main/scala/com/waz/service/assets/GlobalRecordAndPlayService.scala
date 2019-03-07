@@ -29,7 +29,7 @@ import com.waz.api.{AudioEffect, ErrorType}
 import com.waz.audioeffect.{AudioEffect => AVSEffect}
 import com.waz.cache.{CacheEntry, CacheService, Expiration}
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.model._
 import com.waz.service.AccountsService.InForeground
 import com.waz.service.assets.AudioLevels.peakLoudness

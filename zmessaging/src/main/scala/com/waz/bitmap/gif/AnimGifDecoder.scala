@@ -19,7 +19,7 @@ package com.waz.bitmap.gif
 
 import android.graphics.Bitmap
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 
 import scala.concurrent.duration.Duration
 

@@ -20,7 +20,7 @@ package com.waz.utils
 import android.content.Context
 import android.os.PowerManager
 import com.waz.log.BasicLogging.LogTag
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.threading.CancellableFuture
 import com.waz.threading.Threading.Implicits.Background
 

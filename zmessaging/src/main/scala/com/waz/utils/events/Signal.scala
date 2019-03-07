@@ -20,7 +20,7 @@ package com.waz.utils.events
 import java.util.concurrent.atomic.AtomicBoolean
 
 import com.waz.log.BasicLogging.LogTag
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.threading.CancellableFuture.delayed
 import com.waz.threading.{CancellableFuture, SerialDispatchQueue, Threading}
 import com.waz.utils._

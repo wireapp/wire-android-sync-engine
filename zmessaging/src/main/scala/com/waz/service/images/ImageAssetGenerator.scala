@@ -19,7 +19,7 @@ package com.waz.service.images
 
 import android.content.Context
 import android.graphics.{Bitmap => ABitmap}
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.bitmap.BitmapUtils.Mime
 import com.waz.bitmap.{BitmapDecoder, BitmapUtils}
 import com.waz.cache.{CacheEntry, CacheService, LocalData}

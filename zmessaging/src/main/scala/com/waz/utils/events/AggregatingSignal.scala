@@ -20,7 +20,7 @@ package com.waz.utils.events
 import java.util.concurrent.atomic.AtomicReference
 
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.threading.Threading
 
 import scala.concurrent.{ExecutionContext, Future}

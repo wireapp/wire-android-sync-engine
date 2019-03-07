@@ -22,7 +22,7 @@ import android.database.{Cursor, MatrixCursor}
 import android.net.Uri
 import android.os.ParcelFileDescriptor
 import android.provider.OpenableColumns
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.cache.{CacheEntryData, Expiration}
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model.CacheKey

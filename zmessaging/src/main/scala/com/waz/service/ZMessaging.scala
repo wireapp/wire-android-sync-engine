@@ -19,8 +19,7 @@ package com.waz.service
 
 import android.content.Context
 import com.softwaremill.macwire._
-import com.waz.ZLog
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.api.ContentSearchQuery
 import com.waz.content.{MembersStorageImpl, UsersStorageImpl, ZmsDatabase, _}
 import com.waz.log.BasicLogging.LogTag

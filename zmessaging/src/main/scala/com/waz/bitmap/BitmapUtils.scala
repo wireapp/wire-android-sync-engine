@@ -24,7 +24,7 @@ import android.graphics._
 import android.media.ExifInterface
 import android.renderscript.{Allocation, Element, RenderScript, ScriptIntrinsicBlur}
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.service.ZMessaging
 import com.waz.utils.{IoUtils, returning}
 

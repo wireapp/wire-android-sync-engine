@@ -20,7 +20,7 @@ package com.waz.service.assets2
 import java.io.{ByteArrayInputStream, File, FileOutputStream}
 import java.net.URI
 
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.cache2.CacheService
 import com.waz.cache2.CacheService.{Encryption, NoEncryption}
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag

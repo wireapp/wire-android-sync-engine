@@ -19,7 +19,7 @@ package com.waz.sync.client
 
 import java.net.URLEncoder
 
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.api.MediaProvider
 import com.waz.api.impl.ErrorResponse
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag

@@ -18,7 +18,7 @@
 package com.waz.znet2.http
 
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.threading.CancellableFuture
 import com.waz.znet2.http.HttpClient._
 import com.waz.znet2.http.Request.QueryParameter

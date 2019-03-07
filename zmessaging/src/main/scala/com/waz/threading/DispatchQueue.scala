@@ -22,7 +22,7 @@ import java.util.concurrent.atomic.AtomicInteger
 
 import android.os.{Handler, Looper}
 import com.waz.log.BasicLogging.LogTag
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.utils.crypto.ZSecureRandom
 
 import scala.annotation.tailrec

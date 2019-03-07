@@ -21,7 +21,7 @@ import com.waz.api
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.utils.events.{AggregatingSignal, EventStream, Signal}
 import com.waz.utils.returning
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 
 import scala.concurrent.Future
 import scala.math.max

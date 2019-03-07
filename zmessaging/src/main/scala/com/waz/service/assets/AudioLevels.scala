@@ -26,7 +26,7 @@ import android.media.{MediaCodec, MediaExtractor, MediaFormat}
 import com.waz.bitmap.video.{MediaCodecHelper, TrackDecoder}
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.log.LogShow.SafeToLog
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.model.AssetMetaData.Loudness
 import com.waz.model.Mime
 import com.waz.threading.CancellableFuture.{CancelException, DefaultCancelException}

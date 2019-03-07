@@ -21,7 +21,7 @@ import java.io._
 import java.util.concurrent.CountDownLatch
 
 import android.content.Context
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.api.ZmsVersion
 import com.waz.cache.{CacheService, Expiration}
 import com.waz.content.GlobalPreferences.PushToken

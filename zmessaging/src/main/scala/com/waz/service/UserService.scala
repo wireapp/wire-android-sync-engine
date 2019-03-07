@@ -17,7 +17,7 @@
  */
 package com.waz.service
 
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.content._
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model.AccountData.Password

@@ -19,7 +19,7 @@ package com.waz.sync.client
 
 import java.util.UUID
 
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.api.Credentials
 import com.waz.api.impl.ErrorResponse
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag

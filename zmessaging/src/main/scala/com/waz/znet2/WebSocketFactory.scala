@@ -18,7 +18,7 @@
 package com.waz.znet2
 
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.sync.client.{BinaryResponse, JsonObjectResponse, ResponseContent, StringResponse}
 import com.waz.utils.events.EventStream
 import com.waz.znet2.WebSocketFactory.SocketEvent

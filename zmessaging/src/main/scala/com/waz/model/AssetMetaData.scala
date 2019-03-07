@@ -24,7 +24,7 @@ import android.graphics.BitmapFactory
 import android.media.MediaMetadataRetriever
 import android.media.MediaMetadataRetriever._
 import android.net.Uri
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.service.assets.MetaDataRetriever
 import com.waz.utils.wrappers.URI

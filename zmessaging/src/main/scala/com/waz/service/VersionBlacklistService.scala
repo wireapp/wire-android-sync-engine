@@ -20,7 +20,7 @@ package com.waz.service
 import com.waz.content.GlobalPreferences
 import com.waz.content.GlobalPreferences._
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.model.VersionBlacklist
 import com.waz.sync.client.VersionBlacklistClient
 import com.waz.threading.Threading

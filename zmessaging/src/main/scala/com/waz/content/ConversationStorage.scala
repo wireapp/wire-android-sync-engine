@@ -17,7 +17,7 @@
  */
 package com.waz.content
 
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.api.Verification
 import com.waz.api.Verification.UNKNOWN
 import com.waz.log.BasicLogging.LogTag

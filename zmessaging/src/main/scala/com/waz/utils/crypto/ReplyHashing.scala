@@ -21,7 +21,7 @@ import java.nio.ByteBuffer
 
 import com.waz.content.AssetsStorage
 import com.waz.model._
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.model.GenericMessage.TextMessage
 import com.waz.utils.returning
 

@@ -20,7 +20,7 @@ package com.waz.sync.client
 import java.io.ByteArrayInputStream
 
 import com.waz.{AuthenticationConfig, ZIntegrationSpec}
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.api.impl.ErrorResponse
 import com.waz.cache2.CacheService.NoEncryption
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag

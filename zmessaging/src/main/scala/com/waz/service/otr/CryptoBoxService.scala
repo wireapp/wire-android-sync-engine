@@ -20,7 +20,7 @@ package com.waz.service.otr
 import java.io.File
 
 import android.content.Context
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.api.Verification
 import com.waz.content.UserPreferences
 import com.waz.content.UserPreferences.OtrLastPrekey

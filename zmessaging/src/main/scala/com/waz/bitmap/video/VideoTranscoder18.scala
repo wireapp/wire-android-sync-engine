@@ -25,7 +25,7 @@ import android.media.{MediaCodec, MediaExtractor, MediaFormat, MediaMuxer}
 import com.waz.bitmap.video.VideoTranscoder.CodecResponse.{CodecBuffer, FormatChanged, TryAgain}
 import com.waz.bitmap.video.VideoTranscoder.{MediaCodecIterator, OutputWriter}
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.utils.{Cleanup, Managed, returning}
 
 

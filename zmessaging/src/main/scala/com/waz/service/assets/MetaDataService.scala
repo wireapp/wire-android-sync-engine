@@ -24,7 +24,7 @@ import android.media.MediaMetadataRetriever._
 import com.waz.bitmap.BitmapUtils
 import com.waz.cache.{CacheEntry, CacheService, LocalData}
 import com.waz.content.AssetsStorage
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.content.WireContentProvider.CacheUri
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model.AssetMetaData.Image.Tag.Medium

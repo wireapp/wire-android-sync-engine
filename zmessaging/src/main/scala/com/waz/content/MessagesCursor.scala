@@ -21,7 +21,7 @@ import android.support.v4.util.LruCache
 import com.waz.content.MessagesCursor.Entry
 import com.waz.db.{CursorIterator, Reader, ReverseCursorIterator}
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.model._
 import com.waz.service.messages.MessageAndLikes
 import com.waz.service.tracking.TrackingService

@@ -25,7 +25,7 @@ import com.waz.db.Col._
 import com.waz.db.ZGlobalDB.{DbName, DbVersion, Migrations, daos}
 import com.waz.db.migrate.AccountDataMigration
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.model.AccountData.AccountDataDao
 import com.waz.model.TeamData.TeamDataDoa
 import com.waz.model.otr.ClientId

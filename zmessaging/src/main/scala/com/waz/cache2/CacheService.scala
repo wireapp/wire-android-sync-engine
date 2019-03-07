@@ -20,7 +20,7 @@ package com.waz.cache2
 import java.io._
 import java.text.DecimalFormat
 
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.cache2.CacheService.Encryption
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model.AESKey

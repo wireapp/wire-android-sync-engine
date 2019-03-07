@@ -21,7 +21,7 @@ import com.waz.api.Message.Status
 import com.waz.api.{Message, MessageFilter}
 import com.waz.content.ConvMessagesIndex._
 import com.waz.log.BasicLogging.LogTag
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.model.MessageData.{MessageDataDao, isUserContent}
 import com.waz.model._
 import com.waz.service.tracking.TrackingService

@@ -22,7 +22,7 @@ import java.io._
 import com.waz.cache.{CacheService, LocalData}
 import com.waz.content.{GlobalPreferences, MembersStorageImpl, OtrClientsStorage}
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.model.GenericContent.ClientAction.SessionReset
 import com.waz.model.GenericContent._
 import com.waz.model._

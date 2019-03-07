@@ -22,7 +22,7 @@ import android.content.res.Configuration
 import android.content.{ComponentCallbacks2, Context}
 import android.support.v4.util.LruCache
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.utils.TrimmingLruCache.CacheSize
 
 trait Cache[K, V] {

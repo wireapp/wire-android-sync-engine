@@ -17,7 +17,6 @@
  */
 package com.waz.service.conversation
 
-import com.waz.ZLog._
 import com.waz.content._
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model.ConversationData.ConversationType

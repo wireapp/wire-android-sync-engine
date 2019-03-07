@@ -18,7 +18,7 @@
 package com.waz.sync.handler
 
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.model.otr.ClientId
 import com.waz.model.PushToken
 import com.waz.service.BackendConfig

@@ -18,7 +18,7 @@
 package com.waz.service.push
 
 import android.content.Context
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.api.NetworkMode.{OFFLINE, UNKNOWN}
 import com.waz.api.impl.ErrorResponse
 import com.waz.content.GlobalPreferences.BackendDrift

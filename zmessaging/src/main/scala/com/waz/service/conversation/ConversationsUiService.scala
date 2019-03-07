@@ -24,7 +24,7 @@ import com.waz.api.NetworkMode.{OFFLINE, WIFI}
 import com.waz.api.impl._
 import com.waz.content._
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.model.ConversationData.{ConversationType, getAccessAndRoleForGroupConv}
 import com.waz.model.GenericContent.{Location, MsgEdit, Quote}
 import com.waz.model.UserData.ConnectionStatus

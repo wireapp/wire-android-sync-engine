@@ -20,7 +20,7 @@ package com.waz.service.call
 import com.sun.jna.Pointer
 import com.waz.log.BasicLogging.LogTag
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.model._
 import com.waz.model.otr.ClientId
 import com.waz.service.call.Calling._

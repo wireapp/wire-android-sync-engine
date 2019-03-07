@@ -17,7 +17,7 @@
  */
 package com.waz.sync.handler
 
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.api.Message
 import com.waz.api.impl.ErrorResponse
 import com.waz.api.impl.ErrorResponse.{Cancelled, internalError}

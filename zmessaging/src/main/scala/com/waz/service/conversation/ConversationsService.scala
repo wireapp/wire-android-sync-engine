@@ -18,7 +18,7 @@
 package com.waz.service.conversation
 
 import com.softwaremill.macwire._
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.api.ErrorType
 import com.waz.api.IConversation.Access
 import com.waz.api.impl.ErrorResponse
