@@ -135,6 +135,13 @@ case class UserData(override val id:       UserId,
   def matchesFilter(filter: String, handleOnly: Boolean): Boolean =
     handle.exists(_.startsWithQuery(filter)) ||
       (!handleOnly && (SearchKey(filter).isAtTheStartOfAnyWordIn(searchKey) || email.exists(e => filter.trim.equalsIgnoreCase(e.str))))
+
+  // Whether the user matches a search query
+  def matchesQuery(query: Option[SearchKey] = None, handleOnly: Boolean = false) = (query match {
+    case Some(q) =>
+      this.handle.map(_.string).contains(q.asciiRepresentation) || (!handleOnly && q.isAtTheStartOfAnyWordIn(this.searchKey))
+    case _ => true
+  })
 }
 
 object UserData {
