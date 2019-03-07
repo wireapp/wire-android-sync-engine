@@ -18,7 +18,7 @@
 package com.waz.sync.client
 
 import com.waz.ZLog.ImplicitTag._
-import com.waz.ZLog._
+import com.waz.log.ZLog2._
 import com.waz.api.IConversation.{Access, AccessRole}
 import com.waz.api.impl.ErrorResponse
 import com.waz.model.ConversationData.{ConversationType, Link}
@@ -212,7 +212,7 @@ class ConversationsClientImpl(implicit
   }
 
   def postConversation(state: ConversationInitState): ErrorOrResponse[ConversationResponse] = {
-    debug(s"postConversation(${state.users}, ${state.name})")
+    debug(l"postConversation(${state.users}, ${state.name})")
     Request.Post(relativePath = ConversationsPath, body = state)
       .withResultType[ConversationsResult]
       .withErrorType[ErrorResponse]
@@ -314,8 +314,8 @@ object ConversationsClient {
         }
       } catch {
         case NonFatal(e) =>
-          warn(s"couldn't parse conversations response: $response", e)
-          warn("json decoding failed", e)
+          warn(l"couldn't parse conversations response", e)
+          warn(l"json decoding failed", e)
           None
       }
     }
@@ -333,7 +333,7 @@ object ConversationsClient {
       }
     } catch {
       case NonFatal(e) =>
-        warn(s"couldn't parse events response $response", e)
+        warn(l"couldn't parse events response", e)
         None
     }
   }

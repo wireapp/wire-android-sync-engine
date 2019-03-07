@@ -85,7 +85,7 @@ class UiModule(val global: GlobalModule) extends UiEventContext with ZMessagingR
 
   currentZms.onChanged { _ => onReset ! true }
 
-  def getCurrent = accounts.activeZms.head
+  def getCurrent: Future[Option[ZMessaging]] = accounts.activeZms.head
   
 
 }

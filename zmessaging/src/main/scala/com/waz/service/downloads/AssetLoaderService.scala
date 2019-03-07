@@ -18,7 +18,8 @@
 package com.waz.service.downloads
 
 import com.waz.ZLog.ImplicitTag._
-import com.waz.ZLog._
+import com.waz.ZLog.LogTag
+//import com.waz.ZLog._
 import com.waz.api.ProgressIndicator.State
 import com.waz.api.impl.ProgressIndicator.ProgressData
 import com.waz.cache.CacheEntry
@@ -60,7 +61,7 @@ class AssetLoaderService {
 
   def getLoadProgress(id: AssetId): Signal[ProgressData] = getLoadEntry(id).flatMap {
     case Some(entry) =>
-      verbose(s"getLoadProgress: $id")
+//      verbose(s"getLoadProgress: $id")
       entry.state
     case None => Signal(ProgressData.Unknown)
   }
@@ -71,7 +72,7 @@ class AssetLoaderService {
   //This also helps prevent race conditions caused by Cancellable futures exposing the work done by the LoadEntry
   private def removeTaskIfIdle(id: AssetId) = {
     if (!active.contains(id)) {
-      verbose(s"Cancelling idle task: $id")
+//      verbose(s"Cancelling idle task: $id")
       updateQueue(toRemove = Some(id))
       requests.get(id).foreach(_.cancel())
       true
@@ -83,7 +84,7 @@ class AssetLoaderService {
 
   //reveals attempted load count - useful for testing retry logic
   def loadRevealAttempts(asset: AssetData, force: Boolean = false)(implicit loader: AssetLoader): CancellableFuture[(Option[CacheEntry], Int)] = {
-    verbose(s"loadRevealAttempts: ${asset.id}")
+//    verbose(s"loadRevealAttempts: ${asset.id}")
 
     val loadEntry =
       updateQueue(toAdd = Some(asset, loader), force = force)
@@ -92,7 +93,7 @@ class AssetLoaderService {
     new CancellableFuture(loadEntry.promise) {
       override def cancel()(implicit tag: LogTag) =
         returning(removeTaskIfIdle(asset.id)) { removed =>
-          verbose(s"Tried to cancel loadEntry: ${asset.id}: removed?: $removed")(tag)
+//          verbose(s"Tried to cancel loadEntry: ${asset.id}: removed?: $removed")(tag)
         }
     }.map {
       case (entry, attempts) => (Some(entry), attempts)
@@ -104,14 +105,14 @@ class AssetLoaderService {
   private def updateQueue(toAdd: Option[(AssetData, AssetLoader)] = None,
                           toRemove: Option[AssetId] = None,
                           force: Boolean = false): Option[LoadEntry] = synchronized {
-    verbose(s"updateQueue(${toAdd.map(_._1.id)}, $toRemove, $force)")
-    verbose(s"load requests: ${requests.keys.map(_.toString).toSeq.sorted}")
-    verbose(s"active:        ${active.map(_.toString).toSeq.sorted}")
+//    verbose(s"updateQueue(${toAdd.map(_._1.id)}, $toRemove, $force)")
+//    verbose(s"load requests: ${requests.keys.map(_.toString).toSeq.sorted}")
+//    verbose(s"active:        ${active.map(_.toString).toSeq.sorted}")
 
     val ret = toAdd.map { case (asset, loader) =>
       requests.getOrElse(asset.id,
         if (!active.contains(asset.id)) {
-          verbose(s"adding entry to the queue: ${asset.id}")
+//          verbose(s"adding entry to the queue: ${asset.id}")
           returning(LoadEntry(asset, loader, force)) { entry =>
             requests += asset.id -> entry
             queue.enqueue(entry.queuePlaceHolder)
@@ -128,11 +129,13 @@ class AssetLoaderService {
 
     if (queue.nonEmpty && active.size < MaxConcurrentLoadRequests) {
       val id = queue.dequeue().id
-      requests.get(id).fold(verbose(s"De-queued load entry: $id has been cancelled - discarding")) { entry =>
+      requests.get(id).fold(() /*verbose(s"De-queued load entry: $id has been cancelled - discarding")*/) { entry =>
         if (active.add(id)) {
-          verbose(s"starting load for $entry")
+//          verbose(s"starting load for $entry")
           load(entry).onComplete { _ => updateQueue(toRemove = Some(id)) } //check queue again in case we're blocked and waiting (in which case we won't reach the next checkQueue call)
-        } else verbose(s"entry: $id was already active, doing nothing")
+        } else {
+//          verbose(s"entry: $id was already active, doing nothing")
+        }
       }
       Future { updateQueue() } //effectively causes a while(queue.nonEmpty && active.size < MaxConcurrentLoadRequests)
     }
@@ -147,10 +150,10 @@ class AssetLoaderService {
     def onFail(ex: Throwable, attempts: Int = 1) = {
       ex match {
         case _: CancelException =>
-          error(s"Loading cancelled for $id after $attempts attempts", ex)
+//          error(s"Loading cancelled for $id after $attempts attempts", ex)
           requests.get(id).foreach(_.state ! ProgressData(0, 0, State.CANCELLED))
         case NonFatal(_) =>
-          error(s"Loading failed for $id after $attempts attempts", ex)
+//          error(s"Loading failed for $id after $attempts attempts", ex)
           requests.get(id).foreach(_.state ! ProgressData(0, 0, State.FAILED))
       }
       Future.failed(ex)
@@ -164,7 +167,7 @@ class AssetLoaderService {
 
       delay.future.flatMap { _ =>
         entry.load().future.map { res =>
-          verbose(s"Loading succeeded for: $id")
+//          verbose(s"Loading succeeded for: $id")
           requests.get(id).foreach(_.state ! ProgressData(0, 0, State.COMPLETED))
           (res, retries + 1)
         }
@@ -200,7 +203,7 @@ object AssetLoaderService {
       promise.tryFailure(new CancelException("Cancelled by user"))
 
     def load() = {
-      verbose(s"performing load: ${asset.id}, name: ${asset.name}")
+//      verbose(s"performing load: ${asset.id}, name: ${asset.name}")
       loader.loadAsset(asset, state ! _, force)
     }
 

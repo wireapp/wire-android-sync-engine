@@ -24,6 +24,7 @@ import android.content.Context
 import com.waz.log.ZLog2._
 import com.waz.cache.CacheEntryData.CacheEntryDao
 import com.waz.content.Database
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model._
 import com.waz.threading.CancellableFuture.CancelException
 import com.waz.threading.Threading.Implicits.Background
@@ -35,7 +36,6 @@ import com.waz.utils.{IoUtils, returning}
 import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
-import com.waz.ZLog.ImplicitTag._
 import com.waz.service.tracking.TrackingService
 
 trait CacheService {
@@ -98,7 +98,8 @@ trait CacheService {
   def optSignal(cacheKey: CacheKey): Signal[Option[CacheEntry]]
 }
 
-class CacheServiceImpl(context: Context, storage: Database, cacheStorage: CacheStorage, tracking: TrackingService) extends CacheService {
+class CacheServiceImpl(context: Context, storage: Database, cacheStorage: CacheStorage, tracking: TrackingService)
+  extends CacheService with DerivedLogTag {
 
   import CacheService._
   import Threading.Implicits.Background

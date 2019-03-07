@@ -31,20 +31,20 @@ object ZLog {
     implicit def implicitLogTag: LogTag = macro ZLogMacros.enclosingLogTag
   }
 
-  @deprecated("Use methods from ZLog2 instead", "zmessaging 133")
-  def error(message: String, cause: Throwable)(implicit tag: LogTag): Unit = macro ZLogMacros.errorWithCause
-  @deprecated("Use methods from ZLog2 instead", "zmessaging 133")
-  def error(message: String)(implicit tag: LogTag): Unit = macro ZLogMacros.error
-  @deprecated("Use methods from ZLog2 instead", "zmessaging 133")
-  def warn(message: String, cause: Throwable)(implicit tag: LogTag): Unit = macro ZLogMacros.warnWithCause
-  @deprecated("Use methods from ZLog2 instead", "zmessaging 133")
-  def warn(message: String)(implicit tag: LogTag): Unit = macro ZLogMacros.warn
-  @deprecated("Use methods from ZLog2 instead", "zmessaging 133")
-  def info(message: String)(implicit tag: LogTag): Unit = macro ZLogMacros.info
-  @deprecated("Use methods from ZLog2 instead", "zmessaging 133")
-  def debug(message: String)(implicit tag: LogTag): Unit = macro ZLogMacros.debug
-  @deprecated("Use methods from ZLog2 instead", "zmessaging 133")
-  def verbose(message: String)(implicit tag: LogTag): Unit = macro ZLogMacros.verbose
+//  @deprecated("Use methods from ZLog2 instead", "zmessaging 133")
+//  def error(message: String, cause: Throwable)(implicit tag: LogTag): Unit = macro ZLogMacros.errorWithCause
+//  @deprecated("Use methods from ZLog2 instead", "zmessaging 133")
+//  def error(message: String)(implicit tag: LogTag): Unit = macro ZLogMacros.error
+//  @deprecated("Use methods from ZLog2 instead", "zmessaging 133")
+//  def warn(message: String, cause: Throwable)(implicit tag: LogTag): Unit = macro ZLogMacros.warnWithCause
+//  @deprecated("Use methods from ZLog2 instead", "zmessaging 133")
+//  def warn(message: String)(implicit tag: LogTag): Unit = macro ZLogMacros.warn
+//  @deprecated("Use methods from ZLog2 instead", "zmessaging 133")
+//  def info(message: String)(implicit tag: LogTag): Unit = macro ZLogMacros.info
+//  @deprecated("Use methods from ZLog2 instead", "zmessaging 133")
+//  def debug(message: String)(implicit tag: LogTag): Unit = macro ZLogMacros.debug
+//  @deprecated("Use methods from ZLog2 instead", "zmessaging 133")
+//  def verbose(message: String)(implicit tag: LogTag): Unit = macro ZLogMacros.verbose
 
   def logTime[A](message: String)(body: A)(implicit tag: LogTag): A = macro ZLogMacros.logTime[A]
 }
@@ -108,20 +108,20 @@ private object ZLogMacros {
     }
   }
 
-  def logTime[A](c: Context)(message: c.Expr[String])(body: c.Expr[A])(tag: c.Expr[LogTag]) = {
-    import c.universe._
-    DebugMode.DEBUG(c) match {
-      case Expr(Literal(Constant(d: Boolean))) if d =>
-        q"""val time = System.nanoTime
-        try {
-          $body
-        } finally {
-           com.waz.log.InternalLog.verbose($message + ": " + ((System.nanoTime - time) / 1000 / 1000f) + " ms", $tag)
-        }
-        """
-      case _ => q"try { $body } finally { }"
-    }
-  }
+//  def logTime[A](c: Context)(message: c.Expr[String])(body: c.Expr[A])(tag: c.Expr[LogTag]) = {
+//    import c.universe._
+//    DebugMode.DEBUG(c) match {
+//      case Expr(Literal(Constant(d: Boolean))) if d =>
+//        q"""val time = System.nanoTime
+//        try {
+//          $body
+//        } finally {
+//           com.waz.log.InternalLog.verbose($message + ": " + ((System.nanoTime - time) / 1000 / 1000f) + " ms", $tag)
+//        }
+//        """
+//      case _ => q"try { $body } finally { }"
+//    }
+//  }
 
   def logTagForSingleton[A <: Singleton](c: Context)(a: c.Expr[A])(implicit tag: c.WeakTypeTag[A]) = logTagFor[A](c)
 

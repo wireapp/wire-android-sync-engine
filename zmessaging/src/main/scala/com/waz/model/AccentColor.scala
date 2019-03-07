@@ -19,7 +19,7 @@ package com.waz.model
 
 import android.content.Context
 import android.graphics.Color
-import com.waz.log.ZLog2.SafeToLog
+import com.waz.log.LogShow.SafeToLog
 import com.waz.model.AccentColor._
 
 case class AccentColor(id: Int, r: Int, g: Int, b: Int, a: Int) extends SafeToLog {

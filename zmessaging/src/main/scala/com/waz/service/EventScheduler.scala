@@ -17,7 +17,6 @@
  */
 package com.waz.service
 
-import com.waz.ZLog.ImplicitTag._
 import com.waz.ZLog.{LogTag, logTagFor}
 import com.waz.log.ZLog2._
 import com.waz.model.{Event, RConvEvent, RConvId}

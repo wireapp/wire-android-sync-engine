@@ -18,7 +18,7 @@
 package com.waz.sync.client
 
 import com.waz.ZLog.ImplicitTag._
-import com.waz.ZLog._
+import com.waz.log.ZLog2._
 import com.waz.api.impl.ErrorResponse
 import com.waz.model.AssetMetaData.Image
 import com.waz.model.AssetMetaData.Image.Tag
@@ -79,7 +79,7 @@ class IntegrationsClientImpl(implicit
   }
 
   override def addBot(rConvId: RConvId, pId: ProviderId, iId: IntegrationId) = {
-    debug(s"addBot: rConvId: $rConvId, providerId: $pId, integrationId: $iId")
+    debug(l"addBot: rConvId: $rConvId, providerId: $pId, integrationId: $iId")
     Request
       .Post(
         relativePath = s"$ConversationsPath/${rConvId.str}/bots",
@@ -91,7 +91,7 @@ class IntegrationsClientImpl(implicit
   }
 
   override def removeBot(rConvId: RConvId, botId: UserId) = {
-    debug(s"removeBot: convId: $rConvId, botId: $botId")
+    debug(l"removeBot: convId: $rConvId, botId: $botId")
     Request.Delete(relativePath = s"$ConversationsPath/${rConvId.str}/bots/$botId")
       .withResultType[ConversationEvent]
       .withErrorType[ErrorResponse]
@@ -117,7 +117,7 @@ object IntegrationsClient {
       case JsonObjectResponse(js) if js.has("services") =>
         Try(decodeSeq('services)(js, IntegrationDecoder).toMap).toOption
       case response =>
-        warn(s"Unexpected response: $response")
+//        warn(l"Unexpected response: $response")
         None
     }
   }
@@ -126,7 +126,7 @@ object IntegrationsClient {
     def unapply(resp: ResponseContent): Option[ConversationEvent] = resp match {
       case JsonObjectResponse(js) if js.has("event") => Try(ConversationEventDecoder(js.getJSONObject("event"))).toOption
       case response =>
-        warn(s"Unexpected response: $response")
+//        warn(l"Unexpected response: $response")
         None
     }
   }

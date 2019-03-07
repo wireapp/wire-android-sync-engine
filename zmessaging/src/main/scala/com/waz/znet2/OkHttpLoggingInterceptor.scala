@@ -22,7 +22,7 @@ import java.nio.charset.Charset
 import java.util.concurrent.TimeUnit
 
 import com.waz.ZLog.ImplicitTag._
-import com.waz.ZLog.info
+import com.waz.log.ZLog2._
 import okhttp3._
 import okio.Buffer
 import com.waz.znet2
@@ -137,7 +137,7 @@ final class OkHttpLoggingInterceptor(logBodyTypes: List[String], maxBodyStringLe
     val response = Try(chain.proceed(request)).recoverWith {
       case err =>
         logMsgBuilder.append(s"<-- HTTP FAILED: $err")
-        info(logMsgBuilder.toString)
+        info(l"${showString(logMsgBuilder.toString)}")
         Failure(err)
     }.get
     val tookMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime - startNs)
@@ -172,7 +172,7 @@ final class OkHttpLoggingInterceptor(logBodyTypes: List[String], maxBodyStringLe
       logMsgBuilder.append(s"<-- END HTTP (${buffer.size}-byte body)")
     }
 
-    info(logMsgBuilder.toString)
+    info(l"${showString(logMsgBuilder.toString())}")
     response
   }
 }

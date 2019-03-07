@@ -18,13 +18,14 @@
 package com.waz.service.push
 
 import android.content.Context
-import com.waz.ZLog.LogTag
 import com.waz.log.ZLog2._
 import com.waz.api.NetworkMode.{OFFLINE, UNKNOWN}
 import com.waz.api.impl.ErrorResponse
 import com.waz.content.GlobalPreferences.BackendDrift
 import com.waz.content.UserPreferences.LastStableNotification
 import com.waz.content.{GlobalPreferences, UserPreferences}
+import com.waz.log.BasicLogging.LogTag
+import com.waz.log.LogShow
 import com.waz.model.Event.EventDecoder
 import com.waz.model._
 import com.waz.model.otr.ClientId

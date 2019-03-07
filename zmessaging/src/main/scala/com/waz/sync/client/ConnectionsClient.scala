@@ -18,7 +18,7 @@
 package com.waz.sync.client
 
 import com.waz.ZLog.ImplicitTag._
-import com.waz.ZLog._
+import com.waz.log.ZLog2._
 import com.waz.api.impl.ErrorResponse
 import com.waz.model.UserData.ConnectionStatus
 import com.waz.model._
@@ -109,7 +109,7 @@ object ConnectionsClient {
     def unapply(resp: ResponseContent): Option[UserConnectionEvent] = resp match {
       case JsonObjectResponse(js) => Try(UserConnectionEvent.Decoder(js)).toOption
       case _ =>
-        warn(s"unknown response format for connection response: $resp")
+        warn(l"unknown response format for connection response:")
         None
     }
   }
@@ -120,12 +120,12 @@ object ConnectionsClient {
         case JsonObjectResponse(js) =>
           Some((if (js.has("connections")) array[UserConnectionEvent](js.getJSONArray("connections")).toList else Nil, decodeBool('has_more)(js)))
         case _ =>
-          warn(s"unknown response format for connections response: $response")
+          warn(l"unknown response format for connections response:")
           None
       }
     } catch {
       case NonFatal(e) =>
-        warn(s"couldn't parse connections response: $response", e)
+        warn(l"couldn't parse connections response:", e)
         None
     }
   }

@@ -17,8 +17,8 @@
  */
 package com.waz.service
 
-import com.waz.ZLog.ImplicitTag._
 import com.waz.content._
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.log.ZLog2._
 import com.waz.model.SearchQuery.{Recommended, RecommendedHandle}
 import com.waz.model.UserData.{ConnectionStatus, UserDataDao}
@@ -56,7 +56,7 @@ class UserSearchService(selfUserId:           UserId,
                         messages:             MessagesStorage,
                         convsStorage:         ConversationStorage,
                         convsUi:              ConversationsUiService,
-                        conversationsService: ConversationsService) {
+                        conversationsService: ConversationsService) extends DerivedLogTag {
 
   import Threading.Implicits.Background
   import com.waz.service.UserSearchService._

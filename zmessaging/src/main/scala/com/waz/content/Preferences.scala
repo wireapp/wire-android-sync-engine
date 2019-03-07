@@ -19,9 +19,9 @@ package com.waz.content
 
 import android.content.SharedPreferences.OnSharedPreferenceChangeListener
 import android.content.{Context, SharedPreferences}
-import com.waz.ZLog.{LogTag, logTagFor}
 import com.waz.content.Preferences.Preference.PrefCodec
 import com.waz.content.Preferences.{PrefKey, Preference}
+import com.waz.log.BasicLogging.LogTag
 import com.waz.log.ZLog2._
 import com.waz.media.manager.context.IntensityLevel
 import com.waz.model.KeyValueData.KeyValueDataDao
@@ -168,7 +168,7 @@ object Preferences {
 class GlobalPreferences(context: Context, prefs: SharedPreferences) extends Preferences {
 
   override protected implicit val dispatcher = new SerialDispatchQueue(name = "GlobalPreferencesDispatcher")
-  override protected implicit val logTag = logTagFor[GlobalPreferences]
+  override protected implicit val logTag = LogTag[GlobalPreferences]
 
   def v31AssetsEnabled = false
 
@@ -264,7 +264,7 @@ class GlobalPreferences(context: Context, prefs: SharedPreferences) extends Pref
 class UserPreferences(context: Context, storage: ZmsDatabase) extends CachedStorageImpl[String, KeyValueData](new TrimmingLruCache(context, Fixed(128)), storage)(KeyValueDataDao, "KeyValueStorage_Cached") with Preferences {
 
   override protected implicit val dispatcher = Threading.Background
-  override protected implicit val logTag = logTagFor[UserPreferences]
+  override protected implicit val logTag = LogTag[UserPreferences]
 
   override protected def getValue[A: PrefCodec](key: PrefKey[A]) = {
     get(key.str).map(_.map(_.value)).map(_.map(implicitly[PrefCodec[A]].decode).getOrElse(key.default))

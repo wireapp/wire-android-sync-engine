@@ -20,7 +20,7 @@ package com.waz.service.call
 import android.content.Context
 import android.view.View
 import com.waz.ZLog.ImplicitTag._
-import com.waz.ZLog._
+import com.waz.log.ZLog2._
 import com.waz.call._
 import com.waz.content.GlobalPreferences
 import com.waz.content.GlobalPreferences._
@@ -69,7 +69,7 @@ class DefaultFlowManagerService(context:      Context,
 
   private val flowListener = new FlowManagerListener {
     override def cameraFailed(): Unit = {
-      debug(s"cameraFailed")
+      debug(l"cameraFailed")
       cameraFailedSig ! true
     }
 
@@ -87,19 +87,19 @@ class DefaultFlowManagerService(context:      Context,
   }
 
   def getVideoCaptureDevices: Future[Vector[VideoCaptureDevice]] = scheduleOr[Array[CaptureDevice]]({ fm =>
-    debug("getVideoCaptureDevices")
+    debug(l"getVideoCaptureDevices")
     safeguardAgainstOldAvs(fm.getVideoCaptureDevices, fallback = Array.empty)
   }, Array.empty).map(_.map(d => VideoCaptureDevice(d.devId, d.devName))(breakOut))
 
   def setVideoCaptureDevice(id: RConvId, deviceId: String): Future[Unit] = schedule { fm =>
-    debug(s"setVideoCaptureDevice($id, $deviceId)")
+    debug(l"setVideoCaptureDevice($id, ???)")
     fm.setVideoCaptureDevice(id.str, deviceId)
   }
 
   // This is the preview of the outgoing video stream.
   // Call this from the callback telling us to.
   def setVideoPreview(view: View): Future[Unit] = schedule { fm =>
-    debug(s"setVideoPreview($view)")
+    debug(l"setVideoPreview(${showString(view.toString)}")
     cameraFailedSig ! false //reset this signal since we are trying to start the capture again
     fm.setVideoPreview(null, view)
   }
@@ -108,14 +108,14 @@ class DefaultFlowManagerService(context:      Context,
   // partId is the participant id (for group calls, can be null for now).
   // Call this from the callback telling us to.
   def setVideoView(id: RConvId, partId: Option[UserId], view: View): Future[Unit] = schedule { fm =>
-    debug(s"setVideoView($id, $partId, $view")
+    debug(l"setVideoView($id, $partId, ${showString(view.toString)}")
     fm.setVideoView(id.str, partId.map(_.str).orNull, view)
   }
 
   private def doWithFlowManager(op: FlowManager => Unit): Try[Unit] = withFlowManager(op, ())
 
   private def withFlowManager[T](op: FlowManager => T, fallback: => T): Try[T] =
-    flowManager.fold { warn("unable to access flow manager"); Try(fallback) } { fm => Try { op(fm) } }
+    flowManager.fold { warn(l"unable to access flow manager"); Try(fallback) } { fm => Try { op(fm) } }
 
   private def schedule(op: FlowManager => Unit)(implicit dispatcher: ExecutionContext): Future[Unit] =
     scheduleWithoutRecovery(op) .recoverWithLog()
@@ -128,7 +128,7 @@ class DefaultFlowManagerService(context:      Context,
 
   private def safeguardAgainstOldAvs[T](op: => T, fallback: => T): T = try op catch {
     case e: Error =>
-      warn("too old avs version")
+      warn(l"too old avs version")
       fallback
   }
 }

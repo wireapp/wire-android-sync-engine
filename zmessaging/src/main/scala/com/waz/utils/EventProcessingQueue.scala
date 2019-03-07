@@ -20,7 +20,8 @@ package com.waz.utils
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicBoolean
 
-import com.waz.ZLog._
+import com.waz.ZLog.LogTag
+import com.waz.log.ZLog2._
 import com.waz.model.Event
 import com.waz.threading.{CancellableFuture, SerialDispatchQueue, Threading}
 
@@ -102,7 +103,7 @@ class SerialProcessingQueue[A](processor: Seq[A] => Future[Any], name: String = 
 
   protected def processQueueNow(): Future[Any] = {
     val events = Iterator.continually(queue.poll()).takeWhile(_ != null).toVector
-    verbose(s"processQueueNow, events: ${if (events.size > 20) events.size else events}")
+    verbose(l"processQueueNow, events: ???")
     if (events.nonEmpty) processor(events).recoverWithLog()
     else Future.successful(())
   }
@@ -125,7 +126,7 @@ class ThrottledProcessingQueue[A](delay: FiniteDuration, processor: Seq[A] => Fu
     if (waiting.compareAndSet(false, true)) {
       post {
         val d = math.max(0, lastDispatched - System.currentTimeMillis() + delay.toMillis)
-        verbose(s"processQueue, delaying: $d millis")
+        verbose(l"processQueue, delaying: $d millis")
         waitFuture = CancellableFuture.delay(d.millis)
         if (!waiting.get()) waitFuture.cancel()(logTag) // to avoid race conditions with `flush`
         waitFuture.future.flatMap { _ =>

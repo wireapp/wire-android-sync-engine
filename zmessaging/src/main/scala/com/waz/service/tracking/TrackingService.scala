@@ -17,8 +17,8 @@
  */
 package com.waz.service.tracking
 
-import com.waz.ZLog.ImplicitTag._
-import com.waz.ZLog.LogTag
+import com.waz.log.BasicLogging.LogTag
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.log.ZLog2._
 import com.waz.model._
 import com.waz.service.call.CallInfo
@@ -70,7 +70,8 @@ object TrackingService {
 
 }
 
-class TrackingServiceImpl(curAccount: => Signal[Option[UserId]], zmsProvider: ZmsProvider) extends TrackingService {
+class TrackingServiceImpl(curAccount: => Signal[Option[UserId]], zmsProvider: ZmsProvider)
+  extends TrackingService with DerivedLogTag {
   import TrackingService._
 
   val events = EventStream[(Option[ZMessaging], TrackingEvent)]()

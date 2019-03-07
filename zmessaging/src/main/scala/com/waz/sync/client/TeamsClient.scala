@@ -18,7 +18,7 @@
 package com.waz.sync.client
 
 import com.waz.ZLog.ImplicitTag._
-import com.waz.ZLog.warn
+import com.waz.log.ZLog2._
 import com.waz.api.impl.ErrorResponse
 import com.waz.model.AccountDataOld.PermissionsMasks
 import com.waz.model._
@@ -106,7 +106,7 @@ object TeamsClient {
         case JsonObjectResponse(js) if js.has("teams") =>
           Try(decodeSeq('teams)(js, TeamData.TeamBindingDecoder), decodeOptBoolean('has_more)(js).getOrElse(false)).toOption
         case _ =>
-          warn(s"Unexpected response: $response")
+          warn(l"Unexpected response:")
           None
       }
   }

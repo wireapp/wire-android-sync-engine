@@ -19,7 +19,8 @@ package com.waz.threading
 
 import java.util.TimerTask
 
-import com.waz.ZLog._
+import com.waz.log.BasicLogging.LogTag
+import com.waz.log.ZLog2._
 import com.waz.service.tracking.TrackingService.NoReporting
 import com.waz.utils.events.{BaseSubscription, EventContext}
 
@@ -55,7 +56,7 @@ class CancellableFuture[+A](promise: Promise[A]) extends Awaitable[A] { self =>
       case _: CancelException => body
     }
 
-  def map[B](f: A => B)(implicit executor: ExecutionContext, tag: LogTag = "CancellableFuture"): CancellableFuture[B] = {
+  def map[B](f: A => B)(implicit executor: ExecutionContext, tag: LogTag = DefaultLogTag): CancellableFuture[B] = {
     val p = Promise[B]()
     @volatile var cancelFunc = Option(self.cancel()(_: LogTag))
     future.onComplete { v =>
@@ -72,16 +73,16 @@ class CancellableFuture[+A](promise: Promise[A]) extends Awaitable[A] { self =>
     }
   }
 
-  def filter(f: (A) => Boolean)(implicit executor: ExecutionContext, tag: LogTag = "CancellableFuture"): CancellableFuture[A] =
+  def filter(f: (A) => Boolean)(implicit executor: ExecutionContext, tag: LogTag = DefaultLogTag): CancellableFuture[A] =
     flatMap { res =>
       if (f(res)) CancellableFuture.successful(res)
       else CancellableFuture.failed(new NoSuchElementException(s"[$tag] CancellableFuture.filter failed"))
-    }
+    } (executor, tag)
 
-  final def withFilter(p: A => Boolean)(implicit executor: ExecutionContext, tag: LogTag = "CancellableFuture"): CancellableFuture[A] =
+  final def withFilter(p: A => Boolean)(implicit executor: ExecutionContext, tag: LogTag = DefaultLogTag): CancellableFuture[A] =
     filter(p)(executor)
 
-  def flatMap[B](f: A => CancellableFuture[B])(implicit executor: ExecutionContext, tag: LogTag = "CancellableFuture"): CancellableFuture[B] = {
+  def flatMap[B](f: A => CancellableFuture[B])(implicit executor: ExecutionContext, tag: LogTag = DefaultLogTag): CancellableFuture[B] = {
     val p = Promise[B]()
     @volatile var cancelFunc = Option(self.cancel()(_: LogTag))
 
@@ -114,9 +115,10 @@ class CancellableFuture[+A](promise: Promise[A]) extends Awaitable[A] { self =>
     }
   }
 
-  def recover[U >: A](pf: PartialFunction[Throwable, U])(implicit executor: ExecutionContext, tag: LogTag = "CancellableFuture") = recoverWith(pf.andThen(CancellableFuture.successful))
+  def recover[U >: A](pf: PartialFunction[Throwable, U])(implicit executor: ExecutionContext, tag: LogTag = DefaultLogTag) =
+    recoverWith(pf.andThen(CancellableFuture.successful))(executor, tag)
 
-  def recoverWith[U >: A](pf: PartialFunction[Throwable, CancellableFuture[U]])(implicit executor: ExecutionContext, tag: LogTag = "CancellableFuture"): CancellableFuture[U] = {
+  def recoverWith[U >: A](pf: PartialFunction[Throwable, CancellableFuture[U]])(implicit executor: ExecutionContext, tag: LogTag = DefaultLogTag): CancellableFuture[U] = {
     val p = Promise[U]()
     @volatile var cancelFunc = Option(self.cancel()(_: LogTag))
     future.onComplete { res =>
@@ -161,7 +163,7 @@ class CancellableFuture[+A](promise: Promise[A]) extends Awaitable[A] { self =>
   override def result(atMost: Duration)(implicit permit: CanAwait): A = future.result(atMost)
 
   // TODO: timeout should generate different exception
-  def withTimeout(timeout: FiniteDuration)(implicit tag: LogTag = "CancellableFuture"): CancellableFuture[A] = {
+  def withTimeout(timeout: FiniteDuration)(implicit tag: LogTag = DefaultLogTag): CancellableFuture[A] = {
     implicit val ec = CancellableFuture.internalExecutionContext
     val f = CancellableFuture.delayed(timeout)(this.fail(new TimeoutException(s"[$tag] timedOut($timeout)")))
     onComplete(_ => f.cancel()(tag))
@@ -173,12 +175,12 @@ class CancellableFuture[+A](promise: Promise[A]) extends Awaitable[A] { self =>
     eventContext.register(new BaseSubscription(WeakReference(eventContext)) {
       import com.waz.ZLog.ImplicitTag._
       override def onUnsubscribe(): Unit = {
-        verbose("Cancel this future.")
+        verbose(l"Cancel this future.")
         cancel()
         eventContext.unregister(this)
       }
       override def onSubscribe(): Unit = {
-        verbose("We are must never reached this point!")
+        verbose(l"We are must never reached this point!")
       }
     })
   }
@@ -186,6 +188,8 @@ class CancellableFuture[+A](promise: Promise[A]) extends Awaitable[A] { self =>
 }
 
 object CancellableFuture {
+
+  val DefaultLogTag: LogTag = LogTag("CancellableFuture")
 
   private[threading] def internalExecutionContext = Threading.Background
 
@@ -203,7 +207,7 @@ object CancellableFuture {
       if (!promise.isCompleted) promise.tryComplete(Try(body))
   }
   
-  def apply[A](body: => A)(implicit executor: ExecutionContext, tag: LogTag = ""): CancellableFuture[A] = {
+  def apply[A](body: => A)(implicit executor: ExecutionContext, tag: LogTag = DefaultLogTag): CancellableFuture[A] = {
     val runnable = new PromiseCompletingRunnable[A](body)
     executor.execute(DispatchQueueStats(s"CancellableFuture_$tag", runnable))
     new CancellableFuture(runnable.promise)
@@ -275,7 +279,7 @@ object CancellableFuture {
         }
 
         private def doCleanup(): Unit = {
-          interrupter.foreach(_.cancel()) //do not forget to cancel interrupter
+          interrupter.foreach(_.cancel()(tag)) //do not forget to cancel interrupter
           if (currentTask != null) currentTask.cancel() //do not forget to to cancel scheduled task
         }
 

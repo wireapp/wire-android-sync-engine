@@ -19,8 +19,9 @@ package com.waz.utils.events
 
 import scala.concurrent.ExecutionContext
 import com.waz.ZLog.ImplicitTag._
+import com.waz.log.LogShow
 
-class EventStreamWithAuxSignal[A, B](source: EventStream[A], aux: Signal[B]) extends EventStream[(A, Option[B])] {
+class EventStreamWithAuxSignal[A, B: LogShow](source: EventStream[A], aux: Signal[B]) extends EventStream[(A, Option[B])] {
   val listener = new EventListener[A] {
     override protected[events] def onEvent(event: A, sourceContext: Option[ExecutionContext]): Unit = dispatch((event, aux.currentValue), sourceContext)
   }

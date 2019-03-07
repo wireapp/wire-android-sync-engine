@@ -26,6 +26,7 @@ import android.media.AudioRecord
 import android.media.AudioRecord._
 import com.waz.log.ZLog2._
 import com.waz.ZLog.ImplicitTag._
+import com.waz.log.LogShow.SafeToLog
 import com.waz.threading.Threading
 import com.waz.threading.Threading.BlockingIO
 import com.waz.utils._

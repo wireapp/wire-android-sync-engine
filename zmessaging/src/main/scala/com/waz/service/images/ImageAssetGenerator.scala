@@ -24,6 +24,7 @@ import com.waz.ZLog.ImplicitTag._
 import com.waz.bitmap.BitmapUtils.Mime
 import com.waz.bitmap.{BitmapDecoder, BitmapUtils}
 import com.waz.cache.{CacheEntry, CacheService, LocalData}
+import com.waz.log.LogShow.SafeToLog
 import com.waz.model
 import com.waz.model.AssetMetaData.Image.Tag.Preview
 import com.waz.model._

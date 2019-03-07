@@ -20,6 +20,7 @@ package com.waz.db
 import android.database.sqlite.SQLiteDatabase
 import com.waz.ZLog
 import com.waz.ZLog.LogTag
+import com.waz.log.LogShow
 import com.waz.log.ZLog2._
 import com.waz.service.tracking.TrackingService
 import com.waz.utils.wrappers.DB

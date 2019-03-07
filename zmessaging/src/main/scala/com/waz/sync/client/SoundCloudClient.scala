@@ -20,7 +20,7 @@ package com.waz.sync.client
 import java.net.URLEncoder
 
 import com.waz.ZLog.ImplicitTag._
-import com.waz.ZLog._
+import com.waz.log.ZLog2._
 import com.waz.api.MediaProvider
 import com.waz.api.impl.ErrorResponse
 import com.waz.model.AssetData
@@ -132,12 +132,12 @@ object SoundCloudClient {
         if (js has "tracks") Some(PlaylistDataDecoder(js))
         else if (js has "stream_url") Some(TrackDataDecoder(js))
         else {
-          warn(s"unrecognized json for audio assets: ${js.toString(2)}")
+          warn(l"unrecognized json for audio assets:")
           None
         }
 
       case other =>
-        warn(s"unknown response content: $resp")
+        warn(l"unknown response content:")
         None
     }
   }

@@ -39,11 +39,11 @@ class AssetSyncHandler(teamId:  Option[TeamId],
   def uploadAssetData(assetId: AssetId, public: Boolean = false, retention: Retention): ErrorOrResponse[AssetData] =
     CancellableFuture.lift(assets.updateAsset(assetId, asset => asset.copy(status = if (asset.status == UploadNotStarted) UploadInProgress else asset.status )).zip(assets.getLocalData(assetId))) flatMap {
       case (Some(asset), Some(data)) if data.length > AssetData.maxAssetSizeInBytes(teamId.isDefined) =>
-        debug(s"Local data too big. Data length: ${data.length}, max size: ${AssetData.maxAssetSizeInBytes(teamId.isDefined)}, local data: $data, asset: $asset")
+//        debug(s"Local data too big. Data length: ${data.length}, max size: ${AssetData.maxAssetSizeInBytes(teamId.isDefined)}, local data: $data, asset: $asset")
         CancellableFuture successful Left(internalError(AssetSyncHandler.AssetTooLarge))
 
       case (Some(asset), _) if asset.remoteId.isDefined =>
-        warn(s"asset has already been uploaded, skipping: $asset")
+//        warn(s"asset has already been uploaded, skipping: $asset")
         CancellableFuture.successful(Left(internalError("asset has already been uploaded, skipping")))
 
       case (Some(asset), Some(data)) if Set[AssetStatus](UploadInProgress, UploadFailed).contains(asset.status) =>
@@ -56,11 +56,11 @@ class AssetSyncHandler(teamId:  Option[TeamId],
         }
 
       case (Some(asset), Some(_)) if asset.status == UploadCancelled =>
-        debug(s"Upload for asset was cancelled")
+//        debug(s"Upload for asset was cancelled")
         CancellableFuture successful Left(internalError("Upload for asset was cancelled"))
 
       case (asset, local) =>
-        debug(s"Unable to handle asset upload with asset: $asset, and local data: $local")
+//        debug(s"Unable to handle asset upload with asset: $asset, and local data: $local")
         CancellableFuture successful Left(internalError(s"Unable to handle asset upload with asset: $asset, and local data: $local"))
     }
 }

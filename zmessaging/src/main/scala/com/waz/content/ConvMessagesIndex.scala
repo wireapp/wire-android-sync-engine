@@ -17,10 +17,11 @@
  */
 package com.waz.content
 
-import com.waz.ZLog.{LogTag, logTime}
+import com.waz.ZLog.logTime
 import com.waz.api.Message.Status
 import com.waz.api.{Message, MessageFilter}
 import com.waz.content.ConvMessagesIndex._
+import com.waz.log.BasicLogging.LogTag
 import com.waz.log.ZLog2._
 import com.waz.model.MessageData.{MessageDataDao, isUserContent}
 import com.waz.model._
@@ -37,7 +38,7 @@ class ConvMessagesIndex(convId: ConvId, messages: MessagesStorageImpl, selfUserI
                         convs: ConversationStorage, msgAndLikes: MessageAndLikesStorage, storage: ZmsDatabase,
                         tracking: TrackingService, filter: Option[MessageFilter] = None) { self =>
 
-  private implicit val tag: LogTag = s"ConvMessagesIndex_$convId"
+  private implicit val tag: LogTag = LogTag(s"ConvMessagesIndex_$convId")
 
   import com.waz.utils.events.EventContext.Implicits.global
   private implicit val dispatcher = new SerialDispatchQueue(name = "ConvMessagesIndex")

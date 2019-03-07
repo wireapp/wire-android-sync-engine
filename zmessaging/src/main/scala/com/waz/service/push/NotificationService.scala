@@ -17,11 +17,11 @@
  */
 package com.waz.service.push
 
-import com.waz.ZLog.LogTag
 import com.waz.api.Message
 import com.waz.api.NotificationsHandler.NotificationType
 import com.waz.api.NotificationsHandler.NotificationType._
 import com.waz.content._
+import com.waz.log.BasicLogging.LogTag
 import com.waz.log.ZLog2._
 import com.waz.model.GenericContent.{MsgDeleted, MsgEdit, MsgRecall, Reaction, Text}
 import com.waz.model.UserData.ConnectionStatus

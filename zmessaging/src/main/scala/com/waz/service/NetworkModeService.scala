@@ -23,8 +23,8 @@ import android.net.{ConnectivityManager, NetworkInfo}
 import android.os.Build.VERSION_CODES.M
 import android.os.PowerManager
 import android.telephony.TelephonyManager
-import com.waz.ZLog.ImplicitTag._
 import com.waz.api.NetworkMode
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.log.ZLog2._
 import com.waz.utils.events.{EventContext, Signal}
 import com.waz.utils.returning
@@ -38,7 +38,7 @@ trait NetworkModeService {
   def isDeviceIdleMode: Boolean
 }
 
-class DefaultNetworkModeService(context: Context, lifeCycle: UiLifeCycle) extends NetworkModeService {
+class DefaultNetworkModeService(context: Context, lifeCycle: UiLifeCycle) extends NetworkModeService with DerivedLogTag {
   import NetworkModeService._
 
   private implicit val ev = EventContext.Global

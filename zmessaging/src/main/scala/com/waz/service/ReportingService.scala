@@ -21,13 +21,14 @@ import java.io._
 import java.util.concurrent.CountDownLatch
 
 import android.content.Context
-import com.waz.ZLog._
+import com.waz.ZLog
 import com.waz.log.ZLog2._
 import com.waz.api.ZmsVersion
 import com.waz.cache.{CacheService, Expiration}
 import com.waz.content.GlobalPreferences.PushToken
 import com.waz.content.WireContentProvider.CacheUri
 import com.waz.content.{AccountStorage, GlobalPreferences}
+import com.waz.log.BasicLogging.LogTag
 import com.waz.log.{BufferedLogOutput, InternalLog}
 import com.waz.model.{Mime, UserId}
 import com.waz.threading.{SerialDispatchQueue, Threading}
@@ -44,7 +45,7 @@ trait ReportingService {
   private[service] var reporters = Seq.empty[Reporter]
 
   def addStateReporter(report: PrintWriter => Future[Unit])(implicit tag: LogTag): Unit = Future {
-    reporters = reporters :+ Reporter(tag, report)
+    reporters = reporters :+ Reporter(tag.value, report)
   }
 
   private[service] def generateStateReport(writer: PrintWriter) =
@@ -54,7 +55,7 @@ trait ReportingService {
 }
 
 object ReportingService {
-  private implicit val tag: LogTag = logTagFor[ReportingService]
+  private implicit val tag: LogTag = LogTag(ZLog.logTagFor[ReportingService])
 
   case class Reporter(name: String, report: PrintWriter => Future[Unit]) {
 
@@ -66,16 +67,16 @@ object ReportingService {
 }
 
 class ZmsReportingService(user: UserId, global: ReportingService) extends ReportingService {
-  implicit val tag: LogTag = logTagFor[ZmsReportingService]
+  implicit val tag: LogTag = LogTag(ZLog.logTagFor[ZmsReportingService])
   private implicit val dispatcher = new SerialDispatchQueue(name = "ZmsReportingService")
 
-  global.addStateReporter(generateStateReport)(s"ZMessaging[$user]")
+  global.addStateReporter(generateStateReport)(LogTag(s"ZMessaging[$user]"))
 }
 
 class GlobalReportingService(context: Context, cache: CacheService, metadata: MetaDataService, storage: AccountStorage, prefs: GlobalPreferences) extends ReportingService {
   import ReportingService._
   import Threading.Implicits.Background
-  implicit val tag: LogTag = logTagFor[GlobalReportingService]
+  implicit val tag: LogTag = LogTag(ZLog.logTagFor[GlobalReportingService])
 
   def generateReport(): Future[URI] =
     cache.createForFile(mime = Mime("text/txt"), name = Some("wire_debug_report.txt"), cacheLocation = Some(cache.intCacheDir))(Expiration.in(12.hours)).flatMap { entry =>
@@ -105,7 +106,7 @@ class GlobalReportingService(context: Context, cache: CacheService, metadata: Me
   })
 
   val ZUsersReporter = Reporter("ZUsers", { writer =>
-    val current = ZMessaging.currentAccounts.activeAccount.currentValue.flatten
+    val current = ZMessaging.currentAccounts.activeAccount.currentValue(tag).flatten
     writer.println(l"current: $current".buildMessageSafe)
     storage.list() map { all =>
       all.filter(!current.contains(_)).foreach { u =>

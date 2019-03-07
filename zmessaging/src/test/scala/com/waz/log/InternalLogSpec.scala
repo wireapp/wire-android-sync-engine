@@ -169,10 +169,10 @@ class InternalLogSpec extends AndroidFreeSpec {
         InternalLog.add(log)
         log.empty shouldEqual(true)
 
-        import com.waz.ZLog._
+        import com.waz.log.ZLog2._
         import com.waz.ZLog.ImplicitTag._
 
-        verbose("something")
+        verbose(l"something")
 
         log.empty shouldEqual(false)
       }

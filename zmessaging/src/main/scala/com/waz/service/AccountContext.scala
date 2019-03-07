@@ -17,7 +17,7 @@
  */
 package com.waz.service
 
-import com.waz.ZLog.LogTag
+import com.waz.log.BasicLogging.LogTag
 import com.waz.log.ZLog2._
 import com.waz.model.UserId
 import com.waz.service.AccountsService.LoggedOut

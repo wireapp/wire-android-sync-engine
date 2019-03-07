@@ -19,6 +19,7 @@ package com.waz.service.call
 
 import com.sun.jna.Pointer
 import com.waz.ZLog.ImplicitTag._
+import com.waz.log.LogShow.SafeToLog
 import com.waz.log.ZLog2._
 import com.waz.model.{ConvId, GenericMessage, LocalInstant, UserId}
 import com.waz.service.call.Avs.AvsClosedReason.reasonString

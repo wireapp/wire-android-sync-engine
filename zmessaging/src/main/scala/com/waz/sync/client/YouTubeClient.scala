@@ -18,7 +18,7 @@
 package com.waz.sync.client
 
 import com.waz.ZLog.ImplicitTag._
-import com.waz.ZLog._
+import com.waz.log.ZLog2._
 import com.waz.api.MediaProvider
 import com.waz.api.impl.ErrorResponse
 import com.waz.model.AssetData
@@ -202,12 +202,12 @@ object YouTubeClient {
       case JsonObjectResponse(js) if Option(js.optString("kind")).contains(kind) && js.has("items") =>
         Some(MediaAssetData.extractImageAssets(arrayColl[MediaWithImages[T], Vector](js.getJSONArray("items"))))
       case resp =>
-        warn(s"unknown response content: $resp")
+        warn(l"unknown response content:")
         None
     }
   } catch {
     case NonFatal(e) =>
-      warn(s"response: $response parsing failed", e)
+      warn(l"response: parsing failed", e)
       None
   }
 

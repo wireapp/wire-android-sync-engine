@@ -18,7 +18,7 @@
 package com.waz.sync.client
 
 import com.waz.ZLog.ImplicitTag._
-import com.waz.ZLog._
+import com.waz.log.ZLog2._
 import com.waz.api.impl.ErrorResponse
 import com.waz.model._
 import com.waz.model.otr.ClientId
@@ -114,7 +114,7 @@ object PushNotificationsClient {
       case _ => None
     } catch {
       case NonFatal(e) =>
-        warn(s"couldn't parse paged push notifications from response: $response", e)
+        warn(l"couldn't parse paged push notifications from response:", e)
         None
     }
   }
@@ -126,7 +126,7 @@ object PushNotificationsClient {
       case _ => None
     } catch {
       case NonFatal(e) =>
-        warn(s"couldn't parse push notification(s) from response: $response", e)
+        warn(l"couldn't parse push notification(s) from response:", e)
         None
     }
   }

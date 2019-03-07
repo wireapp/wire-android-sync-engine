@@ -19,9 +19,11 @@ package com.waz.service
 
 import android.content.Context
 import com.softwaremill.macwire._
-import com.waz.ZLog._
+import com.waz.ZLog
+import com.waz.log.ZLog2._
 import com.waz.api.ContentSearchQuery
 import com.waz.content.{MembersStorageImpl, UsersStorageImpl, ZmsDatabase, _}
+import com.waz.log.BasicLogging.LogTag
 import com.waz.model._
 import com.waz.model.otr.ClientId
 import com.waz.service.EventScheduler.{Sequential, Stage}
@@ -90,7 +92,7 @@ class StorageModule(context: Context, val userId: UserId, globalPreferences: Glo
 
 class ZMessaging(val teamId: Option[TeamId], val clientId: ClientId, account: AccountManager, val storage: StorageModule, val cryptoBox: CryptoBoxService) {
 
-  private implicit val logTag: LogTag = logTagFor[ZMessaging]
+  private implicit val logTag: LogTag = LogTag(ZLog.logTagFor[ZMessaging])
   private implicit val dispatcher = new SerialDispatchQueue(name = "ZMessaging")
 
   val clock = ZMessaging.clock
@@ -324,9 +326,9 @@ class ZMessaging(val teamId: Option[TeamId], val clientId: ClientId, account: Ac
   */
 object ZMessaging { self =>
 
-  def accountTag[A: reflect.Manifest](userId: UserId): LogTag = s"${implicitly[reflect.Manifest[A]].runtimeClass.getSimpleName}#${userId.str.take(8)}"
+  def accountTag[A: reflect.Manifest](userId: UserId): LogTag = LogTag(s"${implicitly[reflect.Manifest[A]].runtimeClass.getSimpleName}#${userId.str.take(8)}")
 
-  private implicit val logTag: LogTag = logTagFor(ZMessaging)
+  private implicit val logTag: LogTag = LogTag(ZLog.logTagFor[ZMessaging])
 
   private[waz] var context: Context = _
 

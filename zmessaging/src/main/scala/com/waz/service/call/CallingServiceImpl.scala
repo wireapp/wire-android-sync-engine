@@ -17,13 +17,13 @@
  */
 package com.waz.service.call
 
-
 import android.Manifest.permission.CAMERA
 import com.sun.jna.Pointer
-import com.waz.ZLog.ImplicitTag._
 import com.waz.api.impl.ErrorResponse
 import com.waz.content.GlobalPreferences.SkipTerminatingState
 import com.waz.content.{GlobalPreferences, MembersStorage, UserPreferences}
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
+import com.waz.log.LogShow.SafeToLog
 import com.waz.log.ZLog2._
 import com.waz.model.otr.ClientId
 import com.waz.model.{ConvId, RConvId, UserId, _}
@@ -54,7 +54,7 @@ import scala.concurrent.{Future, Promise}
 import scala.util.Success
 import scala.util.control.NonFatal
 
-class GlobalCallingService() {
+class GlobalCallingService extends DerivedLogTag {
 
   import com.waz.threading.Threading.Implicits.Background
 
@@ -165,7 +165,7 @@ class CallingServiceImpl(val accountId:       UserId,
                          userPrefs:           UserPreferences,
                          globalPrefs:         GlobalPreferences,
                          permissions:         PermissionsService,
-                         tracking:            TrackingService)(implicit accountContext: AccountContext) extends CallingService { self =>
+                         tracking:            TrackingService)(implicit accountContext: AccountContext) extends CallingService with DerivedLogTag with SafeToLog { self =>
 
   import CallingService._
 

@@ -17,15 +17,12 @@
  */
 package com.waz.service.assets
 
-
 import java.io._
 
 import android.Manifest.permission.WRITE_EXTERNAL_STORAGE
 import android.content.{ContentResolver, Context}
 import android.media.ExifInterface
 import android.os.Environment
-import com.waz.ZLog.ImplicitTag._
-import com.waz.ZLog.LogTag
 import com.waz.api
 import com.waz.api.ProgressIndicator.State
 import com.waz.api.impl.ProgressIndicator.ProgressData
@@ -34,6 +31,7 @@ import com.waz.bitmap.BitmapUtils
 import com.waz.cache.{CacheEntry, CacheService, Expiration, LocalData}
 import com.waz.content.WireContentProvider.CacheUri
 import com.waz.content._
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.log.ZLog2._
 import com.waz.model.AssetData.{ProcessingTaskKey, UploadTaskKey}
 import com.waz.model.AssetMetaData.Image.Tag
@@ -93,7 +91,7 @@ object AssetService {
   object BitmapResult {
     case object Empty extends BitmapResult
     case class BitmapLoaded(bitmap: Bitmap, etag: Int = 0) extends BitmapResult {
-      override def toString: LogTag = s"BitmapLoaded([${bitmap.getWidth}, ${bitmap.getHeight}], $etag)"
+      override def toString: String = s"BitmapLoaded([${bitmap.getWidth}, ${bitmap.getHeight}], $etag)"
     }
     case class LoadingFailed(ex: Throwable) extends BitmapResult
   }
@@ -135,7 +133,7 @@ class AssetServiceImpl(storage:         AssetsStorage,
                        metaService:     MetaDataService,
                        sync:            SyncServiceHandle,
                        media:           GlobalRecordAndPlayService,
-                       prefs:           GlobalPreferences) extends AssetService {
+                       prefs:           GlobalPreferences) extends AssetService with DerivedLogTag {
 
   import AssetService._
   import com.waz.threading.Threading.Implicits.Background

@@ -20,12 +20,12 @@ package com.waz.service
 import java.io._
 import java.util.Locale
 
-import com.waz.ZLog.ImplicitTag._
 import com.waz.log.ZLog2._
 import com.waz.api.ZmsVersion
 import com.waz.api.impl.ErrorResponse
 import com.waz.api.impl.ErrorResponse.internalError
 import com.waz.content.UserPreferences._
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model.AccountData.Password
 import com.waz.model._
 import com.waz.model.otr.{Client, ClientId}
@@ -56,7 +56,7 @@ class AccountManager(val userId:   UserId,
                      val accounts: AccountsService,
                      val startedJustAfterBackup: Boolean,
                      initialSelf: Option[UserInfo],
-                     isLogin:     Option[Boolean]) {
+                     isLogin:     Option[Boolean]) extends DerivedLogTag {
   import AccountManager._
 
   implicit val dispatcher = new SerialDispatchQueue()

@@ -21,7 +21,8 @@ import java.util.Timer
 import java.util.concurrent.{Executor, ExecutorService, Executors}
 
 import android.os.{Handler, HandlerThread, Looper}
-import com.waz.ZLog._
+import com.waz.ZLog.LogTag
+import com.waz.log.ZLog2._
 import com.waz.api.ZmsVersion
 import com.waz.utils.returning
 
@@ -44,7 +45,7 @@ object Threading {
   def executionContext(service: ExecutorService)(implicit tag: LogTag): ExecutionContext = new ExecutionContext {
     override def reportFailure(cause: Throwable): Unit = {
 //      exception(cause, "ExecutionContext failed") TODO make threading mockable and then inject tracking
-      error(cause.getMessage, cause)
+      error(l"${showString(cause.getMessage)}", cause)
     }
     override def execute(runnable: Runnable): Unit = service.execute(runnable)
   }

@@ -20,7 +20,7 @@ package com.waz.log
 import java.io._
 
 import com.waz.ZLog.LogTag
-import com.waz.log.ZLog2.Log
+import com.waz.log.BasicLogging.Log
 import com.waz.service.ZMessaging.clock
 
 import scala.Ordered._

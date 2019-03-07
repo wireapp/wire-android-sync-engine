@@ -17,7 +17,7 @@
  */
 package com.waz.content
 
-import com.waz.ZLog.ImplicitTag._
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.log.ZLog2._
 import com.waz.model.SyncId
 import com.waz.model.sync.SyncJob
@@ -33,7 +33,7 @@ import scala.concurrent.duration._
  *
  * Warning - this is not thread safe
  */
-class SyncStorage(db: Database, jobs: Seq[SyncJob]) {
+class SyncStorage(db: Database, jobs: Seq[SyncJob]) extends DerivedLogTag {
   import SyncStorage._
 
   private val jobsMap = new mutable.HashMap[SyncId, SyncJob]

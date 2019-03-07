@@ -19,9 +19,10 @@ package com.waz.specs
 
 import java.util.concurrent.{Executors, ThreadFactory, TimeoutException}
 
-import com.waz.{SystemLogOutput, ZLog}
+import com.waz.SystemLogOutput
 import com.waz.ZLog.LogTag
-import com.waz.log.InternalLog
+import com.waz.log.ZLog2._
+import com.waz.log.{InternalLog, ZLog2}
 import com.waz.model.UserId
 import com.waz.service.AccountsService.{AccountState, InForeground, LoggedOut}
 import com.waz.service._
@@ -86,7 +87,7 @@ abstract class AndroidFreeSpec extends ZMockSpec { this: Suite =>
     Future {
       t match {
         case e: exceptions.TestFailedException => swallowedFailure = Some(e)
-        case _ => ZLog.error(s"Exception sent: $description", t)(tag)
+        case _ => ZLog2.error(l"Exception sent: ${showString(description)}", t)(tag)
       }
     } (Threading.Background)
   }

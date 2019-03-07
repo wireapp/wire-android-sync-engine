@@ -23,7 +23,7 @@ import com.waz.api.IConversation.{Access, AccessRole}
 import com.waz.api.{IConversation, Verification}
 import com.waz.db.Col._
 import com.waz.db.{Dao, Dao2}
-import com.waz.log.ZLog2.SafeToLog
+import com.waz.log.LogShow.SafeToLog
 import com.waz.model
 import com.waz.model.ConversationData.{ConversationType, Link, UnreadCount}
 import com.waz.service.SearchKey

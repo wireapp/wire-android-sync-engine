@@ -17,7 +17,7 @@
  */
 package com.waz.model
 
-import com.waz.log.ZLog2.LogShow
+import com.waz.log.LogShow.SafeToLog
 import com.waz.utils.{JsonDecoder, JsonEncoder}
 import com.waz.utils.JsonDecoder.{decodeOptObject, decodeString}
 import org.json.JSONObject

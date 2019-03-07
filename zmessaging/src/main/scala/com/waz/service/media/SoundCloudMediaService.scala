@@ -17,7 +17,7 @@
  */
 package com.waz.service.media
 
-import com.waz.ZLog._
+import com.waz.log.ZLog2._
 import com.waz.ZLog.ImplicitTag._
 import com.waz.api.Message
 import com.waz.model.messages.media.MediaAssetData
@@ -41,11 +41,11 @@ class SoundCloudMediaService(client: SoundCloudClient, assets: AssetService) {
         Right(content.copy(tpe = Message.Part.Type.SOUNDCLOUD, richMedia = Some(media.media)))
 
       case Left(error) if error.isFatal =>
-        warn(s"soundcloud media loading for ${content.content} failed fatally: $error, switching back to text")
+        warn(l"soundcloud media loading for $content failed fatally: $error, switching back to text")
         Right(content.copy(tpe = Message.Part.Type.TEXT, richMedia = None))
 
       case Left(error) =>
-        warn(s"unable to resolve SoundCloud link ${content.content}: $error")
+        warn(l"unable to resolve SoundCloud link $content: $error")
         Left(error)
     }
 

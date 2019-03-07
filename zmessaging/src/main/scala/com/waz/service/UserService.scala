@@ -17,9 +17,9 @@
  */
 package com.waz.service
 
-import com.waz.ZLog.ImplicitTag._
 import com.waz.log.ZLog2._
 import com.waz.content._
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model.AccountData.Password
 import com.waz.model.UserData.ConnectionStatus
 import com.waz.model.{AccentColor, _}
@@ -41,7 +41,6 @@ import scala.collection.breakOut
 import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.Right
-import scala.util.control.NonFatal
 
 
 trait UserService {
@@ -96,7 +95,7 @@ class UserServiceImpl(selfUserId:        UserId,
                       sync:              SyncServiceHandle,
                       assetsStorage:     AssetsStorage,
                       credentialsClient: CredentialsUpdateClient,
-                      selectedConv:      SelectedConversationService) extends UserService {
+                      selectedConv:      SelectedConversationService) extends UserService with DerivedLogTag {
 
   import Threading.Implicits.Background
   private implicit val ec = EventContext.Global
@@ -351,7 +350,7 @@ class ExpiredUsersService(push:         PushService,
                           members:      MembersStorage,
                           users:        UserService,
                           usersStorage: UsersStorage,
-                          sync:         SyncServiceHandle)(implicit ev: AccountContext) {
+                          sync:         SyncServiceHandle)(implicit ev: AccountContext) extends DerivedLogTag {
 
   private implicit val ec = new SerialDispatchQueue(name = "ExpiringUsers")
 

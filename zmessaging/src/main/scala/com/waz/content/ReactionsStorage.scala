@@ -17,8 +17,10 @@
  */
 package com.waz.content
 
-import com.waz.ZLog._
+import com.waz.log.ZLog2._
 import android.content.Context
+import com.waz.ZLog
+import com.waz.ZLog.LogTag
 import com.waz.model.Liking.{Action, LikingDao}
 import com.waz.model._
 import com.waz.threading.{CancellableFuture, SerialDispatchQueue}
@@ -104,7 +106,7 @@ class ReactionsStorageImpl(context: Context, storage: Database) extends CachedSt
 }
 
 object ReactionsStorageImpl {
-  private implicit val logTag: LogTag = logTagFor[ReactionsStorageImpl]
+  private implicit val logTag: LogTag = ZLog.logTagFor[ReactionsStorageImpl]
 
   private def likers(likings: Seq[Liking]): Map[UserId, RemoteInstant] =
     likings.collect { case l if l.action == Action.Like => l.user -> l.timestamp } (breakOut)

@@ -23,8 +23,9 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 import android.content.Context
 import android.media.{MediaCodec, MediaExtractor, MediaFormat}
-import com.waz.ZLog.ImplicitTag._
 import com.waz.bitmap.video.{MediaCodecHelper, TrackDecoder}
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
+import com.waz.log.LogShow.SafeToLog
 import com.waz.log.ZLog2._
 import com.waz.model.AssetMetaData.Loudness
 import com.waz.model.Mime
@@ -38,7 +39,7 @@ import scala.concurrent.duration._
 import scala.math._
 import scala.util.control.NonFatal
 
-case class AudioLevels(context: Context) {
+case class AudioLevels(context: Context) extends DerivedLogTag {
   import AudioLevels._
   import Threading.Implicits.Background
 

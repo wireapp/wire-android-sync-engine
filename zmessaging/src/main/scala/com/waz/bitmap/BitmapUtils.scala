@@ -23,12 +23,12 @@ import android.graphics.Bitmap.Config
 import android.graphics._
 import android.media.ExifInterface
 import android.renderscript.{Allocation, Element, RenderScript, ScriptIntrinsicBlur}
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.log.ZLog2._
-import com.waz.ZLog.ImplicitTag._
 import com.waz.service.ZMessaging
 import com.waz.utils.{IoUtils, returning}
 
-object BitmapUtils {
+object BitmapUtils extends DerivedLogTag {
 
   object Mime {
     val Gif = "image/gif"

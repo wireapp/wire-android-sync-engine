@@ -18,10 +18,10 @@
 package com.waz.content
 
 import android.support.v4.util.LruCache
-import com.waz.ZLog.ImplicitTag._
 import com.waz.ZLog.logTime
 import com.waz.content.MessagesCursor.Entry
 import com.waz.db.{CursorIterator, Reader, ReverseCursorIterator}
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.log.ZLog2._
 import com.waz.model._
 import com.waz.service.messages.MessageAndLikes
@@ -48,7 +48,7 @@ class MessagesCursor(cursor: DBCursor,
                      override val lastReadIndex: Int,
                      val lastReadTime: RemoteInstant,
                      loader: MessageAndLikesStorage,
-                     tracking: TrackingService)(implicit ordering: Ordering[RemoteInstant]) extends MsgCursor { self =>
+                     tracking: TrackingService)(implicit ordering: Ordering[RemoteInstant]) extends MsgCursor with DerivedLogTag { self =>
   import MessagesCursor._
   import com.waz.utils.events.EventContext.Implicits.global
 
@@ -266,7 +266,7 @@ object MessagesCursor {
   }
 }
 
-class WindowLoader(cursor: DBCursor)(implicit dispatcher: SerialDispatchQueue) {
+class WindowLoader(cursor: DBCursor)(implicit dispatcher: SerialDispatchQueue) extends DerivedLogTag {
   import MessagesCursor._
 
   @volatile private[this] var window = IndexWindow.Empty

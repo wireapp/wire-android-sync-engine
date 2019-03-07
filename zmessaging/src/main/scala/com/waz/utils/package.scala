@@ -22,7 +22,7 @@ import java.util.Date
 import java.util.concurrent.atomic.AtomicReference
 import java.util.concurrent.{TimeUnit, TimeoutException}
 
-import com.waz.ZLog.LogTag
+import com.waz.log.BasicLogging.LogTag
 import com.waz.api.UpdateListener
 import com.waz.log.ZLog2._
 import com.waz.model.{LocalInstant, WireInstant}

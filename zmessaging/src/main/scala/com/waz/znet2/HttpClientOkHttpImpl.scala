@@ -22,7 +22,7 @@ import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
 
 import com.waz.ZLog.ImplicitTag._
-import com.waz.ZLog._
+import com.waz.log.ZLog2._
 import com.waz.service.CertificatePin
 import com.waz.threading.CancellableFuture
 import com.waz.utils.crypto.AESUtils
@@ -76,12 +76,12 @@ class HttpClientOkHttpImpl(client: OkHttpClient)(implicit protected val ec: Exec
           future = Future { okCall.execute() }
             .recoverWith {
               case err =>
-                error("failure while getting okHttp response.", err)
+                error(l"failure while getting okHttp response.", err)
                 Future.failed(ConnectionError(err))
             }
             .map(convertOkHttpResponse(_, downloadCallback)),
           onCancel = {
-            verbose(s"cancel executing okHttp request: $request")
+            verbose(l"cancel executing okHttp request: $request")
             okCall.cancel()
           }
         )

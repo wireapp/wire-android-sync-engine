@@ -35,6 +35,7 @@ import com.waz.ZLog.logTime
 import com.waz.log.ZLog2._
 import com.waz.content.UserPreferences._
 import com.waz.content._
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model.AddressBook.ContactHashes
 import com.waz.model.Contact.{ContactsDao, ContactsOnWireDao, EmailAddressesDao, PhoneNumbersDao}
 import com.waz.model._
@@ -76,7 +77,7 @@ class ContactsServiceImpl(userId:         UserId,
                           sync:           SyncServiceHandle,
                           convs:          ConversationStorage,
                           permissions:    PermissionsService)
-  extends ContactsService {
+  extends ContactsService with DerivedLogTag {
 
   import ContactsServiceImpl._
   import EventContext.Implicits.global

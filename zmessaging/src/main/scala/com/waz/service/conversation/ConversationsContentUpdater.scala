@@ -17,11 +17,11 @@
  */
 package com.waz.service.conversation
 
-import com.waz.ZLog.ImplicitTag._
-import com.waz.ZLog.LogTag
 import com.waz.log.ZLog2._
 import com.waz.api.IConversation.{Access, AccessRole}
 import com.waz.content._
+import com.waz.log.BasicLogging.LogTag
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model.ConversationData.ConversationType
 import com.waz.model.sync.ReceiptType
 import com.waz.model.{UserId, _}
@@ -73,7 +73,7 @@ class ConversationsContentUpdaterImpl(val storage:     ConversationStorage,
                                       membersStorage:  MembersStorage,
                                       messagesStorage: => MessagesStorage,
                                       tracking:        TrackingService,
-                                      syncHandler:     SyncServiceHandle) extends ConversationsContentUpdater {
+                                      syncHandler:     SyncServiceHandle) extends ConversationsContentUpdater with DerivedLogTag {
   import com.waz.utils.events.EventContext.Implicits.global
 
   private implicit val dispatcher = new SerialDispatchQueue(name = "ConversationContentUpdater")

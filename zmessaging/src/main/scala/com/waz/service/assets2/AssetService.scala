@@ -20,9 +20,9 @@ package com.waz.service.assets2
 import java.io.InputStream
 import java.net.URI
 
-import com.waz.ZLog.ImplicitTag._
 import com.waz.log.ZLog2._
 import com.waz.cache2.CacheService
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model.errors._
 import com.waz.model.{AssetId, Mime}
 import com.waz.service.assets2.Asset.General
@@ -55,7 +55,7 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
                        uriHelper: UriHelper,
                        cache: CacheService,
                        assetClient: AssetClient2)
-                      (implicit ec: ExecutionContext) extends AssetService {
+                      (implicit ec: ExecutionContext) extends AssetService with DerivedLogTag {
 
   protected def cacheKey(asset: Asset[General]): String = asset.id.str
 

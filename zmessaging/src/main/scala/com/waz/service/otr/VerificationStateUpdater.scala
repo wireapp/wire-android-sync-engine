@@ -22,7 +22,7 @@ import com.waz.ZLog.LogTag
 import com.waz.log.ZLog2._
 import com.waz.api.Verification
 import com.waz.content._
-import com.waz.log.ZLog2.SafeToLog
+import com.waz.log.LogShow.SafeToLog
 import com.waz.model.ConversationData.ConversationType
 import com.waz.model._
 import com.waz.model.otr.UserClients

@@ -21,7 +21,7 @@ import java.io.ByteArrayInputStream
 
 import com.waz.{AuthenticationConfig, ZIntegrationSpec}
 import com.waz.ZLog.ImplicitTag._
-import com.waz.ZLog.verbose
+import com.waz.log.ZLog2._
 import com.waz.api.impl.ErrorResponse
 import com.waz.cache2.CacheService.NoEncryption
 import com.waz.model.{AssetId, Mime, Sha256}
@@ -61,14 +61,14 @@ class AssetClient2Spec extends ZIntegrationSpec with AuthenticationConfig {
     scenario("upload asset") {
       for {
         result <- assetClient.uploadAsset(testAssetMetadata, testRawAsset, callback = None)
-        _ = verbose(s"Uploading asset result: $result")
+        _ = verbose(l"Uploading asset result: $result")
       } yield result shouldBe an[Right[ErrorResponse, UploadResponse]]
     }
 
     scenario("upload and load asset") {
       for {
         uploadResult <- assetClient.uploadAsset(testAssetMetadata, testRawAsset, callback = None)
-        _ = verbose(s"Uploading asset result: $uploadResult")
+        _ = verbose(l"Uploading asset result: $uploadResult")
         uploadResponse = uploadResult.right.get
         asset = createBlobAsset(uploadResponse)
         loadResult <- assetClient.loadAssetContent(asset, callback = None)
@@ -81,11 +81,11 @@ class AssetClient2Spec extends ZIntegrationSpec with AuthenticationConfig {
     scenario("upload and delete asset") {
       for {
         uploadResult <- assetClient.uploadAsset(testAssetMetadata, testRawAsset, callback = None)
-        _ = verbose(s"Uploading asset result: $uploadResult")
+        _ = verbose(l"Uploading asset result: $uploadResult")
         uploadResponse = uploadResult.right.get
         asset = createBlobAsset(uploadResponse)
         deleteResult <- assetClient.deleteAsset(asset.id)
-        _ = verbose(s"Deleting asset result: $deleteResult")
+        _ = verbose(l"Deleting asset result: $deleteResult")
       } yield {
         deleteResult shouldBe an[Right[ErrorResponse, Boolean]]
         deleteResult.right.get shouldBe true
@@ -95,7 +95,7 @@ class AssetClient2Spec extends ZIntegrationSpec with AuthenticationConfig {
     scenario("delete not existed asset") {
       for {
         deleteResult <- assetClient.deleteAsset(AssetId("3-3-cff20a61-3dd5-4fcf-b612-dc650a9ca245"))
-        _ = verbose(s"Deleting asset result: $deleteResult")
+        _ = verbose(l"Deleting asset result: $deleteResult")
       } yield {
         deleteResult shouldBe an[Right[ErrorResponse, Boolean]]
         deleteResult.right.get shouldBe false

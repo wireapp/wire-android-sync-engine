@@ -19,12 +19,12 @@ package com.waz.service
 
 import android.content.Context
 import com.waz.log.ZLog2._
-import com.waz.ZLog.ImplicitTag._
 import com.waz.api.ErrorType
 import com.waz.content.MessagesStorage
 import com.waz.model.ErrorData.ErrorDataDao
 import com.waz.model._
 import com.waz.content.ZmsDatabase
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.service.AccountsService.InForeground
 import com.waz.threading.{CancellableFuture, SerialDispatchQueue}
 import com.waz.utils.TrimmingLruCache.Fixed
@@ -50,7 +50,7 @@ class ErrorsServiceImpl(userId:    UserId,
                         context:   Context,
                         storage:   ZmsDatabase,
                         accounts:  AccountsService,
-                        messages:  MessagesStorage) extends ErrorsService {
+                        messages:  MessagesStorage) extends ErrorsService with DerivedLogTag {
   import com.waz.utils.events.EventContext.Implicits.global
 
   private implicit val dispatcher = new SerialDispatchQueue(name = "ErrorsService")
