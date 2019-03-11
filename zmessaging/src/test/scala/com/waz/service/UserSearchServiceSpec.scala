@@ -38,10 +38,12 @@ import scala.concurrent.Future
 
 class UserSearchServiceSpec extends AndroidFreeSpec {
 
-  val selfId            = UserId()
+  val selfId            = id('selfUser)
   val emptyTeamId       = Option.empty[TeamId]
   val teamId            = Option(TeamId("59bbc94c-2618-491a-8dba-cf6f94c65873"))
   val partnerPermissions: Long = 1025
+  val memberPermissions: Long = 1587
+  val adminPermissions: Long = 5951
 
   val queryCacheStorage = mock[SearchQueryCacheStorage]
   val userService       = mock[UserService]
@@ -80,10 +82,42 @@ class UserSearchServiceSpec extends AndroidFreeSpec {
     id('pp1) -> UserData(id('pp1), "Partner 1").copy(
       permissions = (partnerPermissions, partnerPermissions),
       teamId = teamId,
-      handle = Some(Handle("pp1"))
+      handle = Some(Handle("pp1")),
+      createdBy = Some(id('aa1))
     ),
-    id('mm1) -> UserData(id('mm1), "Member 1").copy(teamId = teamId, handle = Some(Handle("mm1"))),
-    id('mm2) -> UserData(id('mm2), "Member 2").copy(teamId = teamId, handle = Some(Handle("mm2")))
+    id('pp2) -> UserData(id('pp2), "Partner 2").copy(
+      permissions = (partnerPermissions, partnerPermissions),
+      teamId = teamId,
+      handle = Some(Handle("pp2")),
+      createdBy = Some(id('aa2))
+    ),
+    id('pp3) -> UserData(id('pp3), "Partner 3").copy(
+      permissions = (partnerPermissions, partnerPermissions),
+      teamId = teamId,
+      handle = Some(Handle("pp3"))
+    ),
+    id('mm1) -> UserData(id('mm1), "Member 1").copy(
+      permissions = (memberPermissions, memberPermissions),
+      teamId = teamId,
+      handle = Some(Handle("mm1")),
+      createdBy = Some(id('aa1))
+    ),
+    id('mm2) -> UserData(id('mm2), "Member 2").copy(
+      permissions = (memberPermissions, memberPermissions),
+      teamId = teamId,
+      handle = Some(Handle("mm2")),
+      createdBy = Some(id('aa1))
+    ),
+    id('aa1) -> UserData(id('aa1), "Admin 1").copy(
+      permissions = (adminPermissions, adminPermissions),
+      teamId = teamId,
+      handle = Some(Handle("aa1"))
+    ),
+    id('aa2) -> UserData(id('aa2), "Admin 2").copy(
+      permissions = (adminPermissions, adminPermissions),
+      teamId = teamId,
+      handle = Some(Handle("aa2"))
+    )
   )
 
   // Mock search in team
@@ -326,21 +360,24 @@ class UserSearchServiceSpec extends AndroidFreeSpec {
       val querySignal = new SourceSignal[Option[SearchQueryCache]]()
       val queryCache = SearchQueryCache(searchQuery, Instant.now, Some(Vector.empty[UserId]))
 
-      (queryCacheStorage.deleteBefore _).expects(*).anyNumberOfTimes().returning(Future.successful[Unit]({}))
-      (queryCacheStorage.optSignal _).expects(searchQuery).once().returning(querySignal)
+      (queryCacheStorage.deleteBefore _).stubs(*).returning(Future.successful[Unit]({}))
+      (queryCacheStorage.optSignal _).stubs(searchQuery).returning(querySignal)
 
+      (usersStorage.get _).stubs(*).onCall { id: UserId =>
+        Future.successful(users.get(id))
+      }
       (usersStorage.find(_: UserData => Boolean, _: DB => Managed[TraversableOnce[UserData]], _: UserData => UserData)(_: CanBuild[UserData, Vector[UserData]]))
-        .expects(*, *, *, *).once().returning(Future.successful(Vector.empty[UserData]))
-      (userService.acceptedOrBlockedUsers _).expects().once().returning(Signal.const(connectedUsers.map(k => (k -> users(k))).toMap))
+        .stubs(*, *, *, *).returning(Future.successful(Vector.empty[UserData]))
+      (userService.acceptedOrBlockedUsers _).stubs().returning(Signal.const(connectedUsers.map(k => (k -> users(k))).toMap))
 
-      (convsStorage.findGroupConversations _).expects(*, *, *, *).returns(Future.successful(IndexedSeq.empty[ConversationData]))
-      (queryCacheStorage.updateOrCreate _).expects(*, *, *).once().returning(Future.successful(queryCache))
+      (convsStorage.findGroupConversations _).stubs(*, *, *, *).returns(Future.successful(IndexedSeq.empty[ConversationData]))
+      (queryCacheStorage.updateOrCreate _).stubs(*, *, *).returning(Future.successful(queryCache))
 
-      (membersStorage.getByUsers _).expects(*).anyNumberOfTimes().onCall { ids: Set[UserId] =>
+      (membersStorage.getByUsers _).stubs(*).onCall { ids: Set[UserId] =>
         Future.successful(ids.filter(i => conversationMembers.contains(i)).map(ConversationMemberData(_, convId)).toIndexedSeq)
       }
 
-      (sync.syncSearchQuery _).expects(*).once().onCall { _: SearchQuery =>
+      (sync.syncSearchQuery _).stubs(*).onCall { _: SearchQuery =>
         Future.successful[SyncId] {
           querySignal ! Some(queryCache)
           result(querySignal.filter(_.contains(queryCache)).head)
@@ -499,9 +536,43 @@ class UserSearchServiceSpec extends AndroidFreeSpec {
       // THEN
       res shouldBe ids()
     }
+
+    scenario("as an admin, see the partners that I invited") {
+
+      // GIVEN
+      userPrefs.setValue(UserPreferences.SelfPermissions, adminPermissions)
+      mockServicesForTeam(query = "Partner", conversationMembers = ids())
+
+      // WHEN
+      val res = result(getService(
+        true,
+        selfId = id('aa1)
+      ).search("Partner").map(_.local.map(_.id).toSet).head)
+
+      // THEN
+      res shouldBe ids('pp1)
+
+    }
+
+    scenario("as a partner, see the admin that invited me") {
+
+      // GIVEN
+      userPrefs.setValue(UserPreferences.SelfPermissions, partnerPermissions)
+      mockServicesForTeam(query = "", conversationMembers = ids())
+
+      // WHEN
+      val res = result(getService(
+        true,
+        selfId = id('pp2)
+      ).search("").map(_.local.map(_.id).toSet).head)
+
+      // THEN
+      res shouldBe ids('aa2)
+
+    }
   }
 
-  def getService(inTeam: Boolean) = {
+  def getService(inTeam: Boolean, selfId: UserId = selfId) = {
     new UserSearchService(
       selfId,
       queryCacheStorage,
