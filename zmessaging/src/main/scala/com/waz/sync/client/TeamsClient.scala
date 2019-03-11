@@ -122,7 +122,7 @@ object TeamsClient {
   case class TeamMember(user: UserId, permissions: Option[Permissions], created_by: Option[UserId])
 
   implicit val TeamMemberLogShow: LogShow[TeamMember] =
-    LogShow.create(tm => s"TeamMember(${tm.user}, ${tm.permissions}, ${tm.created_by})")
+    LogShow.create(tm => s"TeamMember with permissions: ${tm.permissions}")
 
   case class Permissions(self: Long, copy: Long)
 

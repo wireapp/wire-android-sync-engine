@@ -17,7 +17,7 @@
  */
 package com.waz.service
 
-import com.waz.ZLog
+import com.waz.ZLog.verbose
 import com.waz.ZLog.ImplicitTag._
 import com.waz.content.UserPreferences.SelfPermissions
 import com.waz.content._
@@ -87,10 +87,10 @@ class UserSearchService(selfUserId:           UserId,
     lazy val knownUsers = membersStorage.getByUsers(searchResults.map(_.id).toSet).map(_.map(_.userId).toSet)
     isPartner.flatMap {
       case true if teamId.isDefined =>
-        ZLog.verbose(s"filterForPartner1 Q: $query, RES: ${searchResults.map(_.getDisplayName)}) with partner = true and teamId")
+        verbose(s"filterForPartner1 Q: $query, RES: ${searchResults.map(_.getDisplayName)}) with partner = true and teamId")
         knownUsers.map(knownUsersIds => searchResults.filter(u => knownUsersIds.contains(u.id)))
       case false if teamId.isDefined =>
-        ZLog.verbose(s"filterForPartner2 Q: $query, RES: ${searchResults.map(_.getDisplayName)}) with partner = false and teamId")
+        verbose(s"filterForPartner2 Q: $query, RES: ${searchResults.map(_.getDisplayName)}) with partner = false and teamId")
         knownUsers.map { knownUsersIds =>
           searchResults.filter { u =>
             knownUsersIds.contains(u.id) ||
