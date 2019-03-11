@@ -17,8 +17,8 @@
  */
 package com.waz.service
 
-import com.waz.ZLog.verbose
 import com.waz.ZLog.ImplicitTag._
+import com.waz.ZLog.verbose
 import com.waz.content.UserPreferences.SelfPermissions
 import com.waz.content._
 import com.waz.log.ZLog2._
@@ -31,12 +31,12 @@ import com.waz.service.conversation.{ConversationsService, ConversationsUiServic
 import com.waz.service.teams.TeamsService
 import com.waz.sync.SyncServiceHandle
 import com.waz.sync.client.UserSearchClient.UserSearchEntry
-import com.waz.threading.{CancellableFuture, Threading}
+import com.waz.threading.Threading
 import com.waz.utils._
 import com.waz.utils.events._
 
+import scala.collection.breakOut
 import scala.collection.immutable.Set
-import scala.collection.{breakOut, mutable}
 import scala.concurrent.Future
 import scala.concurrent.duration._
 
@@ -77,11 +77,10 @@ class UserSearchService(selfUserId:           UserId,
   ClockSignal(1.day)(i => queryCache.deleteBefore(i - cacheExpiryTime))(EventContext.Global)
 
   private val exactMatchUser = new SourceSignal[Option[UserData]]()
-  private val signalMap = mutable.HashMap[SearchQuery, Signal[IndexedSeq[UserData]]]()
 
   private lazy val isPartner = userPrefs(SelfPermissions).apply()
     .map(decodeBitmask)
-    .map(ps => PartnerPermissions.subsetOf(ps) && PartnerPermissions.size == ps.size)
+    .map(_ == PartnerPermissions)
 
   private def filterForPartner(query: Filter, searchResults: IndexedSeq[UserData]): Future[IndexedSeq[UserData]] = {
     lazy val knownUsers = membersStorage.getByUsers(searchResults.map(_.id).toSet).map(_.map(_.userId).toSet)
@@ -103,19 +102,22 @@ class UserSearchService(selfUserId:           UserId,
     }
   }
 
-  def usersForNewConversation(filter: Filter = "", teamOnly: Boolean): Signal[IndexedSeq[UserData]] = {
-    val isHandle = Handle.isHandle(filter)
-    searchLocal(filter, isHandle = isHandle)
-      .map(_.filter(u => !(u.isGuest(teamId) && teamOnly)))
-      .flatMap(res => Signal.future(filterForPartner(filter, res)))
-  }
+  // a utility method for using `filterForPartner` with signals more easily
+  private def filterForPartner(query: Filter, searchResults: Signal[IndexedSeq[UserData]]): Signal[IndexedSeq[UserData]] =
+    searchResults.flatMap(res => Signal.future(filterForPartner(query, res)))
+
+  def usersForNewConversation(filter: Filter = "", teamOnly: Boolean): Signal[IndexedSeq[UserData]] =
+    filterForPartner(
+      filter,
+      searchLocal(filter, isHandle = Handle.isHandle(filter)).map(_.filter(u => !(u.isGuest(teamId) && teamOnly)))
+    )
 
   def usersToAddToConversation(filter: Filter = "", toConv: ConvId): Signal[IndexedSeq[UserData]] =
     for {
-      curr <- membersStorage.activeMembers(toConv)
-      conv <- convsStorage.signal(toConv)
-      res  <- searchLocal(filter, curr, isHandle = Handle.isHandle(filter))
-      res  <- Signal.future(filterForPartner(filter, res.filter(conv.isUserAllowed)))
+      curr         <- membersStorage.activeMembers(toConv)
+      conv         <- convsStorage.signal(toConv)
+      localResults =  searchLocal(filter, curr, isHandle = Handle.isHandle(filter)).map(_.filter(conv.isUserAllowed))
+      res          <- filterForPartner(filter, localResults)
     } yield res
 
   def mentionsSearchUsersInConversation(convId: ConvId, filter: Filter, includeSelf: Boolean = false): Signal[IndexedSeq[UserData]] =
@@ -248,12 +250,10 @@ class UserSearchService(selfUserId:           UserId,
 
     for {
       top       <- topUsers
-      isPartner <- Signal.future(isPartner)
-      local     <- searchLocal(filter, showBlockedUsers = true, isHandle = isHandle)
-      local     <- Signal.future(filterForPartner(filter, local))
+      local     <- filterForPartner(filter, searchLocal(filter, showBlockedUsers = true, isHandle = isHandle))
       convs     <- conversations
-      dir       <- if (isPartner) Signal.const(IndexedSeq.empty[UserData]) else directorySearch
-      dir       <- Signal.future(filterForPartner(filter, dir))
+      isPartner <- Signal.future(isPartner)
+      dir       <- filterForPartner(filter, if (isPartner) Signal.const(IndexedSeq.empty[UserData]) else directorySearch)
     } yield SearchResults(top, local, convs, dir)
   }
 
@@ -264,12 +264,11 @@ class UserSearchService(selfUserId:           UserId,
     val ids = results.map(_.id)(breakOut): Vector[UserId]
 
     for {
-      userData <- usersStorage.listAll(ids)
-      filtered <- filterForPartner(query.filter, userData)
-      filteredIds = filtered.map(_.id).toSet
-      updated <- userService.updateUsers(results.filter(r => filteredIds.contains(r.id)))
-      _       <- userService.syncIfNeeded(filteredIds, Duration.Zero)
-      _       <- queryCache.updateOrCreate(query, updating(filteredIds.toVector), SearchQueryCache(query, clock.instant(), Some(filteredIds.toVector)))
+      userData    <- usersStorage.listAll(ids)
+      filteredIds <- filterForPartner(query.filter, userData).map(_.map(_.id).toSet)
+      updated     <- userService.updateUsers(results.filter(r => filteredIds.contains(r.id)))
+      _           <- userService.syncIfNeeded(filteredIds, Duration.Zero)
+      _           <- queryCache.updateOrCreate(query, updating(filteredIds.toVector), SearchQueryCache(query, clock.instant(), Some(filteredIds.toVector)))
     } yield ()
 
     query match {
@@ -297,14 +296,8 @@ class UserSearchService(selfUserId:           UserId,
     Future.successful({})
   }
 
-  def searchUserData(query: SearchQuery): Signal[IndexedSeq[UserData]] = signalMap.getOrElseUpdate(query, returning( startNewSearch(query) ) { _ =>
-    CancellableFuture.delay(cacheRefreshInterval).map { _ =>
-      signalMap.remove(query)
-      queryCache.remove(query)
-    }
-  })
-
-  private def startNewSearch(query: SearchQuery): Signal[IndexedSeq[UserData]] = returning( queryCache.optSignal(query) ){ _ =>
+  // not private for tests
+  def searchUserData(query: SearchQuery): Signal[IndexedSeq[UserData]] = returning( queryCache.optSignal(query) ){ _ =>
     localSearch(query).flatMap(_ => sync.syncSearchQuery(query))
   }.flatMap {
     case None => Signal.const(IndexedSeq.empty[UserData])

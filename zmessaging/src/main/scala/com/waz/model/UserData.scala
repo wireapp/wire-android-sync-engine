@@ -57,8 +57,7 @@ case class UserData(override val id:       UserId,
                     managedBy:             Option[ManagedBy]      = None,
                     fields:                Seq[UserField]         = Seq.empty,
                     permissions:           PermissionsMasks       = (0,0),
-                    createdBy:             Option[UserId]         = None
-                   ) extends Identifiable[UserId] {
+                    createdBy:             Option[UserId]         = None) extends Identifiable[UserId] {
 
   def isConnected = ConnectionStatus.isConnected(connection)
   def hasEmailOrPhone = email.isDefined || phone.isDefined
@@ -122,10 +121,8 @@ case class UserData(override val id:       UserId,
 
   def isGuest(ourTeamId: Option[TeamId]): Boolean = ourTeamId.isDefined && teamId != ourTeamId
 
-  def isPartner(ourTeamId: Option[TeamId]): Boolean = {
-    lazy val ps = decodeBitmask(permissions._1)
-    teamId.isDefined && teamId == ourTeamId && PartnerPermissions.subsetOf(ps) && PartnerPermissions.size == ps.size
-  }
+  def isPartner(ourTeamId: Option[TeamId]): Boolean =
+    teamId.isDefined && teamId == ourTeamId && decodeBitmask(permissions._1) == PartnerPermissions
 
   def matchesFilter(filter: String): Boolean = {
     val isHandleSearch = Handle.isHandle(filter)
@@ -136,12 +133,11 @@ case class UserData(override val id:       UserId,
     handle.exists(_.startsWithQuery(filter)) ||
       (!handleOnly && (SearchKey(filter).isAtTheStartOfAnyWordIn(searchKey) || email.exists(e => filter.trim.equalsIgnoreCase(e.str))))
 
-  // Whether the user matches a search query
-  def matchesQuery(query: Option[SearchKey] = None, handleOnly: Boolean = false) = (query match {
+  def matchesQuery(query: Option[SearchKey] = None, handleOnly: Boolean = false): Boolean = query match {
     case Some(q) =>
       this.handle.map(_.string).contains(q.asciiRepresentation) || (!handleOnly && q.isAtTheStartOfAnyWordIn(this.searchKey))
     case _ => true
-  })
+  }
 }
 
 object UserData {

@@ -40,8 +40,7 @@ class UsersSyncHandler(assetSync: AssetSyncHandler,
                        assets: AssetService,
                        usersClient: UsersClient,
                        imageGenerator: ImageAssetGenerator,
-                       otrSync: OtrSyncHandler
-                      ) {
+                       otrSync: OtrSyncHandler) {
   import Threading.Implicits.Background
   private implicit val ec = EventContext.Global
 
