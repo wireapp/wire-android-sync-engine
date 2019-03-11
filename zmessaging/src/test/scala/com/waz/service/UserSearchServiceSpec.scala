@@ -108,6 +108,12 @@ class UserSearchServiceSpec extends AndroidFreeSpec {
       handle = Some(Handle("mm2")),
       createdBy = Some(id('aa1))
     ),
+    id('mm3) -> UserData(id('mm3), "Member 3").copy(
+      permissions = (memberPermissions, memberPermissions),
+      teamId = teamId,
+      handle = Some(Handle("mm3")),
+      createdBy = Some(id('aa1))
+    ),
     id('aa1) -> UserData(id('aa1), "Admin 1").copy(
       permissions = (adminPermissions, adminPermissions),
       teamId = teamId,
@@ -391,7 +397,10 @@ class UserSearchServiceSpec extends AndroidFreeSpec {
       mockServicesForTeam(query = "Partner", conversationMembers = ids('a, 'mm1))
 
       // WHEN
-      val res = result(getService(true).search("Partner").map(_.local.map(_.id).toSet).head)
+      val res = result(getService(
+        true,
+        id('mm1)
+      ).search("Partner").map(_.local.map(_.id).toSet).head)
 
       // THEN
       res shouldBe ids()
@@ -403,7 +412,10 @@ class UserSearchServiceSpec extends AndroidFreeSpec {
       mockServicesForTeam(query = "Partner", conversationMembers = ids('pp1, 'k, 'mm1))
 
       // WHEN
-      val res = result(getService(true).search("Partner").map(_.local.map(_.id).toSet).head)
+      val res = result(getService(
+        true,
+        id('mm1)
+      ).search("Partner").map(_.local.map(_.id).toSet).head)
 
       // THEN
       res shouldBe ids('pp1)
@@ -417,7 +429,10 @@ class UserSearchServiceSpec extends AndroidFreeSpec {
       mockServicesForTeam(query = "pp1", conversationMembers = ids('k, 'a, 'mm1))
 
       // WHEN
-      val res = result(getService(true).search("pp1").map(_.local.map(_.id).toSet).head)
+      val res = result(getService(
+        true,
+        id('mm1)
+      ).search("pp1").map(_.local.map(_.id).toSet).head)
 
       // THEN
       res shouldBe ids('pp1)
@@ -429,7 +444,10 @@ class UserSearchServiceSpec extends AndroidFreeSpec {
       mockServicesForTeam(query = "Member", conversationMembers = ids('mm2, 'pp1))
 
       // WHEN
-      val res = result(getService(true).search("Member").map(_.local.map(_.id).toSet).head)
+      val res = result(getService(
+        true,
+        id('mm3)
+      ).search("Member").map(_.local.map(_.id).toSet).head)
 
       // THEN
       res shouldBe ids('mm1, 'mm2)
@@ -441,7 +459,10 @@ class UserSearchServiceSpec extends AndroidFreeSpec {
       mockServicesForTeam(query = "related", conversationMembers = ids('mm2, 'pp1, 'e), connectedUsers = ids('d, 'e))
 
       // WHEN
-      val res = result(getService(true).search("related").map(_.local.map(_.id).toSet).head)
+      val res = result(getService(
+        true,
+        id('mm1)
+      ).search("related").map(_.local.map(_.id).toSet).head)
 
       // THEN
       res shouldBe ids('d, 'e)
@@ -453,7 +474,10 @@ class UserSearchServiceSpec extends AndroidFreeSpec {
       mockServicesForTeam(query = "related", conversationMembers = ids('mm2, 'pp1, 'e))
 
       // WHEN
-      val res = result(getService(true).search("related").map(_.local.map(_.id).toSet).head)
+      val res = result(getService(
+        true,
+        id('mm1)
+      ).search("related").map(_.local.map(_.id).toSet).head)
 
       // THEN
       res shouldBe ids()
@@ -466,7 +490,26 @@ class UserSearchServiceSpec extends AndroidFreeSpec {
       mockServicesForTeam(query = "Member", conversationMembers = ids('pp1, 'k))
 
       // WHEN
-      val res = result(getService(true).search("Member").map(_.local.map(_.id).toSet).head)
+      val res = result(getService(
+        true,
+        id('pp1)
+      ).search("Member").map(_.local.map(_.id).toSet).head)
+
+      // THEN
+      res shouldBe ids()
+    }
+
+    scenario("as a partner, show no team members") {
+
+      // GIVEN
+      userPrefs.setValue(UserPreferences.SelfPermissions, partnerPermissions)
+      mockServicesForTeam(query = "", conversationMembers = ids('pp3, 'k))
+
+      // WHEN
+      val res = result(getService(
+        true,
+        id('pp3)
+      ).search("").map(_.local.map(_.id).toSet).head)
 
       // THEN
       res shouldBe ids()
@@ -479,7 +522,10 @@ class UserSearchServiceSpec extends AndroidFreeSpec {
       mockServicesForTeam(query = "Member", conversationMembers = ids('mm1, 'k))
 
       // WHEN
-      val res = result(getService(true).search("Member").map(_.local.map(_.id).toSet).head)
+      val res = result(getService(
+        true,
+        id('pp1)
+      ).search("Member").map(_.local.map(_.id).toSet).head)
 
       // THEN
       res shouldBe ids('mm1)
@@ -489,10 +535,13 @@ class UserSearchServiceSpec extends AndroidFreeSpec {
 
       // GIVEN
       userPrefs.setValue(UserPreferences.SelfPermissions, partnerPermissions)
-      mockServicesForTeam(query = "Partner", conversationMembers = Set(id('pp1)))
+      mockServicesForTeam(query = "Partner", conversationMembers = ids('pp1, 'pp2))
 
       // WHEN
-      val res = result(getService(true).search("Partner").map(_.local.map(_.id).toSet).head)
+      val res = result(getService(
+        true,
+        id('pp2)
+      ).search("Partner").map(_.local.map(_.id).toSet).head)
 
       // THEN
       res shouldBe ids('pp1)
@@ -505,7 +554,10 @@ class UserSearchServiceSpec extends AndroidFreeSpec {
       mockServicesForTeam(query = "Partner", conversationMembers = Set(id('mm1)))
 
       // WHEN
-      val res = result(getService(true).search("Partner").map(_.local.map(_.id).toSet).head)
+      val res = result(getService(
+        true,
+        id('pp1)
+      ).search("Partner").map(_.local.map(_.id).toSet).head)
 
       // THEN
       res shouldBe ids()
@@ -518,7 +570,10 @@ class UserSearchServiceSpec extends AndroidFreeSpec {
       mockServicesForTeam(query = "related", conversationMembers = ids('mm2, 'pp1, 'e), connectedUsers = ids('d, 'e))
 
       // WHEN
-      val res = result(getService(true).search("related").map(_.local.map(_.id).toSet).head)
+      val res = result(getService(
+        true,
+        id('pp1)
+      ).search("related").map(_.local.map(_.id).toSet).head)
 
       // THEN
       res shouldBe ids('e)
@@ -531,13 +586,16 @@ class UserSearchServiceSpec extends AndroidFreeSpec {
       mockServicesForTeam(query = "related", conversationMembers = ids('mm2, 'pp1, 'e))
 
       // WHEN
-      val res = result(getService(true).search("related").map(_.local.map(_.id).toSet).head)
+      val res = result(getService(
+        true,
+        id('pp1)
+      ).search("related").map(_.local.map(_.id).toSet).head)
 
       // THEN
       res shouldBe ids()
     }
 
-    scenario("as an admin, see the partners that I invited") {
+    scenario("as an admin, search the partners that I invited") {
 
       // GIVEN
       userPrefs.setValue(UserPreferences.SelfPermissions, adminPermissions)
@@ -551,6 +609,26 @@ class UserSearchServiceSpec extends AndroidFreeSpec {
 
       // THEN
       res shouldBe ids('pp1)
+
+    }
+
+    scenario("as an admin, see the partners that I invited") {
+
+      // GIVEN
+      userPrefs.setValue(UserPreferences.SelfPermissions, adminPermissions)
+      mockServicesForTeam(query = "", conversationMembers = ids())
+
+      // WHEN
+      val res = result(getService(
+        true,
+        selfId = id('aa1)
+      ).search("").map(_.local.map(_.id).toSet).head)
+
+      // THEN
+      res shouldBe ids(
+        'aa2, 'mm1, 'mm2, 'mm3, // all non-partner team members
+        'pp1 // partner that I invited
+      )
 
     }
 
