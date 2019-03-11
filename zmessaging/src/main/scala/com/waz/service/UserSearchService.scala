@@ -88,11 +88,19 @@ class UserSearchService(selfUserId:           UserId,
     isPartner.flatMap {
       case true if teamId.isDefined =>
         ZLog.verbose(s"filterForPartner1 Q: $query, RES: ${searchResults.map(_.getDisplayName)}) with partner = true and teamId")
-        knownUsers.map(knownUsersIds => searchResults.filter(u => knownUsersIds.contains(u.id)))
+        for {
+          userThatInvitedMe <- usersStorage.get(selfUserId).map(_.flatMap(_.createdBy))
+          filteredUsers <- knownUsers.map(knownUsersIds => searchResults.filter(u =>
+            knownUsersIds.contains(u.id) ||
+            userThatInvitedMe.contains(u.id)
+          ))
+        } yield filteredUsers
       case false if teamId.isDefined =>
+        lazy val usersInvitedByMe = searchResults.filter(_.createdBy == Some(selfUserId)).map(_.id).toSet
         ZLog.verbose(s"filterForPartner2 Q: $query, RES: ${searchResults.map(_.getDisplayName)}) with partner = false and teamId")
         knownUsers.map { knownUsersIds =>
           searchResults.filter { u =>
+            usersInvitedByMe.contains(u.id) ||
             knownUsersIds.contains(u.id) ||
               u.teamId != teamId ||
               (u.teamId == teamId && !u.isPartner(teamId)) ||
