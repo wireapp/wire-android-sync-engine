@@ -17,11 +17,11 @@
  */
 package com.waz.service
 
+import com.waz.ZLog
 import com.waz.ZLog.ImplicitTag._
-import com.waz.ZLog.verbose
 import com.waz.content.UserPreferences.SelfPermissions
 import com.waz.content._
-import com.waz.log.ZLog2._
+import com.waz.log.ZLog2.{verbose, _}
 import com.waz.model.SearchQuery.{Recommended, RecommendedHandle}
 import com.waz.model.UserData.{ConnectionStatus, UserDataDao}
 import com.waz.model.UserPermissions.{PartnerPermissions, decodeBitmask}
@@ -79,22 +79,25 @@ class UserSearchService(selfUserId:           UserId,
   private val exactMatchUser = new SourceSignal[Option[UserData]]()
 
   private lazy val isPartner = userPrefs(SelfPermissions).apply()
-    .map(decodeBitmask)
-    .map(_ == PartnerPermissions)
+    .map { ps =>
+      ZLog.verbose(s"isPartner permissions are $ps, bitmask: ${decodeBitmask(ps)}, partner permissions: $PartnerPermissions")
+      decodeBitmask(ps)
+    }.map(_.equals(PartnerPermissions))
 
   private def filterForPartner(query: Filter, searchResults: IndexedSeq[UserData]): Future[IndexedSeq[UserData]] = {
     lazy val knownUsers = membersStorage.getByUsers(searchResults.map(_.id).toSet).map(_.map(_.userId).toSet)
     isPartner.flatMap {
       case true if teamId.isDefined =>
-        verbose(s"filterForPartner1 Q: $query, RES: ${searchResults.map(_.getDisplayName)}) with partner = true and teamId")
+        verbose(l"filterForPartner1 Q: ${showString(query)}, RES: ${searchResults.map(_.getDisplayName)} with partner = true and teamId")
         for {
           Some(self)    <- userService.getSelfUser
-          filteredUsers <- knownUsers.map(knownUsersIds =>
-                             searchResults.filter(u => self.createdBy.contains(u.id) || knownUsersIds.contains(u.id))
-                           )
+          knownUsers <- knownUsers
+          _ = verbose(l"self created by is: ${self.createdBy} and results: ${searchResults.map(_.id)} (${searchResults.map(u => Some(u.id)).contains(self.createdBy)})")
+          filteredUsers = searchResults.filter(u => self.createdBy.contains(u.id) || knownUsers.contains(u.id))
+
         } yield filteredUsers
       case false if teamId.isDefined =>
-        verbose(s"filterForPartner2 Q: $query, RES: ${searchResults.map(_.getDisplayName)}) with partner = false and teamId")
+        verbose(l"filterForPartner2 Q: ${showString(query)}, RES: ${searchResults.map(_.getDisplayName)} with partner = false and teamId")
         knownUsers.map { knownUsersIds =>
           searchResults.filter { u =>
             u.createdBy.contains(selfUserId) ||
@@ -242,7 +245,8 @@ class UserSearchService(selfUserId:           UserId,
         dir <-
           if (shouldShowDirectorySearch)
             searchUserData(query)
-              .map(_.filter(!_.isWireBot))
+              .map(us => us.filter(!_.isWireBot))
+
               .map(sortUsers(_, filter, isHandle, symbolStripped))
           else Signal.const(IndexedSeq.empty)
         exact <- exactMatchUser
@@ -270,19 +274,15 @@ class UserSearchService(selfUserId:           UserId,
     val ids = results.map(_.id)(breakOut): Vector[UserId]
 
     for {
-      userData    <- usersStorage.listAll(ids)
-      filteredIds <- filterForPartner(query.filter, userData).map(_.map(_.id).toSet)
-      updated     <- userService.updateUsers(results.filter(r => filteredIds.contains(r.id)))
-      _           <- userService.syncIfNeeded(filteredIds, Duration.Zero)
-      _           <- queryCache.updateOrCreate(query, updating(filteredIds.toVector), SearchQueryCache(query, clock.instant(), Some(filteredIds.toVector)))
+      updated <- userService.updateUsers(results)
+      _       <- userService.syncIfNeeded(updated.map(_.id), Duration.Zero)
+      _       = verbose(l"updateSearchResults($query, ${results.map(_.handle)})")
+      _       <- queryCache.updateOrCreate(query, updating(ids), SearchQueryCache(query, clock.instant(), Some(ids)))
     } yield ()
 
-    query match {
-      case Recommended(handle) if handle.length > 1 && !results.map(_.handle).exists(_.exactMatchQuery(handle)) =>
-        sync.exactMatchHandle(Handle(Handle.stripSymbol(handle)))
-      case RecommendedHandle(handle) if !results.map(_.handle).exists(_.exactMatchQuery(handle)) =>
-        sync.exactMatchHandle(Handle(Handle.stripSymbol(handle)))
-      case _ =>
+    if (!results.map(_.handle).exists(_.exactMatchQuery(query.filter))) {
+      debug(l"exact match requested, $query")
+      sync.exactMatchHandle(Handle(query.filter))
     }
 
     Future.successful({})
@@ -295,6 +295,7 @@ class UserSearchService(selfUserId:           UserId,
 
     usersStorage.get(userId).collect {
       case Some(user) =>
+        debug(l"exact match returned $user")
         exactMatchUser ! Some(user)
         queryCache.updateOrCreate(query, updating(userId), SearchQueryCache(query, clock.instant(), Some(Vector(userId))))
     }
