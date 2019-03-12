@@ -19,14 +19,16 @@ package com.waz.log
 
 import java.io._
 
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.log.BasicLogging.{Log, LogTag}
 import com.waz.service.ZMessaging.clock
+import com.waz.utils.events.Signal
 
 import scala.Ordered._
 import scala.collection.mutable
 
-//TODO Merge this class with ZLog2 after migration period
-object InternalLog {
+object InternalLog extends DerivedLogTag {
+
   sealed trait LogLevel
   object LogLevel {
     case object Error   extends LogLevel { override def toString = "E" }
@@ -46,16 +48,22 @@ object InternalLog {
     implicit val ordering: Ordering[LogLevel] = Ordering by weight
   }
 
+  private var logsEnabled: Signal[Boolean] = Signal.const(false)
+
+  def setLogsService(logsService: LogsService): Unit = this.synchronized {
+    logsEnabled = logsService.logsEnabledGlobally
+  }
+
   private val outputs = mutable.HashMap[String, LogOutput]()
 
   def getOutputs: List[LogOutput] = outputs.values.toList
 
   def reset(): Unit = this.synchronized {
-    outputs.values.foreach( _.close() )
+    outputs.values.foreach(_.close())
     outputs.clear
   }
 
-  def flush(): Unit = outputs.values.foreach( _.flush() )
+  def flush(): Unit = outputs.values.foreach(_.flush())
 
   def apply(id: String): Option[LogOutput] = outputs.get(id)
 
@@ -63,12 +71,10 @@ object InternalLog {
     outputs.getOrElseUpdate(output.id, output)
   }
 
-  def remove(output: LogOutput) = this.synchronized { outputs.remove(output.id) match {
+  def remove(output: LogOutput): Unit = this.synchronized { outputs.remove(output.id) match {
     case Some(o) => o.close()
     case _ =>
   } }
-
-  import LogLevel._
 
   def stackTrace(cause: Throwable): String = Option(cause) match {
     case Some(c) => val result = new StringWriter()
@@ -86,13 +92,17 @@ object InternalLog {
   def log(log: Log, cause: Throwable, level: LogLevel, tag: LogTag): Unit =
     writeLog(log, level, out => out.log(_, cause, level, tag))
 
-  private def writeLog(log: Log, level: LogLevel, logMsgConsumerCreator: LogOutput => String => Unit): Unit = {
-    outputs.values.filter(_.level <= level).foreach { output =>
-      val logMessage =
-        if (output.showSafeOnly) log.buildMessageSafe
-        else log.buildMessageUnsafe
+  def clearAll(): Unit = outputs.valuesIterator.foreach(_.clear())
 
-      logMsgConsumerCreator(output)(logMessage)
+  private def writeLog(log: Log, level: LogLevel, logMsgConsumerCreator: LogOutput => String => Unit): Unit = {
+    if (logsEnabled.currentValue.contains(true)) {
+      outputs.values.filter(_.level <= level).foreach { output =>
+        val logMessage =
+          if (output.showSafeOnly) log.buildMessageSafe
+          else log.buildMessageUnsafe
+
+        logMsgConsumerCreator(output)(logMessage)
+      }
     }
   }
 

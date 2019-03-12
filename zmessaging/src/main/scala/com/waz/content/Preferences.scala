@@ -30,7 +30,7 @@ import com.waz.model.otr.ClientId
 import com.waz.service.AccountManager.ClientRegistrationState
 import com.waz.sync.client.AuthenticationManager.{AccessToken, Cookie}
 import com.waz.sync.client.OAuth2Client.RefreshToken
-import com.waz.threading.{SerialDispatchQueue, Threading}
+import com.waz.threading.{DispatchQueue, SerialDispatchQueue, Threading}
 import com.waz.utils.TrimmingLruCache.Fixed
 import com.waz.utils.events.{Signal, SourceSignal}
 import com.waz.utils.{CachedStorageImpl, JsonDecoder, JsonEncoder, Serialized, TrimmingLruCache, returning}
@@ -261,10 +261,12 @@ class GlobalPreferences(context: Context, prefs: SharedPreferences) extends Pref
 /**
   * Per-user preference storage in user db.
   */
-class UserPreferences(context: Context, storage: ZmsDatabase) extends CachedStorageImpl[String, KeyValueData](new TrimmingLruCache(context, Fixed(128)), storage)(KeyValueDataDao, LogTag("KeyValueStorage_Cached")) with Preferences {
+class UserPreferences(context: Context, storage: ZmsDatabase)
+  extends CachedStorageImpl[String, KeyValueData](new TrimmingLruCache(context, Fixed(128)), storage)(KeyValueDataDao, LogTag("KeyValueStorage_Cached"))
+    with Preferences {
 
-  override protected implicit val dispatcher = Threading.Background
-  override protected implicit val logTag = LogTag[UserPreferences]
+  override protected implicit val dispatcher: DispatchQueue = Threading.Background
+  override protected implicit val logTag: LogTag = LogTag[UserPreferences]
 
   override protected def getValue[A: PrefCodec](key: PrefKey[A]) = {
     get(key.str).map(_.map(_.value)).map(_.map(implicitly[PrefCodec[A]].decode).getOrElse(key.default))
@@ -449,4 +451,6 @@ object UserPreferences {
   lazy val CheckMutedStatus                 = PrefKey[Boolean]("check_muted_status", customDefault = true)
 
   lazy val ReadReceiptsRemotelyChanged      = PrefKey[Boolean]("read_receipts_remotely_changed", customDefault = false)
+
+  lazy val LogsEnabled: PrefKey[Boolean] = PrefKey[Boolean]("logs_enabled", customDefault = false)
 }

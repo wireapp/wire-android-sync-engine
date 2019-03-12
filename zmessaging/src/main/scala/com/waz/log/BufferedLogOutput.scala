@@ -27,7 +27,6 @@ import com.waz.utils.returning
 
 import scala.annotation.tailrec
 import scala.collection.JavaConversions._
-import scala.concurrent.Future
 
 class BufferedLogOutput(baseDir: String,
                         override val showSafeOnly: Boolean = false,
@@ -47,7 +46,7 @@ class BufferedLogOutput(baseDir: String,
   private var paths = this.synchronized {
     asScalaIterator(new File(baseDir).listFiles().iterator)
       .map(_.getAbsolutePath)
-      .collect { case path@pathRegex(index) => (path, -index.toInt) }
+      .collect { case path @ pathRegex(index) => (path, -index.toInt) }
       .toList
       .sortBy(_._2)
       .map(_._1)
@@ -55,7 +54,7 @@ class BufferedLogOutput(baseDir: String,
 
   private def newPath = s"$baseDir/${BufferedLogOutput.DefFileName}${paths.size}.log"
 
-  def currentPath = {
+  def currentPath: String = {
     if (paths.isEmpty) paths = List(newPath)
     while (new File(paths.head).length > maxFileSize) paths = newPath :: paths
     paths.head
@@ -64,33 +63,35 @@ class BufferedLogOutput(baseDir: String,
   //for tests
   def getMaxBufferSize: Long = maxBufferSize
 
-  def getPaths = paths.reverse // internally the first path is the youngest one, but to the outside we want to show paths from the oldest to the youngest
+  // internally the first path is the youngest one, but to the outside we want to show paths from the oldest to the youngest
+  def getPaths: List[String] = paths.reverse
 
   override def log(str: String, level: LogLevel, tag: LogTag, ex: Option[Throwable] = None): Unit = this.synchronized {
     buffer.append(s"$dateTag/$level/${tag.value}: $str\n${ex.map(e => s"${stackTrace(e)}\n").getOrElse("")}")
     if (size > maxBufferSize) flush()
   }
 
-  override def close(): Future[Unit] = flush()
+  override def close(): Unit = flush()
 
-  def empty = buffer.isEmpty
+  def empty: Boolean = buffer.isEmpty
 
-  def size = buffer.length
+  def size: Int = buffer.length
 
   // TODO: In this implementation we risk that writing to the file fails and we lose the contents.
   // But if we wait for the result of writeToFile, we risk that meanwhile someone will add something
   // to the buffer and we will lose that.
-  override def flush(): Future[Unit] = this.synchronized {
+  override def flush(): Unit = this.synchronized {
     if (!empty) {
       val path = currentPath
       val contents = buffer.toString
       buffer.clear()
-      Future {
-        writeToFile(path, contents)
-        while (paths.size > maxRollFiles) paths = BufferedLogOutput.roll(paths.reverse)
-      }
-    } else Future.successful {}
+      writeToFile(path, contents)
+      while (paths.size > maxRollFiles)
+        paths = BufferedLogOutput.roll(paths.reverse)
+    }
   }
+
+  override def clear(): Unit = paths foreach { path => new File(path).delete() }
 
   private def writeToFile(fileName: String, contents: String): Unit = this.synchronized {
     try {

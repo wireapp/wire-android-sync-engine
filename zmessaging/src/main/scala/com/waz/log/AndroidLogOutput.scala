@@ -20,8 +20,6 @@ package com.waz.log
 import android.util.Log
 import com.waz.log.BasicLogging.LogTag
 
-import scala.concurrent.Future
-
 class AndroidLogOutput(override val showSafeOnly: Boolean = false) extends LogOutput {
 
   override val id: String = AndroidLogOutput.id
@@ -36,9 +34,6 @@ class AndroidLogOutput(override val showSafeOnly: Boolean = false) extends LogOu
       case Verbose => Log.v(tag.value, str)
       case _ =>
     }
-
-  override def close(): Future[Unit] = Future.successful {}
-  override def flush(): Future[Unit] = Future.successful {}
 }
 
 object AndroidLogOutput {

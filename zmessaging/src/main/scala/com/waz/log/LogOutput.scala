@@ -23,14 +23,15 @@ import com.waz.log.InternalLog.LogLevel
 import scala.concurrent.Future
 
 trait LogOutput {
-  val id: String
-  val showSafeOnly: Boolean
+  def id: String
+  def showSafeOnly: Boolean
   def level: LogLevel = LogLevel.Verbose
 
   def log(str: String, level: InternalLog.LogLevel, tag: LogTag, ex: Option[Throwable] = None): Unit
   def log(str: String, cause: Throwable, level: InternalLog.LogLevel, tag: LogTag): Unit =
     log(str, level, tag, Some(cause))
 
-  def close(): Future[Unit]
-  def flush(): Future[Unit]
+  def close(): Unit = ()
+  def flush(): Unit = ()
+  def clear(): Unit = ()
 }

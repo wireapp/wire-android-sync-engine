@@ -22,7 +22,7 @@ import java.util.concurrent.{Executors, ThreadFactory, TimeoutException}
 import com.waz.SystemLogOutput
 import com.waz.log.BasicLogging.LogTag
 import com.waz.log.LogSE._
-import com.waz.log.{InternalLog, LogSE}
+import com.waz.log.{InternalLog, LogSE, LogsService}
 import com.waz.model.UserId
 import com.waz.service.AccountsService.{AccountState, InForeground, LoggedOut}
 import com.waz.service._
@@ -68,6 +68,7 @@ trait ZSpec extends FeatureSpec
 
     InternalLog.reset()
     InternalLog.add(new SystemLogOutput)
+    InternalLog.setLogsService(new DummyLogsService)
   }
 }
 
@@ -181,4 +182,10 @@ object AndroidFreeSpec {
 
   val DefaultTimeout = 5.seconds
   @volatile private var swallowedFailure = Option.empty[exceptions.TestFailedException]
+}
+
+class DummyLogsService extends LogsService {
+  override def logsEnabledGlobally: Signal[Boolean] = Signal.const(true)
+  override def logsEnabled(userId: UserId): Future[Boolean] = ???
+  override def setLogsEnabled(userId: UserId, enabled: Boolean): Future[Unit] = ???
 }

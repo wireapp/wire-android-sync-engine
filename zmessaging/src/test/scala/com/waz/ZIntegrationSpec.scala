@@ -18,6 +18,7 @@
 package com.waz
 
 import com.waz.log.{InternalLog, LogOutput}
+import com.waz.specs.DummyLogsService
 import com.waz.utils.isTest
 import org.scalamock.scalatest.AsyncMockFactory
 import org.scalatest._
@@ -34,6 +35,7 @@ trait ZIntegrationSpec extends AsyncFeatureSpec
 
     InternalLog.reset()
     InternalLog.add(new SystemLogOutput)
+    InternalLog.setLogsService(new DummyLogsService)
   }
 }
 
@@ -42,8 +44,6 @@ trait ZIntegrationMockSpec extends ZIntegrationSpec with AsyncMockFactory
 
 import com.waz.log.BasicLogging.LogTag
 import com.waz.log.InternalLog.dateTag
-
-import scala.concurrent.Future
 
 class SystemLogOutput extends LogOutput {
   override val id: String = SystemLogOutput.id
@@ -54,10 +54,6 @@ class SystemLogOutput extends LogOutput {
     println(s"$dateTag/$level/${tag.value}: $str")
     ex.foreach(e => println(InternalLog.stackTrace(e)))
   }
-
-  override def close(): Future[Unit] = Future.successful {}
-  override def flush(): Future[Unit] = Future.successful {}
-
 }
 
 object SystemLogOutput {

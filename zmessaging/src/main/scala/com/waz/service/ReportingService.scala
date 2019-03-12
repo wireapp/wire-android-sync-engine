@@ -139,20 +139,21 @@ class GlobalReportingService(context: Context, cache: CacheService, metadata: Me
   })
 
   val InternalLogReporter = Reporter("InternalLog", { writer =>
-    val outputs = InternalLog.getOutputs.flatMap {
-      case o: BufferedLogOutput => Some(o)
-      case _ => None
-    }
+    Future {
+      val outputs = InternalLog.getOutputs.flatMap {
+        case o: BufferedLogOutput => Some(o)
+        case _ => None
+      }
 
-    Future.sequence(outputs.map( _.flush() )).map { _ =>
+      outputs.foreach(_.flush())
       outputs.flatMap(_.getPaths) // paths should be sorted from the oldest to the youngest
-             .map(new File(_))
-             .filter(_.exists)
-             .foreach { file =>
-               IoUtils.withResource(new BufferedReader(new InputStreamReader(new FileInputStream(file)))) {
-                 reader => Iterator.continually(reader.readLine()).takeWhile(_ != null).foreach(writer.println)
-               }
-             }
+        .map(new File(_))
+        .filter(_.exists)
+        .foreach { file =>
+          IoUtils.withResource(new BufferedReader(new InputStreamReader(new FileInputStream(file)))) {
+            reader => Iterator.continually(reader.readLine()).takeWhile(_ != null).foreach(writer.println)
+          }
+        }
     }
   })
 }
