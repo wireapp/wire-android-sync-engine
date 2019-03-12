@@ -165,15 +165,6 @@ import org.threeten.bp.Instant
       }
     }
 
-    scenario("Inline search results in 75") {
-      implicit val db = loadDb("/db/zmessaging_60.db")
-      dbHelper.onUpgrade(db, 60, 75)
-
-      val cachedQuery = SearchQueryCache(SearchQuery.Recommended("meep moop"), Instant.now, Some(Vector(UserId("a"), UserId("b"))))
-      SearchQueryCacheDao.insertOrIgnore(cachedQuery)
-      SearchQueryCacheDao.list shouldEqual Vector(cachedQuery)
-    }
-
     scenario("Drop excludeFromPYMK and search from sync jobs in 75") {
       implicit val db = loadDb("/db/zmessaging_60.db")
       import Generators._

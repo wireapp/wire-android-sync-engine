@@ -24,7 +24,7 @@ import com.waz.model.ConversationData.ConversationDataDao
 import com.waz.model._
 import com.waz.service.EventScheduler.Stage
 import com.waz.service.conversation.ConversationsContentUpdater
-import com.waz.service.{EventScheduler, SearchKey}
+import com.waz.service.{EventScheduler, SearchKey, SearchQuery}
 import com.waz.sync.client.TeamsClient.TeamMember
 import com.waz.sync.{SyncRequestService, SyncServiceHandle}
 import com.waz.threading.{CancellableFuture, SerialDispatchQueue}
@@ -40,7 +40,7 @@ trait TeamsService {
 
   def eventsProcessingStage: Stage.Atomic
 
-  def searchTeamMembers(query: Option[SearchKey] = None, handleOnly: Boolean = false): Signal[Set[UserData]]
+  def searchTeamMembers(query: SearchQuery): Signal[Set[UserData]]
 
   val selfTeam: Signal[Option[TeamData]]
 
@@ -93,7 +93,7 @@ class TeamsServiceImpl(selfUser:           UserId,
     } yield {}
   }
 
-  override def searchTeamMembers(query: Option[SearchKey] = None, handleOnly: Boolean = false) = teamId match {
+  override def searchTeamMembers(query: SearchQuery) = teamId match {
     case None => Signal.empty
     case Some(tId) =>
 
@@ -103,12 +103,11 @@ class TeamsServiceImpl(selfUser:           UserId,
         userStorage.onDeleted.map(_.map(Removed(_)))
       )
 
-      def load = query match {
-        case Some(q) => userStorage.searchByTeam(tId, q, handleOnly)
-        case None    => userStorage.getByTeam(Set(tId))
-      }
+      def load =
+        if (!query.isEmpty) userStorage.searchByTeam(tId, SearchKey(query.str), query.handleOnly)
+        else userStorage.getByTeam(Set(tId))
 
-      def userMatches(data: UserData) = data.isInTeam(teamId) && data.matchesQuery(query, handleOnly)
+      def userMatches(data: UserData) = data.isInTeam(teamId) && data.matchesQuery(query)
 
       new AggregatingSignal[Seq[ContentChange[UserId, UserData]], Set[UserData]](changesStream, load, { (current, changes) =>
         val added = changes.collect {

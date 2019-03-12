@@ -21,8 +21,8 @@ import com.waz.api.IConversation.{Access, AccessRole}
 import com.waz.model.AddressBook.AddressBookDecoder
 import com.waz.model.UserData.ConnectionStatus
 import com.waz.model.otr.ClientId
-import com.waz.model.{AccentColor, Availability, SearchQuery, _}
-import com.waz.service.PropertyKey
+import com.waz.model.{AccentColor, Availability, _}
+import com.waz.service.{PropertyKey, SearchQuery}
 import com.waz.service.assets2.{Codec, StorageCodecs, UploadAssetStatus}
 import com.waz.sync.client.{ConversationsClient, UsersClient}
 import com.waz.sync.queue.SyncJobMerger._
@@ -415,7 +415,7 @@ object SyncRequest {
         case SyncUser(users)                  => o.put("users", arrString(users.toSeq map (_.str)))
         case SyncConversation(convs)          => o.put("convs", arrString(convs.toSeq map (_.str)))
         case SyncConvLink(conv)               => o.put("conv", conv.str)
-        case SyncSearchQuery(queryCacheKey)   => o.put("queryCacheKey", queryCacheKey.cacheKey)
+        case SyncSearchQuery(query)           => o.put("queryCacheKey", query.cacheKey)
         case PostAddBot(cId, pId, iId)        =>
           o.put("convId", cId.str)
           o.put("providerId", pId.str)

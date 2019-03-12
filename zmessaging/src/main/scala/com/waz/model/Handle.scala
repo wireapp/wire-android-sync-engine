@@ -26,11 +26,9 @@ case class Handle(string: String) extends AnyVal {
 
   def startsWithQuery(query: String): Boolean =
     query.nonEmpty && string.startsWith(Handle.stripSymbol(query).toLowerCase)
-  
 
   def exactMatchQuery(query: String): Boolean =
     string == Handle.stripSymbol(query).toLowerCase
-
 
   def withSymbol: String = if (string.startsWith("@")) string else s"@$string"
 }
