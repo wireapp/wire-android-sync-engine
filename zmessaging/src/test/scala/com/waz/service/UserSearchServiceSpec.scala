@@ -390,14 +390,14 @@ class UserSearchServiceSpec extends AndroidFreeSpec {
       }
       (usersStorage.find(_: UserData => Boolean, _: DB => Managed[TraversableOnce[UserData]], _: UserData => UserData)(_: CanBuild[UserData, Vector[UserData]]))
         .stubs(*, *, *, *).returning(Future.successful(Vector.empty[UserData]))
-      (userService.acceptedOrBlockedUsers _).stubs().returning(Signal.const(connectedUsers.map(k => (k -> users(k))).toMap))
+      (userService.acceptedOrBlockedUsers _).stubs().returning(Signal.const(users.filterKeys(connectedUsers.contains)))
       (userService.getSelfUser _).stubs().onCall(_ => Future.successful(users.get(selfId)))
 
       (convsStorage.findGroupConversations _).stubs(*, *, *, *).returns(Future.successful(IndexedSeq.empty[ConversationData]))
       (queryCacheStorage.updateOrCreate _).stubs(*, *, *).returning(Future.successful(queryCache))
 
       (membersStorage.getByUsers _).stubs(*).onCall { ids: Set[UserId] =>
-        Future.successful(ids.filter(i => conversationMembers.contains(i)).map(ConversationMemberData(_, convId)).toIndexedSeq)
+        Future.successful(ids.intersect(conversationMembers).map(ConversationMemberData(_, convId)).toIndexedSeq)
       }
 
       (sync.syncSearchQuery _).stubs(*).onCall { _: SearchQuery =>
