@@ -59,6 +59,8 @@ class UserSearchServiceSpec extends AndroidFreeSpec {
   val userPrefs         = new TestUserPreferences
 
   lazy val users = Map(
+    id('selfUser) -> UserData(id('selfUser), "self user"),
+
     id('a) -> UserData(id('a), "other user 1"),
     id('b) -> UserData(id('b), "other user 2"),
     id('c) -> UserData(id('c), "some name"),
@@ -144,7 +146,7 @@ class UserSearchServiceSpec extends AndroidFreeSpec {
     (membersStorage.activeMembers _).expects(*).anyNumberOfTimes().returning(Signal.const(convMembers))
     (usersStorage.listSignal _).expects(*).once().returning(Signal.const(convMembers.map(users).toVector))
 
-    val res = getService(false).mentionsSearchUsersInConversation(ConvId("123"),"rod")
+    val res = getService(false, selfId).mentionsSearchUsersInConversation(ConvId("123"),"rod")
     result(res.filter(_.size == 1).head)
   }
 
@@ -156,7 +158,7 @@ class UserSearchServiceSpec extends AndroidFreeSpec {
     (membersStorage.activeMembers _).expects(*).anyNumberOfTimes().returning(Signal.const(convMembers))
     (usersStorage.listSignal _).expects(*).once().returning(Signal.const(convMembers.map(users).toVector))
 
-    val res = getService(false).mentionsSearchUsersInConversation(ConvId("123"),"bjo")
+    val res = getService(false, selfId).mentionsSearchUsersInConversation(ConvId("123"),"bjo")
     result(res.filter(_.size == 1).head)
   }
 
@@ -168,7 +170,7 @@ class UserSearchServiceSpec extends AndroidFreeSpec {
     (membersStorage.activeMembers _).expects(*).anyNumberOfTimes().returning(Signal.const(convMembers))
     (usersStorage.listSignal _).expects(*).once().returning(Signal.const(convMembers.map(users).toVector))
 
-    val res = getService(false).mentionsSearchUsersInConversation(ConvId("123"),"rn")
+    val res = getService(false, selfId).mentionsSearchUsersInConversation(ConvId("123"),"rn")
     result(res.filter{u => println(u.map(_.displayName));u.size == 1}.head)
   }
 
@@ -180,7 +182,7 @@ class UserSearchServiceSpec extends AndroidFreeSpec {
     (membersStorage.activeMembers _).expects(*).anyNumberOfTimes().returning(Signal.const(convMembers))
     (usersStorage.listSignal _).expects(*).once().returning(Signal.const(convMembers.map(users).toVector))
 
-    val res = getService(false).mentionsSearchUsersInConversation(ConvId("123"),"mores")
+    val res = getService(false, selfId).mentionsSearchUsersInConversation(ConvId("123"),"mores")
     result(res.filter(_.size == 2).head)
   }
 
@@ -192,7 +194,7 @@ class UserSearchServiceSpec extends AndroidFreeSpec {
     (membersStorage.activeMembers _).expects(*).anyNumberOfTimes().returning(Signal.const(convMembers))
     (usersStorage.listSignal _).expects(*).once().returning(Signal.const(convMembers.map(users).toVector))
 
-    val res = getService(false).mentionsSearchUsersInConversation(ConvId("123"),"smores")
+    val res = getService(false, selfId).mentionsSearchUsersInConversation(ConvId("123"),"smores")
     result(res.filter(_.size == 1).head)
   }
 
@@ -205,7 +207,7 @@ class UserSearchServiceSpec extends AndroidFreeSpec {
     (membersStorage.activeMembers _).expects(*).anyNumberOfTimes().returning(Signal.const(convMembers))
     (usersStorage.listSignal _).expects(*).once().returning(Signal.const(convMembers.map(users).toVector))
 
-    val res = getService(false).mentionsSearchUsersInConversation(ConvId("123"),"john")
+    val res = getService(false, selfId).mentionsSearchUsersInConversation(ConvId("123"),"john")
 
     result(res.filter(_.equals(correctOrder)).head)
   }
@@ -247,7 +249,7 @@ class UserSearchServiceSpec extends AndroidFreeSpec {
     querySignal ! Some(firstQueryCache)
     result(querySignal.filter(_.contains(firstQueryCache)).head)
     
-    val resSignal = getService(false).searchUserData(Recommended(prefix)).map(_.map(_.id)).disableAutowiring()
+    val resSignal = getService(false, selfId).searchUserData(Recommended(prefix)).map(_.map(_.id)).disableAutowiring()
 
     result(querySignal.filter(_.contains(secondQueryCache)).head)
 
@@ -284,7 +286,7 @@ class UserSearchServiceSpec extends AndroidFreeSpec {
       (userService.acceptedOrBlockedUsers _).expects().returns(Signal.const(Map.empty[UserId, UserData]))
       (messagesStorage.countLaterThan _).expects(*, *).repeated(3).returning(Future.successful(1L))
 
-      val res = getService(false).search("").map(_.top.map(_.id).toSet)
+      val res = getService(false, selfId).search("").map(_.top.map(_.id).toSet)
 
       result(res.filter(_ == expected).head)
     }
@@ -316,7 +318,7 @@ class UserSearchServiceSpec extends AndroidFreeSpec {
 
       (usersStorage.listSignal _).expects(*).never()
 
-      val res = getService(false).search("fr").map(_.local.map(_.id).toSet)
+      val res = getService(false, selfId).search("fr").map(_.local.map(_.id).toSet)
 
       result(res.filter(_ == expected).head)
     }
@@ -348,7 +350,7 @@ class UserSearchServiceSpec extends AndroidFreeSpec {
 
      (usersStorage.listSignal _).expects(expected.toVector).once().returning(Signal.const(expected.map(users).toVector))
 
-      val res = getService(false).search("ot").map(_.dir.map(_.id).toSet)
+      val res = getService(false, selfId).search("ot").map(_.dir.map(_.id).toSet)
 
       result(res.filter(_.nonEmpty).head)
     }
@@ -357,6 +359,7 @@ class UserSearchServiceSpec extends AndroidFreeSpec {
   feature("search Inside the team") {
 
     def mockServicesForTeam(query: String,
+                            selfId: UserId,
                             conversationMembers: Set[UserId] = Set(),
                             connectedUsers: Set[UserId] = Set()
                            ): Unit = {
@@ -375,6 +378,7 @@ class UserSearchServiceSpec extends AndroidFreeSpec {
       (usersStorage.find(_: UserData => Boolean, _: DB => Managed[TraversableOnce[UserData]], _: UserData => UserData)(_: CanBuild[UserData, Vector[UserData]]))
         .stubs(*, *, *, *).returning(Future.successful(Vector.empty[UserData]))
       (userService.acceptedOrBlockedUsers _).stubs().returning(Signal.const(connectedUsers.map(k => (k -> users(k))).toMap))
+      (userService.getSelfUser _).stubs().onCall(_ => Future.successful(users.get(selfId)))
 
       (convsStorage.findGroupConversations _).stubs(*, *, *, *).returns(Future.successful(IndexedSeq.empty[ConversationData]))
       (queryCacheStorage.updateOrCreate _).stubs(*, *, *).returning(Future.successful(queryCache))
@@ -394,12 +398,13 @@ class UserSearchServiceSpec extends AndroidFreeSpec {
 
     scenario("as a member, search partners that are not in a conversation with me") {
       // GIVEN
-      mockServicesForTeam(query = "Partner", conversationMembers = ids('a, 'mm1))
+      val selfId = id('mm1)
+      mockServicesForTeam(query = "Partner", selfId = selfId, conversationMembers = ids('a, 'mm1))
 
       // WHEN
       val res = result(getService(
         true,
-        id('mm1)
+        selfId
       ).search("Partner").map(_.local.map(_.id).toSet).head)
 
       // THEN
@@ -409,12 +414,13 @@ class UserSearchServiceSpec extends AndroidFreeSpec {
     scenario("as a member, search partners that are in a conversation with me") {
 
       // GIVEN
-      mockServicesForTeam(query = "Partner", conversationMembers = ids('pp1, 'k, 'mm1))
+      val selfId = id('mm1)
+      mockServicesForTeam(query = "Partner", selfId = selfId, conversationMembers = ids('pp1, 'k, 'mm1))
 
       // WHEN
       val res = result(getService(
         true,
-        id('mm1)
+        selfId
       ).search("Partner").map(_.local.map(_.id).toSet).head)
 
       // THEN
@@ -426,12 +432,13 @@ class UserSearchServiceSpec extends AndroidFreeSpec {
     scenario("as a member, search partners that are not in a conversation with me by exact handle") {
 
       // GIVEN
-      mockServicesForTeam(query = "pp1", conversationMembers = ids('k, 'a, 'mm1))
+      val selfId = id('mm1)
+      mockServicesForTeam(query = "pp1", selfId = selfId, conversationMembers = ids('k, 'a, 'mm1))
 
       // WHEN
       val res = result(getService(
         true,
-        id('mm1)
+        selfId
       ).search("pp1").map(_.local.map(_.id).toSet).head)
 
       // THEN
@@ -441,12 +448,13 @@ class UserSearchServiceSpec extends AndroidFreeSpec {
     scenario("as a member, search team members whether they are in a conversation with me or not") {
 
       // GIVEN
-      mockServicesForTeam(query = "Member", conversationMembers = ids('mm2, 'pp1))
+      val selfId = id('mm3)
+      mockServicesForTeam(query = "Member", selfId = selfId, conversationMembers = ids('mm2, 'pp1))
 
       // WHEN
       val res = result(getService(
         true,
-        id('mm3)
+        selfId
       ).search("Member").map(_.local.map(_.id).toSet).head)
 
       // THEN
@@ -456,12 +464,13 @@ class UserSearchServiceSpec extends AndroidFreeSpec {
     scenario("as a member, search connected guests whether they are in a conversation with me or not") {
 
       // GIVEN
-      mockServicesForTeam(query = "related", conversationMembers = ids('mm2, 'pp1, 'e), connectedUsers = ids('d, 'e))
+      val selfId = id('mm1)
+      mockServicesForTeam(query = "related", selfId = selfId, conversationMembers = ids('mm2, 'pp1, 'e), connectedUsers = ids('d, 'e))
 
       // WHEN
       val res = result(getService(
         true,
-        id('mm1)
+        selfId
       ).search("related").map(_.local.map(_.id).toSet).head)
 
       // THEN
@@ -471,12 +480,13 @@ class UserSearchServiceSpec extends AndroidFreeSpec {
     scenario("as a member, search not connected guests") {
 
       // GIVEN
-      mockServicesForTeam(query = "related", conversationMembers = ids('mm2, 'pp1, 'e))
+      val selfId = id('mm1)
+      mockServicesForTeam(query = "related", selfId = selfId, conversationMembers = ids('mm2, 'pp1, 'e))
 
       // WHEN
       val res = result(getService(
         true,
-        id('mm1)
+        selfId
       ).search("related").map(_.local.map(_.id).toSet).head)
 
       // THEN
@@ -486,13 +496,14 @@ class UserSearchServiceSpec extends AndroidFreeSpec {
     scenario("as a partner, search team members that are not in a conversation with me") {
 
       // GIVEN
+      val selfId = id('pp1)
       userPrefs.setValue(UserPreferences.SelfPermissions, partnerPermissions)
-      mockServicesForTeam(query = "Member", conversationMembers = ids('pp1, 'k))
+      mockServicesForTeam(query = "Member", selfId = selfId, conversationMembers = ids('pp1, 'k))
 
       // WHEN
       val res = result(getService(
         true,
-        id('pp1)
+        selfId
       ).search("Member").map(_.local.map(_.id).toSet).head)
 
       // THEN
@@ -502,13 +513,14 @@ class UserSearchServiceSpec extends AndroidFreeSpec {
     scenario("as a partner, show no team members") {
 
       // GIVEN
+      val selfId = id('pp3)
       userPrefs.setValue(UserPreferences.SelfPermissions, partnerPermissions)
-      mockServicesForTeam(query = "", conversationMembers = ids('pp3, 'k))
+      mockServicesForTeam(query = "", selfId = selfId, conversationMembers = ids('pp3, 'k))
 
       // WHEN
       val res = result(getService(
         true,
-        id('pp3)
+        selfId
       ).search("").map(_.local.map(_.id).toSet).head)
 
       // THEN
@@ -518,13 +530,14 @@ class UserSearchServiceSpec extends AndroidFreeSpec {
     scenario("as a partner, search team members that are in a conversation with me") {
 
       // GIVEN
+      val selfId = id('pp1)
       userPrefs.setValue(UserPreferences.SelfPermissions, partnerPermissions)
-      mockServicesForTeam(query = "Member", conversationMembers = ids('mm1, 'k))
+      mockServicesForTeam(query = "Member", selfId = selfId, conversationMembers = ids('mm1, 'k))
 
       // WHEN
       val res = result(getService(
         true,
-        id('pp1)
+        selfId
       ).search("Member").map(_.local.map(_.id).toSet).head)
 
       // THEN
@@ -534,13 +547,14 @@ class UserSearchServiceSpec extends AndroidFreeSpec {
     scenario("as a partner, search partners that are in a conversation with me") {
 
       // GIVEN
+      val selfId = id('pp2)
       userPrefs.setValue(UserPreferences.SelfPermissions, partnerPermissions)
-      mockServicesForTeam(query = "Partner", conversationMembers = ids('pp1, 'pp2))
+      mockServicesForTeam(query = "Partner", selfId = selfId, conversationMembers = ids('pp1, 'pp2))
 
       // WHEN
       val res = result(getService(
         true,
-        id('pp2)
+        selfId
       ).search("Partner").map(_.local.map(_.id).toSet).head)
 
       // THEN
@@ -550,13 +564,14 @@ class UserSearchServiceSpec extends AndroidFreeSpec {
     scenario("as a partner, search partners that are not in a conversation with me") {
 
       // GIVEN
+      val selfId = id('pp1)
       userPrefs.setValue(UserPreferences.SelfPermissions, partnerPermissions)
-      mockServicesForTeam(query = "Partner", conversationMembers = Set(id('mm1)))
+      mockServicesForTeam(query = "Partner", selfId = selfId, conversationMembers = Set(id('mm1)))
 
       // WHEN
       val res = result(getService(
         true,
-        id('pp1)
+        selfId
       ).search("Partner").map(_.local.map(_.id).toSet).head)
 
       // THEN
@@ -566,13 +581,14 @@ class UserSearchServiceSpec extends AndroidFreeSpec {
     scenario("as a partner, search connected guests whether they are in a conversation with me or not") {
 
       // GIVEN
+      val selfId = id('pp1)
       userPrefs.setValue(UserPreferences.SelfPermissions, partnerPermissions)
-      mockServicesForTeam(query = "related", conversationMembers = ids('mm2, 'pp1, 'e), connectedUsers = ids('d, 'e))
+      mockServicesForTeam(query = "related", selfId = selfId, conversationMembers = ids('mm2, 'pp1, 'e), connectedUsers = ids('d, 'e))
 
       // WHEN
       val res = result(getService(
         true,
-        id('pp1)
+        selfId
       ).search("related").map(_.local.map(_.id).toSet).head)
 
       // THEN
@@ -582,13 +598,14 @@ class UserSearchServiceSpec extends AndroidFreeSpec {
     scenario("as a partner, search not connected guests") {
 
       // GIVEN
+      val selfId = id('pp1)
       userPrefs.setValue(UserPreferences.SelfPermissions, partnerPermissions)
-      mockServicesForTeam(query = "related", conversationMembers = ids('mm2, 'pp1, 'e))
+      mockServicesForTeam(query = "related", selfId = selfId, conversationMembers = ids('mm2, 'pp1, 'e))
 
       // WHEN
       val res = result(getService(
         true,
-        id('pp1)
+        selfId
       ).search("related").map(_.local.map(_.id).toSet).head)
 
       // THEN
@@ -598,13 +615,14 @@ class UserSearchServiceSpec extends AndroidFreeSpec {
     scenario("as an admin, search the partners that I invited") {
 
       // GIVEN
+      val selfId = id('aa1)
       userPrefs.setValue(UserPreferences.SelfPermissions, adminPermissions)
-      mockServicesForTeam(query = "Partner", conversationMembers = ids())
+      mockServicesForTeam(query = "Partner", selfId = selfId, conversationMembers = ids())
 
       // WHEN
       val res = result(getService(
         true,
-        selfId = id('aa1)
+        selfId
       ).search("Partner").map(_.local.map(_.id).toSet).head)
 
       // THEN
@@ -615,13 +633,14 @@ class UserSearchServiceSpec extends AndroidFreeSpec {
     scenario("as an admin, see the partners that I invited") {
 
       // GIVEN
+      val selfId = id('aa1)
       userPrefs.setValue(UserPreferences.SelfPermissions, adminPermissions)
-      mockServicesForTeam(query = "", conversationMembers = ids())
+      mockServicesForTeam(query = "", selfId = selfId, conversationMembers = ids())
 
       // WHEN
       val res = result(getService(
         true,
-        selfId = id('aa1)
+        selfId
       ).search("").map(_.local.map(_.id).toSet).head)
 
       // THEN
@@ -635,13 +654,14 @@ class UserSearchServiceSpec extends AndroidFreeSpec {
     scenario("as a partner, see the admin that invited me") {
 
       // GIVEN
+      val selfId = id('pp2)
       userPrefs.setValue(UserPreferences.SelfPermissions, partnerPermissions)
-      mockServicesForTeam(query = "", conversationMembers = ids())
+      mockServicesForTeam(query = "", selfId = selfId, conversationMembers = ids())
 
       // WHEN
       val res = result(getService(
         true,
-        selfId = id('pp2)
+        selfId
       ).search("").map(_.local.map(_.id).toSet).head)
 
       // THEN
@@ -650,7 +670,7 @@ class UserSearchServiceSpec extends AndroidFreeSpec {
     }
   }
 
-  def getService(inTeam: Boolean, selfId: UserId = selfId) = {
+  def getService(inTeam: Boolean, selfId: UserId) = {
     new UserSearchService(
       selfId,
       queryCacheStorage,
