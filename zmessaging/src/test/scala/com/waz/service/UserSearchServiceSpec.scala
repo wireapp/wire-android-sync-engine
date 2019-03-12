@@ -359,20 +359,16 @@ class UserSearchServiceSpec extends AndroidFreeSpec {
     /**
     * Helper class to keep track of mocked query
       */
-    class PreparedSearch(service: UserSearchService, query: String) {
+    case class PreparedSearch(inTeam: Boolean, selfId: UserId, query: String) {
 
       def perform() = {
-        this.service.search(query).map(_.local.map(_.id).toSet).head
+        val service = getService(this.inTeam, this.selfId)
+        service.search(query).map(_.local.map(_.id).toSet).head
       }
     }
 
     /**
     * Will mock all services, instantiate a UserSearchService to test, and store the query to expect
-      * @param query
-      * @param selfId
-      * @param conversationMembers
-      * @param connectedUsers
-      * @return
       */
     def prepareTestSearch(query: String,
                             selfId: UserId,
@@ -416,10 +412,7 @@ class UserSearchServiceSpec extends AndroidFreeSpec {
       val user = users(selfId)
       userPrefs.setValue(UserPreferences.SelfPermissions, user.permissions._1)
 
-      // Return the service, configured for that user
-      val service = getService(true, selfId)
-
-      return new PreparedSearch(service, query)
+      PreparedSearch(true, selfId, query)
     }
 
     scenario("as a member, search partners that are not in a conversation with me") {
