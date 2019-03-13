@@ -53,6 +53,7 @@ import com.waz.sync.client.AssetClient.Retention
 import com.waz.sync.client.AssetClient2.UploadResponse
 import com.waz.sync.client.AuthenticationManager.{AccessToken, Cookie}
 import com.waz.sync.client.GiphyClient2.GifObject
+import com.waz.sync.client.TeamsClient.TeamMember
 import com.waz.threading.CancellableFuture
 import com.waz.utils.events.Signal
 import com.waz.utils.{sha2, wrappers}
@@ -266,6 +267,9 @@ trait LogShowInstancesSE {
          |TeamData(id: $id | name: $name | creator: $creator)
         """.stripMargin
     }
+
+  implicit val TeamMemberLogShow: LogShow[TeamMember] =
+    LogShow.create(tm => s"TeamMember with permissions: ${tm.permissions}")
 
   implicit val VideoStateLogShow: LogShow[VideoState] = logShowWithToString
 
