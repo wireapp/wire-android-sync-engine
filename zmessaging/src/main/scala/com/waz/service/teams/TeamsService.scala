@@ -20,7 +20,6 @@ package com.waz.service.teams
 import com.waz.content._
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.log.LogSE._
-import com.waz.model.AccountDataOld.PermissionsMasks
 import com.waz.model.ConversationData.ConversationDataDao
 import com.waz.model._
 import com.waz.service.EventScheduler.Stage
