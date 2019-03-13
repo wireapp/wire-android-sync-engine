@@ -107,7 +107,7 @@ object OpenGraphClient {
       override def apply(v: OpenGraphData): JSONObject = JsonEncoder { o =>
         o.put("title", v.title)
         o.put("description", v.description)
-        v.image foreach { uri => o.put("image", uri.toString) }
+        v.image foreach { image => o.put("image", image.url.toString) }
         v.permanentUrl foreach { uri => o.put("url", uri.toString) }
         o.put("tpe", v.tpe)
       }
