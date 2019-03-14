@@ -18,8 +18,9 @@
 package com.waz
 
 import com.waz.log.{InternalLog, LogOutput}
+import com.waz.specs.DummyLogsService
 import com.waz.utils.isTest
-import org.scalamock.scalatest.{AsyncMockFactory, MockFactory}
+import org.scalamock.scalatest.AsyncMockFactory
 import org.scalatest._
 
 trait ZIntegrationSpec extends AsyncFeatureSpec
@@ -34,29 +35,25 @@ trait ZIntegrationSpec extends AsyncFeatureSpec
 
     InternalLog.reset()
     InternalLog.add(new SystemLogOutput)
+    InternalLog.setLogsService(new DummyLogsService)
   }
 }
 
 trait ZIntegrationMockSpec extends ZIntegrationSpec with AsyncMockFactory
 
-import com.waz.ZLog.LogTag
+
+import com.waz.log.BasicLogging.LogTag
 import com.waz.log.InternalLog.dateTag
 
-import scala.concurrent.Future
-
 class SystemLogOutput extends LogOutput {
-  override val id: LogTag = SystemLogOutput.id
+  override val id: String = SystemLogOutput.id
 
   override val showSafeOnly: Boolean = false
 
   override def log(str: String, level: InternalLog.LogLevel, tag: LogTag, ex: Option[Throwable] = None): Unit = {
-    println(s"$dateTag/$level/$tag: $str")
+    println(s"$dateTag/$level/${tag.value}: $str")
     ex.foreach(e => println(InternalLog.stackTrace(e)))
   }
-
-  override def close(): Future[Unit] = Future.successful {}
-  override def flush(): Future[Unit] = Future.successful {}
-
 }
 
 object SystemLogOutput {

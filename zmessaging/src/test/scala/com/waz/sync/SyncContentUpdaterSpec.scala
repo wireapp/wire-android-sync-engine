@@ -17,8 +17,8 @@
  */
 package com.waz.sync
 
-import com.waz.ZLog.LogTag
 import com.waz.content.Database
+import com.waz.log.BasicLogging.LogTag
 import com.waz.model.sync.SyncJob
 import com.waz.model.sync.SyncJob.Priority
 import com.waz.model.sync.SyncRequest.PostOpenGraphMeta

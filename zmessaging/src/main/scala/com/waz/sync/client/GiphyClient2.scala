@@ -19,7 +19,6 @@ package com.waz.sync.client
 
 import java.net.{URL, URLEncoder}
 
-import com.waz.ZLog.ImplicitTag._
 import com.waz.model.Dim2
 import com.waz.sync.client.GiphyClient2.{Gif, GifObject}
 import com.waz.threading.CancellableFuture

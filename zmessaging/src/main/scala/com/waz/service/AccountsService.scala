@@ -19,13 +19,13 @@ package com.waz.service
 
 import java.io.File
 
-import com.waz.ZLog
-import com.waz.ZLog.ImplicitTag._
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.api.impl.ErrorResponse
 import com.waz.api._
 import com.waz.content.GlobalPreferences._
 import com.waz.content.UserPreferences
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
+import com.waz.log.LogShow.SafeToLog
 import com.waz.model.AccountData.Password
 import com.waz.model._
 import com.waz.service.tracking.LoggedOutEvent
@@ -117,7 +117,7 @@ object AccountsService {
   case object InForeground extends Active
 }
 
-class AccountsServiceImpl(val global: GlobalModule) extends AccountsService {
+class AccountsServiceImpl(val global: GlobalModule) extends AccountsService with DerivedLogTag {
   import AccountsService._
   import Threading.Implicits.Background
 

@@ -18,6 +18,7 @@
 package com.waz.service.teams
 
 import com.waz.content._
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model._
 import com.waz.service.SearchKey
 import com.waz.service.conversation.ConversationsContentUpdater
@@ -25,15 +26,13 @@ import com.waz.specs.AndroidFreeSpec
 import com.waz.sync.{SyncRequestService, SyncServiceHandle}
 import com.waz.testutils.TestUserPreferences
 import com.waz.utils.events.EventStream
-import com.waz.ZLog.ImplicitTag._
 import com.waz.content.UserPreferences.{CopyPermissions, SelfPermissions}
 import com.waz.sync.client.TeamsClient
 import com.waz.sync.client.TeamsClient.TeamMember
-
 import scala.collection.breakOut
 import scala.concurrent.Future
 
-class TeamsServiceSpec extends AndroidFreeSpec {
+class TeamsServiceSpec extends AndroidFreeSpec with DerivedLogTag {
 
 
   def id(s: Symbol) = UserId(s.toString)

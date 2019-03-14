@@ -20,11 +20,11 @@ package com.waz.cache
 import java.io.File
 import java.lang.System.currentTimeMillis
 
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.db.Col._
 import com.waz.db.Dao
 import com.waz.db.DbTranslator.FileTranslator
-import com.waz.log.ZLog2.LogShow
+import com.waz.log.LogShow
 import com.waz.model._
 import com.waz.utils.{Identifiable, returning}
 import com.waz.utils.wrappers.{DB, DBCursor}

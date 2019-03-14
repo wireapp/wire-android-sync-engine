@@ -24,8 +24,8 @@ import android.graphics.BitmapFactory
 import android.media.MediaMetadataRetriever
 import android.media.MediaMetadataRetriever._
 import android.net.Uri
-import com.waz.log.ZLog2._
-import com.waz.ZLog.ImplicitTag._
+import com.waz.log.LogSE._
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.service.assets.MetaDataRetriever
 import com.waz.utils.wrappers.URI
 import com.waz.utils.{JsonDecoder, JsonEncoder, _}
@@ -94,7 +94,7 @@ object AssetMetaData {
   case class Audio(duration: Duration, loudness: Option[Loudness] = None) extends AssetMetaData('audio) with HasDuration
   case object Empty extends AssetMetaData('empty)
 
-  object Video {
+  object Video extends DerivedLogTag {
     def apply(file: File): Future[Either[String, Video]] = MetaDataRetriever(file)(apply)
 
     def apply(context: Context, uri: Uri): Future[Either[String, Video]] = MetaDataRetriever(context, uri)(apply)

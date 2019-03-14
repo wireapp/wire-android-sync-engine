@@ -18,6 +18,7 @@
 package com.waz.content
 
 import android.content.Context
+import com.waz.log.BasicLogging.LogTag
 import com.waz.model.AssetData.AssetDataDao
 import com.waz.model.AssetStatus.UploadDone
 import com.waz.model._
@@ -35,7 +36,10 @@ trait AssetsStorage extends CachedStorage[AssetId, AssetData] {
   def mergeOrCreateAsset(newData: Option[AssetData]): Future[Option[AssetData]]
 }
 
-class AssetsStorageImpl(context: Context, storage: Database) extends CachedStorageImpl[AssetId, AssetData](new TrimmingLruCache(context, Fixed(100)), storage)(AssetDataDao, "AssetsStorage") with AssetsStorage {
+class AssetsStorageImpl(context: Context, storage: Database)
+  extends CachedStorageImpl[AssetId, AssetData](new TrimmingLruCache(context, Fixed(100)), storage)(AssetDataDao, LogTag("AssetsStorage"))
+    with AssetsStorage {
+
   private implicit val dispatcher = new SerialDispatchQueue(name = "AssetsStorage")
 
   //allows overwriting of asset data

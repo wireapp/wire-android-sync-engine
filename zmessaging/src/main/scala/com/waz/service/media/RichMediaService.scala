@@ -17,11 +17,11 @@
  */
 package com.waz.service.media
 
-import com.waz.log.ZLog2._
-import com.waz.ZLog.ImplicitTag._
+import com.waz.log.LogSE._
 import com.waz.api.impl.ErrorResponse
 import com.waz.api.{MediaProvider, Message}
 import com.waz.content.MessagesStorage
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model._
 import com.waz.model.messages.media.MediaAssetData
 import com.waz.service.assets.AssetService
@@ -39,7 +39,7 @@ class RichMediaService(assets:      AssetService,
                        messages:    MessagesContentUpdater,
                        sync:        SyncServiceHandle,
                        youTube:     YouTubeMediaService,
-                       soundCloud:  SoundCloudMediaService) {
+                       soundCloud:  SoundCloudMediaService) extends DerivedLogTag {
   import com.waz.api.Message.Part.Type._
   import Threading.Implicits.Background
 

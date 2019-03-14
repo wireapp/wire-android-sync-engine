@@ -24,8 +24,9 @@ import java.util.concurrent.atomic.AtomicReference
 
 import android.media.AudioRecord
 import android.media.AudioRecord._
-import com.waz.log.ZLog2._
-import com.waz.ZLog.ImplicitTag._
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
+import com.waz.log.LogSE._
+import com.waz.log.LogShow.SafeToLog
 import com.waz.threading.Threading
 import com.waz.threading.Threading.BlockingIO
 import com.waz.utils._
@@ -45,7 +46,7 @@ trait PCMRecorder {
   def maxAmplitudeSinceLastCall: Short
 }
 
-object PCMRecorder {
+object PCMRecorder extends DerivedLogTag {
   import Threading.Implicits.Background
 
   def startRecording(destination: File, maxDuration: FiniteDuration): PCMRecorder = {

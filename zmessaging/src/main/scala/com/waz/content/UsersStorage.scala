@@ -18,7 +18,7 @@
 package com.waz.content
 
 import android.content.Context
-import com.waz.ZLog.ImplicitTag._
+import com.waz.log.BasicLogging.LogTag
 import com.waz.model.UserData.{ConnectionStatus, UserDataDao}
 import com.waz.model._
 import com.waz.service.SearchKey
@@ -43,7 +43,10 @@ trait UsersStorage extends CachedStorage[UserId, UserData] {
   def findUsersForService(id: IntegrationId): Future[Set[UserData]]
 }
 
-class UsersStorageImpl(context: Context, storage: ZmsDatabase) extends CachedStorageImpl[UserId, UserData](new TrimmingLruCache(context, Fixed(2000)), storage)(UserDataDao, "UsersStorage_Cached") with UsersStorage {
+class UsersStorageImpl(context: Context, storage: ZmsDatabase)
+  extends CachedStorageImpl[UserId, UserData](new TrimmingLruCache(context, Fixed(2000)), storage)(UserDataDao, LogTag("UsersStorage_Cached"))
+    with UsersStorage {
+
   import EventContext.Implicits.global
   private implicit val dispatcher = new SerialDispatchQueue(name = "UsersStorage")
 

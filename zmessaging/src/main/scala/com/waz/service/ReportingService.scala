@@ -21,13 +21,14 @@ import java.io._
 import java.util.concurrent.CountDownLatch
 
 import android.content.Context
-import com.waz.ZLog._
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.api.ZmsVersion
 import com.waz.cache.{CacheService, Expiration}
 import com.waz.content.GlobalPreferences.PushToken
 import com.waz.content.WireContentProvider.CacheUri
 import com.waz.content.{AccountStorage, GlobalPreferences}
+import com.waz.log.BasicLogging.LogTag
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.log.{BufferedLogOutput, InternalLog}
 import com.waz.model.{Mime, UserId}
 import com.waz.threading.{SerialDispatchQueue, Threading}
@@ -44,7 +45,7 @@ trait ReportingService {
   private[service] var reporters = Seq.empty[Reporter]
 
   def addStateReporter(report: PrintWriter => Future[Unit])(implicit tag: LogTag): Unit = Future {
-    reporters = reporters :+ Reporter(tag, report)
+    reporters = reporters :+ Reporter(tag.value, report)
   }
 
   private[service] def generateStateReport(writer: PrintWriter) =
@@ -54,11 +55,10 @@ trait ReportingService {
 }
 
 object ReportingService {
-  private implicit val tag: LogTag = logTagFor[ReportingService]
 
   case class Reporter(name: String, report: PrintWriter => Future[Unit]) {
 
-    def apply(writer: PrintWriter) = {
+    def apply(writer: PrintWriter): Future[Unit] = {
       writer.println(s"\n###### $name:")
       report(writer)
     }
@@ -66,16 +66,17 @@ object ReportingService {
 }
 
 class ZmsReportingService(user: UserId, global: ReportingService) extends ReportingService {
-  implicit val tag: LogTag = logTagFor[ZmsReportingService]
   private implicit val dispatcher = new SerialDispatchQueue(name = "ZmsReportingService")
 
-  global.addStateReporter(generateStateReport)(s"ZMessaging[$user]")
+  global.addStateReporter(generateStateReport)(LogTag(s"ZMessaging[$user]"))
 }
 
-class GlobalReportingService(context: Context, cache: CacheService, metadata: MetaDataService, storage: AccountStorage, prefs: GlobalPreferences) extends ReportingService {
+class GlobalReportingService(context: Context, cache: CacheService, metadata: MetaDataService, storage: AccountStorage, prefs: GlobalPreferences)
+  extends ReportingService
+    with DerivedLogTag {
+
   import ReportingService._
   import Threading.Implicits.Background
-  implicit val tag: LogTag = logTagFor[GlobalReportingService]
 
   def generateReport(): Future[URI] =
     cache.createForFile(mime = Mime("text/txt"), name = Some("wire_debug_report.txt"), cacheLocation = Some(cache.intCacheDir))(Expiration.in(12.hours)).flatMap { entry =>
@@ -138,20 +139,21 @@ class GlobalReportingService(context: Context, cache: CacheService, metadata: Me
   })
 
   val InternalLogReporter = Reporter("InternalLog", { writer =>
-    val outputs = InternalLog.getOutputs.flatMap {
-      case o: BufferedLogOutput => Some(o)
-      case _ => None
-    }
+    Future {
+      val outputs = InternalLog.getOutputs.flatMap {
+        case o: BufferedLogOutput => Some(o)
+        case _ => None
+      }
 
-    Future.sequence(outputs.map( _.flush() )).map { _ =>
+      outputs.foreach(_.flush())
       outputs.flatMap(_.getPaths) // paths should be sorted from the oldest to the youngest
-             .map(new File(_))
-             .filter(_.exists)
-             .foreach { file =>
-               IoUtils.withResource(new BufferedReader(new InputStreamReader(new FileInputStream(file)))) {
-                 reader => Iterator.continually(reader.readLine()).takeWhile(_ != null).foreach(writer.println)
-               }
-             }
+        .map(new File(_))
+        .filter(_.exists)
+        .foreach { file =>
+          IoUtils.withResource(new BufferedReader(new InputStreamReader(new FileInputStream(file)))) {
+            reader => Iterator.continually(reader.readLine()).takeWhile(_ != null).foreach(writer.println)
+          }
+        }
     }
   })
 }

@@ -19,11 +19,12 @@ package com.waz.service.images
 
 import android.content.Context
 import android.graphics.{Bitmap => ABitmap}
-import com.waz.log.ZLog2._
-import com.waz.ZLog.ImplicitTag._
+import com.waz.log.LogSE._
 import com.waz.bitmap.BitmapUtils.Mime
 import com.waz.bitmap.{BitmapDecoder, BitmapUtils}
 import com.waz.cache.{CacheEntry, CacheService, LocalData}
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
+import com.waz.log.LogShow.SafeToLog
 import com.waz.model
 import com.waz.model.AssetMetaData.Image.Tag.Preview
 import com.waz.model._
@@ -38,7 +39,7 @@ import com.waz.utils.wrappers.Bitmap
 
 import scala.concurrent.Future
 
-class ImageAssetGenerator(context: Context, cache: CacheService, loader: ImageLoader, imageCache: MemoryImageCache, bitmapLoader: BitmapDecoder) {
+class ImageAssetGenerator(context: Context, cache: CacheService, loader: ImageLoader, imageCache: MemoryImageCache, bitmapLoader: BitmapDecoder) extends DerivedLogTag {
 
   import com.waz.service.images.ImageAssetGenerator._
 

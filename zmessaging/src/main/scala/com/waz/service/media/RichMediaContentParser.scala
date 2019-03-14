@@ -20,9 +20,9 @@ package com.waz.service.media
 import java.net.URLDecoder
 
 import android.util.Patterns
-import com.waz.ZLog.ImplicitTag._
 import com.waz.api.Message.Part
-import com.waz.log.ZLog2._
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
+import com.waz.log.LogSE._
 import com.waz.model.{Mention, MessageContent}
 import com.waz.sync.client.{SoundCloudClient, YouTubeClient}
 import com.waz.utils.wrappers.URI
@@ -30,7 +30,7 @@ import com.waz.utils.wrappers.URI
 import scala.util.Try
 import scala.util.control.NonFatal
 
-object RichMediaContentParser {
+object RichMediaContentParser extends DerivedLogTag {
 
   import Part.Type._
 

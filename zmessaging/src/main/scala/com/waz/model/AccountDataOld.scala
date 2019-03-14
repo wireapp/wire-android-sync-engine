@@ -17,10 +17,10 @@
  */
 package com.waz.model
 
-import com.waz.ZLog.ImplicitTag._
-import com.waz.ZLog._
+import com.waz.log.LogSE._
 import com.waz.db.Col._
 import com.waz.db.{Col, Dao, DbTranslator}
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model.AccountData.Password
 import com.waz.model.AccountDataOld.TriTeamId
 import com.waz.model.UserPermissions.PermissionsMasks
@@ -224,7 +224,7 @@ case class ConfirmationCode(str: String) extends AnyVal {
   override def toString: String = str
 }
 
-object AccountDataOld {
+object AccountDataOld extends DerivedLogTag {
 
   //TODO Might be nice to have a TriOption type...
   //Left is undefined, Right(None) is no team, Right(Some()) is a team
@@ -236,7 +236,7 @@ object AccountDataOld {
   }
 
   def computeHash(id: AccountId, password: String) =
-    logTime(s"compute scrypt password hash") {
+    logTime(l"compute scrypt password hash") {
       if (password.isEmpty) "" else {
         val salt = id.str.replace("-", "").getBytes("utf8").take(16)
         val hash = SCrypt.scrypt(password.getBytes("utf8"), salt, 1024, 8, 1, 32)

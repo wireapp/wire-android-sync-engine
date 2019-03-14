@@ -18,9 +18,10 @@
 package com.waz.bitmap
 
 import java.io.InputStream
+
 import android.media.ExifInterface
-import com.waz.ZLog.ImplicitTag._
-import com.waz.log.ZLog2._
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
+import com.waz.log.LogSE._
 
 import scala.util.control.NonFatal
 
@@ -28,7 +29,7 @@ import scala.util.control.NonFatal
  * Extracts orientation tag from exif data in jpeg image data.
  * TODO: make it prettier
  */
-object ExifOrientation {
+object ExifOrientation extends DerivedLogTag {
   def apply(in: InputStream): Int = try {
 
     def readShort(be: Boolean = true) =

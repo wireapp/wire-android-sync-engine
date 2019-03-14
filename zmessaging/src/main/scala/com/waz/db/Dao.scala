@@ -17,8 +17,8 @@
  */
 package com.waz.db
 
-import com.waz.ZLog.ImplicitTag._
-import com.waz.log.ZLog2._
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
+import com.waz.log.LogSE._
 import com.waz.utils.wrappers.{DB, DBContentValues, DBCursor}
 import com.waz.utils.{Managed, returning}
 
@@ -101,7 +101,7 @@ abstract class DaoIdOps[T] extends BaseDao[T] {
   override def Table(name: String, columns: Column[_]*) = new TableWithId(name, columns:_*)(idColumns(idCol))
 }
 
-abstract class BaseDao[T] extends Reader[T] {
+abstract class BaseDao[T] extends Reader[T] with DerivedLogTag {
   val table: Table[T]
 
   def onCreate(db: DB) = db.execSQL(table.createSql)

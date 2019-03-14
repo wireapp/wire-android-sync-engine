@@ -17,10 +17,9 @@
  */
 package com.waz.sync.client
 
-import com.waz.ZLog.ImplicitTag._
-import com.waz.ZLog.warn
 import com.waz.api.impl.ErrorResponse
-import com.waz.log.ZLog2.LogShow
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
+import com.waz.log.LogSE._
 import com.waz.model.UserPermissions.PermissionsMasks
 import com.waz.model._
 import com.waz.sync.client.TeamsClient.TeamMember
@@ -106,13 +105,13 @@ object TeamsClient {
   case class TeamBindingResponse(teams: Seq[(TeamData, Boolean)], hasMore: Boolean)
 
   //TODO Remove after assets refactoring
-  object TeamBindingResponse {
+  object TeamBindingResponse extends DerivedLogTag {
     def unapply(response: ResponseContent): Option[(Seq[(TeamData, Boolean)], Boolean)] =
       response match {
         case JsonObjectResponse(js) if js.has("teams") =>
           Try(decodeSeq('teams)(js, TeamData.TeamBindingDecoder), decodeOptBoolean('has_more)(js).getOrElse(false)).toOption
         case _ =>
-          warn(s"Unexpected response: $response")
+          warn(l"Unexpected response:")
           None
       }
   }
@@ -120,9 +119,6 @@ object TeamsClient {
   case class TeamMembers(members: Seq[TeamMember])
 
   case class TeamMember(user: UserId, permissions: Option[Permissions], created_by: Option[UserId])
-
-  implicit val TeamMemberLogShow: LogShow[TeamMember] =
-    LogShow.create(tm => s"TeamMember with permissions: ${tm.permissions}")
 
   case class Permissions(self: Long, copy: Long)
 

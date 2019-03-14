@@ -20,7 +20,8 @@ package com.waz.utils
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicBoolean
 
-import com.waz.ZLog._
+import com.waz.log.BasicLogging.LogTag
+import com.waz.log.LogSE._
 import com.waz.model.Event
 import com.waz.threading.{CancellableFuture, SerialDispatchQueue, Threading}
 
@@ -81,7 +82,7 @@ class GroupedEventProcessingQueue[A <: Event, Key](groupBy: A => Key, processor:
 }
 
 class SerialProcessingQueue[A](processor: Seq[A] => Future[Any], name: String = "") {
-  private implicit val logTag: LogTag = name
+  private implicit val logTag: LogTag = LogTag(name)
 
   private val queue = new ConcurrentLinkedQueue[A]()
 
@@ -102,7 +103,7 @@ class SerialProcessingQueue[A](processor: Seq[A] => Future[Any], name: String = 
 
   protected def processQueueNow(): Future[Any] = {
     val events = Iterator.continually(queue.poll()).takeWhile(_ != null).toVector
-    verbose(s"processQueueNow, events: ${if (events.size > 20) events.size else events}")
+    verbose(l"processQueueNow, events: ???")
     if (events.nonEmpty) processor(events).recoverWithLog()
     else Future.successful(())
   }
@@ -119,13 +120,13 @@ class ThrottledProcessingQueue[A](delay: FiniteDuration, processor: Seq[A] => Fu
   private val waiting = new AtomicBoolean(false)
   @volatile private var waitFuture: CancellableFuture[Any] = CancellableFuture.successful(())
   private var lastDispatched = 0L
-  private implicit val logTag: LogTag = name
+  private implicit val logTag: LogTag = LogTag(name)
 
   override protected def processQueue(): Future[Any] =
     if (waiting.compareAndSet(false, true)) {
       post {
         val d = math.max(0, lastDispatched - System.currentTimeMillis() + delay.toMillis)
-        verbose(s"processQueue, delaying: $d millis")
+        verbose(l"processQueue, delaying: $d millis")
         waitFuture = CancellableFuture.delay(d.millis)
         if (!waiting.get()) waitFuture.cancel()(logTag) // to avoid race conditions with `flush`
         waitFuture.future.flatMap { _ =>

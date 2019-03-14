@@ -18,9 +18,8 @@
 package com.waz.bitmap.gif
 
 import android.graphics.Bitmap
-import com.waz.ZLog._
-import com.waz.ZLog.ImplicitTag._
 import com.waz.bitmap
+import com.waz.log.BasicLogging.LogTag
 import com.waz.threading.{CancellableFuture, Threading}
 
 import scala.concurrent.Promise

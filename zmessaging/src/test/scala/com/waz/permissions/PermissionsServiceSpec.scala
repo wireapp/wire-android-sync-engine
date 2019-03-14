@@ -17,15 +17,15 @@
  */
 package com.waz.permissions
 
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.permissions.PermissionsService.{Permission, PermissionKey, PermissionProvider}
 import com.waz.specs.AndroidFreeSpec
 import com.waz.threading.Threading
 import com.waz.utils.events.{Signal, SourceSignal}
-import com.waz.ZLog.ImplicitTag._
 
 import scala.collection.immutable.ListSet
 
-class PermissionsServiceSpec extends AndroidFreeSpec {
+class PermissionsServiceSpec extends AndroidFreeSpec with DerivedLogTag {
 
   val service = new PermissionsService()
 
@@ -37,7 +37,7 @@ class PermissionsServiceSpec extends AndroidFreeSpec {
     Permission("ReadExternal")
   ))
 
-  def getSystemState = systemState.currentValue("").get
+  def getSystemState = systemState.currentValue.get
 
   var requestCalls = 0
   var checkCalls = 0
@@ -85,7 +85,7 @@ class PermissionsServiceSpec extends AndroidFreeSpec {
     val signal = service.permissions(ListSet("WriteExternal", "ReadExternal")).disableAutowiring()
 
     awaitAllTasks
-    signal.currentValue("") shouldEqual None
+    signal.currentValue shouldEqual None
 
     service.registerProvider(provider)
 

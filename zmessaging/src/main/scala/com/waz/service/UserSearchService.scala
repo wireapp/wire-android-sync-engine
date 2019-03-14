@@ -17,11 +17,10 @@
  */
 package com.waz.service
 
-import com.waz.ZLog.ImplicitTag._
-import com.waz.ZLog.verbose
 import com.waz.content.UserPreferences.SelfPermissions
 import com.waz.content._
-import com.waz.log.ZLog2._
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
+import com.waz.log.LogSE._
 import com.waz.model.SearchQuery.{Recommended, RecommendedHandle}
 import com.waz.model.UserData.{ConnectionStatus, UserDataDao}
 import com.waz.model.UserPermissions.{PartnerPermissions, decodeBitmask}
@@ -44,14 +43,8 @@ case class SearchResults(top:   IndexedSeq[UserData]         = IndexedSeq.empty,
                          local: IndexedSeq[UserData]         = IndexedSeq.empty,
                          convs: IndexedSeq[ConversationData] = IndexedSeq.empty,
                          dir:   IndexedSeq[UserData]         = IndexedSeq.empty) { //directory (backend search)
-  override def toString = s"SearchResults(top: ${top.size}, local: ${local.size}, convs: ${convs.size}, dir: ${dir.size})"
 
   def isEmpty: Boolean = top.isEmpty && local.isEmpty && convs.isEmpty && dir.isEmpty
-}
-
-object SearchResults {
-  implicit val SearchResultsLogShow: LogShow[SearchResults] =
-    LogShow.create(sr => s"SearchResults(${sr.top.length}, ${sr.local.length}, ${sr.convs.length}, ${sr.dir.length})")
 }
 
 class UserSearchService(selfUserId:           UserId,
@@ -67,8 +60,7 @@ class UserSearchService(selfUserId:           UserId,
                         convsStorage:         ConversationStorage,
                         convsUi:              ConversationsUiService,
                         conversationsService: ConversationsService,
-                        userPrefs:            UserPreferences
-                       ) {
+                        userPrefs:            UserPreferences) extends DerivedLogTag {
 
   import Threading.Implicits.Background
   import com.waz.service.UserSearchService._
@@ -86,7 +78,7 @@ class UserSearchService(selfUserId:           UserId,
     lazy val knownUsers = membersStorage.getByUsers(searchResults.map(_.id).toSet).map(_.map(_.userId).toSet)
     isPartner.flatMap {
       case true if teamId.isDefined =>
-        verbose(s"filterForPartner1 Q: $query, RES: ${searchResults.map(_.getDisplayName)}) with partner = true and teamId")
+        verbose(l"filterForPartner1 Q: ${redactedString(query)}, RES: ${searchResults.map(_.getDisplayName)}) with partner = true and teamId")
         for {
           Some(self)    <- userService.getSelfUser
           filteredUsers <- knownUsers.map(knownUsersIds =>
@@ -94,7 +86,7 @@ class UserSearchService(selfUserId:           UserId,
                            )
         } yield filteredUsers
       case false if teamId.isDefined =>
-        verbose(s"filterForPartner2 Q: $query, RES: ${searchResults.map(_.getDisplayName)}) with partner = false and teamId")
+        verbose(l"filterForPartner2 Q: ${redactedString(query)}, RES: ${searchResults.map(_.getDisplayName)}) with partner = false and teamId")
         knownUsers.map { knownUsersIds =>
           searchResults.filter { u =>
             u.createdBy.contains(selfUserId) ||

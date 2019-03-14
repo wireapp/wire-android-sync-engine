@@ -20,9 +20,9 @@ package com.waz.cache2
 import java.io._
 import java.text.DecimalFormat
 
-import com.waz.ZLog.ImplicitTag._
-import com.waz.ZLog.verbose
+import com.waz.log.LogSE._
 import com.waz.cache2.CacheService.Encryption
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model.AESKey
 import com.waz.model.errors.NotFoundLocal
 import com.waz.utils.IoUtils
@@ -98,28 +98,27 @@ class LruFileCacheServiceImpl(
     directorySizeThreshold: Long,
     sizeCheckingInterval: FiniteDuration
 )(implicit override val ec: ExecutionContext, ev: EventContext)
-    extends CacheService {
+    extends CacheService with DerivedLogTag {
 
   private val directorySize: SourceSignal[Long] = Signal()
   directorySize
     .throttle(sizeCheckingInterval)
     .filter { size =>
-      verbose(s"Current cache size: ${LoggingUtils.formatSize(size)}")
+      verbose(l"Current cache size: ${asSize(size)}")
       size > directorySizeThreshold
     } { size =>
       var shouldBeCleared = size - directorySizeThreshold
-      verbose(s"Cache directory size threshold reached. Current size: ${LoggingUtils.formatSize(size)}. " +
-        s"Should be cleared: ${LoggingUtils.formatSize(shouldBeCleared)}")
+      verbose(l"Cache directory size threshold reached. Current size: ${asSize(size)}. Should be cleared: ${asSize(shouldBeCleared)}")
       cacheDirectory
         .listFiles()
         .sortBy(_.lastModified())
         .takeWhile { file =>
           val fileSize = file.length()
           if (file.delete()) {
-            verbose(s"File '${file.getName}' removed. Cleared ${LoggingUtils.formatSize(fileSize)}.")
+            verbose(l"File '$file' removed. Cleared ${asSize(fileSize)}.")
             shouldBeCleared -= fileSize
           } else {
-            verbose(s"File '${file.getName}' can not be removed. Not cleared ${LoggingUtils.formatSize(fileSize)}.")
+            verbose(l"File '$file' can not be removed. Not cleared ${asSize(fileSize)}.")
           }
           shouldBeCleared > 0
         }

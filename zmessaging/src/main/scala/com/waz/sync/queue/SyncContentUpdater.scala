@@ -17,10 +17,10 @@
  */
 package com.waz.sync.queue
 
-import com.waz.ZLog.ImplicitTag._
 import com.waz.api.SyncState
 import com.waz.content._
-import com.waz.log.ZLog2._
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
+import com.waz.log.LogSE._
 import com.waz.model.SyncId
 import com.waz.model.sync.SyncJob.SyncJobDao
 import com.waz.model.sync._
@@ -50,7 +50,7 @@ trait SyncContentUpdater {
   def syncStorage[A](body: SyncStorage => A): Future[A]
 }
 
-class SyncContentUpdaterImpl(db: Database) extends SyncContentUpdater {
+class SyncContentUpdaterImpl(db: Database) extends SyncContentUpdater with DerivedLogTag {
   import EventContext.Implicits.global
   import SyncContentUpdater._
 

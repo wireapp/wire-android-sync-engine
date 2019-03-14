@@ -17,9 +17,9 @@
  */
 package com.waz.service.conversation
 
-import com.waz.ZLog.ImplicitTag._
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.content.{ConversationStorage, MessagesStorage}
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model.GenericContent._
 import com.waz.model._
 import com.waz.service.EventScheduler.Stage
@@ -38,7 +38,7 @@ class ConversationOrderEventsService(selfUserId: UserId,
                                      msgStorage: MessagesStorage,
                                      users:      UserService,
                                      sync:       SyncServiceHandle,
-                                     pipeline:   EventPipeline) {
+                                     pipeline:   EventPipeline) extends DerivedLogTag {
 
   private implicit val dispatcher = new SerialDispatchQueue(name = "ConversationEventsDispatcher")
 

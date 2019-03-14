@@ -17,14 +17,14 @@
  */
 package com.waz.api.impl
 
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.testutils.Matchers._
 import com.waz.utils.events.EventStream
 import com.waz.utils.returning
 import org.scalatest._
-import com.waz.ZLog.ImplicitTag._
 import com.waz.specs.AndroidFreeSpec
 
-class RecordingLevelsSpec extends AndroidFreeSpec with OptionValues {
+class RecordingLevelsSpec extends AndroidFreeSpec with OptionValues with DerivedLogTag {
   scenario("Aggregating recording levels") {
     val stream = EventStream[Float]()
     val levels = returning(new RecordingLevels(stream).windowed(5))(_.disableAutowiring())

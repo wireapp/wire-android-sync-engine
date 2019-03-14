@@ -17,7 +17,7 @@
  */
 package com.waz.utils.events
 
-import com.waz.ZLog.ImplicitTag._
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.threading.CancellableFuture
 import com.waz.threading.CancellableFuture.delayed
 import com.waz.threading.Threading.Background
@@ -28,7 +28,8 @@ import com.waz.utils._
 import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.duration._
 
-case class ClockSignal(interval: FiniteDuration, clock: Clock = Clock.systemUTC()) extends SourceSignal[Instant](Some(now(clock))) {
+case class ClockSignal(interval: FiniteDuration, clock: Clock = Clock.systemUTC())
+  extends SourceSignal[Instant](Some(now(clock))) with DerivedLogTag {
 
   private var delay = CancellableFuture.successful({})
 

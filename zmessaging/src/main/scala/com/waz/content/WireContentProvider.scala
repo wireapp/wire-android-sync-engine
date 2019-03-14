@@ -22,9 +22,9 @@ import android.database.{Cursor, MatrixCursor}
 import android.net.Uri
 import android.os.ParcelFileDescriptor
 import android.provider.OpenableColumns
-import com.waz.log.ZLog2._
-import com.waz.ZLog.ImplicitTag._
+import com.waz.log.LogSE._
 import com.waz.cache.{CacheEntryData, Expiration}
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model.CacheKey
 import com.waz.service.ZMessaging
 import com.waz.threading.CancellableFuture
@@ -35,7 +35,7 @@ import com.waz.utils.wrappers.{AndroidURI, URI}
 import scala.concurrent.Await
 import scala.concurrent.duration._
 
-class WireContentProvider extends ContentProvider {
+class WireContentProvider extends ContentProvider with DerivedLogTag {
   import WireContentProvider._
 
   private val AsyncTimeout = 15.seconds

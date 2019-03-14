@@ -21,8 +21,8 @@ import java.io.IOException
 import java.nio.charset.Charset
 import java.util.concurrent.TimeUnit
 
-import com.waz.ZLog.ImplicitTag._
-import com.waz.ZLog.info
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
+import com.waz.log.LogSE._
 import okhttp3._
 import okio.Buffer
 import com.waz.znet2
@@ -58,7 +58,8 @@ import scala.util.{Failure, Try}
   *
   * <-- END HTTP
   */
-final class OkHttpLoggingInterceptor(logBodyTypes: List[String], maxBodyStringLength: Int = 1000) extends Interceptor {
+final class OkHttpLoggingInterceptor(logBodyTypes: List[String], maxBodyStringLength: Int = 1000)
+  extends Interceptor with DerivedLogTag {
 
   private val CharsetUtf8: Charset = Charset.forName("UTF-8")
   private val truncatedBodySuffix: String = "...TRUNCATED"
@@ -137,7 +138,7 @@ final class OkHttpLoggingInterceptor(logBodyTypes: List[String], maxBodyStringLe
     val response = Try(chain.proceed(request)).recoverWith {
       case err =>
         logMsgBuilder.append(s"<-- HTTP FAILED: $err")
-        info(logMsgBuilder.toString)
+        info(l"${showString(logMsgBuilder.toString)}")
         Failure(err)
     }.get
     val tookMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime - startNs)
@@ -172,7 +173,7 @@ final class OkHttpLoggingInterceptor(logBodyTypes: List[String], maxBodyStringLe
       logMsgBuilder.append(s"<-- END HTTP (${buffer.size}-byte body)")
     }
 
-    info(logMsgBuilder.toString)
+    info(l"${showString(logMsgBuilder.toString())}")
     response
   }
 }

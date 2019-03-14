@@ -22,14 +22,14 @@ import java.io.{File, FileNotFoundException}
 import android.content.{BroadcastReceiver, Context, Intent, IntentFilter}
 import android.media.AudioManager
 import android.telephony.TelephonyManager
-import com.waz.ZLog.ImplicitTag._
 import com.waz.api
 import com.waz.api.ErrorType._
 import com.waz.api.impl.AudioAssetForUpload
 import com.waz.api.{AudioEffect, ErrorType}
 import com.waz.audioeffect.{AudioEffect => AVSEffect}
 import com.waz.cache.{CacheEntry, CacheService, Expiration}
-import com.waz.log.ZLog2._
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
+import com.waz.log.LogSE._
 import com.waz.model._
 import com.waz.service.AccountsService.InForeground
 import com.waz.service.assets.AudioLevels.peakLoudness
@@ -65,7 +65,7 @@ class RecordAndPlayService(userId:        UserId,
 }
 
 // invariant: only do side effects and/or access player/recorder during a transition
-class GlobalRecordAndPlayService(cache: CacheService, context: Context) {
+class GlobalRecordAndPlayService(cache: CacheService, context: Context) extends DerivedLogTag {
   import GlobalRecordAndPlayService._
   import Threading.Implicits.Background
 
@@ -113,7 +113,7 @@ class GlobalRecordAndPlayService(cache: CacheService, context: Context) {
       }
     }.andThen { case Failure(cause) => abandonAudioFocus() }
 
-  case class Observe(key: MediaKey) extends Player.Observer {
+  case class Observe(key: MediaKey) extends Player.Observer with DerivedLogTag {
     override def onCompletion(): Unit = transitionF {
       case Playing(player, `key`) =>
         player.release().recoverWithLog().map(_ => Next(Idle))

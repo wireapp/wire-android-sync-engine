@@ -29,12 +29,10 @@ import android.os.Build.VERSION_CODES.LOLLIPOP
 import android.provider.ContactsContract.DisplayNameSources._
 import android.provider.{BaseColumns, ContactsContract}
 import com.google.i18n.phonenumbers.PhoneNumberUtil
-import com.waz.ZLog
-import com.waz.ZLog.ImplicitTag._
-import com.waz.ZLog.logTime
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.content.UserPreferences._
 import com.waz.content._
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model.AddressBook.ContactHashes
 import com.waz.model.Contact.{ContactsDao, ContactsOnWireDao, EmailAddressesDao, PhoneNumbersDao}
 import com.waz.model._
@@ -76,7 +74,7 @@ class ContactsServiceImpl(userId:         UserId,
                           sync:           SyncServiceHandle,
                           convs:          ConversationStorage,
                           permissions:    PermissionsService)
-  extends ContactsService {
+  extends ContactsService with DerivedLogTag {
 
   import ContactsServiceImpl._
   import EventContext.Implicits.global
@@ -221,10 +219,10 @@ class ContactsServiceImpl(userId:         UserId,
   }
 
   private def initialContactsLoading: Future[IndexedSeq[Contact]] =
-    storage.read(db => logTime(s"loading first $InitialContactsBatchSize contacts")(ContactsDao.list(ContactsDao.listCursorWithLimit(Some(InitialContactsBatchSize))(db)))).andThen {
+    storage.read(db => logTime(l"loading first $InitialContactsBatchSize contacts")(ContactsDao.list(ContactsDao.listCursorWithLimit(Some(InitialContactsBatchSize))(db)))).andThen {
       case Success(loaded) =>
         if (loaded.size < InitialContactsBatchSize) () // there are no more contacts to load
-        else storage.read(db => logTime(s"loading all contacts")(ContactsDao.list(db))).onSuccess { case v => contactsLoaded ! v }
+        else storage.read(db => logTime(l"loading all contacts")(ContactsDao.list(db))).onSuccess { case v => contactsLoaded ! v }
     }
 
   lazy val contactsLoaded = EventStream[IndexedSeq[Contact]]()

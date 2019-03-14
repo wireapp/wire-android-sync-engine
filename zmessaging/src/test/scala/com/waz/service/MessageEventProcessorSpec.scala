@@ -20,6 +20,7 @@ package com.waz.service
 import com.waz.api.Message.Status
 import com.waz.api.Message.Type._
 import com.waz.content._
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model.ConversationData.ConversationType
 import com.waz.model.GenericContent.Text
 import com.waz.model._
@@ -33,13 +34,12 @@ import com.waz.testutils.TestGlobalPreferences
 import com.waz.utils.crypto.ReplyHashing
 import com.waz.utils.events.{EventStream, Signal}
 import org.scalatest.Inside
-import com.waz.ZLog.ImplicitTag.implicitLogTag
 import com.waz.threading.Threading
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
 
-class MessageEventProcessorSpec extends AndroidFreeSpec with Inside {
+class MessageEventProcessorSpec extends AndroidFreeSpec with Inside with DerivedLogTag {
 
 
   val selfUserId        = UserId("self")
