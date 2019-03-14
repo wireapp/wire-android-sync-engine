@@ -44,7 +44,7 @@ import com.waz.sync.otr.OtrSyncHandler
 import com.waz.sync.{SyncResult, SyncServiceHandle}
 import com.waz.threading.CancellableFuture
 import com.waz.utils._
-import com.waz.znet2.http.ResponseCode
+import com.waz.znet2.http.{HttpClient, ResponseCode}
 
 import scala.concurrent.Future
 import scala.concurrent.Future.successful
@@ -132,6 +132,7 @@ class MessagesSyncHandler(selfUserId: UserId,
             } yield SyncResult.Success
 
           case Left(error) =>
+            verbose(l"postOtrMessage($msg) not successful $error")
             for {
               _ <- error match {
                 case ErrorResponse(ResponseCode.Forbidden, _, "unknown-client") =>
@@ -147,10 +148,12 @@ class MessagesSyncHandler(selfUserId: UserId,
               }
               result <- syncResult match {
                 case r: SyncResult.Failure =>
+                  verbose(l"postOtrMessage($msg) mark message delivery failed $r")
                   service
                     .messageDeliveryFailed(convId, msg, error)
                     .map(_ => r)
                 case r =>
+                  verbose(l"postOtrMessage($msg) do not mark message delivery failed $r")
                   Future.successful(r)
               }
             } yield result
@@ -170,8 +173,7 @@ class MessagesSyncHandler(selfUserId: UserId,
     * in the database to the new message ID.
     * @return either error, or the remote timestamp and the new message ID
     */
-  private def postMessage(conv: ConversationData, msg: MessageData, reqEditTime: RemoteInstant):
-    Future[Either[ErrorResponse, (RemoteInstant, MessageId)]] = {
+  private def postMessage(conv: ConversationData, msg: MessageData, reqEditTime: RemoteInstant): Future[Either[ErrorResponse, (RemoteInstant, MessageId)]] = {
 
     def postTextMessage() = {
       val adjustedMsg = msg.adjustMentions(true).getOrElse(msg)
@@ -305,7 +307,9 @@ class MessagesSyncHandler(selfUserId: UserId,
           CancellableFuture.successful(Left(ErrorResponse.Cancelled))
         case Some(asset) =>
           verbose(l"Sending asset: $asset")
-          sendWithV3(asset).map(Right.apply)
+          sendWithV3(asset)
+            .map(Right.apply)
+            .recover { case response: ErrorResponse => Left(response) }
       }
     } yield result
   }
