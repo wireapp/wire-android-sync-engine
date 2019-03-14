@@ -20,10 +20,8 @@ package com.waz.cache2
 import java.io._
 
 import com.waz.log.LogSE._
-import com.waz.cache2.CacheService.Encryption
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
-import com.waz.model.AESKey
-import com.waz.model.errors.NotFoundLocal
+import com.waz.model.errors.{FailedExpectationsError, FileSystemError, NotFoundLocal, ZError}
 import com.waz.utils.IoUtils
 import com.waz.utils.events._
 
@@ -52,7 +50,7 @@ trait FileCache[K] {
   def changeKey(oldKey: K, newKey: K): Future[Unit]
 }
 
-abstract class BaseFileCache[K] extends FileCache[K] {
+abstract class BaseFileCache[K] extends FileCache[K] with DerivedLogTag {
   import BaseFileCache._
 
   protected implicit def ec: ExecutionContext
@@ -76,13 +74,13 @@ abstract class BaseFileCache[K] extends FileCache[K] {
     Future {
       val targetFile = createFile(key)
       def copy(): Unit = {
-        debug(s"Copy $file to $targetFile")
+        debug(l"Copy $file to $targetFile")
         IoUtils.copy(file, targetFile)
       }
       if (removeOriginal) {
-        debug(s"Renaming $file to $targetFile")
+        debug(l"Renaming $file to $targetFile")
         if (!file.renameTo(targetFile)) {
-          debug("Renaming failed. Falling back to copy.")
+          debug(l"Renaming failed. Falling back to copy.")
           copy()
           file.delete()
         }
@@ -168,12 +166,13 @@ object BaseFileCache {
 
 }
 
-class LruFileCacheServiceImpl(
-                               cacheDirectory: File,
-                               directorySizeThreshold: Long,
-                               sizeCheckingInterval: FiniteDuration
-                             )(implicit override val ec: ExecutionContext, ev: EventContext)
-  extends CacheService with DerivedLogTag {
+abstract class LruFileCache[K] extends BaseFileCache[K] {
+
+  protected def cacheDirectory: File
+  protected def directorySizeThreshold: Long
+  protected def sizeCheckingInterval: FiniteDuration
+
+  protected implicit def ev: EventContext
 
   private val directorySize: SourceSignal[Long] = Signal()
   directorySize

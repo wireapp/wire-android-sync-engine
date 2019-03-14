@@ -29,7 +29,6 @@ import com.waz.api.impl.PlaybackControls
 import com.waz.api.{AudioEffect, ErrorType}
 import com.waz.audioeffect.{AudioEffect => AVSEffect}
 import com.waz.cache.{CacheService, Expiration}
-import com.waz.cache.{CacheEntry, CacheService, Expiration}
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.log.LogSE._
 import com.waz.model._
@@ -425,7 +424,7 @@ class GlobalRecordAndPlayService(cache: CacheService, context: Context, fileCach
   }
 }
 
-object GlobalRecordAndPlayService {
+object GlobalRecordAndPlayService extends DerivedLogTag {
 
   case class Audio(key: MediaKey,
                    file: File,

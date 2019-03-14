@@ -22,13 +22,12 @@ import java.io.ByteArrayInputStream
 import com.waz.{AuthenticationConfig, ZIntegrationSpec}
 import com.waz.log.LogSE._
 import com.waz.api.impl.ErrorResponse
-import com.waz.cache2.CacheService.NoEncryption
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model.{AssetId, MD5, Mime, Sha256}
 import com.waz.service.assets2.{Asset, BlobDetails, NoEncryption}
 import com.waz.sync.client.AssetClient.FileWithSha
-import com.waz.sync.client.AssetClient2.{AssetContent, Metadata, Retention, UploadResponse}
-import com.waz.utils.returning
+import com.waz.sync.client.AssetClient2.{AssetContent, Metadata, Retention, UploadResponse2}
+import com.waz.utils.{IoUtils, returning}
 import org.scalatest.Ignore
 
 import scala.concurrent.Future

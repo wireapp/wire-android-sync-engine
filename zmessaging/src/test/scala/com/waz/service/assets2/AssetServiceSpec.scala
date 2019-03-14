@@ -20,24 +20,16 @@ package com.waz.service.assets2
 import java.io._
 import java.net.URI
 
-import com.waz.log.ZLog2._
-import com.waz.ZLog.ImplicitTag._
-import com.waz.service.assets2.Asset.General
 import com.waz.api.impl.ErrorResponse
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
+import com.waz.log.LogSE._
+import com.waz.log.LogShow
 import com.waz.model.errors.NotFoundLocal
 import com.waz.model.{AssetId, Mime, Sha256, UploadAssetId}
 import com.waz.service.assets2.Asset.UploadGeneral
 import com.waz.sync.SyncServiceHandle
 import com.waz.sync.client.AssetClient2.{FileWithSha, Retention}
 import com.waz.sync.client.{AssetClient2, AssetClient2Impl}
-import com.waz.log.LogSE._
-import com.waz.cache2.CacheService
-import com.waz.cache2.CacheService.{Encryption, NoEncryption}
-import com.waz.log.BasicLogging.LogTag.DerivedLogTag
-import com.waz.model.errors.NotFoundLocal
-import com.waz.model.{AssetId, Mime, Sha256}
-import com.waz.sync.client.AssetClient2
-import com.waz.sync.client.AssetClient2.{FileWithSha, Metadata, Retention}
 import com.waz.threading.CancellableFuture
 import com.waz.utils.{IoUtils, ReactiveStorageImpl2, UnlimitedInMemoryStorage, returning}
 import com.waz.{AuthenticationConfig, FilesystemUtils, ZIntegrationMockSpec}

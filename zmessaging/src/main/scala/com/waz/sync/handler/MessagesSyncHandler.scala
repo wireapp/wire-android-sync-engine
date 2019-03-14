@@ -17,12 +17,13 @@
  */
 package com.waz.sync.handler
 
-import com.waz.log.LogSE._
 import com.waz.api.Message
 import com.waz.api.impl.ErrorResponse
 import com.waz.api.impl.ErrorResponse.internalError
 import com.waz.cache.CacheService
 import com.waz.content.{MembersStorage, MessagesStorage}
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
+import com.waz.log.LogSE._
 import com.waz.model.AssetData.{ProcessingTaskKey, UploadTaskKey}
 import com.waz.model.GenericContent.{Ephemeral, Knock, Location, MsgEdit}
 import com.waz.model.GenericMessage.TextMessage
@@ -43,7 +44,7 @@ import com.waz.sync.otr.OtrSyncHandler
 import com.waz.sync.{SyncResult, SyncServiceHandle}
 import com.waz.threading.CancellableFuture
 import com.waz.utils._
-import com.waz.znet2.http.{HttpClient, ResponseCode}
+import com.waz.znet2.http.ResponseCode
 
 import scala.concurrent.Future
 import scala.concurrent.Future.successful

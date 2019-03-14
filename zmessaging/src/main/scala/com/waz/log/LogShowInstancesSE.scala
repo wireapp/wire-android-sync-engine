@@ -25,14 +25,14 @@ import com.waz.log.LogSE._
 import android.net.Uri
 import com.waz.api.impl.ErrorResponse
 import com.waz.api.{MessageContent => _, _}
-import com.waz.cache2.CacheService.{AES_CBC_Encryption, Encryption, NoEncryption}
 import com.waz.content.MessagesCursor
 import com.waz.content.Preferences.PrefKey
-import com.waz.log.BasicLogging.Log
 import com.waz.model.AccountData.Password
 import com.waz.model.AssetData.ProcessingTaskKey
 import com.waz.model.GenericContent.Location
 import com.waz.model.ManagedBy.ManagedBy
+import com.waz.model.UserData.Picture
+import com.waz.model.UserInfo.ProfilePicture
 import com.waz.model.messages.media.{ArtistData, TrackData}
 import com.waz.model._
 import com.waz.model.otr.{Client, ClientId, UserClients}
@@ -42,7 +42,7 @@ import com.waz.service.assets.AssetService.RawAssetInput
 import com.waz.service.assets.AssetService.RawAssetInput.{BitmapInput, ByteInput, UriInput, WireAssetInput}
 import com.waz.service.assets.GlobalRecordAndPlayService._
 import com.waz.service.assets.{GlobalRecordAndPlayService, Player}
-import com.waz.service.assets2.{Asset, AssetDetails}
+import com.waz.service.assets2._
 import com.waz.service.call.Avs.AvsClosedReason.reasonString
 import com.waz.service.call.Avs.VideoState
 import com.waz.service.call.CallInfo
@@ -50,7 +50,7 @@ import com.waz.service.call.CallingService.CallProfile
 import com.waz.service.otr.OtrService.SessionId
 import com.waz.sync.SyncResult
 import com.waz.sync.client.AssetClient.Retention
-import com.waz.sync.client.AssetClient2.UploadResponse
+import com.waz.sync.client.AssetClient2.UploadResponse2
 import com.waz.sync.client.AuthenticationManager.{AccessToken, Cookie}
 import com.waz.sync.client.GiphyClient2.GifObject
 import com.waz.sync.client.TeamsClient.TeamMember
@@ -95,6 +95,8 @@ trait LogShowInstancesSE {
   implicit val UidShow:        LogShow[Uid]        = logShowWithHash
   implicit val UserIdShow:     LogShow[UserId]     = logShowWithHash
   implicit val AssetIdShow:    LogShow[AssetId]    = logShowWithHash
+  implicit val UploadAssetIdLogShow: LogShow[UploadAssetId] = logShowWithHash
+  implicit val DownloadAssetIdLogShow: LogShow[DownloadAssetId] = logShowWithHash
   implicit val RAssetIdShow:   LogShow[RAssetId]   = logShowWithHash
   implicit val AccountIdShow:  LogShow[AccountId]  = logShowWithHash
   implicit val MessageIdShow:  LogShow[MessageId]  = logShowWithHash
@@ -119,7 +121,10 @@ trait LogShowInstancesSE {
   implicit val PushTokenShow:   LogShow[PushToken]   = logShowWithHash
   implicit val SearchQueryShow: LogShow[SearchQuery] = logShowWithHash
   implicit val AESKeyShow:      LogShow[AESKey]      = logShowWithHash
+  implicit val AESKey2Show:      LogShow[AESKey2]      = logShowWithHash
   implicit val ProcessingTaskKeyLogShow: LogShow[ProcessingTaskKey] = logShowWithHash
+
+  implicit val SaltLogShow: LogShow[Salt] = logShowWithToString
 
   implicit val RetentionLogShow: LogShow[Retention] = logShowWithHash
   implicit val CallProfileLogShow: LogShow[CallProfile] = logShowWithHash
@@ -132,7 +137,7 @@ trait LogShowInstancesSE {
   implicit val ManagedByShow: LogShow[ManagedBy] = create(id => s"ManagedBy($id)")
 
   implicit val GiphyLogShow: LogShow[GifObject] = logShowWithHash
-  implicit val UploadResponseLogShow: LogShow[UploadResponse] = logShowWithHash
+  implicit val UploadResponseLogShow: LogShow[UploadResponse2] = logShowWithHash
 
   implicit val RawAssetInputLogShow: LogShow[RawAssetInput] =
     createFrom {
@@ -198,6 +203,10 @@ trait LogShowInstancesSE {
       l"UserData(id: $id | teamId: $teamId | name: $name | displayName: $displayName | email: $email | phone: $phone | handle: $handle | deleted: $deleted)"
     }
 
+  implicit val PictureLogShow: LogShow[Picture] = logShowWithHash
+
+  implicit val UserProfilePictureLogShow: LogShow[ProfilePicture] = logShowWithHash
+
   implicit val UserInfoLogShow: LogShow[UserInfo] =
     LogShow.createFrom { u =>
       import u._
@@ -216,10 +225,28 @@ trait LogShowInstancesSE {
       l"Mention(userId: $userId, start: $start, length: $length)"
     }
 
+  implicit val LocalSourceLogShow: LogShow[LocalSource] = logShowWithHash
+
+  implicit val AssetDetailsLogShow: LogShow[AssetDetails] = logShowWithHash
+
+  implicit val AudioLogShow: LogShow[Audio] = logShowWithHash
+
   implicit val AssetLogShow: LogShow[Asset[AssetDetails]] =
     LogShow.createFrom { a =>
       import a._
       l"Asset(id: $id | token: $token | sha: $sha | encryption: $encryption | localSource: $localSource | preview: $preview | details: $details | convId: $convId)"
+    }
+
+  implicit val UploadAssetLogShow: LogShow[UploadAsset[UploadAssetDetails]] =
+    LogShow.createFrom { a =>
+      import a._
+      l"UploadAsset(id: $id)"
+    }
+
+  implicit val DownloadAssetLogShow: LogShow[DownloadAsset] =
+    LogShow.createFrom { a =>
+      import a._
+      l"DownloadAsset(id: $id)"
     }
 
   implicit val AssetDataLogShow: LogShow[AssetData] =
@@ -307,7 +334,7 @@ trait LogShowInstancesSE {
       case Idle => l"Idle"
       case Playing(player, key) => l"Playing(player: $player, key: $key)"
       case Paused(player, key, playhead, transient) => l"Paused(player: $player, key: $key, playhead: $playhead, transient: $transient)"
-      case Recording(_, key, start, entry, promisedAsset) => l"Recording(key: $key, start: $start, entry: $entry)"
+      case Recording(_, key, start, entry, _, _) => l"Recording(key: $key, start: $start, entry: $entry)"
     }
 
   implicit val PlayerLogShow: LogShow[Player] = LogShow.create(_.getClass.getName)

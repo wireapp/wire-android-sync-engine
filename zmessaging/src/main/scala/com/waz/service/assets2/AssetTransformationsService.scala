@@ -22,8 +22,8 @@ import java.io.{InputStream, OutputStream}
 import com.waz.model.Mime
 import com.waz.service.assets2.Asset.General
 import AssetTransformationsService._
-import com.waz.log.ZLog2._
-import com.waz.ZLog.ImplicitTag._
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
+import com.waz.log.LogSE._
 
 trait AssetTransformationsService {
   def getTransformations(mime: Mime, details: AssetDetails): List[Transformation]
@@ -55,7 +55,7 @@ class AssetTransformationsServiceImpl(handlers: List[Handler]) extends AssetTran
 
 }
 
-class ImageDownscalingCompressing(imageRecoder: ImageRecoder) extends Handler {
+class ImageDownscalingCompressing(imageRecoder: ImageRecoder) extends Handler with DerivedLogTag {
 
   private val MaxImageDimension = 1448
 

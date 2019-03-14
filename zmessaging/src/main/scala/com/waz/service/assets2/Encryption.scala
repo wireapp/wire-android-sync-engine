@@ -19,9 +19,8 @@ package com.waz.service.assets2
 
 import java.io.{File, FileInputStream, InputStream}
 
-import com.waz.ZLog._
-import com.waz.ZLog.ImplicitTag._
-
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
+import com.waz.log.LogSE._
 import com.waz.utils.crypto.AESUtils
 import javax.crypto.KeyGenerator
 
@@ -39,12 +38,12 @@ case object NoEncryption extends Encryption {
   override def randomSalt: Option[Salt] = None
 }
 
-case class AES_CBC_Encryption(key: AESKey2) extends Encryption {
+case class AES_CBC_Encryption(key: AESKey2) extends Encryption with DerivedLogTag {
   override def decrypt(is: InputStream, salt: Option[Salt] = None): InputStream =
     AESUtils.decryptInputStream(key.bytes, is)
   override def encrypt(is: InputStream, salt: Option[Salt] = None): InputStream = {
     val s = salt orElse randomSalt
-    debug(s"encrypt input stream: key: $key salt: $s")
+    debug(l"encrypt input stream: key: $key salt: $s")
     AESUtils.encryptInputStream(key.bytes, s.get.bytes, is)
   }
   override def sizeAfterEncryption(sizeBeforeEncryption: Long, salt: Option[Salt] = None): Long =

@@ -20,12 +20,9 @@ package com.waz.service.assets2
 import java.io.{FileOutputStream, InputStream}
 import java.security.{DigestInputStream, MessageDigest}
 
-import com.waz.ZLog.ImplicitTag._
 import com.waz.model.AssetData.UploadTaskKey
 import com.waz.model._
-import com.waz.log.ZLog2._
 import com.waz.log.LogSE._
-import com.waz.cache2.CacheService
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model.errors._
 import com.waz.service.assets2.Asset.{General, UploadGeneral, Video}
@@ -81,7 +78,7 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
                        uploadContentCache: UploadAssetContentCache,
                        assetClient: AssetClient2,
                        sync: SyncServiceHandle)
-                      (implicit ec: ExecutionContext) extends AssetService {
+                      (implicit ec: ExecutionContext) extends AssetService with DerivedLogTag {
 
 
   override def assetSignal(idGeneral: GeneralAssetId): Signal[GeneralAsset] =
