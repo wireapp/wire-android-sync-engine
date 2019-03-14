@@ -24,11 +24,12 @@ import android.content.Context
 import android.media._
 import android.os.Build
 import android.view.Surface
-import com.waz.log.ZLog2._
-import com.waz.ZLog.ImplicitTag._
+import com.waz.log.LogSE._
 import com.waz.api.impl.ProgressIndicator.{ProgressData, ProgressReporter}
 import com.waz.bitmap.video.VideoTranscoder.CodecResponse._
 import com.waz.bitmap.video.VideoTranscoder.{CodecResponse, MediaCodecIterator}
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
+import com.waz.log.LogShow.SafeToLog
 import com.waz.model.{AssetMetaData, Dim2}
 import com.waz.threading.CancellableFuture
 import com.waz.utils.Deprecated.{codecInfoAtIndex, numberOfCodecs}
@@ -96,7 +97,7 @@ class FallbackTranscoder(context: Context) extends VideoTranscoder {
     CancellableFuture.failed(new UnsupportedOperationException("Transcoding not available in this android version"))
 }
 
-abstract class BaseTranscoder(context: Context) extends VideoTranscoder {
+abstract class BaseTranscoder(context: Context) extends VideoTranscoder with DerivedLogTag {
   import VideoTranscoder._
   private implicit val ec = com.waz.threading.Threading.BlockingIO
 

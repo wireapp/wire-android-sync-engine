@@ -19,10 +19,10 @@ package com.waz.sync.client
 
 import java.net.URLEncoder
 
-import com.waz.ZLog.ImplicitTag._
-import com.waz.ZLog._
+import com.waz.log.LogSE._
 import com.waz.api.MediaProvider
 import com.waz.api.impl.ErrorResponse
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model.AssetData
 import com.waz.model.messages.media.MediaAssetData.{MediaWithImages, Thumbnail}
 import com.waz.model.messages.media.{ArtistData, MediaAssetData, PlaylistData, TrackData}
@@ -126,18 +126,18 @@ object SoundCloudClient {
     }
   }
 
-  object SoundCloudResponse {
+  object SoundCloudResponse extends DerivedLogTag {
     def unapply(resp: ResponseContent): Option[MediaWithImages[MediaAssetData]] = resp match {
       case JsonObjectResponse(js) =>
         if (js has "tracks") Some(PlaylistDataDecoder(js))
         else if (js has "stream_url") Some(TrackDataDecoder(js))
         else {
-          warn(s"unrecognized json for audio assets: ${js.toString(2)}")
+          warn(l"unrecognized json for audio assets:")
           None
         }
 
       case other =>
-        warn(s"unknown response content: $resp")
+        warn(l"unknown response content:")
         None
     }
   }

@@ -20,9 +20,10 @@ package com.waz.content
 import java.util.concurrent.TimeUnit
 
 import android.content.Context
-import com.waz.ZLog._
 import com.waz.api.ContentSearchQuery
 import com.waz.db.{CursorIterator, Reader}
+import com.waz.log.BasicLogging.LogTag
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model._
 import com.waz.service.tracking.TrackingService
 import com.waz.threading.SerialDispatchQueue
@@ -35,13 +36,13 @@ import scala.concurrent.Future
 import scala.concurrent.duration.FiniteDuration
 
 class MessageIndexStorage(context: Context, storage: ZmsDatabase, messagesStorage: MessagesStorage, loader: MessageAndLikesStorage, tracking: TrackingService, conversationStorage: ConversationStorage)
-    extends CachedStorageImpl[MessageId, MessageContentIndexEntry](new TrimmingLruCache(context, Fixed(MessageContentIndex.MaxSearchResults)), storage)(MessageContentIndexDao, "MessageIndexStorage_Cached") {
+    extends CachedStorageImpl[MessageId, MessageContentIndexEntry](new TrimmingLruCache(context, Fixed(MessageContentIndex.MaxSearchResults)), storage)(MessageContentIndexDao, LogTag("MessageIndexStorage_Cached"))
+    with DerivedLogTag {
 
   import MessageIndexStorage._
   import MessageContentIndex.TextMessageTypes
   import com.waz.utils.events.EventContext.Implicits.global
 
-  private implicit val logTag: LogTag = logTagFor[MessageIndexStorage]
   private implicit val dispatcher = new SerialDispatchQueue(name = "MessageIndexStorage")
 
   private def entry(m: MessageData) =

@@ -19,8 +19,8 @@ package com.waz.service.tracking
 
 import java.lang.Math.max
 
-import com.waz.ZLog.LogTag
 import com.waz.api.NetworkMode
+import com.waz.log.BasicLogging.LogTag
 import com.waz.model.{IntegrationId, Mime}
 import com.waz.service.call.Avs.AvsClosedReason
 import com.waz.service.call.Avs.AvsClosedReason.reasonString

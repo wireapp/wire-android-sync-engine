@@ -20,12 +20,13 @@ package com.waz.threading
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.atomic.AtomicInteger
 
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.specs.AndroidFreeSpec
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
 
-class DispatchQueueSpec extends AndroidFreeSpec {
+class DispatchQueueSpec extends AndroidFreeSpec with DerivedLogTag {
 
   feature("Serial execution dispatch queue - concurrentTasks = 1") {
 
@@ -69,7 +70,7 @@ class DispatchQueueSpec extends AndroidFreeSpec {
         count = 1
       }
 
-      f.cancel()("")
+      f.cancel()
       latch.countDown()
 
       Thread.sleep(100) //make sure second task could run if it wasn't properly cancelled

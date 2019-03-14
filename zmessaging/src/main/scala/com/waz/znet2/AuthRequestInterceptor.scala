@@ -17,15 +17,16 @@
  */
 package com.waz.znet2
 
-import com.waz.sync.client.{ AuthenticationManager, AuthenticationManager2 }
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
+import com.waz.sync.client.{AuthenticationManager, AuthenticationManager2}
 import com.waz.threading.CancellableFuture
 import com.waz.znet2.http.HttpClient.ProgressCallback
 import com.waz.znet2.http._
-import com.waz.log.ZLog2._
-import com.waz.ZLog.ImplicitTag._
+import com.waz.log.LogSE._
 
 class AuthRequestInterceptor(authManager: AuthenticationManager, httpClient: HttpClient, attеmptsIfAuthFailed: Int = 1)
-    extends RequestInterceptor {
+    extends RequestInterceptor with DerivedLogTag {
+
   import com.waz.threading.Threading.Implicits.Background
 
   override def intercept(request: Request[Body]): CancellableFuture[Request[Body]] =
@@ -58,7 +59,8 @@ class AuthRequestInterceptor(authManager: AuthenticationManager, httpClient: Htt
 class AuthRequestInterceptor2(authManager: AuthenticationManager2,
                               httpClient: HttpClient,
                               attеmptsIfAuthFailed: Int = 1)
-    extends RequestInterceptor {
+    extends RequestInterceptor with DerivedLogTag {
+
   import com.waz.threading.Threading.Implicits.Background
 
   override def intercept(request: Request[Body]): CancellableFuture[Request[Body]] =

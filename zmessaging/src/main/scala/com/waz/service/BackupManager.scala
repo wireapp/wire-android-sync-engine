@@ -22,22 +22,22 @@ import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.zip.{ZipFile, ZipOutputStream}
 
-import com.waz.ZLog.ImplicitTag._
 import com.waz.db.ZMessagingDB
-import com.waz.log.ZLog2._
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
+import com.waz.log.LogSE._
 import com.waz.model.UserId
 import com.waz.model.otr.ClientId
 import com.waz.service.BackupManager.InvalidBackup.{DbEntryNotFound, MetadataEntryNotFound}
 import com.waz.utils.IoUtils.withResource
 import com.waz.utils.Json.syntax._
-import com.waz.utils.{IoUtils, JsonDecoder, JsonEncoder, returning, RichTry}
+import com.waz.utils.{IoUtils, JsonDecoder, JsonEncoder, RichTry, returning}
 import org.json.JSONObject
 import org.threeten.bp.Instant
 
 import scala.io.Source
 import scala.util.{Failure, Try}
 
-object BackupManager {
+object BackupManager extends DerivedLogTag {
 
   sealed trait BackupError extends Exception
 

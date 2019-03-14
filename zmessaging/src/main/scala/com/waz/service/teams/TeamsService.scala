@@ -17,15 +17,15 @@
  */
 package com.waz.service.teams
 
-import com.waz.ZLog.ImplicitTag._
 import com.waz.content._
-import com.waz.log.ZLog2._
-import com.waz.model.AccountDataOld.PermissionsMasks
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
+import com.waz.log.LogSE._
 import com.waz.model.ConversationData.ConversationDataDao
 import com.waz.model._
 import com.waz.service.EventScheduler.Stage
 import com.waz.service.conversation.ConversationsContentUpdater
 import com.waz.service.{EventScheduler, SearchKey}
+import com.waz.sync.client.TeamsClient.TeamMember
 import com.waz.sync.{SyncRequestService, SyncServiceHandle}
 import com.waz.threading.{CancellableFuture, SerialDispatchQueue}
 import com.waz.utils.ContentChange.{Added, Removed, Updated}
@@ -44,9 +44,9 @@ trait TeamsService {
 
   val selfTeam: Signal[Option[TeamData]]
 
-  def onTeamSynced(team: TeamData, members: Map[UserId, Option[PermissionsMasks]]): Future[Unit]
+  def onTeamSynced(team: TeamData, members: Seq[TeamMember]): Future[Unit]
 
-  def onMemberSynced(userId: UserId, permissions: Option[PermissionsMasks]): Future[Unit]
+  def onMemberSynced(member: TeamMember): Future[Unit]
 
   def guests: Signal[Set[UserId]]
 }
@@ -60,9 +60,18 @@ class TeamsServiceImpl(selfUser:           UserId,
                        convsContent:       ConversationsContentUpdater,
                        sync:               SyncServiceHandle,
                        syncRequestService: SyncRequestService,
-                       userPrefs:          UserPreferences) extends TeamsService {
+                       userPrefs:          UserPreferences) extends TeamsService with DerivedLogTag {
 
   private implicit val dispatcher = SerialDispatchQueue()
+
+  private val shouldSyncTeam = userPrefs.preference(UserPreferences.ShouldSyncTeam)
+
+  for {
+    shouldSync <- shouldSyncTeam()
+  } if (shouldSync && teamId.isDefined) {
+    verbose(l"Syncing the team $teamId")
+    sync.syncTeam().flatMap(_ => shouldSyncTeam := false)
+  }
 
   override val eventsProcessingStage: Stage.Atomic = EventScheduler.Stage[TeamEvent] { (_, events) =>
     verbose(l"Handling events: $events")
@@ -86,7 +95,7 @@ class TeamsServiceImpl(selfUser:           UserId,
 
   override def searchTeamMembers(query: Option[SearchKey] = None, handleOnly: Boolean = false) = teamId match {
     case None => Signal.empty
-    case Some(tId) => {
+    case Some(tId) =>
 
       val changesStream = EventStream.union[Seq[ContentChange[UserId, UserData]]](
         userStorage.onAdded.map(_.map(d => Added(d.id, d))),
@@ -99,12 +108,7 @@ class TeamsServiceImpl(selfUser:           UserId,
         case None    => userStorage.getByTeam(Set(tId))
       }
 
-      def userMatches(data: UserData) = data.teamId == teamId && (query match {
-        case Some(q) =>
-          if (handleOnly) data.handle.map(_.string).contains(q.asciiRepresentation)
-          else q.isAtTheStartOfAnyWordIn(data.searchKey)
-        case _ => true
-      })
+      def userMatches(data: UserData) = data.teamId == teamId && data.matchesQuery(query, handleOnly)
 
       new AggregatingSignal[Seq[ContentChange[UserId, UserData]], Set[UserData]](changesStream, load, { (current, changes) =>
         val added = changes.collect {
@@ -119,7 +123,7 @@ class TeamsServiceImpl(selfUser:           UserId,
 
         current.filterNot(d => removed.contains(d.id) || added.exists(_.id == d.id)) ++ added
       })
-    }
+
   }
 
   override lazy val selfTeam: Signal[Option[TeamData]] = teamId match {
@@ -146,30 +150,35 @@ class TeamsServiceImpl(selfUser:           UserId,
     }
   }
 
-  override def onTeamSynced(team: TeamData, members: Map[UserId, Option[PermissionsMasks]]) = {
+  override def onTeamSynced(team: TeamData, members: Seq[TeamMember]) = {
     verbose(l"onTeamSynced: team: $team \nmembers: $members")
 
-    val memberIds = members.keys.toSet
-    val selfPermissions = members.get(selfUser)
+    val memberIds = members.map(_.user).toSet
 
     for {
       _ <- teamStorage.insert(team)
-      _ <- selfPermissions.fold(Future.successful(()))(perm => onMemberSynced(selfUser, perm))
       oldMembers <- userStorage.getByTeam(Set(team.id))
       _ <- userStorage.updateAll2(oldMembers.map(_.id) -- memberIds, _.copy(deleted = true))
       _ <- sync.syncUsers(memberIds).flatMap(syncRequestService.await)
       _ <- userStorage.updateAll2(memberIds, _.copy(teamId = teamId, deleted = false))
+      _ <- Future.sequence(members.map(onMemberSynced))
     } yield {}
   }
 
-  override def onMemberSynced(userId: UserId, permissions: Option[PermissionsMasks]) = {
-    import UserPreferences._
-    if (userId == selfUser && permissions.nonEmpty)
-      for {
-        _ <- userPrefs(SelfPermissions) := permissions.get._1
-        _ <- userPrefs(CopyPermissions) := permissions.get._2
-      } yield ()
-    else Future.successful(())
+  override def onMemberSynced(member: TeamMember) = member match {
+    case TeamMember(userId, permissions, createdBy) =>
+
+      if (userId == selfUser) permissions.foreach { ps =>
+        import UserPreferences._
+        for {
+          _ <- userPrefs(SelfPermissions) := ps.self
+          _ <- userPrefs(CopyPermissions) := ps.copy
+        } yield ()
+      }
+
+      userStorage
+        .update(userId, _.copy(permissions = permissions.fold((0L, 0L))(p => (p.self, p.copy)), createdBy = createdBy))
+        .map(_ => ())
   }
 
   private def onTeamUpdated(id: TeamId, name: Option[Name], icon: Option[RAssetId], iconKey: Option[AESKey]) = {
@@ -182,9 +191,10 @@ class TeamsServiceImpl(selfUser:           UserId,
   }
 
   private def onMembersJoined(members: Set[UserId]) = {
-    verbose(l"onTeamMembersJoined: members: $members")
+    verbose(l"onMembersJoined: members: $members")
     for {
       _ <- sync.syncUsers(members).flatMap(syncRequestService.await)
+      _ <- sync.syncTeam().flatMap(syncRequestService.await)
       _ <- userStorage.updateAll2(members, _.copy(teamId = teamId, deleted = false))
     } yield {}
   }

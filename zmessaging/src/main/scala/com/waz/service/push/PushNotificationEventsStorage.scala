@@ -18,9 +18,10 @@
 package com.waz.service.push
 
 import android.content.Context
-import com.waz.ZLog.ImplicitTag._
 import com.waz.content.Database
-import com.waz.log.ZLog2._
+import com.waz.log.BasicLogging.LogTag
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
+import com.waz.log.LogSE._
 import com.waz.model.PushNotificationEvents.PushNotificationEventsDao
 import com.waz.model._
 import com.waz.model.otr.ClientId
@@ -54,8 +55,9 @@ trait PushNotificationEventsStorage extends CachedStorage[EventIndex, PushNotifi
 }
 
 class PushNotificationEventsStorageImpl(context: Context, storage: Database, clientId: ClientId)
-  extends CachedStorageImpl[EventIndex, PushNotificationEvent](new TrimmingLruCache(context, Fixed(1024*1024)), storage)(PushNotificationEventsDao, "PushNotificationEvents_Cached")
-    with PushNotificationEventsStorage {
+  extends CachedStorageImpl[EventIndex, PushNotificationEvent](new TrimmingLruCache(context, Fixed(1024*1024)), storage)(PushNotificationEventsDao, LogTag("PushNotificationEvents_Cached"))
+    with PushNotificationEventsStorage
+    with DerivedLogTag {
 
   private implicit val dispatcher = new SerialDispatchQueue(name = "PushNotificationEventsStorage")
 

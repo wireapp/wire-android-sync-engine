@@ -17,7 +17,7 @@
  */
 package com.waz.model
 
-import com.waz.log.ZLog2.SafeToLog
+import com.waz.log.LogShow.SafeToLog
 
 sealed trait Availability extends SafeToLog { val id: Int }
 

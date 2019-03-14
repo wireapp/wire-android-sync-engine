@@ -18,8 +18,8 @@
 package com.waz.bitmap.gif
 
 import android.graphics.Bitmap
-import com.waz.ZLog.ImplicitTag._
-import com.waz.log.ZLog2._
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
+import com.waz.log.LogSE._
 
 import scala.concurrent.duration.Duration
 
@@ -30,7 +30,7 @@ import scala.concurrent.duration.Duration
  * TODO: maybe image decoder could save pixels directly to current image (line bye line), would not need pixels buffer
  * @param gif
  */
-class AnimGifDecoder(gif: Gif) {
+class AnimGifDecoder(gif: Gif) extends DerivedLogTag {
   val framesCount = gif.frames.length
   var frameIndex = -1
   var loopCounter = 0

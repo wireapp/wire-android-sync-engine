@@ -19,12 +19,13 @@ package com.waz.utils
 
 import java.util.Locale
 
+import com.waz.log.BasicLogging.LogTag
 import org.scalatest._
 
 @Ignore class LocalesSpec extends FeatureSpec with Matchers with Inspectors with OptionValues {
   feature("BCP-47-compliant language tags") {
     scenario("Built-in") {
-      lazy val bcp47 = AndroidLanguageTags.create("LocalesSpec")
+      lazy val bcp47 = AndroidLanguageTags.create(LogTag("LocalesSpec"))
 
       forEvery(availableLocale) { original =>
         bcp47.languageTagOf(bcp47.localeFor(bcp47.languageTagOf(original)).value) shouldEqual bcp47.languageTagOf(original)
@@ -32,7 +33,7 @@ import org.scalatest._
     }
 
     scenario("Fallback") {
-      lazy val bcp47 = FallbackLanguageTags.create("LocalesSpec")
+      lazy val bcp47 = FallbackLanguageTags.create(LogTag("LocalesSpec"))
 
       forEvery(availableLocale) { locale =>
         bcp47.localeFor(bcp47.languageTagOf(locale)).value should have(

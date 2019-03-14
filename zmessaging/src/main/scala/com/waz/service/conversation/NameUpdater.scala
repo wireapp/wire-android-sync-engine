@@ -17,8 +17,8 @@
  */
 package com.waz.service.conversation
 
-import com.waz.ZLog._
 import com.waz.content._
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model.ConversationData.ConversationType
 import com.waz.model.UserData.ConnectionStatus
 import com.waz.model.{ConvId, Name, UserData, UserId}
@@ -36,9 +36,8 @@ import scala.concurrent.duration._
 class NameUpdater(selfUserId:     UserId,
                   usersStorage:   UsersStorage,
                   convs:          ConversationStorage,
-                  membersStorage: MembersStorage) {
+                  membersStorage: MembersStorage) extends DerivedLogTag {
 
-  private implicit val tag: LogTag = logTagFor[NameUpdater]
   private implicit val ev = EventContext.Global
   private implicit val dispatcher = new SerialDispatchQueue(name = "NameUpdaterQueue")
 

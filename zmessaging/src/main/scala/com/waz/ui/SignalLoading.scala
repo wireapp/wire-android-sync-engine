@@ -17,8 +17,9 @@
  */
 package com.waz.ui
 
-import com.waz.ZLog.ImplicitTag._
-import com.waz.ZLog._
+import com.waz.log.BasicLogging.LogTag
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
+import com.waz.log.LogSE._
 import com.waz.service.ZMessaging
 import com.waz.threading.Threading
 import com.waz.ui.SignalLoader.{LoaderHandle, LoadingReference, ZmsLoaderHandle}
@@ -49,7 +50,8 @@ trait LoaderSubscription {
   def destroy(): Unit
 }
 
-abstract class SignalLoader[A](handle: LoaderHandle[A])(implicit ui: UiModule) extends LoaderSubscription {
+abstract class SignalLoader[A](handle: LoaderHandle[A])(implicit ui: UiModule)
+  extends LoaderSubscription with DerivedLogTag {
   import ui.eventContext
 
   ui.onStarted { _ => SignalLoader.dropQueue() }
@@ -70,7 +72,7 @@ abstract class SignalLoader[A](handle: LoaderHandle[A])(implicit ui: UiModule) e
   }
 
   def destroy(): Unit = {
-    verbose("destroy()")(s"SignalLoader[${handle.loading.getClass.getName}]")
+    verbose(l"destroy()")(LogTag(s"SignalLoader[${handle.loading.getClass.getName}]"))
     observer.destroy()
     ref.get.foreach { handle => handle.loading.loaderHandles -= handle }
     ref.clear()
@@ -78,10 +80,10 @@ abstract class SignalLoader[A](handle: LoaderHandle[A])(implicit ui: UiModule) e
 }
 
 class ZmsSignalLoader[A](handle: ZmsLoaderHandle[A])(implicit ui: UiModule) extends SignalLoader[A](handle)(ui) {
-  override def signal = ui.currentZms flatMap { zms => verbose(s"currentZms: $zms"); withHandle { _.asInstanceOf[ZmsLoaderHandle[A]].signal(zms) } }
+  override def signal = ui.currentZms flatMap { zms => verbose(l"currentZms: ${zms.map(_.selfUserId)}"); withHandle { _.asInstanceOf[ZmsLoaderHandle[A]].signal(zms) } }
 }
 
-object SignalLoader {
+object SignalLoader extends DerivedLogTag {
 
   private val queue = new ReferenceQueue[LoaderHandle[_]]
 
@@ -90,7 +92,7 @@ object SignalLoader {
       ref.loader.destroy()
       dropQueue()
     case Some(ref) =>
-      error(s"unexpected reference: $ref")
+      error(l"unexpected reference: ${showString(ref.toString())}")
       dropQueue()
     case None => // done
   }

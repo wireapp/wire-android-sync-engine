@@ -20,11 +20,11 @@ package com.waz.service.otr
 import java.io.File
 
 import android.content.Context
-import com.waz.ZLog.ImplicitTag._
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.api.Verification
 import com.waz.content.UserPreferences
 import com.waz.content.UserPreferences.OtrLastPrekey
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model.UserId
 import com.waz.model.otr.{Client, ClientId, SignalingKey}
 import com.waz.service.MetaDataService
@@ -36,7 +36,7 @@ import org.threeten.bp.Instant
 import scala.concurrent.Future
 import scala.util.Try
 
-class CryptoBoxService(context: Context, userId: UserId, metadata: MetaDataService, userPrefs: UserPreferences) {
+class CryptoBoxService(context: Context, userId: UserId, metadata: MetaDataService, userPrefs: UserPreferences) extends DerivedLogTag {
   import CryptoBoxService._
   private implicit val dispatcher = new SerialDispatchQueue(Threading.IO)
 

@@ -17,7 +17,7 @@
  */
 package com.waz.model
 
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.model.AssetMetaData.Image
 import com.waz.model.AssetMetaData.Image.Tag
 import com.waz.model.AssetMetaData.Image.Tag.{Medium, Preview}

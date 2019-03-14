@@ -19,8 +19,8 @@ package com.waz.utils
 
 import android.content.Context
 import android.os.PowerManager
-import com.waz.ZLog.LogTag
-import com.waz.log.ZLog2._
+import com.waz.log.BasicLogging.LogTag
+import com.waz.log.LogSE._
 import com.waz.threading.CancellableFuture
 import com.waz.threading.Threading.Implicits.Background
 
@@ -36,15 +36,15 @@ class WakeLockImpl(context: Context, level: Int = PowerManager.PARTIAL_WAKE_LOCK
 
   protected val appContext = context.getApplicationContext
   protected lazy val powerManager = appContext.getSystemService(Context.POWER_SERVICE).asInstanceOf[PowerManager]
-  protected lazy val wakeLock = powerManager.newWakeLock(level, tag)
+  protected lazy val wakeLock = powerManager.newWakeLock(level, tag.value)
 
   protected def acquire()(implicit srcTag: LogTag): Unit = {
-    verbose(l"acquiring wakelock, src: ${showString(srcTag)}")(tag)
+    verbose(l"acquiring wakelock, src: $srcTag")(tag)
     wakeLock.acquire()
   }
 
   protected def release()(implicit srcTag: LogTag): Unit = {
-    verbose(l"releasing wakelock, src: ${showString(srcTag)}")(tag)
+    verbose(l"releasing wakelock, src: $srcTag")(tag)
     wakeLock.release()
   }
 
@@ -58,8 +58,9 @@ class WakeLockImpl(context: Context, level: Int = PowerManager.PARTIAL_WAKE_LOCK
   }
 
   def async[A](body: Future[A])(implicit srcTag: LogTag): Future[A] = {
-    acquire()(s"async[$srcTag]")
-    returning(body) { _.onComplete(_ => release()(s"async[$srcTag]")) }
+    val logTag = LogTag(s"async[${srcTag.value}]")
+    acquire()(logTag)
+    returning(body) { _.onComplete(_ => release()(logTag)) }
   }
 }
 
@@ -76,11 +77,12 @@ class TimedWakeLock(context: Context, duration: FiniteDuration)(implicit tag: Lo
   }
 
   override def async[A](body: Future[A])(implicit srcTag: LogTag): Future[A] = {
-    acquire()(s"async[$srcTag]")
+    acquire()(LogTag(s"async[${srcTag.value}]"))
     returning(body) { _.onComplete(_ => releaseAfterDuration()(srcTag)) }
   }
 
-  private def releaseAfterDuration()(implicit srcTag: LogTag): Unit = CancellableFuture.delay(duration).onComplete(_ => release()(s"delayed[$srcTag]"))
+  private def releaseAfterDuration()(implicit srcTag: LogTag): Unit =
+    CancellableFuture.delay(duration).onComplete(_ => release()(LogTag(s"delayed[${srcTag.value}]")))
 }
 
 class FakeLock extends WakeLock {

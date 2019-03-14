@@ -19,10 +19,11 @@ package com.waz.cache2
 
 import java.io._
 
-import com.waz.ZLog
-import com.waz.ZLog.ImplicitTag._
-import com.waz.ZLog._
-import com.waz.model.errors.{FailedExpectationsError, FileSystemError, NotFoundLocal, UnexpectedError, ZError}
+import com.waz.log.LogSE._
+import com.waz.cache2.CacheService.Encryption
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
+import com.waz.model.AESKey
+import com.waz.model.errors.NotFoundLocal
 import com.waz.utils.IoUtils
 import com.waz.utils.events._
 
@@ -167,34 +168,32 @@ object BaseFileCache {
 
 }
 
-abstract class LruFileCache[K] extends BaseFileCache[K] {
-
-  protected def cacheDirectory: File
-  protected def directorySizeThreshold: Long
-  protected def sizeCheckingInterval: FiniteDuration
-
-  protected implicit def ev: EventContext
+class LruFileCacheServiceImpl(
+                               cacheDirectory: File,
+                               directorySizeThreshold: Long,
+                               sizeCheckingInterval: FiniteDuration
+                             )(implicit override val ec: ExecutionContext, ev: EventContext)
+  extends CacheService with DerivedLogTag {
 
   private val directorySize: SourceSignal[Long] = Signal()
   directorySize
     .throttle(sizeCheckingInterval)
     .filter { size =>
-      verbose(s"Current cache size: ${ZLog.formatSize(size)}")
+      verbose(l"Current cache size: ${asSize(size)}")
       size > directorySizeThreshold
     } { size =>
       var shouldBeCleared = size - directorySizeThreshold
-      verbose(s"Cache directory size threshold reached(${formatSize(directorySizeThreshold)}). Current size: ${formatSize(size)}. " +
-        s"Should be cleared: ${ZLog.formatSize(shouldBeCleared)}")
+      verbose(l"Cache directory size threshold reached. Current size: ${asSize(size)}. Should be cleared: ${asSize(shouldBeCleared)}")
       cacheDirectory
         .listFiles()
         .sortBy(_.lastModified())
         .takeWhile { file =>
           val fileSize = file.length()
           if (file.delete()) {
-            verbose(s"File '${file.getName}' removed. Cleared ${ZLog.formatSize(fileSize)}.")
+            verbose(l"File '$file' removed. Cleared ${asSize(fileSize)}.")
             shouldBeCleared -= fileSize
           } else {
-            verbose(s"File '${file.getName}' can not be removed. Not cleared ${ZLog.formatSize(fileSize)}.")
+            verbose(l"File '$file' can not be removed. Not cleared ${asSize(fileSize)}.")
           }
           shouldBeCleared > 0
         }

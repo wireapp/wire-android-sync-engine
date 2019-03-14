@@ -30,6 +30,14 @@ import com.waz.service.assets2.Asset.UploadGeneral
 import com.waz.sync.SyncServiceHandle
 import com.waz.sync.client.AssetClient2.{FileWithSha, Retention}
 import com.waz.sync.client.{AssetClient2, AssetClient2Impl}
+import com.waz.log.LogSE._
+import com.waz.cache2.CacheService
+import com.waz.cache2.CacheService.{Encryption, NoEncryption}
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
+import com.waz.model.errors.NotFoundLocal
+import com.waz.model.{AssetId, Mime, Sha256}
+import com.waz.sync.client.AssetClient2
+import com.waz.sync.client.AssetClient2.{FileWithSha, Metadata, Retention}
 import com.waz.threading.CancellableFuture
 import com.waz.utils.{IoUtils, ReactiveStorageImpl2, UnlimitedInMemoryStorage, returning}
 import com.waz.{AuthenticationConfig, FilesystemUtils, ZIntegrationMockSpec}
@@ -37,7 +45,7 @@ import com.waz.{AuthenticationConfig, FilesystemUtils, ZIntegrationMockSpec}
 import scala.concurrent.Future
 import scala.util.{Failure, Random, Success}
 
-class AssetServiceSpec extends ZIntegrationMockSpec with AuthenticationConfig {
+class AssetServiceSpec extends ZIntegrationMockSpec with AuthenticationConfig with DerivedLogTag {
 
   private val assetStorage        = mock[AssetStorage]
   private val inProgressAssetStorage   = mock[DownloadAssetStorage]
@@ -66,11 +74,6 @@ class AssetServiceSpec extends ZIntegrationMockSpec with AuthenticationConfig {
     size = testAssetContent.length,
     details = BlobDetails,
     convId = None
-  )
-
-  implicit val AssetShow: LogShow[Asset[General]] = LogShow.create(
-    hideFields = Set("token"),
-    inlineFields = Set("convId", "encryption")
   )
 
   verbose(l"Test asset: $testAsset")

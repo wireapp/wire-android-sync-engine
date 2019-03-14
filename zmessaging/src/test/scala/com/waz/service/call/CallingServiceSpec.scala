@@ -18,10 +18,10 @@
 package com.waz.service.call
 
 import com.sun.jna.Pointer
-import com.waz.ZLog.ImplicitTag._
 import com.waz.api.NetworkMode
 import com.waz.content.GlobalPreferences.SkipTerminatingState
 import com.waz.content.MembersStorage
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model.ConversationData.ConversationType
 import com.waz.model.otr.ClientId
 import com.waz.model.{LocalInstant, UserId, _}
@@ -46,7 +46,7 @@ import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.control.NonFatal
 
-class CallingServiceSpec extends AndroidFreeSpec {
+class CallingServiceSpec extends AndroidFreeSpec with DerivedLogTag {
 
   implicit val executionContext = new SerialDispatchQueue(name = "CallingServiceSpec")
 

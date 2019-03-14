@@ -17,7 +17,7 @@
  */
 package com.waz.sync.handler
 
-import com.waz.ZLog._
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model.GenericContent.Reaction
 import com.waz.model._
 import com.waz.service.messages.ReactionsService
@@ -27,9 +27,8 @@ import com.waz.sync.otr.OtrSyncHandler
 import scala.concurrent.Future
 
 class ReactionsSyncHandler(service:   ReactionsService,
-                           otrSync:   OtrSyncHandler) {
+                           otrSync:   OtrSyncHandler) extends DerivedLogTag {
 
-  private implicit val logTag: LogTag = logTagFor[ReactionsSyncHandler]
   import com.waz.threading.Threading.Implicits.Background
 
   def postReaction(id: ConvId, liking: Liking): Future[SyncResult] =

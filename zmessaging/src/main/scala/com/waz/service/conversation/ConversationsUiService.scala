@@ -17,7 +17,6 @@
  */
 package com.waz.service.conversation
 
-import com.waz.ZLog.ImplicitTag._
 import com.waz.api
 import com.waz.api.IConversation.{Access, AccessRole}
 import com.waz.api.Message
@@ -25,7 +24,8 @@ import com.waz.api.NetworkMode.{OFFLINE, WIFI}
 import com.waz.api.impl._
 import com.waz.service.assets2._
 import com.waz.content._
-import com.waz.log.ZLog2._
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
+import com.waz.log.LogSE._
 import com.waz.model.ConversationData.{ConversationType, getAccessAndRoleForGroupConv}
 import com.waz.model.GenericContent.{Location, MsgEdit, Quote}
 import com.waz.model.UserData.ConnectionStatus
@@ -122,7 +122,7 @@ class ConversationsUiServiceImpl(selfUserId:      UserId,
                                  accounts:        AccountsService,
                                  tracking:        TrackingService,
                                  errors:          ErrorsService,
-                                 propertiesService: PropertiesService) extends ConversationsUiService {
+                                 propertiesService: PropertiesService) extends ConversationsUiService with DerivedLogTag {
   import ConversationsUiService._
   import Threading.Implicits.Background
 

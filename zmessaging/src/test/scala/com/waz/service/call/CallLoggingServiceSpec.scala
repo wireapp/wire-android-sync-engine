@@ -17,8 +17,8 @@
  */
 package com.waz.service.call
 
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model.{ConvId, RemoteInstant, UserId}
-import com.waz.ZLog.ImplicitTag._
 import com.waz.service.call.Avs.AvsClosedReason
 import com.waz.service.call.CallInfo.CallState
 import com.waz.service.call.CallInfo.CallState._
@@ -33,7 +33,7 @@ import com.waz.utils.RichInstant
 import scala.concurrent.Future
 import scala.concurrent.duration._
 
-class CallLoggingServiceSpec extends AndroidFreeSpec {
+class CallLoggingServiceSpec extends AndroidFreeSpec with DerivedLogTag {
 
   import Threading.Implicits.Background
 

@@ -17,16 +17,15 @@
  */
 package com.waz.sync.client
 
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.{AuthenticationConfig, ZIntegrationSpec}
-import com.waz.ZLog.ImplicitTag._
-import com.waz.ZLog.verbose
+import com.waz.log.LogSE._
 import com.waz.utils.RichSeq
 import org.scalatest.Ignore
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-@Ignore
-class GiphyClient2Spec extends ZIntegrationSpec with AuthenticationConfig {
+class GiphyClient2Spec extends ZIntegrationSpec with AuthenticationConfig with DerivedLogTag {
 
   private lazy val giphyClient = new GiphyClientImpl2()
 
@@ -39,32 +38,32 @@ class GiphyClient2Spec extends ZIntegrationSpec with AuthenticationConfig {
     scenario("loading trending with limit") {
       for {
         result <- giphyClient.loadTrending(limit = testLimit)
-        _ = verbose(s"Loading trending with limit result: $result")
+        _ = verbose(l"Loading trending with limit result: $result")
       } yield result.size shouldBe testLimit
     }
 
     scenario("loading trending with offset") {
       for {
         withZeroOffset <- giphyClient.loadTrending(offset = 0, limit = testLimit)
-        _ = verbose(s"Loading trending with offset=0 result: $withZeroOffset")
+        _ = verbose(l"Loading trending with offset=0 result: $withZeroOffset")
         withTestOffset <- giphyClient.loadTrending(testOffset, testLimit)
-        _ = verbose(s"Loading trending with offset=$testOffset result: $withTestOffset")
+        _ = verbose(l"Loading trending with offset=$testOffset result: $withTestOffset")
       } yield (withZeroOffset ++ withTestOffset).distinctBy(_.original.source).size should be > withZeroOffset.size
     }
 
     scenario("searching by keyword with limit") {
       for {
         result <- giphyClient.search(testSearchKeyword, limit = testLimit)
-        _ = verbose(s"Searching by keyword with limit result: $result")
+        _ = verbose(l"Searching by keyword with limit result: $result")
       } yield result.size shouldBe testLimit
     }
 
     scenario("searching by keyword with offset") {
       for {
         withZeroOffset <- giphyClient.search(testSearchKeyword, offset = 0, limit = testLimit)
-        _ = verbose(s"Searching by keyword with offset=0 result: $withZeroOffset")
+        _ = verbose(l"Searching by keyword with offset=0 result: $withZeroOffset")
         withTestOffset <- giphyClient.search(testSearchKeyword, testOffset, testLimit)
-        _ = verbose(s"Searching by keyword with offset=$testOffset result: $withTestOffset")
+        _ = verbose(l"Searching by keyword with offset=$testOffset result: $withTestOffset")
       } yield (withZeroOffset ++ withTestOffset).distinctBy(_.original.source).size should be > withZeroOffset.size
     }
 

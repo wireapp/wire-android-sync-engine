@@ -19,10 +19,10 @@ package com.waz.service
 
 import android.content.Context
 import android.net.Uri
-import com.waz.ZLog.ImplicitTag._
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.content.Preferences.Preference.PrefCodec.IntensityLevelCodec
 import com.waz.content.UserPreferences.Sounds
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.media.manager.config.Configuration
 import com.waz.media.manager.context.IntensityLevel
 import com.waz.media.manager.{MediaManager, MediaManagerListener}
@@ -43,7 +43,7 @@ trait MediaManagerService {
   def setSpeaker(enable: Boolean): Future[Unit]
 }
 
-class DefaultMediaManagerService(context: Context) extends MediaManagerService { self =>
+class DefaultMediaManagerService(context: Context) extends MediaManagerService with DerivedLogTag { self =>
   import com.waz.service.MediaManagerService._
 
   private implicit val dispatcher = new SerialDispatchQueue(name = "MediaManagerService")

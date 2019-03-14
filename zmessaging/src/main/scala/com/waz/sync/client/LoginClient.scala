@@ -19,10 +19,10 @@ package com.waz.sync.client
 
 import java.util.UUID
 
-import com.waz.ZLog.ImplicitTag._
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.api.Credentials
 import com.waz.api.impl.ErrorResponse
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model.AccountData.Label
 import com.waz.model.{TeamId, UserInfo}
 import com.waz.model2.transport.Team
@@ -58,7 +58,7 @@ trait LoginClient {
 class LoginClientImpl(tracking: TrackingService)
                      (implicit
                       urlCreator: UrlCreator,
-                      client: HttpClient) extends LoginClient {
+                      client: HttpClient) extends LoginClient with DerivedLogTag {
 
   import LoginClient._
 
@@ -186,7 +186,7 @@ class LoginClientImpl(tracking: TrackingService)
   }
 }
 
-object LoginClient {
+object LoginClient extends DerivedLogTag {
 
   case class LoginResult(accessToken: AccessToken, cookie: Option[Cookie], label: Option[Label])
 

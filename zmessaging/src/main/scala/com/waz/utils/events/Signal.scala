@@ -19,7 +19,8 @@ package com.waz.utils.events
 
 import java.util.concurrent.atomic.AtomicBoolean
 
-import com.waz.ZLog._
+import com.waz.log.BasicLogging.LogTag
+import com.waz.log.LogSE._
 import com.waz.threading.CancellableFuture.delayed
 import com.waz.threading.{CancellableFuture, SerialDispatchQueue, Threading}
 import com.waz.utils._
@@ -113,7 +114,7 @@ class Signal[A](@volatile protected[events] var value: Option[A] = None) extends
     if (!wired) {
       val prev = value
       disableAutowiring()
-      warn(s"Accessing value of unwired signal: $this, autowiring has been disabled, value was: $prev, is now: $value")(logTag)
+//      warn(l"Accessing value of unwired signal: $this, autowiring has been disabled, value was: $prev, is now: $value")(logTag)
     }
     value
   }
@@ -393,7 +394,7 @@ class PartialUpdateSignal[A, B](source: Signal[A])(select: A => B) extends Proxy
 
 
 object RefreshingSignal {
-  private implicit val tag: LogTag = "RefreshingSignal"
+  private implicit val tag: LogTag = LogTag("RefreshingSignal")
 
   def apply[A](loader: => Future[A], refreshEvent: EventStream[_]): RefreshingSignal[A] = new RefreshingSignal(CancellableFuture.lift(loader), refreshEvent)
 }
@@ -403,9 +404,9 @@ case class ButtonSignal[A](service: Signal[A], buttonState: Signal[Boolean])(onC
   def press()(implicit logTag: LogTag): Unit = if (wired) {
     (service.value, buttonState.value) match {
       case (Some(s), Some(b)) => onClick(s, b)
-      case _ => warn("ButtonSignal is empty")
+      case _ => warn(l"ButtonSignal is empty")
     }
-  } else warn("ButtonSignal not wired")
+  } else warn(l"ButtonSignal not wired")
 
   override protected def computeValue(current: Option[Boolean]) = buttonState.value
 }

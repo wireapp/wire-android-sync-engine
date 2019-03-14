@@ -18,7 +18,7 @@
 package com.waz.model
 
 import com.waz.api
-import com.waz.log.ZLog2.SafeToLog
+import com.waz.log.LogShow.SafeToLog
 import com.waz.utils.{EnumCodec, JsonDecoder, JsonEncoder}
 import org.json.{JSONException, JSONObject}
 

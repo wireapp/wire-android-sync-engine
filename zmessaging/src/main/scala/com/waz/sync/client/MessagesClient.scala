@@ -20,8 +20,8 @@ package com.waz.sync.client
 import java.io.ByteArrayInputStream
 
 import com.google.protobuf.nano.MessageNano
-import com.waz.ZLog._
 import com.waz.api.impl.ErrorResponse
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model._
 import com.waz.sync.client.OtrClient.{ClientMismatch, MessageResponse}
 import com.waz.sync.otr.OtrSyncHandler.OtrMessage
@@ -67,8 +67,7 @@ class MessagesClientImpl(implicit
   }
 }
 
-object MessagesClient {
-  private implicit val tag: LogTag = logTagFor[MessagesClient]
+object MessagesClient extends DerivedLogTag {
 
   def convMessagesPath(conv: RConvId, ignoreMissing: Boolean, receivers: Option[Set[UserId]] = None): String = {
     val base = s"/conversations/$conv/otr/messages"

@@ -17,10 +17,10 @@
  */
 package com.waz.utils.events
 
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import org.scalatest._
-import com.waz.ZLog.ImplicitTag._
 
-class EmptySignalSpec extends FeatureSpec with Matchers with OptionValues with BeforeAndAfter {
+class EmptySignalSpec extends FeatureSpec with Matchers with OptionValues with BeforeAndAfter with DerivedLogTag {
 
   implicit val ec: EventContext = EventContext.Global
 

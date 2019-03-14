@@ -24,7 +24,7 @@ import com.waz.model
 import com.waz.model.UserData.{ConnectionStatus, Picture}
 import com.waz.model.ManagedBy.ManagedBy
 import com.waz.model.UserData.ConnectionStatus
-import com.waz.model.UserField._
+import com.waz.model.UserPermissions._
 import com.waz.service.SearchKey
 import com.waz.service.assets2.StorageCodecs
 import com.waz.sync.client.UserSearchClient.UserSearchEntry
@@ -57,7 +57,9 @@ case class UserData(override val id:       UserId,
                     integrationId:         Option[IntegrationId]  = None,
                     expiresAt:             Option[RemoteInstant]  = None,
                     managedBy:             Option[ManagedBy]      = None,
-                    fields:                Seq[UserField]         = Seq.empty) extends Identifiable[UserId] {
+                    fields:                Seq[UserField]         = Seq.empty,
+                    permissions:           PermissionsMasks       = (0,0),
+                    createdBy:             Option[UserId]         = None) extends Identifiable[UserId] {
 
   def isConnected = ConnectionStatus.isConnected(connection)
   def hasEmailOrPhone = email.isDefined || phone.isDefined
@@ -121,6 +123,9 @@ case class UserData(override val id:       UserId,
 
   def isGuest(ourTeamId: Option[TeamId]): Boolean = ourTeamId.isDefined && teamId != ourTeamId
 
+  def isPartner(ourTeamId: Option[TeamId]): Boolean =
+    teamId.isDefined && teamId == ourTeamId && decodeBitmask(permissions._1) == PartnerPermissions
+
   def matchesFilter(filter: String): Boolean = {
     val isHandleSearch = Handle.isHandle(filter)
     matchesFilter(filter, isHandleSearch)
@@ -129,6 +134,12 @@ case class UserData(override val id:       UserId,
   def matchesFilter(filter: String, handleOnly: Boolean): Boolean =
     handle.exists(_.startsWithQuery(filter)) ||
       (!handleOnly && (SearchKey(filter).isAtTheStartOfAnyWordIn(searchKey) || email.exists(e => filter.trim.equalsIgnoreCase(e.str))))
+
+  def matchesQuery(query: Option[SearchKey] = None, handleOnly: Boolean = false): Boolean = query match {
+    case Some(q) =>
+      this.handle.map(_.string).contains(q.asciiRepresentation) || (!handleOnly && q.isAtTheStartOfAnyWordIn(this.searchKey))
+    case _ => true
+  }
 }
 
 object UserData {
@@ -206,16 +217,21 @@ object UserData {
     val ExpiresAt = opt(remoteTimestamp('expires_at))(_.expiresAt)
     val Managed = opt(text[ManagedBy]('managed_by, _.toString, ManagedBy(_)))(_.managedBy)
     val Fields = json[Seq[UserField]]('fields)(UserField.userFieldsDecoder, UserField.userFieldsEncoder)(_.fields)
+    val SelfPermissions = long('self_permissions)(_.permissions._1)
+    val CopyPermissions = long('copy_permissions)(_.permissions._2)
+    val CreatedBy = opt(id[UserId]('created_by))(_.createdBy)
 
     override val idCol = Id
     override val table = Table(
       "Users", Id, TeamId, Name, Email, Phone, TrackingId, Picture, Accent, SKey, Conn, ConnTime, ConnMessage,
-      Conversation, Rel, Timestamp, DisplayName, Verified, Deleted, AvailabilityStatus, Handle, ProviderId, IntegrationId, ExpiresAt, Managed
+      Conversation, Rel, Timestamp, DisplayName, Verified, Deleted, AvailabilityStatus, Handle, ProviderId, IntegrationId,
+      ExpiresAt, Managed, SelfPermissions, CopyPermissions, CreatedBy // Fields are now lazy-loaded from BE every time the user opens a profile
     )
 
     override def apply(implicit cursor: DBCursor): UserData = new UserData(
       Id, TeamId, Name, Email, Phone, TrackingId, Picture, Accent, SKey, Conn, RemoteInstant.ofEpochMilli(ConnTime.getTime), ConnMessage,
-      Conversation, Rel, Timestamp, DisplayName, Verified, Deleted, AvailabilityStatus, Handle, ProviderId, IntegrationId, ExpiresAt, Managed
+      Conversation, Rel, Timestamp, DisplayName, Verified, Deleted, AvailabilityStatus, Handle, ProviderId, IntegrationId, ExpiresAt, Managed,
+      Seq.empty, (SelfPermissions, CopyPermissions), CreatedBy
     )
 
     override def onCreate(db: DB): Unit = {

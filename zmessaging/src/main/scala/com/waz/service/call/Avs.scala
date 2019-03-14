@@ -18,10 +18,9 @@
 package com.waz.service.call
 
 import com.sun.jna.Pointer
-import com.waz.ZLog.ImplicitTag._
-import com.waz.ZLog.LogTag
-import com.waz.log.InternalLog
-import com.waz.log.ZLog2._
+import com.waz.log.BasicLogging.LogTag
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
+import com.waz.log.LogSE._
 import com.waz.model._
 import com.waz.model.otr.ClientId
 import com.waz.service.call.Calling._
@@ -51,7 +50,7 @@ trait Avs {
   * Facilitates synchronous communication with AVS and also provides a wrapper around the native code which can be easily
   * mocked for testing the CallingService
   */
-class AvsImpl() extends Avs {
+class AvsImpl() extends Avs with DerivedLogTag {
 
   private implicit val dispatcher = new SerialDispatchQueue(name = "AvsWrapper")
 
@@ -61,13 +60,13 @@ class AvsImpl() extends Avs {
     returning(Calling.wcall_init()) { res =>
       Calling.wcall_set_log_handler(new LogHandler {
         override def onLog(level: Int, msg: String, arg: WCall): Unit = {
-          import InternalLog._
+          val log = l"${showString(msg)}"
           level match {
-            case LogLevelDebug => debug(msg, AvsLogTag)
-            case LogLevelInfo  => info(msg, AvsLogTag)
-            case LogLevelWarn  => warn(msg, AvsLogTag)
-            case LogLevelError => error(msg, AvsLogTag)
-            case _             => verbose(msg, AvsLogTag)
+            case LogLevelDebug => debug(log)(AvsLogTag)
+            case LogLevelInfo  => info(log)(AvsLogTag)
+            case LogLevelWarn  => warn(log)(AvsLogTag)
+            case LogLevelError => error(log)(AvsLogTag)
+            case _             => verbose(log)(AvsLogTag)
           }
         }
       }, null)
@@ -196,9 +195,9 @@ class AvsImpl() extends Avs {
 
 }
 
-object Avs {
+object Avs extends DerivedLogTag {
 
-  val AvsLogTag: LogTag = "AVS"
+  val AvsLogTag: LogTag = LogTag("AVS")
 
   type WCall = Pointer
 

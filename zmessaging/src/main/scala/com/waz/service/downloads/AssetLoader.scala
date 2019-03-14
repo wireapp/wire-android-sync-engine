@@ -23,8 +23,6 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 import android.graphics.Bitmap
 import android.media.ExifInterface
-import com.waz.ZLog.ImplicitTag._
-import com.waz.ZLog.{LogTag, debug, verbose, warn}
 import com.waz.api.NetworkMode
 import com.waz.api.impl.ErrorResponse
 import com.waz.api.impl.ErrorResponse.internalError
@@ -35,6 +33,8 @@ import com.waz.cache.{CacheEntry, CacheService}
 import com.waz.content.AssetsStorage
 import com.waz.content.UserPreferences.DownloadImagesAlways
 import com.waz.content.WireContentProvider.CacheUri
+import com.waz.log.BasicLogging.LogTag
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model.AssetData.{RemoteData, WithExternalUri, WithProxy, WithRemoteData}
 import com.waz.model._
 import com.waz.service.assets.AudioTranscoder
@@ -79,7 +79,7 @@ class AssetLoaderImpl(context:         Context,
                       tracking:        TrackingService)
                      (implicit
                       urlCreator: UrlCreator,
-                      authInterceptor: RequestInterceptor) extends AssetLoader {
+                      authInterceptor: RequestInterceptor) extends AssetLoader with DerivedLogTag {
 
   private lazy val downloadAlways = Option(ZMessaging.currentAccounts).map(_.activeZms).map {
     _.flatMap {
@@ -87,7 +87,7 @@ class AssetLoaderImpl(context:         Context,
       case Some(z) => z.userPrefs.preference(DownloadImagesAlways).signal
     }
   }.getOrElse {
-    warn("No CurrentAccounts available - this may be being called too early...")
+//    warn("No CurrentAccounts available - this may be being called too early...")
     Signal.const(true)
   }
 
@@ -105,7 +105,7 @@ class AssetLoaderImpl(context:         Context,
   override val onDownloadFailed   = EventStream[(AssetId, ErrorResponse)]()
 
   override def loadAsset(asset: AssetData, callback: Callback, force: Boolean): CancellableFuture[CacheEntry] = {
-    verbose(s"loadAsset: ${asset.id}, isDownloadable?: ${asset.isDownloadable}, force?: $force, mime: ${asset.mime}, name: ${asset.name}")
+//    verbose(s"loadAsset: ${asset.id}, isDownloadable?: ${asset.isDownloadable}, force?: $force, mime: ${asset.mime}, name: ${asset.name}")
     returning(asset match {
       case _ if asset.mime == Mime.Audio.PCM => transcodeAudio(asset, callback)
       case _ => CancellableFuture.lift(cache.getEntry(asset.cacheKey)).flatMap {
@@ -137,14 +137,14 @@ class AssetLoaderImpl(context:         Context,
     //TODO Strange situation, only in one case we need request without authorization. Maybe we can get rid of this special case
     (asset match {
       case WithRemoteData(RemoteData(Some(rId), token, otrKey, sha, _)) =>
-        verbose(s"Downloading wire asset: ${asset.id}: $rId")
+//        verbose(s"Downloading wire asset: ${asset.id}: $rId")
         val path = AssetClient.getAssetPath(rId, otrKey, asset.convId)
         val headers = token.fold(Map.empty[String, String])(t => Map("Asset-Token" -> t.str))
         val request = Request.Get(relativePath = path, headers = http.Headers(headers))
         client.loadAsset(request, otrKey, sha, callback)
 
       case WithExternalUri(uri) =>
-        verbose(s"Downloading external asset: ${asset.id}: $uri")
+//        verbose(s"Downloading external asset: ${asset.id}: $uri")
         val request = Request.create(method = Method.Get, url = new URL(uri.toString))
         val resp = client.loadAsset(request, callback = callback)
         if (uri == UserService.UnsplashUrl)
@@ -160,7 +160,7 @@ class AssetLoaderImpl(context:         Context,
         else resp
 
       case WithProxy(proxy) =>
-        verbose(s"Downloading asset from proxy: ${asset.id}: $proxy")
+//        verbose(s"Downloading asset from proxy: ${asset.id}: $proxy")
         val request = Request.Get(relativePath = proxy)
         client.loadAsset(request, callback = callback)
 
@@ -170,7 +170,7 @@ class AssetLoaderImpl(context:         Context,
       case Right(entry) => finish(asset, entry)
       case Left(err) =>
         if (err.code == ResponseCode.NotFound) {
-          verbose(s"Asset not found. Removing from local storage $asset")
+//          verbose(s"Asset not found. Removing from local storage $asset")
           assetStorage.foreach(storage => storage.remove(asset.id))
         }
         if (err.isFatal) onDownloadFailed ! (asset.id, err)
@@ -179,12 +179,12 @@ class AssetLoaderImpl(context:         Context,
   }
 
   private def transcodeAudio(asset: AssetData, callback: Callback) = {
-    verbose(s"transcodeAudio: asset: ${asset.id}, cachekey: ${asset.cacheKey}, mime: ${asset.mime}, uri: ${asset.source}")
+//    verbose(s"transcodeAudio: asset: ${asset.id}, cachekey: ${asset.cacheKey}, mime: ${asset.mime}, uri: ${asset.source}")
     val entry = cache.createManagedFile()
     val uri = asset.source.getOrElse(CacheUri(asset.cacheKey, context))
 
     audioTranscoder(uri, entry.cacheFile, callback).flatMap { _ =>
-      verbose(s"loaded audio from ${asset.cacheKey}, resulting file size: ${entry.length}")
+//      verbose(s"loaded audio from ${asset.cacheKey}, resulting file size: ${entry.length}")
       CancellableFuture.lift(cache.move(asset.cacheKey, entry, Mime.Audio.MP4, asset.name, cacheLocation = Some(cache.cacheDir)))
     }.recoverWith {
       case ex: CancelException => CancellableFuture.failed(ex)
@@ -197,11 +197,11 @@ class AssetLoaderImpl(context:         Context,
   private def openStream(uri: URI) = AssetLoader.openStream(context, uri)
 
   private def transcodeVideo(cacheKey: CacheKey, mime: Mime, name: Option[String], uri: URI, callback: Callback) = {
-    verbose(s"transcodeVideo: cacheKey: $cacheKey, mime: $mime, name: $name, uri: $uri")
+//    verbose(s"transcodeVideo: cacheKey: $cacheKey, mime: $mime, name: $name, uri: $uri")
     val entry = cache.createManagedFile()
     // TODO: check input type, size, bitrate, maybe we don't need to transcode it
     returning(videoTranscoder(uri, entry.cacheFile, callback).flatMap { _ =>
-      verbose(s"loaded video from $cacheKey, resulting file size: ${entry.length}")
+//      verbose(s"loaded video from $cacheKey, resulting file size: ${entry.length}")
       CancellableFuture.lift(cache.move(cacheKey, entry, Mime.Video.MP4, if (mime == Mime.Video.MP4) name else name.map(_ + ".mp4"), cacheLocation = Some(cache.cacheDir)))
         .map { entry =>
           //TODO AN-5742 Use CacheService to store temp vids instead of handling them manually
@@ -230,7 +230,7 @@ class AssetLoaderImpl(context:         Context,
   }
 
   private def loadFromUri(cacheKey: CacheKey, mime: Mime, name: Option[String], uri: URI) = {
-    verbose(s"loadFromUri: cacheKey: $cacheKey, mime: $mime, name: $name, uri: $uri")
+//    verbose(s"loadFromUri: cacheKey: $cacheKey, mime: $mime, name: $name, uri: $uri")
     addStreamToCache(cacheKey, mime, name, openStream(uri))
   }
 
@@ -241,14 +241,14 @@ class AssetLoaderImpl(context:         Context,
     imgCache.reserve(assetId, req, bitmap.getWidth, bitmap.getHeight)
     val img: Bitmap = bitmapDecoder.withFixedOrientation(bitmap, orientation)
     imgCache.add(assetId, req, img)
-    verbose(s"compressing $assetId")
+//    verbose(s"compressing $assetId")
     val before = System.nanoTime
     val bos = new ByteArrayOutputStream(65536)
     val format = BitmapUtils.getCompressFormat(mime.str)
     img.compress(format, 85, bos)
     val bytes = bos.toByteArray
     val duration = (System.nanoTime - before) / 1e6d
-    debug(s"compression took: $duration ms (${img.getWidth} x ${img.getHeight}, ${img.getByteCount} bytes -> ${bytes.length} bytes, ${img.getConfig}, $mime, $format)")
+//    debug(s"compression took: $duration ms (${img.getWidth} x ${img.getHeight}, ${img.getByteCount} bytes -> ${bytes.length} bytes, ${img.getConfig}, $mime, $format)")
     bytes
   }(Threading.ImageDispatcher)
 

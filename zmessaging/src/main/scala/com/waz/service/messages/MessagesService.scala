@@ -17,12 +17,12 @@
  */
 package com.waz.service.messages
 
-import com.waz.ZLog.ImplicitTag._
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.api.Message
 import com.waz.api.Message.{Status, Type}
 import com.waz.api.impl.ErrorResponse
 import com.waz.content._
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model.ConversationData.ConversationType
 import com.waz.model.GenericContent._
 import com.waz.model.{Mention, MessageId, _}
@@ -99,7 +99,7 @@ class MessagesServiceImpl(selfUserId:   UserId,
                           network:      NetworkModeService,
                           members:      MembersStorage,
                           usersStorage: UsersStorage,
-                          sync:         SyncServiceHandle) extends MessagesService {
+                          sync:         SyncServiceHandle) extends MessagesService with DerivedLogTag {
   import Threading.Implicits.Background
   private implicit val ec = EventContext.Global
 
@@ -467,7 +467,7 @@ class MessagesServiceImpl(selfUserId:   UserId,
         .flatMap(p => Signal.sequence(p.map(usersStorage.signal).toSeq: _*)
           .map(_.exists(_.teamId.isDefined)))
 
-    val result = if (teamId.isDefined || convData.team.isDefined) {
+    val result: Signal[Retention] = if (teamId.isDefined || convData.team.isDefined) {
       checkConv(convData.id).map {
         case true => Retention.EternalInfrequentAccess
         case false => Retention.Expiring

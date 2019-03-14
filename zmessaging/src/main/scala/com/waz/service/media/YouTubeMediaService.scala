@@ -17,9 +17,9 @@
  */
 package com.waz.service.media
 
-import com.waz.ZLog.ImplicitTag._
 import com.waz.api.Message
-import com.waz.log.ZLog2._
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
+import com.waz.log.LogSE._
 import com.waz.model._
 import com.waz.model.messages.media.MediaAssetData
 import com.waz.model.messages.media.MediaAssetData.MediaWithImages
@@ -31,7 +31,7 @@ import com.waz.sync.client.ErrorOr
 
 import scala.concurrent.Future
 
-class YouTubeMediaService(client: YouTubeClient, assets: AssetService) {
+class YouTubeMediaService(client: YouTubeClient, assets: AssetService) extends DerivedLogTag {
   import Threading.Implicits.Background
 
   def updateMedia(msg: MessageData, content: MessageContent): ErrorOr[MessageContent] = {

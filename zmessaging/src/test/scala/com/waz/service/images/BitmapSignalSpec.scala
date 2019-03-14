@@ -17,8 +17,8 @@
  */
 package com.waz.service.images
 
-import com.waz.ZLog.ImplicitTag._
 import com.waz.api.NetworkMode
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model._
 import com.waz.service.NetworkModeService
 import com.waz.service.assets.AssetService.BitmapResult.BitmapLoaded
@@ -33,7 +33,7 @@ import com.waz.utils.wrappers.{Bitmap, FakeBitmap}
 
 import scala.concurrent.Future
 
-class BitmapSignalSpec extends AndroidFreeSpec { test =>
+class BitmapSignalSpec extends AndroidFreeSpec with DerivedLogTag { test =>
 
   val network = mock[NetworkModeService]
   val imageCache = mock[MemoryImageCache]

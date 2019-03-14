@@ -19,13 +19,14 @@ package com.waz.sync.handler
 
 import java.io.File
 
-import com.waz.ZLog.ImplicitTag._
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.api.Message
 import com.waz.api.Message.Part
 import com.waz.api.impl.ErrorResponse
 import com.waz.api.impl.ErrorResponse.internalError
 import com.waz.content._
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
+import com.waz.model.AssetMetaData.Image.Tag.Medium
 import com.waz.model.GenericContent.{Asset, LinkPreview, Text}
 import com.waz.model.GenericMessage.TextMessage
 import com.waz.model._
@@ -55,7 +56,7 @@ class OpenGraphSyncHandler(convs:           ConversationStorage,
                            client:          OpenGraphClient,
                            imageGenerator:  ImageAssetGenerator,
                            imageLoader:     ImageLoader,
-                           messagesService: MessagesService) {
+                           messagesService: MessagesService) extends DerivedLogTag {
   import com.waz.threading.Threading.Implicits.Background
 
 

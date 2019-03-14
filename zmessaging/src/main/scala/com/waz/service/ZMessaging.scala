@@ -21,9 +21,11 @@ import java.io.File
 
 import android.content.{ComponentCallbacks2, Context}
 import com.softwaremill.macwire._
-import com.waz.ZLog._
+import com.waz.log.LogSE._
 import com.waz.api.ContentSearchQuery
 import com.waz.content.{MembersStorageImpl, UsersStorageImpl, ZmsDatabase, _}
+import com.waz.log.BasicLogging.LogTag
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model._
 import com.waz.model.otr.ClientId
 import com.waz.service.EventScheduler.{Sequential, Stage}
@@ -107,9 +109,8 @@ class StorageModule(context: Context, val userId: UserId, globalPreferences: Glo
 
 }
 
-class ZMessaging(val teamId: Option[TeamId], val clientId: ClientId, account: AccountManager, val storage: StorageModule, val cryptoBox: CryptoBoxService) {
+class ZMessaging(val teamId: Option[TeamId], val clientId: ClientId, account: AccountManager, val storage: StorageModule, val cryptoBox: CryptoBoxService) extends DerivedLogTag {
 
-  private implicit val logTag: LogTag = logTagFor[ZMessaging]
   private implicit val dispatcher = new SerialDispatchQueue(name = "ZMessaging")
 
   val clock = ZMessaging.clock
@@ -380,11 +381,9 @@ class ZMessaging(val teamId: Option[TeamId], val clientId: ClientId, account: Ac
 /**
   * All vars are there for tests only - do not modify from production code!!
   */
-object ZMessaging { self =>
+object ZMessaging extends DerivedLogTag { self =>
 
-  def accountTag[A: reflect.Manifest](userId: UserId): LogTag = s"${implicitly[reflect.Manifest[A]].runtimeClass.getSimpleName}#${userId.str.take(8)}"
-
-  private implicit val logTag: LogTag = logTagFor(ZMessaging)
+  def accountTag[A: reflect.Manifest](userId: UserId): LogTag = LogTag(s"${implicitly[reflect.Manifest[A]].runtimeClass.getSimpleName}#${userId.str.take(8)}")
 
   private[waz] var context: Context = _
 

@@ -17,11 +17,12 @@
  */
 package com.waz.sync.client
 
-import com.waz.ZLog.ImplicitTag._
-import com.waz.ZLog.warn
 import com.waz.api.impl.ErrorResponse
-import com.waz.model.AccountDataOld.PermissionsMasks
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
+import com.waz.log.LogSE._
+import com.waz.model.UserPermissions.PermissionsMasks
 import com.waz.model._
+import com.waz.sync.client.TeamsClient.TeamMember
 import com.waz.utils.{CirceJSONSupport, JsonDecoder}
 import com.waz.znet2.AuthRequestInterceptor
 import com.waz.znet2.http.Request.UrlCreator
@@ -30,10 +31,11 @@ import com.waz.znet2.http.{HttpClient, RawBodyDeserializer, Request}
 import scala.util.Try
 
 trait TeamsClient {
-  def getTeamMembers(id: TeamId): ErrorOrResponse[Map[UserId, Option[PermissionsMasks]]]
+  def getTeamMembers(id: TeamId): ErrorOrResponse[Seq[TeamMember]]
   def getTeamData(id: TeamId): ErrorOrResponse[TeamData]
 
   def getPermissions(teamId: TeamId, userId: UserId): ErrorOrResponse[Option[PermissionsMasks]]
+  def getTeamMember(teamId: TeamId, userId: UserId): ErrorOrResponse[TeamMember]
 }
 
 class TeamsClientImpl(implicit
@@ -50,15 +52,11 @@ class TeamsClientImpl(implicit
   private implicit val errorResponseDeserializer: RawBodyDeserializer[ErrorResponse] =
     objectFromCirceJsonRawBodyDeserializer[ErrorResponse]
 
-  override def getTeamMembers(id: TeamId): ErrorOrResponse[Map[UserId, Option[PermissionsMasks]]] = {
+  override def getTeamMembers(id: TeamId): ErrorOrResponse[Seq[TeamMember]] = {
     Request.Get(relativePath = teamMembersPath(id))
       .withResultType[TeamMembers]
       .withErrorType[ErrorResponse]
-      .executeSafe { response =>
-        response.members
-          .map(member => member.user -> member.permissions.map(createPermissionsMasks))
-          .toMap
-      }
+      .executeSafe(_.members)
   }
 
   override def getTeamData(id: TeamId): ErrorOrResponse[TeamData] = {
@@ -76,6 +74,13 @@ class TeamsClientImpl(implicit
       .executeSafe { response =>
         response.permissions.map(createPermissionsMasks)
       }
+  }
+
+  override def getTeamMember(teamId: TeamId, userId: UserId): ErrorOrResponse[TeamMember] = {
+    Request.Get(relativePath = memberPath(teamId, userId))
+      .withResultType[TeamMember]
+      .withErrorType[ErrorResponse]
+      .executeSafe
   }
 
   private def createPermissionsMasks(permissions: Permissions): PermissionsMasks =
@@ -99,20 +104,20 @@ object TeamsClient {
   case class TeamBindingResponse(teams: Seq[(TeamData, Boolean)], hasMore: Boolean)
 
   //TODO Remove after assets refactoring
-  object TeamBindingResponse {
+  object TeamBindingResponse extends DerivedLogTag {
     def unapply(response: ResponseContent): Option[(Seq[(TeamData, Boolean)], Boolean)] =
       response match {
         case JsonObjectResponse(js) if js.has("teams") =>
           Try(decodeSeq('teams)(js, TeamData.TeamBindingDecoder), decodeOptBoolean('has_more)(js).getOrElse(false)).toOption
         case _ =>
-          warn(s"Unexpected response: $response")
+          warn(l"Unexpected response:")
           None
       }
   }
 
   case class TeamMembers(members: Seq[TeamMember])
 
-  case class TeamMember(user: UserId, permissions: Option[Permissions])
+  case class TeamMember(user: UserId, permissions: Option[Permissions], created_by: Option[UserId])
 
   case class Permissions(self: Long, copy: Long)
 

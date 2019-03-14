@@ -22,13 +22,13 @@ import java.nio.ByteBuffer
 import java.nio.charset.Charset
 import android.database.DatabaseUtils.queryNumEntries
 import android.database.sqlite.SQLiteQueryBuilder
-import com.waz.ZLog.ImplicitTag._
 import com.waz.{api, model}
 import com.waz.api.Message.Type._
 import com.waz.api.{Message, TypeFilter}
 import com.waz.db.Col._
 import com.waz.db.Dao
-import com.waz.log.ZLog2._
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
+import com.waz.log.LogSE._
 import com.waz.model.GenericContent.{Asset, ImageAsset, Knock, LinkPreview, Location, MsgEdit, Quote, Text}
 import com.waz.model.GenericMessage.{GenericMessageContent, TextMessage}
 import com.waz.model.MessageData.MessageState
@@ -67,26 +67,7 @@ case class MessageData(override val id: MessageId              = MessageId(),
                        assetId:         Option[GeneralAssetId] = None,
                        quote:             Option[QuoteContent]   = None,
                        forceReadReceipts: Option[Int]    = None
-                      ) extends Identifiable[MessageId] {
-
-  override def toString: String =
-    s"""
-       |MessageData:
-       | id:            $id
-       | convId:        $convId
-       | msgType:       $msgType
-       | userId:        $userId
-       | protos:        ${protos.toString().replace("\n", "")}
-       | state:         $state
-       | time:          $time
-       | localTime:     $localTime
-       | editTime:      $editTime
-       | members:       $members
-       | content:       ${content.map(c => (c.content, c.mentions))}
-       | other fields:  $firstMessage, $recipient, $email, $name, $ephemeral, $expiryTime, $expired, $duration
-    """.stripMargin
-
-
+                      ) extends Identifiable[MessageId] with DerivedLogTag {
   def getContent(index: Int) = {
     if (index == 0) content.headOption.getOrElse(MessageContent.Empty)
     else content.drop(index).headOption.getOrElse(MessageContent.Empty)

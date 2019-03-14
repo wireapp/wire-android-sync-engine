@@ -17,10 +17,11 @@
  */
 package com.waz.content
 
-import com.waz.ZLog.ImplicitTag._
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.api.Verification
 import com.waz.api.Verification.UNKNOWN
+import com.waz.log.BasicLogging.LogTag
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model.ConversationData.ConversationDataDao
 import com.waz.model.ConversationData.ConversationType.Group
 import com.waz.model._
@@ -31,7 +32,6 @@ import com.waz.utils._
 import com.waz.utils.events._
 
 import scala.collection.GenMap
-
 import scala.concurrent.Future
 
 trait ConversationStorage extends CachedStorage[ConvId, ConversationData] {
@@ -48,7 +48,10 @@ trait ConversationStorage extends CachedStorage[ConvId, ConversationData] {
   def findGroupConversations(prefix: SearchKey, self: UserId, limit: Int, handleOnly: Boolean): Future[Seq[ConversationData]]
 }
 
-class ConversationStorageImpl(storage: ZmsDatabase) extends CachedStorageImpl[ConvId, ConversationData](new UnlimitedLruCache(), storage)(ConversationDataDao, "ConversationStorage_Cached") with ConversationStorage {
+class ConversationStorageImpl(storage: ZmsDatabase)
+  extends CachedStorageImpl[ConvId, ConversationData](new UnlimitedLruCache(), storage)(ConversationDataDao, LogTag("ConversationStorage_Cached"))
+    with ConversationStorage with DerivedLogTag {
+
   import EventContext.Implicits.global
   private implicit val dispatcher = new SerialDispatchQueue(name = "ConversationStorage")
 

@@ -24,6 +24,9 @@ import com.waz.ZLog.ImplicitTag._
 import com.waz.model.AssetData.UploadTaskKey
 import com.waz.model._
 import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
+import com.waz.cache2.CacheService
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model.errors._
 import com.waz.service.assets2.Asset.{General, UploadGeneral, Video}
 import com.waz.sync.SyncServiceHandle

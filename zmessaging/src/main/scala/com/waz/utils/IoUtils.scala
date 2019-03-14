@@ -22,7 +22,7 @@ import java.security.MessageDigest
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.zip.{GZIPOutputStream, ZipEntry, ZipInputStream, ZipOutputStream}
 
-import com.waz.ZLog._
+import com.waz.log.BasicLogging.LogTag
 import com.waz.model.errors.FileSystemError
 import com.waz.threading.CancellableFuture
 

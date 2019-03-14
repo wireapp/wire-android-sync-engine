@@ -23,6 +23,7 @@ import com.waz.api.ProgressIndicator.State._
 import com.waz.api.impl.ProgressIndicator.ProgressData
 import com.waz.api.impl.{ErrorResponse, ProgressIndicator}
 import com.waz.cache.{CacheEntry, CacheEntryData, CacheService}
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model.AssetMetaData.Image
 import com.waz.model._
 import com.waz.service.NetworkModeService
@@ -30,7 +31,6 @@ import com.waz.service.downloads.AssetLoader.DownloadFailedException
 import com.waz.service.downloads.AssetLoaderService.{MaxConcurrentLoadRequests, MaxRetriesErrorMsg}
 import com.waz.service.downloads.{AssetLoader, AssetLoaderService}
 import com.waz.specs.AndroidFreeSpec
-import com.waz.ZLog.ImplicitTag._
 import com.waz.testutils.TestBackoff
 import com.waz.threading.CancellableFuture.CancelException
 import com.waz.threading.{CancellableFuture, Threading}
@@ -41,7 +41,7 @@ import scala.collection.mutable
 import scala.concurrent.Promise
 import scala.concurrent.duration._
 
-class AssetLoaderServiceSpec extends AndroidFreeSpec {
+class AssetLoaderServiceSpec extends AndroidFreeSpec with DerivedLogTag {
 
   val network      = mock[NetworkModeService]
   val cacheService = mock[CacheService]
@@ -155,7 +155,7 @@ class AssetLoaderServiceSpec extends AndroidFreeSpec {
       val cf1 = service.load(asset)
       val cf2 = service.load(asset)
 
-      cf1.cancel()("test")
+      cf1.cancel()
 
       val res = cacheEntry(asset.cacheKey, Uid())
       entry.publish(res, Threading.Background)
@@ -183,7 +183,7 @@ class AssetLoaderServiceSpec extends AndroidFreeSpec {
       //add another asset and cancel it
       val asset = getWireAsset(MaxConcurrentLoadRequests + 1)
       val cf1 = service.load(asset)
-      cf1.cancel()("test")
+      cf1.cancel()
       intercept[CancelException](result(cf1))
 
       //finish all active jobs
@@ -217,7 +217,7 @@ class AssetLoaderServiceSpec extends AndroidFreeSpec {
 
 
       val cf1 = CancellableFuture({})(Threading.Background).flatMap(_ => service.load(asset))(Threading.Background)
-      cf1.cancel()("test")
+      cf1.cancel()
 
       intercept[CancelException](result(cf1))
 
@@ -258,7 +258,7 @@ class AssetLoaderServiceSpec extends AndroidFreeSpec {
       def addAndCancel() = {
         val asset = nextAsset()
         val cf1 = CancellableFuture({})(Threading.Background).flatMap(_ => service.load(asset))(Threading.Background)
-        cf1.cancel()("test")
+        cf1.cancel()
         intercept[CancelException](result(cf1))
         remove(asset.id)
       }

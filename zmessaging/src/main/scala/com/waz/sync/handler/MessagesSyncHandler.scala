@@ -17,8 +17,7 @@
  */
 package com.waz.sync.handler
 
-import com.waz.ZLog.ImplicitTag._
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.api.Message
 import com.waz.api.impl.ErrorResponse
 import com.waz.api.impl.ErrorResponse.internalError
@@ -66,7 +65,7 @@ class MessagesSyncHandler(selfUserId: UserId,
                           members:    MembersStorage,
                           tracking:   TrackingService,
                           errors:     ErrorsService,
-                          timeouts: Timeouts) {
+                          timeouts: Timeouts) extends DerivedLogTag {
   import com.waz.threading.Threading.Implicits.Background
 
   def postDeleted(convId: ConvId, msgId: MessageId): Future[SyncResult] =

@@ -17,8 +17,9 @@
  */
 package com.waz.znet2
 
-import com.waz.log.ZLog2._
-import com.waz.sync.client.{JsonObjectResponse, ResponseContent, StringResponse, BinaryResponse}
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
+import com.waz.log.LogSE._
+import com.waz.sync.client.{BinaryResponse, JsonObjectResponse, ResponseContent, StringResponse}
 import com.waz.utils.events.EventStream
 import com.waz.znet2.WebSocketFactory.SocketEvent
 import com.waz.znet2.http.{Body, Request}
@@ -43,8 +44,7 @@ trait WebSocketFactory {
   def openWebSocket(request: Request[Body]): EventStream[SocketEvent]
 }
 
-object OkHttpWebSocketFactory extends WebSocketFactory {
-  import com.waz.ZLog.ImplicitTag._
+object OkHttpWebSocketFactory extends WebSocketFactory with DerivedLogTag {
   import okhttp3.{
     OkHttpClient,
     WebSocketListener,

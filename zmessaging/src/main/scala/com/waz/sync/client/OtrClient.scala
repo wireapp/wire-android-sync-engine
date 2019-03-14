@@ -17,10 +17,10 @@
  */
 package com.waz.sync.client
 
-import com.waz.ZLog.{LogTag, logTagFor}
 import com.waz.api.impl.ErrorResponse
 import com.waz.api.{OtrClientType, Verification}
-import com.waz.log.ZLog2._
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
+import com.waz.log.LogSE._
 import com.waz.model.AccountData.Password
 import com.waz.model.otr._
 import com.waz.model.{RemoteInstant, UserId}
@@ -56,13 +56,12 @@ trait OtrClient {
 class OtrClientImpl(implicit
                     urlCreator: UrlCreator,
                     httpClient: HttpClient,
-                    authRequestInterceptor: AuthRequestInterceptor) extends OtrClient {
+                    authRequestInterceptor: AuthRequestInterceptor) extends OtrClient with DerivedLogTag {
 
   import HttpClient.AutoDerivationOld._
   import HttpClient.dsl._
   import MessagesClient.OtrMessageSerializer
   import OtrClient._
-  import com.waz.ZLog.ImplicitTag._
   import com.waz.threading.Threading.Implicits.Background
 
   private[waz] val PermanentClient = true // for testing
@@ -192,8 +191,7 @@ class OtrClientImpl(implicit
   }
 }
 
-object OtrClient {
-  private implicit val tag: LogTag = logTagFor[OtrClient]
+object OtrClient extends DerivedLogTag {
 
   val clientsPath = "/clients"
   val prekeysPath = "/users/prekeys"

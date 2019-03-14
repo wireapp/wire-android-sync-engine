@@ -17,10 +17,10 @@
  */
 package com.waz.model
 
-import com.waz.ZLog.ImplicitTag._
 import com.waz.api.IConversation.{Access, AccessRole}
-import com.waz.log.ZLog2.SafeToLog
-import com.waz.log.ZLog2._
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
+import com.waz.log.LogShow.SafeToLog
+import com.waz.log.LogSE._
 import com.waz.model.ConversationEvent.ConversationEventDecoder
 import com.waz.model.Event.EventDecoder
 import com.waz.model.UserData.ConnectionStatus
@@ -187,7 +187,7 @@ object ConversationState {
 
 object Event {
 
-  implicit object EventDecoder extends JsonDecoder[Event] {
+  implicit object EventDecoder extends JsonDecoder[Event] with DerivedLogTag {
 
     import com.waz.utils.JsonDecoder._
 
@@ -225,7 +225,7 @@ object UserConnectionEvent {
   }
 }
 
-object ConversationEvent {
+object ConversationEvent extends DerivedLogTag {
 
   import OtrErrorEvent._
 
@@ -268,7 +268,7 @@ object ConversationEvent {
   }
 }
 
-object OtrErrorEvent {
+object OtrErrorEvent extends DerivedLogTag {
 
   def decodeOtrError(s: Symbol)(implicit js: JSONObject): OtrError =
     OtrErrorDecoder(js.getJSONObject(s.name))
@@ -349,7 +349,7 @@ sealed trait TeamEvent extends Event {
   val teamId: TeamId
 }
 
-object TeamEvent {
+object TeamEvent extends DerivedLogTag {
 
   /**
     * See: https://github.com/wireapp/architecture/blob/master/teams/backend.md

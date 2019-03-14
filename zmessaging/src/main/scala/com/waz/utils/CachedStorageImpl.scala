@@ -18,9 +18,9 @@
 package com.waz.utils
 
 import android.support.v4.util.LruCache
-import com.waz.ZLog._
 import com.waz.content.Database
 import com.waz.db.DaoIdOps
+import com.waz.log.BasicLogging.LogTag
 import com.waz.model.errors.NotFoundLocal
 import com.waz.threading.SerialDispatchQueue
 import com.waz.utils.ContentChange.{Added, Removed, Updated}
@@ -257,7 +257,12 @@ trait CachedStorage[K, V <: Identifiable[K]] {
   def contents: Signal[Map[K, V]]
 }
 
-class CachedStorageImpl[K, V <: Identifiable[K]](cache: LruCache[K, Option[V]], db: Database)(implicit val dao: StorageDao[K, V], tag: LogTag = "CachedStorage") extends CachedStorage[K, V] {
+class CachedStorageImpl[K, V <: Identifiable[K]](cache: LruCache[K, Option[V]], db: Database)
+                                                (implicit
+                                                 val dao: StorageDao[K, V],
+                                                 tag: LogTag = LogTag("CachedStorage")
+                                                ) extends CachedStorage[K, V] {
+
   private implicit val dispatcher = new SerialDispatchQueue(name = tag + "_Dispatcher")
 
   val onAdded = EventStream[Seq[V]]()

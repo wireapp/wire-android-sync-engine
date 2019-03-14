@@ -17,12 +17,12 @@
  */
 package com.waz.sync.handler
 
-import com.waz.log.ZLog2._
-import com.waz.ZLog.ImplicitTag._
+import com.waz.log.LogSE._
 import com.waz.api.impl.ErrorResponse
 import com.waz.content.UsersStorage
 import com.waz.model.AssetMetaData.Image.Tag
 import com.waz.model.UserInfo.ProfilePicture
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model._
 import com.waz.service.UserService
 import com.waz.service.assets2.AssetService
@@ -41,7 +41,8 @@ class UsersSyncHandler(assetSync: AssetSyncHandler,
                        assets: AssetService,
                        usersClient: UsersClient,
                        imageGenerator: ImageAssetGenerator,
-                       otrSync: OtrSyncHandler) {
+                       otrSync: OtrSyncHandler) extends DerivedLogTag {
+
   import Threading.Implicits.Background
   private implicit val ec = EventContext.Global
 

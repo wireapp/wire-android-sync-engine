@@ -17,8 +17,9 @@
  */
 package com.waz.ui
 
-import com.waz.ZLog.ImplicitTag._
-import com.waz.log.ZLog2._
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
+import com.waz.log.LogShow.SafeToLog
+import com.waz.log.LogSE._
 import com.waz.model.AssetId
 import com.waz.threading.{CancellableFuture, Threading}
 import com.waz.ui.MemoryImageCache.BitmapRequest
@@ -37,7 +38,10 @@ trait MemoryImageCache {
   def apply(id: AssetId, req: BitmapRequest, imgWidth: Int, load: => CancellableFuture[Bitmap]): CancellableFuture[Bitmap]
 }
 
-class MemoryImageCacheImpl(lru: Cache[MemoryImageCache.Key, MemoryImageCache.Entry]) extends MemoryImageCache {
+class MemoryImageCacheImpl(lru: Cache[MemoryImageCache.Key, MemoryImageCache.Entry])
+  extends MemoryImageCache
+    with DerivedLogTag {
+
   import MemoryImageCache._
 
   override def get(id: AssetId, req: BitmapRequest, imgWidth: Int): Option[Bitmap] = Option(lru.get(Key(id, tag(req)))) flatMap {

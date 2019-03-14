@@ -19,9 +19,8 @@ package com.waz.sync.queue
 
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicLong}
 
-import com.waz.ZLog.LogTag
-import com.waz.ZLog.ImplicitTag._
-import com.waz.log.ZLog2._
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
+import com.waz.log.LogSE._
 import com.waz.model.ConvId
 import com.waz.model.sync.SyncJob.Priority
 import com.waz.threading.SerialDispatchQueue
@@ -30,7 +29,7 @@ import scala.collection.immutable.Queue
 import scala.collection.mutable
 import scala.concurrent.{Future, Promise}
 
-class SyncSerializer {
+class SyncSerializer extends DerivedLogTag {
   import SyncSerializer._
   private implicit val dispatcher = new SerialDispatchQueue(name = "SyncSerializer")
 
@@ -120,7 +119,7 @@ object SyncSerializer {
       case _ => false
     }
 
-    override def toString: LogTag = s"PriorityHandle($priority, id: $id, completed: $isCompleted)"
+    override def toString: String = s"PriorityHandle($priority, id: $id, completed: $isCompleted)"
   }
 
   object PriorityHandle {

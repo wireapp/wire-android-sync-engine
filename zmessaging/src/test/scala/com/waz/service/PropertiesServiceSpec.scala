@@ -17,6 +17,7 @@
  */
 package com.waz.service
 import com.waz.content.{PropertiesStorage, PropertyValue, UserPreferences}
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model.{ReadReceiptEnabledPropertyEvent, SyncId}
 import com.waz.service.EventScheduler.{Sequential, Stage}
 import com.waz.service.push.PushService
@@ -28,10 +29,9 @@ import com.waz.utils.events.Signal
 
 import scala.concurrent.Future
 
-class PropertiesServiceSpec extends AndroidFreeSpec {
+class PropertiesServiceSpec extends AndroidFreeSpec with DerivedLogTag {
 
   import Threading.Implicits.Background
-  import com.waz.ZLog.ImplicitTag._
 
   private lazy val sync    = mock[SyncServiceHandle]
   private lazy val storage = mock[PropertiesStorage]

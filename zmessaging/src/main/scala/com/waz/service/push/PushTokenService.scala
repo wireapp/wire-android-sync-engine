@@ -19,10 +19,11 @@ package com.waz.service.push
 
 import java.io.IOException
 
-import com.waz.ZLog.LogTag
 import com.waz.api.NetworkMode
 import com.waz.content.{AccountStorage, GlobalPreferences}
-import com.waz.log.ZLog2._
+import com.waz.log.BasicLogging.LogTag
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
+import com.waz.log.LogSE._
 import com.waz.model.otr.ClientId
 import com.waz.model.{PushToken, PushTokenRemoveEvent, UserId}
 import com.waz.service.AccountsService.Active
@@ -129,9 +130,8 @@ trait GlobalTokenService {
 class GlobalTokenServiceImpl(googleApi: GoogleApi,
                              prefs:     GlobalPreferences,
                              network:   NetworkModeService,
-                             tracking:  TrackingService) extends GlobalTokenService {
+                             tracking:  TrackingService) extends GlobalTokenService with DerivedLogTag {
   import PushTokenService._
-  import com.waz.ZLog.ImplicitTag._
 
   implicit val dispatcher = new SerialDispatchQueue(name = "GlobalTokenService")
   implicit val ev = EventContext.Global

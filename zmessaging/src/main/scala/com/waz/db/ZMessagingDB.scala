@@ -290,6 +290,12 @@ object ZMessagingDB {
       db.execSQL("ALTER TABLE Users ADD COLUMN fields TEXT DEFAULT null")
     },
     Migration(115, 116) { db =>
+      db.execSQL("ALTER TABLE Users ADD COLUMN self_permissions INTEGER DEFAULT 0")
+      db.execSQL("ALTER TABLE Users ADD COLUMN copy_permissions INTEGER DEFAULT 0")
+      db.execSQL("ALTER TABLE Users ADD COLUMN created_by TEXT DEFAULT null")
+      db.execSQL("UPDATE KeyValues SET value = 'true' WHERE key = 'should_sync_teams'")
+    },
+    Migration(116, 117) { db =>
       import com.waz.model.AssetData.{AssetDataDao => OldAssetDao}
       import com.waz.service.assets2.AssetStorageImpl.{AssetDao => NewAssetDao}
       import com.waz.service.assets2._
