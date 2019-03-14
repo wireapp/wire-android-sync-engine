@@ -41,6 +41,7 @@ import com.waz.model.SearchQueryCache.SearchQueryCacheDao
 import com.waz.model.UserData.UserDataDao
 import com.waz.model.otr.UserClients.UserClientsDao
 import com.waz.model.sync.SyncJob.SyncJobDao
+import com.waz.service.push.FCMNotification.FCMNotificationsRepositoryDao
 import com.waz.service.push.ReceivedPushData.ReceivedPushDataDao
 import com.waz.service.tracking.TrackingService
 
@@ -55,7 +56,7 @@ class ZMessagingDB(context: Context, dbName: String, tracking: TrackingService) 
 }
 
 object ZMessagingDB {
-  val DbVersion = 116
+  val DbVersion = 117
 
   lazy val daos = Seq (
     UserDataDao, SearchQueryCacheDao, AssetDataDao, ConversationDataDao,
@@ -64,7 +65,7 @@ object ZMessagingDB {
     ContactHashesDao, ContactsOnWireDao, UserClientsDao, LikingDao,
     ContactsDao, EmailAddressesDao, PhoneNumbersDao, MsgDeletionDao,
     EditHistoryDao, MessageContentIndexDao, PushNotificationEventsDao,
-    ReadReceiptDao, PropertiesDao
+    ReadReceiptDao, PropertiesDao, FCMNotificationsRepositoryDao
   )
 
   lazy val migrations = Seq(
@@ -287,6 +288,9 @@ object ZMessagingDB {
       db.execSQL("ALTER TABLE Users ADD COLUMN copy_permissions INTEGER DEFAULT 0")
       db.execSQL("ALTER TABLE Users ADD COLUMN created_by TEXT DEFAULT null")
       db.execSQL("UPDATE KeyValues SET value = 'true' WHERE key = 'should_sync_teams'")
+    },
+    Migration(116, 117) { db =>
+      db.execSQL("CREATE TABLE FCMNotifications(_id TEXT PRIMARY KEY, received_at INTEGER, stage TEXT)")
     }
   )
 }
