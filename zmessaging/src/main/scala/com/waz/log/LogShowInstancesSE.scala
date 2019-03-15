@@ -95,6 +95,7 @@ trait LogShowInstancesSE {
   implicit val UidShow:        LogShow[Uid]        = logShowWithHash
   implicit val UserIdShow:     LogShow[UserId]     = logShowWithHash
   implicit val AssetIdShow:    LogShow[AssetId]    = logShowWithHash
+  implicit val GeneralAssetIdShow:    LogShow[GeneralAssetId]    = logShowWithHash
   implicit val UploadAssetIdLogShow: LogShow[UploadAssetId] = logShowWithHash
   implicit val DownloadAssetIdLogShow: LogShow[DownloadAssetId] = logShowWithHash
   implicit val RAssetIdShow:   LogShow[RAssetId]   = logShowWithHash
