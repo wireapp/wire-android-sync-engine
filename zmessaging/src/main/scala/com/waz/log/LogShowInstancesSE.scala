@@ -259,6 +259,9 @@ trait LogShowInstancesSE {
         """.stripMargin
     }
 
+  implicit val AssetStatusLogShow: LogShow[com.waz.service.assets2.AssetStatus] =
+    LogShow.createFrom { s => l"AssetStatus(${showString(s.getClass.getName)})" }
+
   implicit val TrackDataLogShow: LogShow[TrackData] =
     LogShow.createFrom { d =>
       import d._
