@@ -165,7 +165,6 @@ class ZMessaging(val teamId: Option[TeamId], val clientId: ClientId, account: Ac
   lazy val msgAndLikes: MessageAndLikesStorageImpl     = wire[MessageAndLikesStorageImpl]
   lazy val messagesIndexStorage: MessageIndexStorage   = wire[MessageIndexStorage]
   lazy val eventStorage: PushNotificationEventsStorage = wire[PushNotificationEventsStorageImpl]
-  lazy val receivedPushStorage: ReceivedPushStorage    = wire[ReceivedPushStorageImpl]
   lazy val fcmNotifications: FCMNotificationsRepository          = wire[FCMNotificationsRepositoryImpl]
   lazy val readReceiptsStorage: ReadReceiptsStorage    = wire[ReadReceiptsStorageImpl]
   lazy val reactionsStorage: ReactionsStorage          = wire[ReactionsStorageImpl]

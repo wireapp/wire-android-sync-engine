@@ -42,7 +42,6 @@ import com.waz.model.UserData.UserDataDao
 import com.waz.model.otr.UserClients.UserClientsDao
 import com.waz.model.sync.SyncJob.SyncJobDao
 import com.waz.service.push.FCMNotification.FCMNotificationsRepositoryDao
-import com.waz.service.push.ReceivedPushData.ReceivedPushDataDao
 import com.waz.service.tracking.TrackingService
 
 class ZMessagingDB(context: Context, dbName: String, tracking: TrackingService) extends DaoDB(context.getApplicationContext, dbName, null, DbVersion, daos, migrations, tracking) {
@@ -56,16 +55,14 @@ class ZMessagingDB(context: Context, dbName: String, tracking: TrackingService) 
 }
 
 object ZMessagingDB {
-  val DbVersion = 117
+  val DbVersion = 118
 
   lazy val daos = Seq (
-    UserDataDao, SearchQueryCacheDao, AssetDataDao, ConversationDataDao,
-    ConversationMemberDataDao, MessageDataDao, KeyValueDataDao,
-    SyncJobDao, ErrorDataDao, NotificationDataDao, ReceivedPushDataDao,
-    ContactHashesDao, ContactsOnWireDao, UserClientsDao, LikingDao,
-    ContactsDao, EmailAddressesDao, PhoneNumbersDao, MsgDeletionDao,
-    EditHistoryDao, MessageContentIndexDao, PushNotificationEventsDao,
-    ReadReceiptDao, PropertiesDao, FCMNotificationsRepositoryDao
+    UserDataDao, SearchQueryCacheDao, AssetDataDao, ConversationDataDao, ConversationMemberDataDao,
+    MessageDataDao, KeyValueDataDao, SyncJobDao, ErrorDataDao, NotificationDataDao,
+    ContactHashesDao, ContactsOnWireDao, UserClientsDao, LikingDao, ContactsDao, EmailAddressesDao,
+    PhoneNumbersDao, MsgDeletionDao, EditHistoryDao, MessageContentIndexDao,
+    PushNotificationEventsDao, ReadReceiptDao, PropertiesDao, FCMNotificationsRepositoryDao
   )
 
   lazy val migrations = Seq(
@@ -291,6 +288,9 @@ object ZMessagingDB {
     },
     Migration(116, 117) { db =>
       db.execSQL(FCMNotificationsRepositoryDao.table.createSql)
+    },
+    Migration(117, 118) { db =>
+      db.execSQL("DROP TABLE ReceivedPushes")
     }
   )
 }
