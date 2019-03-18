@@ -378,6 +378,9 @@ object GlobalPreferences {
 
   lazy val ShouldCreateFullConversation = PrefKey[Boolean]("should_create_full_conv", customDefault = false)
 
+  lazy val LogsEnabled: PrefKey[Boolean] = PrefKey[Boolean]("logs_enabled", customDefault = false)
+
+
   //DEPRECATED!!! Use the UserPreferences instead!!
   lazy val _ShareContacts          = PrefKey[Boolean]("PREF_KEY_PRIVACY_CONTACTS")
   lazy val _DarkTheme              = PrefKey[Boolean]("DarkTheme")
@@ -453,5 +456,4 @@ object UserPreferences {
 
   lazy val ReadReceiptsRemotelyChanged      = PrefKey[Boolean]("read_receipts_remotely_changed", customDefault = false)
 
-  lazy val LogsEnabled: PrefKey[Boolean] = PrefKey[Boolean]("logs_enabled", customDefault = false)
 }
