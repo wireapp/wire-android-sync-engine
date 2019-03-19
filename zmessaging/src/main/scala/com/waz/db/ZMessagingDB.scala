@@ -55,7 +55,7 @@ class ZMessagingDB(context: Context, dbName: String, tracking: TrackingService) 
 }
 
 object ZMessagingDB {
-  val DbVersion = 118
+  val DbVersion = 119
 
   lazy val daos = Seq (
     UserDataDao, SearchQueryCacheDao, AssetDataDao, ConversationDataDao, ConversationMemberDataDao,
@@ -291,6 +291,10 @@ object ZMessagingDB {
     },
     Migration(117, 118) { db =>
       db.execSQL("DROP TABLE ReceivedPushes")
+    },
+    Migration(118, 119) { db =>
+      db.execSQL("CREATE TABLE FCMNotificationStats(stage TEXT PRIMARY KEY, " +
+        "bucket1 INTEGER, bucket2 INTEGER, bucket3 INTEGER)")
     }
   )
 }
