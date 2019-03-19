@@ -47,8 +47,7 @@ object FCMNotification {
 
   val Pushed = "pushed"
   val Fetched = "fetched"
-  val StartOfPipeline = "StartOfPipeline"
-  val EndOfPipeline = "EndOfPipeline"
+  val StartedPipeline = "startedPipeline"
 
   implicit object FCMNotificationsRepositoryDao extends Dao[FCMNotification, Uid] {
     val Id = id[Uid]('_id, "PRIMARY KEY").apply(_.id)
