@@ -42,6 +42,7 @@ import com.waz.model.UserData.UserDataDao
 import com.waz.model.otr.UserClients.UserClientsDao
 import com.waz.model.sync.SyncJob.SyncJobDao
 import com.waz.service.push.FCMNotification.FCMNotificationsRepositoryDao
+import com.waz.service.push.FCMNotificationStats.FCMNotificationStatsRepositoryDao
 import com.waz.service.tracking.TrackingService
 
 class ZMessagingDB(context: Context, dbName: String, tracking: TrackingService) extends DaoDB(context.getApplicationContext, dbName, null, DbVersion, daos, migrations, tracking) {
@@ -62,7 +63,8 @@ object ZMessagingDB {
     MessageDataDao, KeyValueDataDao, SyncJobDao, ErrorDataDao, NotificationDataDao,
     ContactHashesDao, ContactsOnWireDao, UserClientsDao, LikingDao, ContactsDao, EmailAddressesDao,
     PhoneNumbersDao, MsgDeletionDao, EditHistoryDao, MessageContentIndexDao,
-    PushNotificationEventsDao, ReadReceiptDao, PropertiesDao, FCMNotificationsRepositoryDao
+    PushNotificationEventsDao, ReadReceiptDao, PropertiesDao, FCMNotificationsRepositoryDao,
+    FCMNotificationStatsRepositoryDao
   )
 
   lazy val migrations = Seq(
@@ -293,8 +295,7 @@ object ZMessagingDB {
       db.execSQL("DROP TABLE ReceivedPushes")
     },
     Migration(118, 119) { db =>
-      db.execSQL("CREATE TABLE FCMNotificationStats(stage TEXT PRIMARY KEY, " +
-        "bucket1 INTEGER, bucket2 INTEGER, bucket3 INTEGER)")
+      db.execSQL(FCMNotificationStatsRepositoryDao.table.createSql)
     }
   )
 }
