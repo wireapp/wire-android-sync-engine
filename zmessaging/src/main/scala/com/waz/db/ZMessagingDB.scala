@@ -290,7 +290,7 @@ object ZMessagingDB {
       db.execSQL("UPDATE KeyValues SET value = 'true' WHERE key = 'should_sync_teams'")
     },
     Migration(116, 117) { db =>
-      db.execSQL("CREATE TABLE FCMNotifications(_id TEXT PRIMARY KEY, received_at INTEGER, stage TEXT)")
+      db.execSQL(FCMNotificationsRepositoryDao.table.createSql)
     }
   )
 }
