@@ -39,7 +39,7 @@ trait FCMNotificationStatsService {
 class FCMNotificationStatsServiceImpl()(implicit db: Database)
   extends FCMNotificationStatsService with DerivedLogTag{
 
-  import FCMNotificationStatsService.updateBucketWithNotification
+  import FCMNotificationStatsService.getNewStageStats
 
   private def getPreviousStageTime(id: Uid, stage: String)(implicit db: DB): Option[Instant] = {
     FCMNotificationsRepository.prevStage(stage) match {
@@ -52,18 +52,21 @@ class FCMNotificationStatsServiceImpl()(implicit db: Database)
                                      (implicit ec: ExecutionContext): CancellableFuture[Unit] =
     db.withTransaction { implicit db =>
       FCMNotificationsDao.insertOrIgnore(FCMNotification(id, timestamp, stage))
+      val prev = getPreviousStageTime(id, stage)
       FCMNotificationStatsDao.getById(stage) match {
         case Some(stageRow) =>
-          getPreviousStageTime(id, stage) match {
-            case Some(prev) =>
-              FCMNotificationStatsDao
-                .insertOrReplace(updateBucketWithNotification(stageRow, timestamp, stage, prev))
-            case None =>
-              error(l"""Couldn't find prev stage for notification $id at stage
-                    ${showString(stage)}""")
+          if(prev.nonEmpty) {
+            FCMNotificationStatsDao
+              .insertOrReplace(getNewStageStats(stageRow, timestamp, stage, prev.get))
+          } else {
+            error(l"""Couldn't find prev stage for notification $id at stage
+                  ${showString(stage)}""")
           }
         case _ =>
-          error(l"Failed to find row for stage ${showString(stage)}, skipping notification...")
+          prev
+            .map(p => FCMNotificationStatsDao.insertOrReplace(
+              getNewStageStats(
+                FCMNotificationStats(stage, 0, 0, 0), timestamp, stage, p)))
       }
     }.map(_ => ())
 
@@ -74,8 +77,8 @@ class FCMNotificationStatsServiceImpl()(implicit db: Database)
 object FCMNotificationStatsService {
 
   //this method only exists to facilitate testing
-  def updateBucketWithNotification(curStats: FCMNotificationStats, stageTimestamp: Instant,
-                                   stage: String, prevStageTime: Instant): FCMNotificationStats = {
+  def getNewStageStats(curStats: FCMNotificationStats, stageTimestamp: Instant,
+                       stage: String, prevStageTime: Instant): FCMNotificationStats = {
     val bucket1 = Instant.from(prevStageTime).plus(10, SECONDS)
     val bucket2 = Instant.from(prevStageTime).plus(30, MINUTES)
     if (stageTimestamp.isBefore(bucket1))

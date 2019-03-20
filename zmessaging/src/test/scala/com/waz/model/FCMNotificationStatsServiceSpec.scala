@@ -27,7 +27,7 @@ class FCMNotificationStatsServiceSpec extends AndroidFreeSpec {
 
   implicit val ec = Threading.Background
   import FCMNotificationsRepository._
-  import FCMNotificationStatsService.updateBucketWithNotification
+  import FCMNotificationStatsService.getNewStageStats
 
   val stage = Pushed
   val bucket1 = FCMNotificationStats(stage, 1, 0, 0)
@@ -40,7 +40,7 @@ class FCMNotificationStatsServiceSpec extends AndroidFreeSpec {
     val prev = Instant.from(stageTime).minus(offset, MILLIS)
     val curRow = FCMNotificationStats(stage, 0, 0, 0)
 
-    updateBucketWithNotification(curRow, stageTime, stage, prev)
+    getNewStageStats(curRow, stageTime, stage, prev)
   }
 
   scenario("Notifications in bucket1 are sorted correctly") {
