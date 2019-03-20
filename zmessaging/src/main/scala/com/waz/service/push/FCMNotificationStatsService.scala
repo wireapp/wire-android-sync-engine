@@ -25,7 +25,6 @@ import com.waz.service.push.FCMNotificationStatsRepository.FCMNotificationStatsD
 import com.waz.service.push.FCMNotificationsRepository.FCMNotificationsDao
 import com.waz.utils.wrappers.DB
 import org.threeten.bp.Instant
-import org.threeten.bp.temporal.ChronoUnit
 import org.threeten.bp.temporal.ChronoUnit._
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -38,6 +37,8 @@ trait FCMNotificationStatsService {
 
 class FCMNotificationStatsServiceImpl()(implicit db: Database)
   extends FCMNotificationStatsService with DerivedLogTag{
+
+  import FCMNotificationStatsService.updateBucketWithNotification
 
   private def getPreviousStageTime(id: Uid, stage: String)(implicit db: DB): Option[Instant] = {
     FCMNotificationsRepository.prevStage(stage) match {
@@ -55,14 +56,8 @@ class FCMNotificationStatsServiceImpl()(implicit db: Database)
         case Some(stageRow) =>
           getPreviousStageTime(id, stage) match {
             case Some(prev) =>
-              val bucket1 = Instant.from(prev).plus(10, SECONDS)
-              val bucket2 = Instant.from(prev).plus(30, MINUTES)
-              val newRow =
-                if(timestamp.isBefore(bucket1)) stageRow.copy(stage, bucket1 = stageRow.bucket1+1)
-                else if(timestamp.isBefore(bucket2))
-                  stageRow.copy(stage, bucket2 = stageRow.bucket2+1)
-                else stageRow.copy(stage, bucket3 = stageRow.bucket3+1)
-              FCMNotificationStatsDao.insertOrReplace(newRow)
+              FCMNotificationStatsDao
+                .insertOrReplace(updateBucketWithNotification(stageRow, timestamp, stage, prev))
             case None =>
               error(l"""Couldn't find prev stage for notification $id at stage
                     ${showString(stage)}""")
@@ -75,4 +70,19 @@ class FCMNotificationStatsServiceImpl()(implicit db: Database)
 
   override def getStats(implicit db: DB): Vector[FCMNotificationStats] =
     FCMNotificationStatsDao.list
+}
+
+object FCMNotificationStatsService {
+
+  //this method only exists to facilitate testing
+  def updateBucketWithNotification(curStats: FCMNotificationStats, stageTimestamp: Instant,
+                                   stage: String, prevStageTime: Instant): FCMNotificationStats = {
+    val bucket1 = Instant.from(prevStageTime).plus(10, SECONDS)
+    val bucket2 = Instant.from(prevStageTime).plus(30, MINUTES)
+    if (stageTimestamp.isBefore(bucket1))
+      curStats.copy(stage, bucket1 = curStats.bucket1 + 1)
+    else if (stageTimestamp.isBefore(bucket2))
+      curStats.copy(stage, bucket2 = curStats.bucket2 + 1)
+    else curStats.copy(stage, bucket3 = curStats.bucket3 + 1)
+  }
 }
