@@ -38,6 +38,7 @@ object FCMNotificationsRepository {
   val Pushed = "pushed"
   val Fetched = "fetched"
   val StartedPipeline = "startedPipeline"
+  val FinishedPipeline = "finishedPipeline"
 
   def prevStage(stage: String): Option[String] = stage match {
     case StartedPipeline => Some(Fetched)

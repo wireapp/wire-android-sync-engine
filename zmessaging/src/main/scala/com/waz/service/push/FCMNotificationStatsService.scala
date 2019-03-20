@@ -40,6 +40,7 @@ class FCMNotificationStatsServiceImpl()(implicit db: Database)
   extends FCMNotificationStatsService with DerivedLogTag{
 
   import FCMNotificationStatsService.getNewStageStats
+  import FCMNotificationsRepository._
 
   private def getPreviousStageTime(id: Uid, stage: String)(implicit db: DB): Option[Instant] = {
     FCMNotificationsRepository.prevStage(stage) match {
@@ -52,21 +53,20 @@ class FCMNotificationStatsServiceImpl()(implicit db: Database)
                                      (implicit ec: ExecutionContext): CancellableFuture[Unit] =
     db.withTransaction { implicit db =>
       FCMNotificationsDao.insertOrIgnore(FCMNotification(id, timestamp, stage))
-      val prev = getPreviousStageTime(id, stage)
-      FCMNotificationStatsDao.getById(stage) match {
-        case Some(stageRow) =>
-          if(prev.nonEmpty) {
-            FCMNotificationStatsDao
-              .insertOrReplace(getNewStageStats(stageRow, timestamp, stage, prev.get))
-          } else {
-            error(l"""Couldn't find prev stage for notification $id at stage
-                  ${showString(stage)}""")
-          }
-        case _ =>
-          prev
-            .map(p => FCMNotificationStatsDao.insertOrReplace(
-              getNewStageStats(
-                FCMNotificationStats(stage, 0, 0, 0), timestamp, stage, p)))
+      getPreviousStageTime(id, stage).foreach { prev =>
+        FCMNotificationStatsDao.getById(stage) match {
+          case Some(stageRow) =>
+              FCMNotificationStatsDao
+                .insertOrReplace(getNewStageStats(stageRow, timestamp, stage, prev))
+            if(stage == FinishedPipeline) {
+              FCMNotificationsDao
+                .deleteEvery(Seq(Pushed, Fetched, StartedPipeline, FinishedPipeline)
+                  .map(s => (id, s)))
+            }
+          case _ =>
+              FCMNotificationStatsDao.insertOrReplace(
+                getNewStageStats(FCMNotificationStats(stage, 0, 0, 0), timestamp, stage, prev))
+        }
       }
     }.map(_ => ())
 
