@@ -23,15 +23,16 @@ import com.waz.log.LogSE._
 import com.waz.model.Uid
 import com.waz.service.push.FCMNotificationStatsRepository.FCMNotificationStatsDao
 import com.waz.service.push.FCMNotificationsRepository.FCMNotificationsDao
+import com.waz.threading.CancellableFuture
 import com.waz.utils.wrappers.DB
 import org.threeten.bp.Instant
 import org.threeten.bp.temporal.ChronoUnit._
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.ExecutionContext
 
 trait FCMNotificationStatsService {
   def storeNotificationState(id: Uid, stage: String, timestamp: Instant)
-                            (implicit ec: ExecutionContext): Future[Unit]
+                            (implicit ec: ExecutionContext): CancellableFuture[Unit]
   def getStats(implicit db: DB): Vector[FCMNotificationStats]
 }
 
@@ -42,14 +43,13 @@ class FCMNotificationStatsServiceImpl()(implicit db: Database)
 
   private def getPreviousStageTime(id: Uid, stage: String)(implicit db: DB): Option[Instant] = {
     FCMNotificationsRepository.prevStage(stage) match {
-      case Some(s) => FCMNotificationsDao.getById(id, s).map(_.receivedAt) //TODO: rename receivedAt
-      case _ =>
-        None
+      case Some(s) => FCMNotificationsDao.getById(id, s).map(_.stageStartTime)
+      case _ => None
     }
   }
 
   override def storeNotificationState(id: Uid, stage: String, timestamp: Instant)
-                                     (implicit ec: ExecutionContext): Future[Unit] =
+                                     (implicit ec: ExecutionContext): CancellableFuture[Unit] =
     db.withTransaction { implicit db =>
       FCMNotificationsDao.insertOrIgnore(FCMNotification(id, timestamp, stage))
       FCMNotificationStatsDao.getById(stage) match {
@@ -65,8 +65,7 @@ class FCMNotificationStatsServiceImpl()(implicit db: Database)
         case _ =>
           error(l"Failed to find row for stage ${showString(stage)}, skipping notification...")
       }
-
-    }.future.map(_ => ())
+    }.map(_ => ())
 
   override def getStats(implicit db: DB): Vector[FCMNotificationStats] =
     FCMNotificationStatsDao.list

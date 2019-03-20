@@ -26,11 +26,11 @@ import org.threeten.bp.Instant
 
 
 /**
-  * @param receivedAt instant the push notification was received
+  * @param stageStartTime instant the push notification was received at stage
   * @param stage the stage the notification was in at time `receivedAt`
   */
 case class FCMNotification(override val id: Uid,
-                           receivedAt:      Instant,
+                           stageStartTime:      Instant,
                            stage:           String) extends Identifiable[Uid]
 
 object FCMNotificationsRepository {
@@ -47,14 +47,14 @@ object FCMNotificationsRepository {
 
   implicit object FCMNotificationsDao extends Dao2[FCMNotification, Uid, String] {
     val Id = id[Uid]('_id).apply(_.id)
-    val ReceivedAt = timestamp('received_at)(_.receivedAt)
+    val stageStartTime = timestamp('stage_start_time)(_.stageStartTime)
     val Stage = text('stage)(_.stage)
 
     override val idCol = (Id, Stage)
-    override val table = Table("FCMNotifications", Id, ReceivedAt, Stage)
+    override val table = Table("FCMNotifications", Id, stageStartTime, Stage)
 
     override def apply(implicit cursor: DBCursor): FCMNotification =
-      FCMNotification(Id, ReceivedAt, Stage)
+      FCMNotification(Id, stageStartTime, Stage)
   }
 
 }
