@@ -18,15 +18,11 @@
 package com.waz.service.push
 
 import com.waz.content.Database
-import com.waz.log.BasicLogging.LogTag.DerivedLogTag
-import com.waz.log.LogSE._
 import com.waz.model.Uid
 import com.waz.service.push.FCMNotificationStatsRepository.FCMNotificationStatsDao
-import com.waz.service.push.FCMNotificationsRepository.FCMNotificationsDao
 import com.waz.threading.CancellableFuture
 import com.waz.utils.wrappers.DB
 import org.threeten.bp.Instant
-import org.threeten.bp.temporal.ChronoUnit._
 
 import scala.concurrent.ExecutionContext
 
@@ -36,55 +32,14 @@ trait FCMNotificationStatsService {
   def getStats(implicit db: DB): Vector[FCMNotificationStats]
 }
 
-class FCMNotificationStatsServiceImpl()(implicit db: Database)
-  extends FCMNotificationStatsService with DerivedLogTag{
-
-  import FCMNotificationStatsService.getNewStageStats
-  import FCMNotificationsRepository._
-
-  private def getPreviousStageTime(id: Uid, stage: String)(implicit db: DB): Option[Instant] = {
-    FCMNotificationsRepository.prevStage(stage) match {
-      case Some(s) => FCMNotificationsDao.getById(id, s).map(_.stageStartTime)
-      case _ => None
-    }
-  }
+class FCMNotificationStatsServiceImpl(fcmNotRepo: FCMNotificationsRepository)(implicit db: Database)
+  extends FCMNotificationStatsService {
 
   override def storeNotificationState(id: Uid, stage: String, timestamp: Instant)
                                      (implicit ec: ExecutionContext): CancellableFuture[Unit] =
-    db.withTransaction { implicit db =>
-      FCMNotificationsDao.insertOrIgnore(FCMNotification(id, timestamp, stage))
-      getPreviousStageTime(id, stage).foreach { prev =>
-        FCMNotificationStatsDao.getById(stage) match {
-          case Some(stageRow) =>
-              FCMNotificationStatsDao
-                .insertOrReplace(getNewStageStats(stageRow, timestamp, stage, prev))
-            if(stage == FinishedPipeline) {
-              FCMNotificationsDao
-                .deleteEvery(Seq(Pushed, Fetched, StartedPipeline, FinishedPipeline)
-                  .map(s => (id, s)))
-            }
-          case _ =>
-              FCMNotificationStatsDao.insertOrReplace(
-                getNewStageStats(FCMNotificationStats(stage, 0, 0, 0), timestamp, stage, prev))
-        }
-      }
-    }.map(_ => ())
+    fcmNotRepo.storeNotificationState(id, stage, timestamp)
 
   override def getStats(implicit db: DB): Vector[FCMNotificationStats] =
     FCMNotificationStatsDao.list
 }
 
-object FCMNotificationStatsService {
-
-  //this method only exists to facilitate testing
-  def getNewStageStats(curStats: FCMNotificationStats, stageTimestamp: Instant,
-                       stage: String, prevStageTime: Instant): FCMNotificationStats = {
-    val bucket1 = Instant.from(prevStageTime).plus(10, SECONDS)
-    val bucket2 = Instant.from(prevStageTime).plus(30, MINUTES)
-    if (stageTimestamp.isBefore(bucket1))
-      curStats.copy(stage, bucket1 = curStats.bucket1 + 1)
-    else if (stageTimestamp.isBefore(bucket2))
-      curStats.copy(stage, bucket2 = curStats.bucket2 + 1)
-    else curStats.copy(stage, bucket3 = curStats.bucket3 + 1)
-  }
-}
