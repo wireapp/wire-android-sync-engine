@@ -17,22 +17,10 @@
  */
 package com.waz.service.push
 
-import android.content.Context
-import com.waz.content.Database
 import com.waz.db.Col.{int, text}
 import com.waz.db.Dao
-import com.waz.service.push.FCMNotificationStats.FCMNotificationStatsRepositoryDao
-import com.waz.utils.TrimmingLruCache.Fixed
 import com.waz.utils.wrappers.DBCursor
-import com.waz.utils.{CachedStorage, CachedStorageImpl, Identifiable, TrimmingLruCache}
-
-
-trait FCMNotificationStatsRepository extends CachedStorage[String, FCMNotificationStats]
-
-class FCMNotificationStatsRepositoryImpl(context: Context, storage: Database)
-  extends CachedStorageImpl[String, FCMNotificationStats](new TrimmingLruCache(
-    context, Fixed(100)), storage)(FCMNotificationStatsRepositoryDao)
-    with FCMNotificationStatsRepository
+import com.waz.utils.Identifiable
 
 /**
   * @param stage the stage for which these buckets apply
@@ -47,9 +35,9 @@ case class FCMNotificationStats(stage:   String,
   override def id: String = stage
 }
 
-object FCMNotificationStats {
+object FCMNotificationStatsRepository {
 
-  implicit object FCMNotificationStatsRepositoryDao extends Dao[FCMNotificationStats, String] {
+  implicit object FCMNotificationStatsDao extends Dao[FCMNotificationStats, String] {
     val Stage = text('stage, "PRIMARY KEY")(_.stage)
     val Bucket1 = int('bucket1)(_.bucket1)
     val Bucket2 = int('bucket2)(_.bucket2)

@@ -17,23 +17,13 @@
  */
 package com.waz.service.push
 
-import android.content.Context
-import com.waz.content.Database
 import com.waz.db.Col.{id, text, timestamp}
-import com.waz.db.Dao
+import com.waz.db.Dao2
 import com.waz.model.Uid
-import com.waz.service.push.FCMNotification.FCMNotificationsRepositoryDao
-import com.waz.utils.TrimmingLruCache.Fixed
 import com.waz.utils.wrappers.DBCursor
-import com.waz.utils.{CachedStorage, CachedStorageImpl, Identifiable, TrimmingLruCache}
+import com.waz.utils.Identifiable
 import org.threeten.bp.Instant
 
-
-trait FCMNotificationsRepository extends CachedStorage[Uid, FCMNotification]
-
-class FCMNotificationsRepositoryImpl(context: Context, storage: Database)
-  extends CachedStorageImpl[Uid, FCMNotification](new TrimmingLruCache(context, Fixed(100)), storage)(FCMNotificationsRepositoryDao)
-    with FCMNotificationsRepository
 
 /**
   * @param receivedAt instant the push notification was received
@@ -43,18 +33,24 @@ case class FCMNotification(override val id: Uid,
                            receivedAt:      Instant,
                            stage:           String) extends Identifiable[Uid]
 
-object FCMNotification {
+object FCMNotificationsRepository {
 
   val Pushed = "pushed"
   val Fetched = "fetched"
   val StartedPipeline = "startedPipeline"
 
-  implicit object FCMNotificationsRepositoryDao extends Dao[FCMNotification, Uid] {
-    val Id = id[Uid]('_id, "PRIMARY KEY").apply(_.id)
+  def prevStage(stage: String): Option[String] = stage match {
+    case StartedPipeline => Some(Fetched)
+    case Fetched => Some(Pushed)
+    case _ => None
+  }
+
+  implicit object FCMNotificationsDao extends Dao2[FCMNotification, Uid, String] {
+    val Id = id[Uid]('_id).apply(_.id)
     val ReceivedAt = timestamp('received_at)(_.receivedAt)
     val Stage = text('stage)(_.stage)
 
-    override val idCol = Id
+    override val idCol = (Id, Stage)
     override val table = Table("FCMNotifications", Id, ReceivedAt, Stage)
 
     override def apply(implicit cursor: DBCursor): FCMNotification =

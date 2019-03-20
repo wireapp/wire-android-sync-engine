@@ -161,14 +161,12 @@ class ZMessaging(val teamId: Option[TeamId], val clientId: ClientId, account: Ac
   def searchQueryCache  = storage.searchQueryCache
   def propertiesStorage = storage.propertiesStorage
 
-  lazy val messagesStorage: MessagesStorage                     = wire[MessagesStorageImpl]
-  lazy val msgAndLikes: MessageAndLikesStorageImpl              = wire[MessageAndLikesStorageImpl]
-  lazy val messagesIndexStorage: MessageIndexStorage            = wire[MessageIndexStorage]
-  lazy val eventStorage: PushNotificationEventsStorage          = wire[PushNotificationEventsStorageImpl]
-  lazy val fcmNotifications: FCMNotificationsRepository         = wire[FCMNotificationsRepositoryImpl]
-  lazy val fcmNotificationStats: FCMNotificationStatsRepository = wire[FCMNotificationStatsRepositoryImpl]
-  lazy val readReceiptsStorage: ReadReceiptsStorage             = wire[ReadReceiptsStorageImpl]
-  lazy val reactionsStorage: ReactionsStorage                   = wire[ReactionsStorageImpl]
+  lazy val messagesStorage: MessagesStorage            = wire[MessagesStorageImpl]
+  lazy val msgAndLikes: MessageAndLikesStorageImpl     = wire[MessageAndLikesStorageImpl]
+  lazy val messagesIndexStorage: MessageIndexStorage   = wire[MessageIndexStorage]
+  lazy val eventStorage: PushNotificationEventsStorage = wire[PushNotificationEventsStorageImpl]
+  lazy val readReceiptsStorage: ReadReceiptsStorage    = wire[ReadReceiptsStorageImpl]
+  lazy val reactionsStorage: ReactionsStorage          = wire[ReactionsStorageImpl]
 
   lazy val youtubeClient      = new YouTubeClientImpl()(urlCreator, httpClient, authRequestInterceptor)
   lazy val soundCloudClient   = new SoundCloudClientImpl()(urlCreator, httpClient, authRequestInterceptor)

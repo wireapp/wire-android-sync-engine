@@ -41,8 +41,8 @@ import com.waz.model.SearchQueryCache.SearchQueryCacheDao
 import com.waz.model.UserData.UserDataDao
 import com.waz.model.otr.UserClients.UserClientsDao
 import com.waz.model.sync.SyncJob.SyncJobDao
-import com.waz.service.push.FCMNotification.FCMNotificationsRepositoryDao
-import com.waz.service.push.FCMNotificationStats.FCMNotificationStatsRepositoryDao
+import com.waz.service.push.FCMNotificationStatsRepository.FCMNotificationStatsDao
+import com.waz.service.push.FCMNotificationsRepository.FCMNotificationsDao
 import com.waz.service.tracking.TrackingService
 
 class ZMessagingDB(context: Context, dbName: String, tracking: TrackingService) extends DaoDB(context.getApplicationContext, dbName, null, DbVersion, daos, migrations, tracking) {
@@ -63,8 +63,8 @@ object ZMessagingDB {
     MessageDataDao, KeyValueDataDao, SyncJobDao, ErrorDataDao, NotificationDataDao,
     ContactHashesDao, ContactsOnWireDao, UserClientsDao, LikingDao, ContactsDao, EmailAddressesDao,
     PhoneNumbersDao, MsgDeletionDao, EditHistoryDao, MessageContentIndexDao,
-    PushNotificationEventsDao, ReadReceiptDao, PropertiesDao, FCMNotificationsRepositoryDao,
-    FCMNotificationStatsRepositoryDao
+    PushNotificationEventsDao, ReadReceiptDao, PropertiesDao, FCMNotificationsDao,
+    FCMNotificationStatsDao
   )
 
   lazy val migrations = Seq(
@@ -289,13 +289,13 @@ object ZMessagingDB {
       db.execSQL("UPDATE KeyValues SET value = 'true' WHERE key = 'should_sync_teams'")
     },
     Migration(116, 117) { db =>
-      db.execSQL(FCMNotificationsRepositoryDao.table.createSql)
+      db.execSQL(FCMNotificationsDao.table.createSql)
     },
     Migration(117, 118) { db =>
       db.execSQL("DROP TABLE ReceivedPushes")
     },
     Migration(118, 119) { db =>
-      db.execSQL(FCMNotificationStatsRepositoryDao.table.createSql)
+      db.execSQL(FCMNotificationStatsDao.table.createSql)
     }
   )
 }
