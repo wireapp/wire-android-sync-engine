@@ -41,8 +41,8 @@ import com.waz.model.SearchQueryCache.SearchQueryCacheDao
 import com.waz.model.UserData.UserDataDao
 import com.waz.model.otr.UserClients.UserClientsDao
 import com.waz.model.sync.SyncJob.SyncJobDao
-import com.waz.service.push.FCMNotificationStatsRepository.FCMNotificationStatsDao
-import com.waz.service.push.FCMNotificationsRepository.FCMNotificationsDao
+import com.waz.repository.FCMNotificationStatsRepository.FCMNotificationStatsDao
+import com.waz.repository.FCMNotificationsRepository.FCMNotificationsDao
 import com.waz.service.tracking.TrackingService
 
 class ZMessagingDB(context: Context, dbName: String, tracking: TrackingService) extends DaoDB(context.getApplicationContext, dbName, null, DbVersion, daos, migrations, tracking) {

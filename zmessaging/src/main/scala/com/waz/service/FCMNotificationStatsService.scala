@@ -15,9 +15,10 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-package com.waz.service.push
+package com.waz.service
 
-import com.waz.model.Uid
+import com.waz.model.{FCMNotification, Uid}
+import com.waz.repository.{FCMNotificationStats, FCMNotificationStatsRepository, FCMNotificationsRepository}
 import com.waz.threading.Threading
 import org.threeten.bp.Instant
 import org.threeten.bp.temporal.ChronoUnit._
@@ -31,25 +32,24 @@ trait FCMNotificationStatsService {
 
 class FCMNotificationStatsServiceImpl(fcmTimestamps: FCMNotificationsRepository,
                                       fcmStats: FCMNotificationStatsRepository)
-  extends FCMNotificationStatsService {
+    extends FCMNotificationStatsService {
 
   import FCMNotificationStatsService._
 
   private implicit val ec: ExecutionContext = Threading.Background
 
   override def storeNotificationState(id: Uid, stage: String, timestamp: Instant): Future[Unit] =
-    fcmTimestamps.storeNotificationState(id, stage, timestamp)
-      .flatMap { _ =>
-        fcmTimestamps.getPreviousStageTime(id, stage).flatMap {
-          case Some(prev) =>
-            fcmStats.insertOrUpdate(getStageStats(stage, timestamp, prev)).flatMap { _ =>
-              if(stage == FCMNotificationsRepository.FinishedPipeline)
-                fcmTimestamps.deleteAllWithId(id)
-              else Future.successful(())
-            }
-          case _ => Future.successful(())
-        }
+    for {
+
+      _    <- fcmTimestamps.storeNotificationState(id, stage, timestamp)
+      prev <- fcmTimestamps.getPreviousStageTime(id, stage)
+      _ <- prev match {
+        case Some(i) => fcmStats.insertOrUpdate(getStageStats(stage, timestamp, i))
+        case _       => Future.successful(())
       }
+      _ <- if (stage == FCMNotification.FinishedPipeline) fcmTimestamps.deleteAllWithId(id)
+      else Future.successful(())
+    } yield ()
 
   override def getStats: Future[Vector[FCMNotificationStats]] = fcmStats.listAllStats()
 }
@@ -65,4 +65,3 @@ object FCMNotificationStatsService {
     else FCMNotificationStats(stage, 0, 0, 1)
   }
 }
-

@@ -17,7 +17,8 @@
  */
 package com.waz.model
 
-import com.waz.service.push.{FCMNotificationStats, FCMNotificationStatsRepository, FCMNotificationStatsServiceImpl, FCMNotificationsRepository}
+import com.waz.repository.{FCMNotificationStats, FCMNotificationStatsRepository, FCMNotificationsRepository}
+import com.waz.service.FCMNotificationStatsServiceImpl
 import com.waz.specs.AndroidFreeSpec
 import org.threeten.bp.Instant
 import org.threeten.bp.temporal.ChronoUnit._
@@ -26,8 +27,8 @@ import scala.concurrent.Future
 
 class FCMNotificationStatsServiceSpec extends AndroidFreeSpec {
 
-  import FCMNotificationsRepository.{Pushed, FinishedPipeline}
-  import com.waz.service.push.FCMNotificationStatsService._
+  import FCMNotification.{Pushed, FinishedPipeline}
+  import com.waz.service.FCMNotificationStatsService._
 
   private val fcmTimeStamps = mock[FCMNotificationsRepository]
   private val fcmStats = mock[FCMNotificationStatsRepository]

@@ -15,12 +15,11 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-package com.waz.service.push
+package com.waz.repository
 
 import com.waz.content.Database
 import com.waz.db.Col.{int, text}
 import com.waz.db.Dao
-import com.waz.service.push.FCMNotificationStatsRepository.FCMNotificationStatsDao
 import com.waz.threading.Threading
 import com.waz.utils.wrappers.DBCursor
 import com.waz.utils.Identifiable
@@ -48,7 +47,7 @@ trait FCMNotificationStatsRepository {
 class FCMNotificationStatsRepositoryImpl(implicit db: Database)
   extends FCMNotificationStatsRepository {
 
-  import FCMNotificationStatsDao._
+  import com.waz.repository.FCMNotificationStatsRepository.FCMNotificationStatsDao._
 
   private implicit val ec: ExecutionContext = Threading.Background
 
@@ -59,10 +58,9 @@ class FCMNotificationStatsRepositoryImpl(implicit db: Database)
           stageRow.copy(bucket1 = stageRow.bucket1 + update.bucket1,
             bucket2 = stageRow.bucket2 + update.bucket2,
             bucket3 = stageRow.bucket3 + update.bucket3)
-        case _ =>
-          update
+        case _ => update
       })
-    }.future.map(_ => ())
+    }.map(_ => ())
 
   override def listAllStats(): Future[Vector[FCMNotificationStats]] = db.read(implicit db => list)
 }

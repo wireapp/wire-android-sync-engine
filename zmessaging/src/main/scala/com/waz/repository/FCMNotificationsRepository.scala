@@ -15,27 +15,17 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-package com.waz.service.push
+package com.waz.repository
 
 import com.waz.content.Database
 import com.waz.db.Col.{id, text, timestamp}
 import com.waz.db.Dao2
-import com.waz.model.Uid
+import com.waz.model.{FCMNotification, Uid}
 import com.waz.threading.Threading
 import com.waz.utils.wrappers.DBCursor
-import com.waz.utils.Identifiable
 import org.threeten.bp.Instant
 
 import scala.concurrent.{ExecutionContext, Future}
-
-
-/**
-  * @param stageStartTime instant the push notification was received at stage
-  * @param stage the stage the notification was in at time `receivedAt`
-  */
-case class FCMNotification(override val id: Uid,
-                           stage:           String,
-                           stageStartTime:  Instant) extends Identifiable[Uid]
 
 trait FCMNotificationsRepository {
   def storeNotificationState(id: Uid, stage: String, timestamp: Instant): Future[Unit]
@@ -47,6 +37,7 @@ class FCMNotificationsRepositoryImpl(implicit db: Database) extends FCMNotificat
 
   import FCMNotificationsRepository._
   import FCMNotificationsDao._
+  import com.waz.model.FCMNotification._
 
   private implicit val ec: ExecutionContext = Threading.Background
 
@@ -67,18 +58,6 @@ class FCMNotificationsRepositoryImpl(implicit db: Database) extends FCMNotificat
 
 object FCMNotificationsRepository {
 
-  val Pushed = "pushed"
-  val Fetched = "fetched"
-  val StartedPipeline = "startedPipeline"
-  val FinishedPipeline = "finishedPipeline"
-  val everyStage: Seq[String] = Seq(Pushed, Fetched, StartedPipeline, FinishedPipeline)
-
-  def prevStage(stage: String): Option[String] = stage match {
-    case StartedPipeline => Some(Fetched)
-    case Fetched => Some(Pushed)
-    case _ => None
-  }
-
   implicit object FCMNotificationsDao extends Dao2[FCMNotification, Uid, String] {
     val Id = id[Uid]('_id).apply(_.id)
     val Stage = text('stage)(_.stage)
@@ -90,6 +69,5 @@ object FCMNotificationsRepository {
     override def apply(implicit cursor: DBCursor): FCMNotification =
       FCMNotification(Id, Stage, StageStartTime)
   }
-
 }
 
