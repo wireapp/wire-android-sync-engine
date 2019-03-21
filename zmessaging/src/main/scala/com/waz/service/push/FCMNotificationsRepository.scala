@@ -22,7 +22,7 @@ import com.waz.db.Col.{id, text, timestamp}
 import com.waz.db.Dao2
 import com.waz.model.Uid
 import com.waz.threading.Threading
-import com.waz.utils.wrappers.{DB, DBCursor}
+import com.waz.utils.wrappers.DBCursor
 import com.waz.utils.Identifiable
 import org.threeten.bp.Instant
 
@@ -34,8 +34,8 @@ import scala.concurrent.{ExecutionContext, Future}
   * @param stage the stage the notification was in at time `receivedAt`
   */
 case class FCMNotification(override val id: Uid,
-                           stageStartTime:      Instant,
-                           stage:           String) extends Identifiable[Uid]
+                           stage:           String,
+                           stageStartTime:  Instant) extends Identifiable[Uid]
 
 trait FCMNotificationsRepository {
   def storeNotificationState(id: Uid, stage: String, timestamp: Instant): Future[Unit]
@@ -57,7 +57,7 @@ class FCMNotificationsRepositoryImpl(implicit db: Database) extends FCMNotificat
 
   override def storeNotificationState(id: Uid, stage: String, timestamp: Instant): Future[Unit] =
     db.apply { implicit db =>
-      insertOrIgnore(FCMNotification(id, timestamp, stage))
+      insertOrIgnore(FCMNotification(id, stage, timestamp))
     }.map(_ => ())
 
   override def deleteAllWithId(id: Uid): Future[Unit] = db.apply { implicit db =>
@@ -81,14 +81,14 @@ object FCMNotificationsRepository {
 
   implicit object FCMNotificationsDao extends Dao2[FCMNotification, Uid, String] {
     val Id = id[Uid]('_id).apply(_.id)
-    val stageStartTime = timestamp('stage_start_time)(_.stageStartTime)
     val Stage = text('stage)(_.stage)
+    val StageStartTime = timestamp('stage_start_time)(_.stageStartTime)
 
     override val idCol = (Id, Stage)
-    override val table = Table("FCMNotifications", Id, stageStartTime, Stage)
+    override val table = Table("FCMNotifications", Id, Stage, StageStartTime)
 
     override def apply(implicit cursor: DBCursor): FCMNotification =
-      FCMNotification(Id, stageStartTime, Stage)
+      FCMNotification(Id, Stage, StageStartTime)
   }
 
 }
