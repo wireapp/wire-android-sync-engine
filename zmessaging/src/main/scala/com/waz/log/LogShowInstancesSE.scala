@@ -19,25 +19,19 @@ package com.waz.log
 
 import java.io.File
 import java.net.URI
-import java.util.Locale
 
-import com.waz.log.LogSE._
 import android.net.Uri
 import com.waz.api.impl.ErrorResponse
 import com.waz.api.{MessageContent => _, _}
 import com.waz.cache2.CacheService.{AES_CBC_Encryption, Encryption, NoEncryption}
-import com.waz.content.MessagesCursor
 import com.waz.content.Preferences.PrefKey
-import com.waz.log.BasicLogging.Log
+import com.waz.log.LogSE._
 import com.waz.model.AccountData.Password
-import com.waz.model.AssetData.ProcessingTaskKey
-import com.waz.model.GenericContent.Location
 import com.waz.model.ManagedBy.ManagedBy
-import com.waz.model.messages.media.{ArtistData, TrackData}
 import com.waz.model._
-import com.waz.model.otr.{Client, ClientId, UserClients}
+import com.waz.model.messages.media.{ArtistData, TrackData}
+import com.waz.model.otr.{Client, UserClients}
 import com.waz.model.sync.{ReceiptType, SyncCommand, SyncJob, SyncRequest}
-import com.waz.service.{PropertyKey, SearchResults, ZMessaging}
 import com.waz.service.assets.AssetService.RawAssetInput
 import com.waz.service.assets.AssetService.RawAssetInput.{BitmapInput, ByteInput, UriInput, WireAssetInput}
 import com.waz.service.assets.GlobalRecordAndPlayService._
@@ -46,26 +40,18 @@ import com.waz.service.assets2.{Asset, AssetDetails}
 import com.waz.service.call.Avs.AvsClosedReason.reasonString
 import com.waz.service.call.Avs.VideoState
 import com.waz.service.call.CallInfo
-import com.waz.service.call.CallingService.CallProfile
 import com.waz.service.otr.OtrService.SessionId
+import com.waz.service.{PropertyKey, SearchResults}
 import com.waz.sync.SyncResult
-import com.waz.sync.client.AssetClient.Retention
-import com.waz.sync.client.AssetClient2.UploadResponse
 import com.waz.sync.client.AuthenticationManager.{AccessToken, Cookie}
-import com.waz.sync.client.GiphyClient2.GifObject
 import com.waz.sync.client.TeamsClient.TeamMember
-import com.waz.threading.CancellableFuture
-import com.waz.utils.events.Signal
 import com.waz.utils.{sha2, wrappers}
-import com.waz.znet2.http.Request
-import org.json.JSONObject
 import org.threeten.bp
 import org.threeten.bp.Instant
 
-import scala.concurrent.Future
 import scala.concurrent.duration.{Duration, FiniteDuration}
 
-trait LogShowInstancesSE {
+trait LogShowInstancesSE extends FallbackLogShowRule {
   import LogShow._
 
   implicit val RemoteInstantShow: LogShow[RemoteInstant] = logShowWithToString
@@ -75,7 +61,6 @@ trait LogShowInstancesSE {
   implicit val FiniteDurationShow: LogShow[FiniteDuration] = logShowWithToString
   implicit val BPDurationShow: LogShow[bp.Duration] = logShowWithToString
   implicit val Sha256LogShow: LogShow[Sha256] = create(_.hexString, _.str)
-  implicit val JSONObjectLogShow: LogShow[JSONObject] = logShowWithHash
 
   //TODO how much of a file/uri can we show in prod?
   // There might be UUIDs in the URL, so we should obfuscate them.
@@ -86,45 +71,7 @@ trait LogShowInstancesSE {
   implicit val UriLogShow:  LogShow[URI]  = create(_ => "<uri>", _.toString)
   implicit val WUriLogShow: LogShow[wrappers.URI] = create(_ => "<uri>", _.toString)
 
-  implicit val HttpRequestLogShow: LogShow[Request[_]] = logShowWithHash
-  implicit val FutureLogShow: LogShow[Future[_]] = logShowWithHash
-  implicit val CancellableFutureLogShow: LogShow[CancellableFuture[_]] = logShowWithHash
-  implicit val SignalLogShow: LogShow[Signal[_]] = logShowWithHash
-
-  //wire types
-  implicit val ZMessagingLogShow: LogShow[ZMessaging] = logShowWithHash
-
-  implicit val UidShow:        LogShow[Uid]        = logShowWithHash
-  implicit val UserIdShow:     LogShow[UserId]     = logShowWithHash
-  implicit val AssetIdShow:    LogShow[AssetId]    = logShowWithHash
-  implicit val RAssetIdShow:   LogShow[RAssetId]   = logShowWithHash
-  implicit val AccountIdShow:  LogShow[AccountId]  = logShowWithHash
-  implicit val MessageIdShow:  LogShow[MessageId]  = logShowWithHash
-  implicit val ConvIdShow:     LogShow[ConvId]     = logShowWithHash
-  implicit val RConvIdShow:    LogShow[RConvId]    = logShowWithHash
-  implicit val ClientIdShow:   LogShow[ClientId]   = logShowWithHash
-  implicit val TeamIdShow:     LogShow[TeamId]     = logShowWithHash
-  implicit val NotIdShow:      LogShow[NotId]      = logShowWithHash
-  implicit val CacheKeyShow:   LogShow[CacheKey]   = logShowWithHash
-  implicit val AssetTokenShow: LogShow[AssetToken] = logShowWithHash
-  implicit val IntegrationIdLogShow: LogShow[IntegrationId] = logShowWithHash
-  implicit val ProviderIdLogShow: LogShow[ProviderId] = logShowWithHash
-
   implicit val PasswordShow: LogShow[Password] = create(_ => "********") //Also don't show in debug mode (e.g. Internal)
-
-  implicit val NameShow:              LogShow[Name]             = logShowWithHash
-  implicit val EmailShow:             LogShow[EmailAddress]     = logShowWithHash
-  implicit val HandleShow:            LogShow[Handle]           = logShowWithHash
-  implicit val ConfirmationCodedShow: LogShow[ConfirmationCode] = logShowWithHash
-  implicit val PhoneNumberShow:       LogShow[PhoneNumber]      = logShowWithHash
-
-  implicit val PushTokenShow:   LogShow[PushToken]   = logShowWithHash
-  implicit val SearchQueryShow: LogShow[SearchQuery] = logShowWithHash
-  implicit val AESKeyShow:      LogShow[AESKey]      = logShowWithHash
-  implicit val ProcessingTaskKeyLogShow: LogShow[ProcessingTaskKey] = logShowWithHash
-
-  implicit val RetentionLogShow: LogShow[Retention] = logShowWithHash
-  implicit val CallProfileLogShow: LogShow[CallProfile] = logShowWithHash
 
   implicit val PrefKeyLogShow: LogShow[PrefKey[_]]      = logShowWithToString
   implicit val PropertyKeyLogShow: LogShow[PropertyKey] = logShowWithToString
@@ -132,9 +79,6 @@ trait LogShowInstancesSE {
 
   implicit val SSOIdShow: LogShow[SSOId] = create(id => s"SSOId(subject: ${sha2(id.subject)}, tenant:${sha2(id.tenant)})")
   implicit val ManagedByShow: LogShow[ManagedBy] = create(id => s"ManagedBy($id)")
-
-  implicit val GiphyLogShow: LogShow[GifObject] = logShowWithHash
-  implicit val UploadResponseLogShow: LogShow[UploadResponse] = logShowWithHash
 
   implicit val RawAssetInputLogShow: LogShow[RawAssetInput] =
     createFrom {
@@ -370,9 +314,6 @@ trait LogShowInstancesSE {
   implicit val SyncStateLogShow: LogShow[SyncState] = LogShow.create(_.name())
 
   //Events
-
-  implicit val EventLogShow: LogShow[Event] = logShowWithHash
-
   implicit val OtrErrorLogShow: LogShow[OtrError] =
     LogShow.createFrom {
       case Duplicate => l"Duplicate"
@@ -388,13 +329,10 @@ trait LogShowInstancesSE {
     }
 
   //Protos
-
   implicit val GenericMessageLogShow: LogShow[GenericMessage] = LogShow.create { m =>
     m.getContentCase
     s"GenericMessage(messageId: ${sha2(m.messageId)} | contentCase: ${m.getContentCase})"
   }
-
-  implicit val LocationLogShow: LogShow[Location] = LogShow.logShowWithHash
 
   implicit val ReadReceiptShow: LogShow[ReadReceipt] = LogShow.createFrom { r =>
     import r._
@@ -410,12 +348,6 @@ trait LogShowInstancesSE {
       import t._
       s"Thread(id: $getId, name: $getName, priority: $getPriority, state: $getState)"
     }
-
-  implicit val LocaleLogShow: LogShow[Locale] = logShowWithHash
-
-
-  implicit val MessagesCursorLogShow: LogShow[MessagesCursor] = logShowWithHash
-  implicit val UserFieldLogShow: LogShow[UserField] = logShowWithHash
 
   implicit val TypeFilterLogShow: LogShow[TypeFilter] =
     LogShow.createFrom { f =>
