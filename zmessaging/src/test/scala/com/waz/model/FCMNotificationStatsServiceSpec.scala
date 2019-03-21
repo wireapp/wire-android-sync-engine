@@ -17,21 +17,25 @@
  */
 package com.waz.model
 
-import com.waz.service.push.{FCMNotificationStats, FCMNotificationsRepository}
+import com.waz.service.push.{FCMNotificationStats, FCMNotificationStatsRepository, FCMNotificationStatsServiceImpl, FCMNotificationsRepository}
 import com.waz.specs.AndroidFreeSpec
-import com.waz.threading.Threading
 import org.threeten.bp.Instant
 import org.threeten.bp.temporal.ChronoUnit._
 
+import scala.concurrent.Future
+
 class FCMNotificationStatsServiceSpec extends AndroidFreeSpec {
 
-  import FCMNotificationsRepository.Pushed
+  import FCMNotificationsRepository.{Pushed, FinishedPipeline}
   import com.waz.service.push.FCMNotificationStatsService._
 
-  val stage = Pushed
-  val bucket1 = FCMNotificationStats(stage, 1, 0, 0)
-  val bucket2 = FCMNotificationStats(stage, 0, 1, 0)
-  val bucket3 = FCMNotificationStats(stage, 0, 0, 1)
+  private val fcmTimeStamps = mock[FCMNotificationsRepository]
+  private val fcmStats = mock[FCMNotificationStatsRepository]
+
+  private val stage = Pushed
+  private val bucket1 = FCMNotificationStats(stage, 1, 0, 0)
+  private val bucket2 = FCMNotificationStats(stage, 0, 1, 0)
+  private val bucket3 = FCMNotificationStats(stage, 0, 0, 1)
 
   private def runScenario(offset: Long) = {
     val stageTime = Instant.now
@@ -53,4 +57,35 @@ class FCMNotificationStatsServiceSpec extends AndroidFreeSpec {
     runScenario(1000*60*30+1) shouldEqual bucket3 //30 mins + 1 millisecond
   }
 
+  scenario("Stats aren't updated if there is no previous stage") {
+    val id = Uid("test")
+    val service = getService()
+    (fcmTimeStamps.storeNotificationState _).expects(*, *, *).once().returning(Future.successful(()))
+    (fcmTimeStamps.getPreviousStageTime _).expects(*, *).once().returning(Future.successful(None))
+
+    result(service.storeNotificationState(id, stage, Instant.now()))
+  }
+
+  scenario("Stats are updated if there is a previous stage, and current stage isn't final") {
+    val id = Uid("test")
+    val service = getService()
+    (fcmTimeStamps.storeNotificationState _).expects(*, *, *).once().returning(Future.successful(()))
+    (fcmTimeStamps.getPreviousStageTime _).expects(*, *).once().returning(Future.successful(Some(Instant.now())))
+    (fcmStats.insertOrUpdate _).expects(*).once().returning(Future.successful(()))
+
+    result(service.storeNotificationState(id, stage, Instant.now()))
+  }
+
+  scenario("Previous timestamp rows are deleted when we have reached final stage") {
+    val id = Uid("test")
+    val service = getService()
+    (fcmTimeStamps.storeNotificationState _).expects(*, *, *).once().returning(Future.successful(()))
+    (fcmTimeStamps.getPreviousStageTime _).expects(*, *).once().returning(Future.successful(Some(Instant.now())))
+    (fcmStats.insertOrUpdate _).expects(*).once().returning(Future.successful(()))
+    (fcmTimeStamps.deleteAllWithId _).expects(*).once().returning(Future.successful(()))
+
+    result(service.storeNotificationState(id, FinishedPipeline, Instant.now()))
+  }
+
+  def getService() = new FCMNotificationStatsServiceImpl(fcmTimeStamps, fcmStats)
 }

@@ -17,7 +17,6 @@
  */
 package com.waz.service.push
 
-import com.waz.content.Database
 import com.waz.model.Uid
 import com.waz.threading.Threading
 import org.threeten.bp.Instant
@@ -32,7 +31,6 @@ trait FCMNotificationStatsService {
 
 class FCMNotificationStatsServiceImpl(fcmTimestamps: FCMNotificationsRepository,
                                       fcmStats: FCMNotificationStatsRepository)
-                                     (implicit db: Database)
   extends FCMNotificationStatsService {
 
   import FCMNotificationStatsService._
@@ -44,9 +42,11 @@ class FCMNotificationStatsServiceImpl(fcmTimestamps: FCMNotificationsRepository,
       .flatMap { _ =>
         fcmTimestamps.getPreviousStageTime(id, stage).flatMap {
           case Some(prev) =>
-            fcmStats.insertOrUpdate(getStageStats(stage, timestamp, prev))
-              .filter(_ => stage == FCMNotificationsRepository.FinishedPipeline)
-              .flatMap( _ => fcmTimestamps.deleteAllWithId(id))
+            fcmStats.insertOrUpdate(getStageStats(stage, timestamp, prev)).flatMap { _ =>
+              if(stage == FCMNotificationsRepository.FinishedPipeline)
+                fcmTimestamps.deleteAllWithId(id)
+              else Future.successful(())
+            }
           case _ => Future.successful(())
         }
       }
@@ -56,17 +56,13 @@ class FCMNotificationStatsServiceImpl(fcmTimestamps: FCMNotificationsRepository,
 
 object FCMNotificationStatsService {
 
-  //this method only exists to facilitate testing
-  def getStageStats(stage: String, stageTimestamp: Instant, prevStageTime: Instant)
-      : FCMNotificationStats = {
-    val bucket1 = Instant.from(prevStageTime).plus(10, SECONDS)
-    val bucket2 = Instant.from(prevStageTime).plus(30, MINUTES)
-    if (stageTimestamp.isBefore(bucket1))
-      FCMNotificationStats(stage, 1, 0, 0)
-    else if (stageTimestamp.isBefore(bucket2))
-      FCMNotificationStats(stage, 0, 1, 0)
+  def getStageStats(stage: String, timestamp: Instant, prev: Instant): FCMNotificationStats = {
+    val bucket1 = Instant.from(prev).plus(10, SECONDS)
+    val bucket2 = Instant.from(prev).plus(30, MINUTES)
+
+    if (timestamp.isBefore(bucket1)) FCMNotificationStats(stage, 1, 0, 0)
+    else if (timestamp.isBefore(bucket2)) FCMNotificationStats(stage, 0, 1, 0)
     else FCMNotificationStats(stage, 0, 0, 1)
   }
-
 }
 
