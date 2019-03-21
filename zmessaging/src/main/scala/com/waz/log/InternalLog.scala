@@ -48,7 +48,7 @@ object InternalLog extends DerivedLogTag {
     implicit val ordering: Ordering[LogLevel] = Ordering by weight
   }
 
-  private var logsEnabled: Signal[Boolean] = Signal.const(false)
+  private var logsEnabled: Signal[Boolean] = Signal.const(true)
 
   def setLogsService(logsService: LogsService): Unit = this.synchronized {
     logsEnabled = logsService.logsEnabledGlobally
