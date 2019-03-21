@@ -19,27 +19,54 @@ package com.waz.service.push
 
 import com.waz.content.Database
 import com.waz.model.Uid
-import com.waz.service.push.FCMNotificationStatsRepository.FCMNotificationStatsDao
-import com.waz.threading.CancellableFuture
-import com.waz.utils.wrappers.DB
+import com.waz.threading.Threading
 import org.threeten.bp.Instant
+import org.threeten.bp.temporal.ChronoUnit._
 
-import scala.concurrent.ExecutionContext
+import scala.concurrent.{ExecutionContext, Future}
 
 trait FCMNotificationStatsService {
-  def storeNotificationState(id: Uid, stage: String, timestamp: Instant)
-                            (implicit ec: ExecutionContext): CancellableFuture[Unit]
-  def getStats(implicit db: DB): Vector[FCMNotificationStats]
+  def storeNotificationState(id: Uid, stage: String, timestamp: Instant): Future[Unit]
+  def getStats: Future[Vector[FCMNotificationStats]]
 }
 
-class FCMNotificationStatsServiceImpl(fcmNotRepo: FCMNotificationsRepository)(implicit db: Database)
+class FCMNotificationStatsServiceImpl(fcmTimestamps: FCMNotificationsRepository,
+                                      fcmStats: FCMNotificationStatsRepository)
+                                     (implicit db: Database)
   extends FCMNotificationStatsService {
 
-  override def storeNotificationState(id: Uid, stage: String, timestamp: Instant)
-                                     (implicit ec: ExecutionContext): CancellableFuture[Unit] =
-    fcmNotRepo.storeNotificationState(id, stage, timestamp)
+  import FCMNotificationStatsService._
 
-  override def getStats(implicit db: DB): Vector[FCMNotificationStats] =
-    FCMNotificationStatsDao.list
+  private implicit val ec: ExecutionContext = Threading.Background
+
+  override def storeNotificationState(id: Uid, stage: String, timestamp: Instant): Future[Unit] =
+    fcmTimestamps.storeNotificationState(id, stage, timestamp)
+      .flatMap { _ =>
+        fcmTimestamps.getPreviousStageTime(id, stage).flatMap {
+          case Some(prev) =>
+            fcmStats.insertOrUpdate(getStageStats(stage, timestamp, prev))
+              .filter(_ => stage == FCMNotificationsRepository.FinishedPipeline)
+              .flatMap( _ => fcmTimestamps.deleteAllWithId(id))
+          case _ => Future.successful(())
+        }
+      }
+
+  override def getStats: Future[Vector[FCMNotificationStats]] = fcmStats.listAllStats()
+}
+
+object FCMNotificationStatsService {
+
+  //this method only exists to facilitate testing
+  def getStageStats(stage: String, stageTimestamp: Instant, prevStageTime: Instant)
+      : FCMNotificationStats = {
+    val bucket1 = Instant.from(prevStageTime).plus(10, SECONDS)
+    val bucket2 = Instant.from(prevStageTime).plus(30, MINUTES)
+    if (stageTimestamp.isBefore(bucket1))
+      FCMNotificationStats(stage, 1, 0, 0)
+    else if (stageTimestamp.isBefore(bucket2))
+      FCMNotificationStats(stage, 0, 1, 0)
+    else FCMNotificationStats(stage, 0, 0, 1)
+  }
+
 }
 

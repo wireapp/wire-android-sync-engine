@@ -17,10 +17,15 @@
  */
 package com.waz.service.push
 
+import com.waz.content.Database
 import com.waz.db.Col.{int, text}
 import com.waz.db.Dao
+import com.waz.service.push.FCMNotificationStatsRepository.FCMNotificationStatsDao
+import com.waz.threading.Threading
 import com.waz.utils.wrappers.DBCursor
 import com.waz.utils.Identifiable
+
+import scala.concurrent.{ExecutionContext, Future}
 
 /**
   * @param stage the stage for which these buckets apply
@@ -33,6 +38,33 @@ case class FCMNotificationStats(stage:   String,
                                 bucket2: Int,
                                 bucket3: Int) extends Identifiable[String] {
   override def id: String = stage
+}
+
+trait FCMNotificationStatsRepository {
+  def insertOrUpdate(update: FCMNotificationStats): Future[Unit]
+  def listAllStats(): Future[Vector[FCMNotificationStats]]
+}
+
+class FCMNotificationStatsRepositoryImpl(implicit db: Database)
+  extends FCMNotificationStatsRepository {
+
+  import FCMNotificationStatsDao._
+
+  private implicit val ec: ExecutionContext = Threading.Background
+
+  override def insertOrUpdate(update: FCMNotificationStats): Future[Unit] =
+    db.withTransaction { implicit db =>
+      insertOrReplace(getById(update.stage) match {
+        case Some(stageRow) =>
+          stageRow.copy(bucket1 = stageRow.bucket1 + update.bucket1,
+            bucket2 = stageRow.bucket2 + update.bucket2,
+            bucket3 = stageRow.bucket3 + update.bucket3)
+        case _ =>
+          update
+      })
+    }.future.map(_ => ())
+
+  override def listAllStats(): Future[Vector[FCMNotificationStats]] = db.read(implicit db => list)
 }
 
 object FCMNotificationStatsRepository {

@@ -21,14 +21,12 @@ import com.waz.content.Database
 import com.waz.db.Col.{id, text, timestamp}
 import com.waz.db.Dao2
 import com.waz.model.Uid
-import com.waz.service.push.FCMNotificationStatsRepository.FCMNotificationStatsDao
-import com.waz.threading.CancellableFuture
+import com.waz.threading.Threading
 import com.waz.utils.wrappers.{DB, DBCursor}
 import com.waz.utils.Identifiable
 import org.threeten.bp.Instant
-import org.threeten.bp.temporal.ChronoUnit._
 
-import scala.concurrent.ExecutionContext
+import scala.concurrent.{ExecutionContext, Future}
 
 
 /**
@@ -39,36 +37,32 @@ case class FCMNotification(override val id: Uid,
                            stageStartTime:      Instant,
                            stage:           String) extends Identifiable[Uid]
 
-class FCMNotificationsRepository(implicit db: Database) {
+trait FCMNotificationsRepository {
+  def storeNotificationState(id: Uid, stage: String, timestamp: Instant): Future[Unit]
+  def getPreviousStageTime(id: Uid, stage: String): Future[Option[Instant]]
+  def deleteAllWithId(id: Uid): Future[Unit]
+}
+
+class FCMNotificationsRepositoryImpl(implicit db: Database) extends FCMNotificationsRepository {
 
   import FCMNotificationsRepository._
+  import FCMNotificationsDao._
 
-  private def getPreviousStageTime(id: Uid, stage: String)(implicit db: DB): Option[Instant] = {
-    FCMNotificationsRepository
-      .prevStage(stage)
-      .flatMap { s => FCMNotificationsDao.getById(id, s).map(_.stageStartTime) }
-  }
+  private implicit val ec: ExecutionContext = Threading.Background
 
-  def storeNotificationState(id: Uid, stage: String, timestamp: Instant)
-                                     (implicit ec: ExecutionContext): CancellableFuture[Unit] =
-  db.withTransaction { implicit db =>
-    FCMNotificationsDao.insertOrIgnore(FCMNotification(id, timestamp, stage))
-    getPreviousStageTime(id, stage).foreach { prev =>
-      FCMNotificationStatsDao.getById(stage) match {
-        case Some(stageRow) =>
-          FCMNotificationStatsDao
-            .insertOrReplace(getNewStageStats(stageRow, timestamp, stage, prev))
-          if(stage == FinishedPipeline) {
-            FCMNotificationsDao
-              .deleteEvery(Seq(Pushed, Fetched, StartedPipeline, FinishedPipeline)
-                .map(s => (id, s)))
-          }
-        case _ =>
-          FCMNotificationStatsDao.insertOrReplace(
-            getNewStageStats(FCMNotificationStats(stage, 0, 0, 0), timestamp, stage, prev))
-      }
+  override def getPreviousStageTime(id: Uid, stage: String): Future[Option[Instant]] =
+    db.read { implicit db =>
+      prevStage(stage).flatMap { s => getById(id, s).map(_.stageStartTime) }
     }
-  }.map(_ => ())
+
+  override def storeNotificationState(id: Uid, stage: String, timestamp: Instant): Future[Unit] =
+    db.apply { implicit db =>
+      insertOrIgnore(FCMNotification(id, timestamp, stage))
+    }.map(_ => ())
+
+  override def deleteAllWithId(id: Uid): Future[Unit] = db.apply { implicit db =>
+    deleteEvery(everyStage.map((id, _)))
+  }
 }
 
 object FCMNotificationsRepository {
@@ -77,18 +71,7 @@ object FCMNotificationsRepository {
   val Fetched = "fetched"
   val StartedPipeline = "startedPipeline"
   val FinishedPipeline = "finishedPipeline"
-
-  //this method only exists to facilitate testing
-  def getNewStageStats(curStats: FCMNotificationStats, stageTimestamp: Instant,
-                       stage: String, prevStageTime: Instant): FCMNotificationStats = {
-    val bucket1 = Instant.from(prevStageTime).plus(10, SECONDS)
-    val bucket2 = Instant.from(prevStageTime).plus(30, MINUTES)
-    if (stageTimestamp.isBefore(bucket1))
-      curStats.copy(stage, bucket1 = curStats.bucket1 + 1)
-    else if (stageTimestamp.isBefore(bucket2))
-      curStats.copy(stage, bucket2 = curStats.bucket2 + 1)
-    else curStats.copy(stage, bucket3 = curStats.bucket3 + 1)
-  }
+  val everyStage: Seq[String] = Seq(Pushed, Fetched, StartedPipeline, FinishedPipeline)
 
   def prevStage(stage: String): Option[String] = stage match {
     case StartedPipeline => Some(Fetched)

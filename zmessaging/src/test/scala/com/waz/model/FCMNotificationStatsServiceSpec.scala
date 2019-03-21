@@ -25,7 +25,8 @@ import org.threeten.bp.temporal.ChronoUnit._
 
 class FCMNotificationStatsServiceSpec extends AndroidFreeSpec {
 
-  import FCMNotificationsRepository._
+  import FCMNotificationsRepository.Pushed
+  import com.waz.service.push.FCMNotificationStatsService._
 
   val stage = Pushed
   val bucket1 = FCMNotificationStats(stage, 1, 0, 0)
@@ -36,9 +37,8 @@ class FCMNotificationStatsServiceSpec extends AndroidFreeSpec {
     val stageTime = Instant.now
     //bucket1 limit is 10s
     val prev = Instant.from(stageTime).minus(offset, MILLIS)
-    val curRow = FCMNotificationStats(stage, 0, 0, 0)
 
-    getNewStageStats(curRow, stageTime, stage, prev)
+    getStageStats(stage, stageTime, prev)
   }
 
   scenario("Notifications in bucket1 are sorted correctly") {
