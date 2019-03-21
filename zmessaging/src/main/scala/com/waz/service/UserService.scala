@@ -52,6 +52,7 @@ trait UserService {
   def currentConvMembers: Signal[Set[UserId]]
 
   def getSelfUser: Future[Option[UserData]]
+  def findUser(id: UserId): Future[Option[UserData]]
   def getOrCreateUser(id: UserId): Future[UserData]
   def updateUserData(id: UserId, updater: UserData => UserData): Future[Option[(UserData, UserData)]]
   def syncIfNeeded(userIds: Set[UserId], olderThan: FiniteDuration = SyncIfOlderThan): Future[Option[SyncId]]
@@ -160,6 +161,8 @@ class UserServiceImpl(selfUserId:        UserId,
         accu -- toRemove.map(_.id) ++ toAdd.map(u => u.id -> u)
       }
     )
+
+  override def findUser(id: UserId): Future[Option[UserData]] = usersStorage.get(id)
 
   override def getOrCreateUser(id: UserId) = usersStorage.getOrElseUpdate(id, {
     sync.syncUsers(Set(id))
