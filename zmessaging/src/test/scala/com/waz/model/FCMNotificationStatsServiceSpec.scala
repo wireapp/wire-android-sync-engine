@@ -17,7 +17,7 @@
  */
 package com.waz.model
 
-import com.waz.service.push.{FCMNotificationStats, FCMNotificationStatsService, FCMNotificationsRepository}
+import com.waz.service.push.{FCMNotificationStats, FCMNotificationsRepository}
 import com.waz.specs.AndroidFreeSpec
 import com.waz.threading.Threading
 import org.threeten.bp.Instant
@@ -25,9 +25,7 @@ import org.threeten.bp.temporal.ChronoUnit._
 
 class FCMNotificationStatsServiceSpec extends AndroidFreeSpec {
 
-  implicit val ec = Threading.Background
   import FCMNotificationsRepository._
-  import FCMNotificationStatsService.getNewStageStats
 
   val stage = Pushed
   val bucket1 = FCMNotificationStats(stage, 1, 0, 0)
