@@ -36,20 +36,18 @@ class FCMNotificationStatsServiceImpl(fcmTimestamps: FCMNotificationsRepository,
 
   import FCMNotificationStatsService._
 
+  import scala.async.Async._
+
   private implicit val ec: ExecutionContext = Threading.Background
 
   override def storeNotificationState(id: Uid, stage: String, timestamp: Instant): Future[Unit] =
-    for {
-
-      _    <- fcmTimestamps.storeNotificationState(id, stage, timestamp)
-      prev <- fcmTimestamps.getPreviousStageTime(id, stage)
-      _ <- prev match {
-        case Some(i) => fcmStats.insertOrUpdate(getStageStats(stage, timestamp, i))
-        case _       => Future.successful(())
-      }
-      _ <- if (stage == FCMNotification.FinishedPipeline) fcmTimestamps.deleteAllWithId(id)
-      else Future.successful(())
-    } yield ()
+    async {
+      await { fcmTimestamps.storeNotificationState(id, stage, timestamp) }
+      val prevStage = await { fcmTimestamps.getPreviousStageTime(id, stage) }
+      if (prevStage.isDefined)
+        await { fcmStats.insertOrUpdate(getStageStats(stage, timestamp, prevStage.get)) }
+      if (stage == FCMNotification.FinishedPipeline) await { fcmTimestamps.deleteAllWithId(id) }
+    }
 
   override def getStats: Future[Vector[FCMNotificationStats]] = fcmStats.listAllStats()
 }
