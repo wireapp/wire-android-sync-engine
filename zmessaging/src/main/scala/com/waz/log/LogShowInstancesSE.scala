@@ -78,6 +78,8 @@ trait LogShowInstancesSE {
   implicit val JSONObjectLogShow: LogShow[JSONObject] = logShowWithHash
 
   //TODO how much of a file/uri can we show in prod?
+  // There might be UUIDs in the URL, so we should obfuscate them.
+
   //common types
   implicit val FileLogShow: LogShow[File] = create(_ => "<file>", _.getAbsolutePath)
   implicit val AUriLogShow: LogShow[Uri]  = create(_ => "<uri>", _.toString)
@@ -156,7 +158,7 @@ trait LogShowInstancesSE {
     }
 
   implicit val CookieShow: LogShow[Cookie] = create(
-    c => s"Cookie(${c.str.take(10)}, exp: ${c.expiry}, isValid: ${c.isValid})",
+    c => s"Cookie(exp: ${c.expiry}, isValid: ${c.isValid})",
     c => s"Cookie(${c.str}, exp: ${c.expiry}, isValid: ${c.isValid})"
   )
 
