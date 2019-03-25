@@ -17,9 +17,9 @@
  */
 package com.waz.service
 
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model.{FCMNotification, Uid}
 import com.waz.repository.{FCMNotificationStats, FCMNotificationStatsRepository, FCMNotificationsRepository}
-import com.waz.sync.client.PushNotificationEncoded
 import com.waz.threading.Threading
 import org.threeten.bp.Instant
 import org.threeten.bp.temporal.ChronoUnit._
@@ -27,36 +27,42 @@ import org.threeten.bp.temporal.ChronoUnit._
 import scala.concurrent.{ExecutionContext, Future}
 
 trait FCMNotificationStatsService {
-  def storeNotificationState(id: Uid, stage: String, timestamp: Instant): Future[Unit]
   def getStats: Future[Vector[FCMNotificationStats]]
-  def markFCMNotificationsFetched(notifications: Seq[PushNotificationEncoded]): Future[Unit]
+  def markNotificationsWithState(ids: Set[Uid], stage: String): Future[Unit]
 }
 
 class FCMNotificationStatsServiceImpl(fcmTimestamps: FCMNotificationsRepository,
                                       fcmStats: FCMNotificationStatsRepository)
-    extends FCMNotificationStatsService {
+    extends FCMNotificationStatsService with DerivedLogTag {
 
   import FCMNotificationStatsService._
   import scala.async.Async._
+  import com.waz.log.LogSE._
+  import FCMNotification.Pushed
 
   private implicit val ec: ExecutionContext = Threading.Background
 
-  override def markFCMNotificationsFetched(notifications: Seq[PushNotificationEncoded]): Future[Unit] = async {
-    val nots = notifications.map(_.id).toSet
-    val now = Instant.now
-    val fcmIds = await(filterFCMNotifications(nots))
-    val fut = fcmIds.map(id => storeNotificationState(id, FCMNotification.Fetched, now))
-    await(Future.sequence(fut))
+  override def markNotificationsWithState(ids: Set[Uid], stage: String): Future[Unit] =  async {
+    stage match {
+      case Pushed => await { Future.sequence(
+        ids.toSeq.map { fcmTimestamps.storeNotificationState(_, stage, Instant.now) })}
+      case _ =>
+          val fcmIds = await(filterFCMNotifications(ids))
+          verbose(l"""marking ${showString(fcmIds.size.toString)} notifications
+               at stage ${showString(stage)} """)
+          await(calcAndStore(ids, stage))
+    }
   }
 
-  override def storeNotificationState(id: Uid, stage: String, timestamp: Instant): Future[Unit] =
-    async {
-      await { fcmTimestamps.storeNotificationState(id, stage, timestamp) }
-      val prevStage = await { fcmTimestamps.getPreviousStageTime(id, stage) }
-      if (prevStage.isDefined)
-        await { fcmStats.insertOrUpdate(getStageStats(stage, timestamp, prevStage.get)) }
-      if (stage == FCMNotification.FinishedPipeline) await { fcmTimestamps.deleteAllWithId(id) }
-    }
+  private def calcAndStore(ids: Set[Uid], stage: String): Future[Unit] = Future.sequence(ids.map { id =>
+    fcmTimestamps.getPreviousStageTime(id, stage).flatMap {
+      case Some(prev) =>
+        verbose(l"storing timestamp for stage ${showString(stage)} ")
+        val timestamp = Instant.now()
+        val newStage = FCMNotification(id, stage, timestamp)
+        fcmStats.writeTimestampAndStats(getStageStats(stage, timestamp, prev), newStage)
+      case None => Future.successful(())
+    }}).map(_ => ())
 
   override def getStats: Future[Vector[FCMNotificationStats]] = fcmStats.listAllStats()
 

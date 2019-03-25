@@ -33,8 +33,9 @@ object FCMNotification {
   val everyStage: Seq[String] = Seq(Pushed, Fetched, StartedPipeline, FinishedPipeline)
 
   def prevStage(stage: String): Option[String] = stage match {
-    case StartedPipeline => Some(Fetched)
-    case Fetched         => Some(Pushed)
-    case _               => None
+    case FinishedPipeline => Some(StartedPipeline)
+    case StartedPipeline  => Some(Fetched)
+    case Fetched          => Some(Pushed)
+    case _                => None
   }
 }

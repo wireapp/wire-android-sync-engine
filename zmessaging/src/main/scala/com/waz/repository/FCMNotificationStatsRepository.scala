@@ -20,6 +20,8 @@ package com.waz.repository
 import com.waz.content.Database
 import com.waz.db.Col.{int, text}
 import com.waz.db.Dao
+import com.waz.model.FCMNotification
+import com.waz.repository.FCMNotificationsRepository.FCMNotificationsDao
 import com.waz.threading.Threading
 import com.waz.utils.wrappers.DBCursor
 import com.waz.utils.Identifiable
@@ -40,7 +42,7 @@ case class FCMNotificationStats(stage:   String,
 }
 
 trait FCMNotificationStatsRepository {
-  def insertOrUpdate(update: FCMNotificationStats): Future[Unit]
+  def writeTimestampAndStats(update: FCMNotificationStats, stageTimestamp: FCMNotification): Future[Unit]
   def listAllStats(): Future[Vector[FCMNotificationStats]]
 }
 
@@ -51,8 +53,9 @@ class FCMNotificationStatsRepositoryImpl(implicit db: Database)
 
   private implicit val ec: ExecutionContext = Threading.Background
 
-  override def insertOrUpdate(update: FCMNotificationStats): Future[Unit] =
+  override def writeTimestampAndStats(update: FCMNotificationStats, stageTimestamp: FCMNotification): Future[Unit] =
     db.withTransaction { implicit db =>
+      FCMNotificationsDao.insertOrIgnore(stageTimestamp)
       insertOrReplace(getById(update.stage) match {
         case Some(stageRow) =>
           stageRow.copy(bucket1 = stageRow.bucket1 + update.bucket1,
@@ -60,9 +63,11 @@ class FCMNotificationStatsRepositoryImpl(implicit db: Database)
             bucket3 = stageRow.bucket3 + update.bucket3)
         case _ => update
       })
+      if (update.stage == FCMNotification.FinishedPipeline)
+        FCMNotificationsDao.deleteEvery(FCMNotification.everyStage.map((stageTimestamp.id, _)))
     }.map(_ => ())
 
-  override def listAllStats(): Future[Vector[FCMNotificationStats]] = db.read(implicit db => list)
+  override def listAllStats(): Future[Vector[FCMNotificationStats]] = db.read(list(_))
 }
 
 object FCMNotificationStatsRepository {
