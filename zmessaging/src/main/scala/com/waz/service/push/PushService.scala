@@ -93,7 +93,8 @@ class PushServiceImpl(selfUserId:           UserId,
                       lifeCycle:            UiLifeCycle,
                       tracking:             TrackingService,
                       sync:                 SyncServiceHandle,
-                      timeouts:             Timeouts)
+                      timeouts:             Timeouts,
+                      fcmService:           FCMNotificationStatsService)
                      (implicit ev: AccountContext) extends PushService { self =>
   import PushService._
 
@@ -183,9 +184,12 @@ class PushServiceImpl(selfUserId:           UserId,
   wsPushService.connected().onChanged.map(WebSocketChange).on(dispatcher)(syncHistory(_))
 
   private def storeNotifications(notifications: Seq[PushNotificationEncoded]): Future[Unit] =
-    Serialized.future(PipelineKey)(notificationStorage.saveAll(notifications).flatMap { _ =>
-      notifications.lift(notifications.lastIndexWhere(!_.transient)).fold(Future.successful(()))(n => idPref := Some(n.id))
-    })
+    Serialized.future(PipelineKey)(
+      for {
+        _ <- fcmService.markFCMNotificationsFetched(notifications)
+        _ <- notificationStorage.saveAll(notifications)
+        _ <- notifications.lift(notifications.lastIndexWhere(!_.transient)).fold(Future.successful(()))(n => idPref := Some(n.id))
+      } yield ())
 
   private def isOtrEventJson(ev: JSONObject) =
     ev.getString("type").equals("conversation.otr-message-add")

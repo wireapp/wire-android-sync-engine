@@ -31,6 +31,7 @@ trait FCMNotificationsRepository {
   def storeNotificationState(id: Uid, stage: String, timestamp: Instant): Future[Unit]
   def getPreviousStageTime(id: Uid, stage: String): Future[Option[Instant]]
   def deleteAllWithId(id: Uid): Future[Unit]
+  def exists(ids: Set[Uid]): Future[Set[Uid]]
 }
 
 class FCMNotificationsRepositoryImpl(implicit db: Database) extends FCMNotificationsRepository {
@@ -47,12 +48,12 @@ class FCMNotificationsRepositoryImpl(implicit db: Database) extends FCMNotificat
     }
 
   override def storeNotificationState(id: Uid, stage: String, timestamp: Instant): Future[Unit] =
-    db.apply { implicit db =>
-      insertOrIgnore(FCMNotification(id, stage, timestamp))
-    }.map(_ => ())
+    db.apply(insertOrIgnore(FCMNotification(id, stage, timestamp))(_)).map(_ => ())
 
-  override def deleteAllWithId(id: Uid): Future[Unit] = db.apply { implicit db =>
-    deleteEvery(everyStage.map((id, _)))
+  override def deleteAllWithId(id: Uid): Future[Unit] = db.apply(deleteEvery(everyStage.map((id, _)))(_))
+
+  def exists(ids: Set[Uid]): Future[Set[Uid]] = db.read { implicit db =>
+    iterating(FCMNotificationsDao.findInSet(Id, ids)).acquire(_.map(_.id).toSet)
   }
 }
 

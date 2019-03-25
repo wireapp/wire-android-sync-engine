@@ -19,6 +19,7 @@ package com.waz.service
 
 import com.waz.model.{FCMNotification, Uid}
 import com.waz.repository.{FCMNotificationStats, FCMNotificationStatsRepository, FCMNotificationsRepository}
+import com.waz.sync.client.PushNotificationEncoded
 import com.waz.threading.Threading
 import org.threeten.bp.Instant
 import org.threeten.bp.temporal.ChronoUnit._
@@ -28,6 +29,7 @@ import scala.concurrent.{ExecutionContext, Future}
 trait FCMNotificationStatsService {
   def storeNotificationState(id: Uid, stage: String, timestamp: Instant): Future[Unit]
   def getStats: Future[Vector[FCMNotificationStats]]
+  def markFCMNotificationsFetched(notifications: Seq[PushNotificationEncoded]): Future[Unit]
 }
 
 class FCMNotificationStatsServiceImpl(fcmTimestamps: FCMNotificationsRepository,
@@ -35,10 +37,17 @@ class FCMNotificationStatsServiceImpl(fcmTimestamps: FCMNotificationsRepository,
     extends FCMNotificationStatsService {
 
   import FCMNotificationStatsService._
-
   import scala.async.Async._
 
   private implicit val ec: ExecutionContext = Threading.Background
+
+  override def markFCMNotificationsFetched(notifications: Seq[PushNotificationEncoded]): Future[Unit] = async {
+    val nots = notifications.map(_.id).toSet
+    val now = Instant.now
+    val fcmIds = await(filterFCMNotifications(nots))
+    val fut = fcmIds.map(id => storeNotificationState(id, FCMNotification.Fetched, now))
+    await(Future.sequence(fut))
+  }
 
   override def storeNotificationState(id: Uid, stage: String, timestamp: Instant): Future[Unit] =
     async {
@@ -50,6 +59,8 @@ class FCMNotificationStatsServiceImpl(fcmTimestamps: FCMNotificationsRepository,
     }
 
   override def getStats: Future[Vector[FCMNotificationStats]] = fcmStats.listAllStats()
+
+  private def filterFCMNotifications(ids: Set[Uid]): Future[Set[Uid]] = fcmTimestamps.exists(ids)
 }
 
 object FCMNotificationStatsService {
