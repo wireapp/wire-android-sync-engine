@@ -23,6 +23,7 @@ import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.log.BasicLogging.{Log, LogTag}
 import com.waz.service.ZMessaging.clock
 import com.waz.utils.events.Signal
+import com.waz.zms.BuildConfig
 
 import scala.Ordered._
 import scala.collection.mutable
@@ -48,7 +49,7 @@ object InternalLog extends DerivedLogTag {
     implicit val ordering: Ordering[LogLevel] = Ordering by weight
   }
 
-  private var logsEnabled: Signal[Boolean] = Signal.const(false)
+  private var logsEnabled: Signal[Boolean] = Signal.const(BuildConfig.DEBUG)
 
   def setLogsService(logsService: LogsService): Unit = this.synchronized {
     logsEnabled = logsService.logsEnabledGlobally
