@@ -34,16 +34,11 @@ class ZLog2Spec extends ZSpec with DerivedLogTag {
         override def showSafe(value: Person): String   = value.toString + " Safe"
         override def showUnsafe(value: Person): String = value.toString + " Unsafe"
       }
+
       val personLog = l"$testPerson"
       debug(l"Check the current debug mode: Person = $testPerson")
       personLog.buildMessageSafe shouldBe PersonLogShow.showSafe(testPerson)
       personLog.buildMessageUnsafe shouldBe PersonLogShow.showUnsafe(testPerson)
-    }
-
-    scenario("compile and create Log for all basic types") {
-      val numbersLog = l"byte: ${0.toByte} short: ${1.toShort} int: ${2} long: ${3.toLong}"
-      numbersLog.buildMessageSafe shouldBe numbersLog.buildMessageUnsafe
-      numbersLog.buildMessageSafe shouldBe "byte: 0 short: 1 int: 2 long: 3"
     }
 
     scenario("compile and create Log for type if LogShow instance is in scope") {
@@ -54,13 +49,7 @@ class ZLog2Spec extends ZSpec with DerivedLogTag {
       personLog.buildMessageSafe shouldBe s"person: ${testPerson.toString}"
     }
 
-    scenario("not compile for String") {
-      val str = "str"
-      "l\"string: $str\"" shouldNot compile
-    }
 
-    scenario("not compile for type if LogShow instance is not in scope") {
-      "l\"person: $testPerson\"" shouldNot compile
     }
 
   }
