@@ -188,10 +188,9 @@ class PushServiceImpl(selfUserId:           UserId,
     Serialized.future(PipelineKey)(async {
       await { fcmService.markFCMNotificationsFetched(notifications) }
       await { notificationStorage.saveAll(notifications) }
-      await {
-        notifications.lift(notifications.lastIndexWhere(!_.transient))
-          .fold(Future.successful(()))(n => idPref := Some(n.id))
-      }
+      val res = notifications.lift(notifications.lastIndexWhere(!_.transient))
+      if (res.nonEmpty)
+        await { idPref := res.map(_.id) }
     })
 
   private def isOtrEventJson(ev: JSONObject) =
