@@ -51,7 +51,7 @@ import org.threeten.bp.Instant
 
 import scala.concurrent.duration.{Duration, FiniteDuration}
 
-trait LogShowInstancesSE extends FallbackLogShowRule {
+trait LogShowInstancesSE {
   import LogShow._
 
   implicit val RemoteInstantShow: LogShow[RemoteInstant] = logShowWithToString

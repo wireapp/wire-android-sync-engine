@@ -41,6 +41,12 @@ class ZLog2Spec extends ZSpec with DerivedLogTag {
       personLog.buildMessageUnsafe shouldBe PersonLogShow.showUnsafe(testPerson)
     }
 
+    scenario("compile and create Log for all basic types") {
+      val numbersLog = l"byte: ${0.toByte} short: ${1.toShort} int: ${2} long: ${3.toLong}"
+      numbersLog.buildMessageSafe shouldBe numbersLog.buildMessageUnsafe
+      numbersLog.buildMessageSafe shouldBe "byte: 0 short: 1 int: 2 long: 3"
+    }
+
     scenario("compile and create Log for type if LogShow instance is in scope") {
       implicit val PersonLogShow: LogShow[Person] = LogShow.create(_.toString)
 

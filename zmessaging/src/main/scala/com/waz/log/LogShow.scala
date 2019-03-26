@@ -169,4 +169,6 @@ object LogShow {
     }
   })
 
+  //default LogShow for all types
+  implicit def defaultLogShowFor[T]: LogShow[T] = LogShow.logShowWithHash
 }
