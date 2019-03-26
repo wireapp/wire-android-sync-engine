@@ -45,6 +45,7 @@ import com.waz.znet2.http.ResponseCode
 import org.json.JSONObject
 import org.threeten.bp.{Duration, Instant}
 
+import scala.async.Async._
 import scala.concurrent.duration._
 import scala.concurrent.{Future, Promise}
 
@@ -184,12 +185,14 @@ class PushServiceImpl(selfUserId:           UserId,
   wsPushService.connected().onChanged.map(WebSocketChange).on(dispatcher)(syncHistory(_))
 
   private def storeNotifications(notifications: Seq[PushNotificationEncoded]): Future[Unit] =
-    Serialized.future(PipelineKey)(
-      for {
-        _ <- fcmService.markFCMNotificationsFetched(notifications)
-        _ <- notificationStorage.saveAll(notifications)
-        _ <- notifications.lift(notifications.lastIndexWhere(!_.transient)).fold(Future.successful(()))(n => idPref := Some(n.id))
-      } yield ())
+    Serialized.future(PipelineKey)(async {
+      await { fcmService.markFCMNotificationsFetched(notifications) }
+      await { notificationStorage.saveAll(notifications) }
+      await {
+        notifications.lift(notifications.lastIndexWhere(!_.transient))
+          .fold(Future.successful(()))(n => idPref := Some(n.id))
+      }
+    })
 
   private def isOtrEventJson(ev: JSONObject) =
     ev.getString("type").equals("conversation.otr-message-add")
