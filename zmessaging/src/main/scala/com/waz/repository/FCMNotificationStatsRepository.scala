@@ -15,24 +15,16 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-package com.waz.service.push
+package com.waz.repository
 
-import android.content.Context
 import com.waz.content.Database
 import com.waz.db.Col.{int, text}
 import com.waz.db.Dao
-import com.waz.service.push.FCMNotificationStats.FCMNotificationStatsRepositoryDao
-import com.waz.utils.TrimmingLruCache.Fixed
+import com.waz.threading.Threading
 import com.waz.utils.wrappers.DBCursor
-import com.waz.utils.{CachedStorage, CachedStorageImpl, Identifiable, TrimmingLruCache}
+import com.waz.utils.Identifiable
 
-
-trait FCMNotificationStatsRepository extends CachedStorage[String, FCMNotificationStats]
-
-class FCMNotificationStatsRepositoryImpl(context: Context, storage: Database)
-  extends CachedStorageImpl[String, FCMNotificationStats](new TrimmingLruCache(
-    context, Fixed(100)), storage)(FCMNotificationStatsRepositoryDao)
-    with FCMNotificationStatsRepository
+import scala.concurrent.{ExecutionContext, Future}
 
 /**
   * @param stage the stage for which these buckets apply
@@ -47,9 +39,35 @@ case class FCMNotificationStats(stage:   String,
   override def id: String = stage
 }
 
-object FCMNotificationStats {
+trait FCMNotificationStatsRepository {
+  def insertOrUpdate(update: FCMNotificationStats): Future[Unit]
+  def listAllStats(): Future[Vector[FCMNotificationStats]]
+}
 
-  implicit object FCMNotificationStatsRepositoryDao extends Dao[FCMNotificationStats, String] {
+class FCMNotificationStatsRepositoryImpl(implicit db: Database)
+  extends FCMNotificationStatsRepository {
+
+  import com.waz.repository.FCMNotificationStatsRepository.FCMNotificationStatsDao._
+
+  private implicit val ec: ExecutionContext = Threading.Background
+
+  override def insertOrUpdate(update: FCMNotificationStats): Future[Unit] =
+    db.withTransaction { implicit db =>
+      insertOrReplace(getById(update.stage) match {
+        case Some(stageRow) =>
+          stageRow.copy(bucket1 = stageRow.bucket1 + update.bucket1,
+            bucket2 = stageRow.bucket2 + update.bucket2,
+            bucket3 = stageRow.bucket3 + update.bucket3)
+        case _ => update
+      })
+    }.map(_ => ())
+
+  override def listAllStats(): Future[Vector[FCMNotificationStats]] = db.read(implicit db => list)
+}
+
+object FCMNotificationStatsRepository {
+
+  implicit object FCMNotificationStatsDao extends Dao[FCMNotificationStats, String] {
     val Stage = text('stage, "PRIMARY KEY")(_.stage)
     val Bucket1 = int('bucket1)(_.bucket1)
     val Bucket2 = int('bucket2)(_.bucket2)
