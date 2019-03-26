@@ -45,6 +45,7 @@ import com.waz.znet2.http.ResponseCode
 import org.json.JSONObject
 import org.threeten.bp.{Duration, Instant}
 
+import scala.async.Async._
 import scala.concurrent.duration._
 import scala.concurrent.{Future, Promise}
 
@@ -93,7 +94,8 @@ class PushServiceImpl(selfUserId:           UserId,
                       lifeCycle:            UiLifeCycle,
                       tracking:             TrackingService,
                       sync:                 SyncServiceHandle,
-                      timeouts:             Timeouts)
+                      timeouts:             Timeouts,
+                      fcmService:           FCMNotificationStatsService)
                      (implicit ev: AccountContext) extends PushService { self =>
   import PushService._
 
@@ -183,8 +185,12 @@ class PushServiceImpl(selfUserId:           UserId,
   wsPushService.connected().onChanged.map(WebSocketChange).on(dispatcher)(syncHistory(_))
 
   private def storeNotifications(notifications: Seq[PushNotificationEncoded]): Future[Unit] =
-    Serialized.future(PipelineKey)(notificationStorage.saveAll(notifications).flatMap { _ =>
-      notifications.lift(notifications.lastIndexWhere(!_.transient)).fold(Future.successful(()))(n => idPref := Some(n.id))
+    Serialized.future(PipelineKey)(async {
+      await { fcmService.markFCMNotificationsFetched(notifications) }
+      await { notificationStorage.saveAll(notifications) }
+      val res = notifications.lift(notifications.lastIndexWhere(!_.transient))
+      if (res.nonEmpty)
+        await { idPref := res.map(_.id) }
     })
 
   private def isOtrEventJson(ev: JSONObject) =
