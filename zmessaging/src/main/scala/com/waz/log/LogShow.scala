@@ -100,7 +100,14 @@ object LogShow {
   val logShowWithToString: LogShow[Any] = create(_.toString)
 
   val logShowWithHash: LogShow[Any] = new LogShow[Any] {
-    private def name(v: Any) = v.getClass.getSimpleName
+    private def name(v: Any): String = {
+      try {
+        v.getClass.getSimpleName
+      } catch {
+        case _: InternalError =>
+          v.getClass.getName
+      }
+    }
     override def showSafe(v: Any): String = s"${name(v)}(${sha2(v.toString).take(9)})"
     override def showUnsafe(v: Any): String = s"${name(v)}(${v.toString})"
   }
