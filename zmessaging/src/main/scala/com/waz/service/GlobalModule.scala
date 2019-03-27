@@ -42,6 +42,7 @@ import com.waz.ui.MemoryImageCache
 import com.waz.ui.MemoryImageCache.{Entry, Key}
 import com.waz.utils.Cache
 import com.waz.utils.wrappers.{Context, GoogleApi}
+import com.waz.zms.BuildConfig
 import com.waz.znet2.http.Request.UrlCreator
 import com.waz.znet2.http.{HttpClient, RequestInterceptor}
 import com.waz.znet2.{HttpClientOkHttpImpl, OkHttpUserAgentInterceptor}
@@ -180,7 +181,7 @@ class GlobalModuleImpl(val context:                 AContext,
   lazy val flowmanager:         FlowManagerService               = wire[DefaultFlowManagerService]
   lazy val mediaManager:        MediaManagerService              = wire[DefaultMediaManagerService]
 
-  lazy val logsService:         LogsService                      = new LogsServiceImpl(prefs)
+  lazy val logsService:         LogsService                      = new LogsServiceImpl(prefs, logsEnabledByDefault = BuildConfig.DEBUG)
 }
 
 class EmptyGlobalModule extends GlobalModule {
