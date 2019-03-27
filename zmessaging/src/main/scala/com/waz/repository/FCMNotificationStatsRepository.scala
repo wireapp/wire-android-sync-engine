@@ -46,7 +46,8 @@ trait FCMNotificationStatsRepository {
   def listAllStats(): Future[Vector[FCMNotificationStats]]
 }
 
-class FCMNotificationStatsRepositoryImpl(implicit db: Database)
+class FCMNotificationStatsRepositoryImpl(fcmTimestamps: FCMNotificationsRepository)
+                                        (implicit db: Database)
   extends FCMNotificationStatsRepository {
 
   import com.waz.repository.FCMNotificationStatsRepository.FCMNotificationStatsDao._
@@ -65,7 +66,10 @@ class FCMNotificationStatsRepositoryImpl(implicit db: Database)
       })
       if (update.stage == FCMNotification.FinishedPipeline)
         FCMNotificationsDao.deleteEvery(FCMNotification.everyStage.map((stageTimestamp.id, _)))
-    }.map(_ => ())
+    }.andThen { case _ =>
+      //this op is not done as part of the transaction because we will eventually retry
+      fcmTimestamps.trimExcessRows(update.stage)
+    }(Threading.Background)
 
   override def listAllStats(): Future[Vector[FCMNotificationStats]] = db.read(list(_))
 }

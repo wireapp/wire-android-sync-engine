@@ -32,6 +32,7 @@ trait FCMNotificationsRepository {
   def getPreviousStageTime(id: Uid, stage: String): Future[Option[Instant]]
   def deleteAllWithId(id: Uid): Future[Unit]
   def exists(ids: Set[Uid]): Future[Set[Uid]]
+  def trimExcessRows(stage: String): Future[Unit]
 }
 
 class FCMNotificationsRepositoryImpl(implicit db: Database) extends FCMNotificationsRepository {
@@ -55,9 +56,20 @@ class FCMNotificationsRepositoryImpl(implicit db: Database) extends FCMNotificat
   def exists(ids: Set[Uid]): Future[Set[Uid]] = db.read { implicit db =>
     iterating(FCMNotificationsDao.findInSet(Id, ids)).acquire(_.map(_.id).toSet)
   }
+
+  override def trimExcessRows(stage: String): Future[Unit] =
+    if(stage == FCMNotification.FinishedPipeline) {
+      db.read(FCMNotificationsDao.list(_)).flatMap { case rows if rows.size > maxRows =>
+        val rowsToRemove = getOldestExcessRows(rows).map(p => (p.id, p.stage))
+        db.apply(FCMNotificationsDao.deleteEvery(rowsToRemove)(_))
+      }
+    } else Future.successful(())
+
 }
 
 object FCMNotificationsRepository {
+
+  val maxRows = 1000
 
   implicit object FCMNotificationsDao extends Dao2[FCMNotification, Uid, String] {
     val Id = id[Uid]('_id).apply(_.id)
@@ -69,6 +81,13 @@ object FCMNotificationsRepository {
 
     override def apply(implicit cursor: DBCursor): FCMNotification =
       FCMNotification(Id, Stage, StageStartTime)
+  }
+
+  /** This method is here, rather than in the class, to facilitate unit testing **/
+  def getOldestExcessRows(rows: Vector[FCMNotification], max: Int = maxRows): Seq[FCMNotification] = {
+    rows
+      .sortWith { case (t1, t2) => t1.stageStartTime.isBefore(t2.stageStartTime)}
+      .take(rows.size - max)
   }
 }
 
