@@ -30,13 +30,13 @@ trait LogsService {
 }
 
 //TODO Think about cycle dependency between LogsService and InternalLog
-class LogsServiceImpl(globalPreferences: GlobalPreferences)
+class LogsServiceImpl(globalPreferences: GlobalPreferences, logsEnabledByDefault: Boolean = false)
   extends LogsService with DerivedLogTag {
 
   import com.waz.utils.events.EventContext.Implicits._
 
   override lazy val logsEnabledGlobally: Signal[Boolean] =
-    globalPreferences(GlobalPreferences.LogsEnabled).signal
+    globalPreferences(GlobalPreferences.LogsEnabled).signal.orElse(Signal.const(logsEnabledByDefault))
 
   logsEnabledGlobally.ifFalse.apply { _ =>
     InternalLog.clearAll()
