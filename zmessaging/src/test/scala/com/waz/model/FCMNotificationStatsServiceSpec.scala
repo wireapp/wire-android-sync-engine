@@ -27,7 +27,7 @@ import scala.concurrent.Future
 
 class FCMNotificationStatsServiceSpec extends AndroidFreeSpec {
 
-  import FCMNotification.{Pushed, FinishedPipeline}
+  import FCMNotification._
   import com.waz.service.FCMNotificationStatsService._
 
   private val fcmTimeStamps = mock[FCMNotificationsRepository]
@@ -60,33 +60,37 @@ class FCMNotificationStatsServiceSpec extends AndroidFreeSpec {
 
   scenario("Stats aren't updated if there is no previous stage") {
     val id = Uid("test")
-    val service = getService()
-    (fcmTimeStamps.storeNotificationState _).expects(*, *, *).once().returning(Future.successful(()))
-    (fcmTimeStamps.getPreviousStageTime _).expects(*, *).once().returning(Future.successful(None))
+    val s = Pushed
+    val service = getService
+    (fcmTimeStamps.storeNotificationState _).expects(id, s, *).once().returning(Future.successful(()))
 
-    result(service.storeNotificationState(id, stage, Instant.now()))
+    result(service.markNotificationsWithState(Set(id), s))
   }
 
-  scenario("Stats are updated if there is a previous stage, and current stage isn't final") {
+  scenario("Stats are updated if previous stage present, and current stage isn't final") {
     val id = Uid("test")
-    val service = getService()
-    (fcmTimeStamps.storeNotificationState _).expects(*, *, *).once().returning(Future.successful(()))
+    val s = Fetched
+    val service = getService
+    (fcmTimeStamps.exists _).expects(Set(id)).once().returning(Future.successful(Set(id)))
     (fcmTimeStamps.getPreviousStageTime _).expects(*, *).once().returning(Future.successful(Some(Instant.now())))
-    (fcmStats.insertOrUpdate _).expects(*).once().returning(Future.successful(()))
+    (fcmStats.writeTimestampAndStats _).expects(*, *).once().returning(Future.successful(()))
 
-    result(service.storeNotificationState(id, stage, Instant.now()))
+    result(service.markNotificationsWithState(Set(id), s))
   }
 
-  scenario("Previous timestamp rows are deleted when we have reached final stage") {
-    val id = Uid("test")
-    val service = getService()
-    (fcmTimeStamps.storeNotificationState _).expects(*, *, *).once().returning(Future.successful(()))
-    (fcmTimeStamps.getPreviousStageTime _).expects(*, *).once().returning(Future.successful(Some(Instant.now())))
-    (fcmStats.insertOrUpdate _).expects(*).once().returning(Future.successful(()))
-    (fcmTimeStamps.deleteAllWithId _).expects(*).once().returning(Future.successful(()))
+  scenario("marking notification states filters out notifications not present in table") {
+    val id1 = Uid("test1")
+    val id2 = Uid("test2")
+    val s = Fetched
+    val expectedRow = FCMNotificationStats(s, 1, 0, 0)
+    val service = getService
+    (fcmTimeStamps.exists _).expects(*).once().returning(Future.successful(Set(id1)))
+    (fcmTimeStamps.getPreviousStageTime _).expects(id1, *).once().returning(Future.successful(Some(Instant.now())))
+    (fcmTimeStamps.getPreviousStageTime _).expects(id2, *).once().returning(Future.successful(Some(Instant.now())))
+    (fcmStats.writeTimestampAndStats _).expects(expectedRow, *).twice().returning(Future.successful(()))
 
-    result(service.storeNotificationState(id, FinishedPipeline, Instant.now()))
+    result(service.markNotificationsWithState(Set(id1, id2), s))
   }
 
-  def getService() = new FCMNotificationStatsServiceImpl(fcmTimeStamps, fcmStats)
+  private def getService = new FCMNotificationStatsServiceImpl(fcmTimeStamps, fcmStats)
 }
