@@ -33,10 +33,12 @@ trait LogsService {
 class LogsServiceImpl(globalPreferences: GlobalPreferences, logsEnabledByDefault: Boolean = false)
   extends LogsService with DerivedLogTag {
 
+  setLogsEnabled(logsEnabledByDefault)
+
   import com.waz.utils.events.EventContext.Implicits._
 
   override lazy val logsEnabledGlobally: Signal[Boolean] =
-    globalPreferences(GlobalPreferences.LogsEnabled).signal.orElse(Signal.const(logsEnabledByDefault))
+    globalPreferences(GlobalPreferences.LogsEnabled).signal
 
   logsEnabledGlobally.ifFalse.apply { _ =>
     InternalLog.clearAll()
