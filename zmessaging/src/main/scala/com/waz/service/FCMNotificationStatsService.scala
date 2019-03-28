@@ -44,17 +44,18 @@ class FCMNotificationStatsServiceImpl(fcmTimestamps: FCMNotificationsRepository,
 
   override def markNotificationsWithState(ids: Set[Uid], stage: String): Future[Unit] =  async {
     stage match {
-      case Pushed => await { Future.sequence(
-        ids.toSeq.map { fcmTimestamps.storeNotificationState(_, stage, Instant.now) })}
+      case Pushed => await {
+        Future.traverse(ids.toSeq)(p => fcmTimestamps.storeNotificationState(p, stage, Instant.now))
+      }
       case _ =>
-          val fcmIds = await(filterFCMNotifications(ids))
+          val fcmIds = await { filterFCMNotifications(ids) }
           verbose(l"""marking ${showString(fcmIds.size.toString)} notifications
                at stage ${showString(stage)} """)
-          await(calcAndStore(ids, stage))
+          await { calcAndStore(ids, stage) }
     }
   }
 
-  private def calcAndStore(ids: Set[Uid], stage: String): Future[Unit] = Future.sequence(ids.map { id =>
+  private def calcAndStore(ids: Set[Uid], stage: String): Future[Unit] = Future.traverse(ids){ id =>
     fcmTimestamps.getPreviousStageTime(id, stage).flatMap {
       case Some(prev) =>
         verbose(l"storing timestamp for stage ${showString(stage)} ")
@@ -62,7 +63,7 @@ class FCMNotificationStatsServiceImpl(fcmTimestamps: FCMNotificationsRepository,
         val newStage = FCMNotification(id, stage, timestamp)
         fcmStats.writeTimestampAndStats(getStageStats(stage, timestamp, prev), newStage)
       case None => Future.successful(())
-    }}).map(_ => ())
+    }}.map(_ => ())
 
   override def getStats: Future[Vector[FCMNotificationStats]] = fcmStats.listAllStats()
 
