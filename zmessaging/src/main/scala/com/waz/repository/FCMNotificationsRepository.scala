@@ -58,12 +58,25 @@ class FCMNotificationsRepositoryImpl(implicit db: Database) extends FCMNotificat
   }
 
   override def trimExcessRows(stage: String): Future[Unit] =
-    if(stage == FCMNotification.FinishedPipeline) {
-      db.read(FCMNotificationsDao.list(_)).flatMap { case rows if rows.size > maxRows =>
-        val rowsToRemove = getOldestExcessRows(rows).map(p => (p.id, p.stage))
-        db.apply(FCMNotificationsDao.deleteEvery(rowsToRemove)(_))
+    db.withTransaction { implicit db =>
+      val c = db.query(table.name, Array(Id.name, Stage.name), null, null,
+        null, null, StageStartTime.name, null)
+      c.moveToFirst()
+      if(c.getCount > maxRows) {
+        val toDeleteCursor = db.query(table.name, Array(Id.name, Stage.name), null, null,
+          null, null, StageStartTime.name, s"LIMIT ${maxRows - c.getCount}")
+        val b = iterating(toDeleteCursor)
+        deleteEvery(b.acquire(identity))
+        toDeleteCursor.close()
       }
-    } else Future.successful(())
+      c.close()
+    }
+    //if(stage == FCMNotification.FinishedPipeline) {
+    //  db.read(FCMNotificationsDao.list(_)).flatMap { case rows if rows.size > maxRows =>
+    //    val rowsToRemove = getOldestExcessRows(rows).map(p => (p.id, p.stage))
+    //    db.apply(FCMNotificationsDao.deleteEvery(rowsToRemove)(_))
+    //  }
+    //} else Future.successful(())
 
 }
 
