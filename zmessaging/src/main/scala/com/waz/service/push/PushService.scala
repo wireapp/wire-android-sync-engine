@@ -44,6 +44,7 @@ import com.waz.utils.{RichInstant, _}
 import com.waz.znet2.http.ResponseCode
 import org.json.JSONObject
 import org.threeten.bp.{Duration, Instant}
+import FCMNotification.{Fetched, StartedPipeline, FinishedPipeline}
 
 import scala.async.Async._
 import scala.concurrent.duration._
@@ -166,13 +167,16 @@ class PushServiceImpl(selfUserId:           UserId,
 
     notificationStorage.getDecryptedRows().flatMap { rows =>
       verbose(l"Processing ${rows.size} rows")
-      if (rows.nonEmpty)
+      if (rows.nonEmpty) {
+        val ids = rows.map(_.pushId).toSet
         for {
+          _ <- fcmService.markNotificationsWithState(ids, StartedPipeline)
           _ <- pipeline(rows.flatMap(decodeRow))
           _ <- notificationStorage.removeRows(rows.map(_.index))
+          _ <- fcmService.markNotificationsWithState(ids, FinishedPipeline)
           _ <- processDecryptedRows()
         } yield {}
-      else Future.successful(())
+      } else Future.successful(())
     }
   }
 
@@ -186,7 +190,7 @@ class PushServiceImpl(selfUserId:           UserId,
 
   private def storeNotifications(notifications: Seq[PushNotificationEncoded]): Future[Unit] =
     Serialized.future(PipelineKey)(async {
-      await { fcmService.markFCMNotificationsFetched(notifications) }
+      await { fcmService.markNotificationsWithState(notifications.map(_.id).toSet, Fetched) }
       await { notificationStorage.saveAll(notifications) }
       val res = notifications.lift(notifications.lastIndexWhere(!_.transient))
       if (res.nonEmpty)
