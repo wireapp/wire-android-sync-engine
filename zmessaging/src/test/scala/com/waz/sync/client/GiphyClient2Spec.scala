@@ -25,6 +25,7 @@ import org.scalatest.Ignore
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
+@Ignore
 class GiphyClient2Spec extends ZIntegrationSpec with AuthenticationConfig with DerivedLogTag {
 
   private lazy val giphyClient = new GiphyClientImpl2()

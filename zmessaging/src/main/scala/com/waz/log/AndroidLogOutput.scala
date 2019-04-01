@@ -34,6 +34,11 @@ class AndroidLogOutput(override val showSafeOnly: Boolean = false) extends LogOu
       case Verbose => Log.v(tag.value, str)
       case _ =>
     }
+
+  override def clear(): Unit = {
+    import scala.sys.process._
+    Process(Seq("logcat", "-c")).run()
+  }
 }
 
 object AndroidLogOutput {

@@ -28,6 +28,7 @@ import com.waz.bitmap.video.VideoTranscoder
 import com.waz.cache.CacheService
 import com.waz.client.{RegistrationClient, RegistrationClientImpl}
 import com.waz.content._
+import com.waz.log.{LogsService, LogsServiceImpl}
 import com.waz.permissions.PermissionsService
 import com.waz.service.assets.{AudioTranscoder, GlobalRecordAndPlayService}
 import com.waz.service.assets2.GeneralFileCacheImpl
@@ -43,6 +44,7 @@ import com.waz.ui.MemoryImageCache
 import com.waz.ui.MemoryImageCache.{Entry, Key}
 import com.waz.utils.{Cache, IoUtils}
 import com.waz.utils.wrappers.{Context, GoogleApi}
+import com.waz.zms.BuildConfig
 import com.waz.znet2.http.Request.UrlCreator
 import com.waz.znet2.http.{HttpClient, RequestInterceptor}
 import com.waz.znet2.{HttpClientOkHttpImpl, OkHttpUserAgentInterceptor}
@@ -103,6 +105,8 @@ trait GlobalModule {
   def mediaManager:             MediaManagerService
 
   def trackingService:          TrackingService
+
+  def logsService:              LogsService
 }
 
 class GlobalModuleImpl(val context:                 AContext,
@@ -184,6 +188,8 @@ class GlobalModuleImpl(val context:                 AContext,
 
   lazy val flowmanager:         FlowManagerService               = wire[DefaultFlowManagerService]
   lazy val mediaManager:        MediaManagerService              = wire[DefaultMediaManagerService]
+
+  lazy val logsService:         LogsService                      = new LogsServiceImpl(prefs, logsEnabledByDefault = BuildConfig.DEBUG)
 }
 
 class EmptyGlobalModule extends GlobalModule {
@@ -234,5 +240,6 @@ class EmptyGlobalModule extends GlobalModule {
   override def httpClientForLongRunning: HttpClient                                          = ???
   override def syncRequests:             SyncRequestService                                  = ???
   override def syncHandler:              SyncHandler                                         = ???
+  override def logsService:              LogsService                                         = ???
 }
 

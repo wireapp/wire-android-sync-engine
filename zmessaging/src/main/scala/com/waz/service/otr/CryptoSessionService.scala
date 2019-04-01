@@ -79,7 +79,7 @@ class CryptoSessionService(cryptoBox: CryptoBoxService) extends DerivedLogTag {
     def decrypt(arg: Option[CryptoBox]): (CryptoSession, Array[Byte]) = arg match {
       case None => throw new Exception("CryptoBox missing")
       case Some(cb) =>
-        verbose(l"decryptMessage($sessionId for message: ${msg.length} = ${showString(AESUtils.base64(msg))})")
+        verbose(l"decryptMessage($sessionId. Message length: ${msg.length})")
         loadSession(cb, sessionId).fold {
           val sm = cb.initSessionFromMessage(sessionId.toString, msg)
           onCreate ! sessionId

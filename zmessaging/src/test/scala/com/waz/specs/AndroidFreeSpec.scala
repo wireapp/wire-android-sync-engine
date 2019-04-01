@@ -186,6 +186,6 @@ object AndroidFreeSpec {
 
 class DummyLogsService extends LogsService {
   override def logsEnabledGlobally: Signal[Boolean] = Signal.const(true)
-  override def logsEnabled(userId: UserId): Future[Boolean] = ???
-  override def setLogsEnabled(userId: UserId, enabled: Boolean): Future[Unit] = ???
+  override def logsEnabled: Future[Boolean] = ???
+  override def setLogsEnabled(enabled: Boolean): Future[Unit] = ???
 }

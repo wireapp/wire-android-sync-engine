@@ -126,6 +126,8 @@ case class UserData(override val id:       UserId,
   def isPartner(ourTeamId: Option[TeamId]): Boolean =
     teamId.isDefined && teamId == ourTeamId && decodeBitmask(permissions._1) == PartnerPermissions
 
+  def isInTeam(otherTeamId: Option[TeamId]): Boolean = teamId.isDefined && teamId == otherTeamId
+
   def matchesFilter(filter: String): Boolean = {
     val isHandleSearch = Handle.isHandle(filter)
     matchesFilter(filter, isHandleSearch)

@@ -24,3 +24,7 @@ Build aar libraries and publish them to local Maven repository:
 ```
 sbt publishM2
 ```
+
+Once you have run this command, you will have a package called `zmessaging-android-<VERSION>-SNAPSHOT` (where `<VERSION>`  is the current version number, such as `141.0`). 
+
+You can then use this snapshop in the [UI project](https://github.com/wireapp/wire-android) by modifying the `zMessagingDevVersion` value in the UI [`Build.gradle`](https://github.com/wireapp/wire-android/blob/develop/app/build.gradle#L25) to `<VERSION>-SNAPSHOT` (e.g. `141.0-SNAPSHOT`). This will make sure that the application pulls in the locally build sync engine version when building in **debug**.

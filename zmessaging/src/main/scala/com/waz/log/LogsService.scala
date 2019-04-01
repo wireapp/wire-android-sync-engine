@@ -17,49 +17,34 @@
  */
 package com.waz.log
 
-import com.waz.content.UserPreferences
+import com.waz.content.GlobalPreferences
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
-import com.waz.model.UserId
-import com.waz.service.AccountsService
 import com.waz.utils.events.Signal
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.Future
 
 trait LogsService {
   def logsEnabledGlobally: Signal[Boolean]
-  def logsEnabled(userId: UserId): Future[Boolean]
-  def setLogsEnabled(userId: UserId, enabled: Boolean): Future[Unit]
+  def logsEnabled: Future[Boolean]
+  def setLogsEnabled(enabled: Boolean): Future[Unit]
 }
 
 //TODO Think about cycle dependency between LogsService and InternalLog
-class LogsServiceImpl(accountsService: AccountsService)(implicit ec: ExecutionContext)
+class LogsServiceImpl(globalPreferences: GlobalPreferences, logsEnabledByDefault: Boolean = false)
   extends LogsService with DerivedLogTag {
 
   import com.waz.utils.events.EventContext.Implicits._
 
-  override val logsEnabledGlobally: Signal[Boolean] =
-    for {
-      zmss <- accountsService.zmsInstances
-      prefSignals = zmss.map(_.userPrefs(UserPreferences.LogsEnabled).signal)
-      prefs <- Signal.sequence(prefSignals.toSeq: _*)
-    } yield prefs.forall(identity)
+  override lazy val logsEnabledGlobally: Signal[Boolean] =
+    globalPreferences(GlobalPreferences.LogsEnabled).signal.orElse(Signal.const(logsEnabledByDefault))
 
   logsEnabledGlobally.ifFalse.apply { _ =>
     InternalLog.clearAll()
   }
 
-  override def logsEnabled(userId: UserId): Future[Boolean] =
-    for {
-      zmss <- accountsService.zmsInstances.head
-      zms = zmss.filter(_.selfUserId == userId).head
-      enabled <- zms.userPrefs(UserPreferences.LogsEnabled).apply()
-    } yield enabled
+  override def logsEnabled: Future[Boolean] =
+    globalPreferences(GlobalPreferences.LogsEnabled).apply()
 
-  override def setLogsEnabled(userId: UserId, enabled: Boolean): Future[Unit] =
-    for {
-      zmss <- accountsService.zmsInstances.head
-      zms = zmss.filter(_.selfUserId == userId).head
-      _ <- zms.userPrefs(UserPreferences.LogsEnabled) := enabled
-    } yield ()
-
+  override def setLogsEnabled(enabled: Boolean): Future[Unit] =
+    globalPreferences(GlobalPreferences.LogsEnabled) := enabled
 }
