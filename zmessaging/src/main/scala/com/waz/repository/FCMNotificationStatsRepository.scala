@@ -67,8 +67,10 @@ class FCMNotificationStatsRepositoryImpl(fcmTimestamps: FCMNotificationsReposito
       if (update.stage == FCMNotification.FinishedPipeline)
         FCMNotificationsDao.deleteEvery(FCMNotification.everyStage.map((stageTimestamp.id, _)))
     }.andThen { case _ =>
-      //this op is not done as part of the transaction because we will eventually retry
-      fcmTimestamps.trimExcessRows(update.stage)
+      //this op is not done as part of the transaction because it's not essential, it's just an
+      //extra check to ensure the FCM timestamps table doesn't grow overly long due to bugs
+      if (update.stage == FCMNotification.FinishedPipeline)
+        fcmTimestamps.trimExcessRows()
     }(Threading.Background)
 
   override def listAllStats(): Future[Vector[FCMNotificationStats]] = db.read(list(_))

@@ -20,10 +20,12 @@ package com.waz.repository
 import com.waz.content.Database
 import com.waz.db.Col.{id, text, timestamp}
 import com.waz.db.Dao2
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model.{FCMNotification, Uid}
 import com.waz.threading.Threading
 import com.waz.utils.wrappers.DBCursor
 import org.threeten.bp.Instant
+import com.waz.log.LogSE._
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -32,10 +34,10 @@ trait FCMNotificationsRepository {
   def getPreviousStageTime(id: Uid, stage: String): Future[Option[Instant]]
   def deleteAllWithId(id: Uid): Future[Unit]
   def exists(ids: Set[Uid]): Future[Set[Uid]]
-  def trimExcessRows(stage: String): Future[Unit]
+  def trimExcessRows(): Future[Unit]
 }
 
-class FCMNotificationsRepositoryImpl(implicit db: Database) extends FCMNotificationsRepository {
+class FCMNotificationsRepositoryImpl(implicit db: Database) extends FCMNotificationsRepository with DerivedLogTag {
 
   import FCMNotificationsRepository._
   import FCMNotificationsDao._
@@ -57,27 +59,18 @@ class FCMNotificationsRepositoryImpl(implicit db: Database) extends FCMNotificat
     iterating(FCMNotificationsDao.findInSet(Id, ids)).acquire(_.map(_.id).toSet)
   }
 
-  override def trimExcessRows(stage: String): Future[Unit] =
+  override def trimExcessRows(): Future[Unit] =
     db.withTransaction { implicit db =>
-      val c = db.query(table.name, Array(Id.name, Stage.name), null, null,
-        null, null, StageStartTime.name, null)
+      val c = db.query(table.name, Array(StageStartTime.name), null, null,
+        null, null, s"${StageStartTime.name} DESC", null)
       c.moveToFirst()
-      if(c.getCount > maxRows) {
-        val toDeleteCursor = db.query(table.name, Array(Id.name, Stage.name), null, null,
-          null, null, StageStartTime.name, s"LIMIT ${maxRows - c.getCount}")
-        val b = iterating(toDeleteCursor)
-        deleteEvery(b.acquire(identity))
-        toDeleteCursor.close()
+      if (c.getCount > maxRows) {
+        c.moveToPosition(maxRows - 1)
+        val maxTime = c.getLong(c.getColumnIndex(StageStartTime.name))
+        single(db.rawQuery(s"DELETE FROM ${table.name} WHERE ${StageStartTime.name} < $maxTime", null))
       }
       c.close()
     }
-    //if(stage == FCMNotification.FinishedPipeline) {
-    //  db.read(FCMNotificationsDao.list(_)).flatMap { case rows if rows.size > maxRows =>
-    //    val rowsToRemove = getOldestExcessRows(rows).map(p => (p.id, p.stage))
-    //    db.apply(FCMNotificationsDao.deleteEvery(rowsToRemove)(_))
-    //  }
-    //} else Future.successful(())
-
 }
 
 object FCMNotificationsRepository {
