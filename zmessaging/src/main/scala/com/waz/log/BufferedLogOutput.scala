@@ -91,7 +91,10 @@ class BufferedLogOutput(baseDir: String,
     }
   }
 
-  override def clear(): Unit = paths foreach { path => new File(path).delete() }
+  override def clear(): Unit = {
+    flush()
+    paths foreach { path => new File(path).delete() }
+  }
 
   private def writeToFile(fileName: String, contents: String): Unit = this.synchronized {
     try {
