@@ -23,11 +23,12 @@ import com.waz.repository.{FCMNotificationStats, FCMNotificationStatsRepository,
 import com.waz.threading.Threading
 import org.threeten.bp.Instant
 import org.threeten.bp.temporal.ChronoUnit._
+import com.waz.log.LogSE._
 
 import scala.concurrent.{ExecutionContext, Future}
 
 trait FCMNotificationStatsService {
-  def getStats: Future[Vector[FCMNotificationStats]]
+  def getFormattedStats: Future[String]
   def markNotificationsWithState(ids: Set[Uid], stage: String): Future[Unit]
 }
 
@@ -38,7 +39,7 @@ class FCMNotificationStatsServiceImpl(fcmTimestamps: FCMNotificationsRepository,
   import FCMNotificationStatsService._
   import scala.async.Async._
   import com.waz.log.LogSE._
-  import FCMNotification.Pushed
+  import FCMNotification._
 
   private implicit val ec: ExecutionContext = Threading.Background
 
@@ -58,14 +59,28 @@ class FCMNotificationStatsServiceImpl(fcmTimestamps: FCMNotificationsRepository,
   private def calcAndStore(ids: Set[Uid], stage: String): Future[Unit] = Future.traverse(ids){ id =>
     fcmTimestamps.getPreviousStageTime(id, stage).flatMap {
       case Some(prev) =>
-        verbose(l"storing timestamp for stage ${showString(stage)} ")
         val timestamp = Instant.now()
         val newStage = FCMNotification(id, stage, timestamp)
         fcmStats.writeTimestampAndStats(getStageStats(stage, timestamp, prev), newStage)
       case None => Future.successful(())
     }}.map(_ => ())
 
-  override def getStats: Future[Vector[FCMNotificationStats]] = fcmStats.listAllStats()
+  override def getFormattedStats: Future[String] = {
+    def formatRow(stage: String, m: Map[String, FCMNotificationStats]): String = {
+      m.get(stage).map(p => f"${p.stage} | ${p.bucket1} | ${p.bucket2} | ${p.bucket3}\n")
+        .getOrElse("Missing")
+    }
+
+    fcmStats.listAllStats().map { stats =>
+      val m = stats.map(p => (p.stage, p)).toMap
+      val builder = new StringBuilder
+      builder.append("Stage name | 0-10s | 10s-30m | 30m+\n")
+      builder.append(formatRow(Fetched, m))
+      builder.append(formatRow(StartedPipeline, m))
+      builder.append(formatRow(FinishedPipeline, m))
+      builder.result()
+    }
+  }
 
   private def filterFCMNotifications(ids: Set[Uid]): Future[Set[Uid]] = fcmTimestamps.exists(ids)
 }
