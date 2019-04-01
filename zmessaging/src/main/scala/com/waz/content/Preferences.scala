@@ -34,6 +34,7 @@ import com.waz.threading.{DispatchQueue, SerialDispatchQueue, Threading}
 import com.waz.utils.TrimmingLruCache.Fixed
 import com.waz.utils.events.{Signal, SourceSignal}
 import com.waz.utils.{CachedStorageImpl, JsonDecoder, JsonEncoder, Serialized, TrimmingLruCache, returning}
+import com.waz.zms.BuildConfig
 import org.json.JSONObject
 import org.threeten.bp.{Duration, Instant}
 
@@ -378,7 +379,7 @@ object GlobalPreferences {
 
   lazy val ShouldCreateFullConversation = PrefKey[Boolean]("should_create_full_conv", customDefault = false)
 
-  lazy val LogsEnabled: PrefKey[Boolean] = PrefKey[Boolean]("logs_enabled", customDefault = false)
+  lazy val LogsEnabled: PrefKey[Boolean] = PrefKey[Boolean]("logs_enabled", customDefault = BuildConfig.DEBUG)
 
 
   //DEPRECATED!!! Use the UserPreferences instead!!

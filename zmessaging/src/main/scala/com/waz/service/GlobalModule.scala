@@ -181,7 +181,7 @@ class GlobalModuleImpl(val context:                 AContext,
   lazy val flowmanager:         FlowManagerService               = wire[DefaultFlowManagerService]
   lazy val mediaManager:        MediaManagerService              = wire[DefaultMediaManagerService]
 
-  lazy val logsService:         LogsService                      = new LogsServiceImpl(prefs, logsEnabledByDefault = BuildConfig.DEBUG)
+  lazy val logsService:         LogsService                      = new LogsServiceImpl(prefs)
 }
 
 class EmptyGlobalModule extends GlobalModule {
