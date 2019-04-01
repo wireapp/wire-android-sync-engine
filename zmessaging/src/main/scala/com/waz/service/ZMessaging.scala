@@ -190,7 +190,7 @@ class ZMessaging(val teamId: Option[TeamId], val clientId: ClientId, account: Ac
   lazy val callingClient      = new CallingClientImpl()(urlCreator, httpClient, authRequestInterceptor)
   lazy val propertiesClient: PropertiesClient = new PropertiesClientImpl()(urlCreator, httpClient, authRequestInterceptor)
   lazy val fcmNotsRepo        = new FCMNotificationsRepositoryImpl()(db)
-  lazy val fcmNotStatsRepo    = new FCMNotificationStatsRepositoryImpl()(db)
+  lazy val fcmNotStatsRepo    = new FCMNotificationStatsRepositoryImpl(fcmNotsRepo)(db, Threading.Background)
 
   lazy val convsContent: ConversationsContentUpdaterImpl = wire[ConversationsContentUpdaterImpl]
   lazy val messagesContent: MessagesContentUpdater = wire[MessagesContentUpdater]

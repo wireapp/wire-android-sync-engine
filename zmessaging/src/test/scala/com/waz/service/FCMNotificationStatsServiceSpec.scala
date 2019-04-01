@@ -15,10 +15,10 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-package com.waz.model
+package com.waz.service
 
+import com.waz.model.{FCMNotification, Uid}
 import com.waz.repository.{FCMNotificationStats, FCMNotificationStatsRepository, FCMNotificationsRepository}
-import com.waz.service.FCMNotificationStatsServiceImpl
 import com.waz.specs.AndroidFreeSpec
 import org.threeten.bp.Instant
 import org.threeten.bp.temporal.ChronoUnit._

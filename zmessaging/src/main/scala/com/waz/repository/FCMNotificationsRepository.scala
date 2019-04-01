@@ -20,10 +20,12 @@ package com.waz.repository
 import com.waz.content.Database
 import com.waz.db.Col.{id, text, timestamp}
 import com.waz.db.Dao2
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model.{FCMNotification, Uid}
 import com.waz.threading.Threading
 import com.waz.utils.wrappers.DBCursor
 import org.threeten.bp.Instant
+import com.waz.log.LogSE._
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -32,9 +34,10 @@ trait FCMNotificationsRepository {
   def getPreviousStageTime(id: Uid, stage: String): Future[Option[Instant]]
   def deleteAllWithId(id: Uid): Future[Unit]
   def exists(ids: Set[Uid]): Future[Set[Uid]]
+  def trimExcessRows(): Future[Unit]
 }
 
-class FCMNotificationsRepositoryImpl(implicit db: Database) extends FCMNotificationsRepository {
+class FCMNotificationsRepositoryImpl(implicit db: Database) extends FCMNotificationsRepository with DerivedLogTag {
 
   import FCMNotificationsRepository._
   import FCMNotificationsDao._
@@ -55,9 +58,24 @@ class FCMNotificationsRepositoryImpl(implicit db: Database) extends FCMNotificat
   def exists(ids: Set[Uid]): Future[Set[Uid]] = db.read { implicit db =>
     iterating(FCMNotificationsDao.findInSet(Id, ids)).acquire(_.map(_.id).toSet)
   }
+
+  override def trimExcessRows(): Future[Unit] =
+    db.withTransaction { implicit db =>
+      val c = db.query(table.name, Array(StageStartTime.name), null, null,
+        null, null, s"${StageStartTime.name} DESC", null)
+      c.moveToFirst()
+      if (c.getCount > maxRows) {
+        c.moveToPosition(maxRows - 1)
+        val maxTime = c.getLong(c.getColumnIndex(StageStartTime.name))
+        single(db.rawQuery(s"DELETE FROM ${table.name} WHERE ${StageStartTime.name} < $maxTime", null))
+      }
+      c.close()
+    }
 }
 
 object FCMNotificationsRepository {
+
+  val maxRows = 1000
 
   implicit object FCMNotificationsDao extends Dao2[FCMNotification, Uid, String] {
     val Id = id[Uid]('_id).apply(_.id)
@@ -69,6 +87,13 @@ object FCMNotificationsRepository {
 
     override def apply(implicit cursor: DBCursor): FCMNotification =
       FCMNotification(Id, Stage, StageStartTime)
+  }
+
+  /** This method is here, rather than in the class, to facilitate unit testing **/
+  def getOldestExcessRows(rows: Vector[FCMNotification], max: Int = maxRows): Seq[FCMNotification] = {
+    rows
+      .sortWith { case (t1, t2) => t1.stageStartTime.isBefore(t2.stageStartTime)}
+      .take(rows.size - max)
   }
 }
 
