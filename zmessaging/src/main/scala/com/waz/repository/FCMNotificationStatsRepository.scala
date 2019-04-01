@@ -47,12 +47,10 @@ trait FCMNotificationStatsRepository {
 }
 
 class FCMNotificationStatsRepositoryImpl(fcmTimestamps: FCMNotificationsRepository)
-                                        (implicit db: Database)
+                                        (implicit val db: Database, ec: ExecutionContext)
   extends FCMNotificationStatsRepository {
 
   import com.waz.repository.FCMNotificationStatsRepository.FCMNotificationStatsDao._
-
-  private implicit val ec: ExecutionContext = Threading.Background
 
   override def writeTimestampAndStats(update: FCMNotificationStats, stageTimestamp: FCMNotification): Future[Unit] =
     db.withTransaction { implicit db =>
@@ -71,7 +69,7 @@ class FCMNotificationStatsRepositoryImpl(fcmTimestamps: FCMNotificationsReposito
       //extra check to ensure the FCM timestamps table doesn't grow overly long due to bugs
       if (update.stage == FCMNotification.FinishedPipeline)
         fcmTimestamps.trimExcessRows()
-    }(Threading.Background)
+    }
 
   override def listAllStats(): Future[Vector[FCMNotificationStats]] = db.read(list(_))
 }
