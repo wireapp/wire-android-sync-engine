@@ -43,7 +43,7 @@ import com.waz.utils.wrappers.{Context, URI}
 import com.waz.znet2.http.ResponseCode
 import com.waz.sync.client.ErrorOr
 import com.waz.sync.client.ErrorOrResponse
-import com.waz.znet2.AuthRequestInterceptor
+import com.waz.znet2.{AuthRequestInterceptor, AuthRequestInterceptorOld}
 
 import scala.collection.immutable.ListMap
 import scala.concurrent.Future
@@ -90,7 +90,7 @@ class AccountManager(val userId:   UserId,
 
   val cryptoBox         = global.factory.cryptobox(userId, storage)
   val auth              = global.factory.auth(userId)
-  val authRequestInterceptor: AuthRequestInterceptor = new AuthRequestInterceptor(auth, global.httpClient)
+  val authRequestInterceptor: AuthRequestInterceptor = new AuthRequestInterceptorOld(auth, global.httpClient)
   val otrClient         = new OtrClientImpl()(global.urlCreator, global.httpClient, authRequestInterceptor)
   val credentialsClient = global.factory.credentialsClient(global.urlCreator, global.httpClient, authRequestInterceptor)
 

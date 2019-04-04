@@ -203,7 +203,7 @@ class ZMessaging(val teamId: Option[TeamId], val clientId: ClientId, account: Ac
   lazy val gcmClient          = new PushTokenClientImpl()(urlCreator, httpClient, authRequestInterceptor)
   lazy val typingClient       = new TypingClientImpl()(urlCreator, httpClient, authRequestInterceptor)
   lazy val invitationClient   = account.invitationClient
-  lazy val giphyClient        = new GiphyClientImpl()(urlCreator, httpClient, authRequestInterceptor)
+  lazy val giphyClient: GiphyClient = new GiphyClientImpl()(urlCreator, httpClient, authRequestInterceptor)
   lazy val userSearchClient   = new UserSearchClientImpl()(urlCreator, httpClient, authRequestInterceptor)
   lazy val connectionsClient  = new ConnectionsClientImpl()(urlCreator, httpClient, authRequestInterceptor)
   lazy val messagesClient     = new MessagesClientImpl()(urlCreator, httpClient, authRequestInterceptor)
@@ -245,7 +245,7 @@ class ZMessaging(val teamId: Option[TeamId], val clientId: ClientId, account: Ac
   lazy val contacts: ContactsServiceImpl              = wire[ContactsServiceImpl]
   lazy val typing: TypingService                      = wire[TypingService]
   lazy val richmedia                                  = wire[RichMediaService]
-  lazy val giphy                                      = wire[GiphyService]
+  lazy val giphy: GiphyService                        = new GiphyServiceImpl(giphyClient)(Threading.Background)
   lazy val youtubeMedia                               = wire[YouTubeMediaService]
   lazy val soundCloudMedia                            = wire[SoundCloudMediaService]
   lazy val otrService: OtrServiceImpl                 = wire[OtrServiceImpl]
