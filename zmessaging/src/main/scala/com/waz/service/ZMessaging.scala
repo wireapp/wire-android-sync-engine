@@ -26,6 +26,7 @@ import com.waz.log.BasicLogging.LogTag
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model._
 import com.waz.model.otr.ClientId
+import com.waz.repository.{FCMNotificationStatsRepositoryImpl, FCMNotificationsRepositoryImpl}
 import com.waz.service.EventScheduler.{Sequential, Stage}
 import com.waz.service.assets._
 import com.waz.service.call._
@@ -165,7 +166,6 @@ class ZMessaging(val teamId: Option[TeamId], val clientId: ClientId, account: Ac
   lazy val msgAndLikes: MessageAndLikesStorageImpl     = wire[MessageAndLikesStorageImpl]
   lazy val messagesIndexStorage: MessageIndexStorage   = wire[MessageIndexStorage]
   lazy val eventStorage: PushNotificationEventsStorage = wire[PushNotificationEventsStorageImpl]
-  lazy val receivedPushStorage: ReceivedPushStorage    = wire[ReceivedPushStorageImpl]
   lazy val readReceiptsStorage: ReadReceiptsStorage    = wire[ReadReceiptsStorageImpl]
   lazy val reactionsStorage: ReactionsStorage          = wire[ReactionsStorageImpl]
 
@@ -189,6 +189,8 @@ class ZMessaging(val teamId: Option[TeamId], val clientId: ClientId, account: Ac
   lazy val integrationsClient = new IntegrationsClientImpl()(urlCreator, httpClient, authRequestInterceptor)
   lazy val callingClient      = new CallingClientImpl()(urlCreator, httpClient, authRequestInterceptor)
   lazy val propertiesClient: PropertiesClient = new PropertiesClientImpl()(urlCreator, httpClient, authRequestInterceptor)
+  lazy val fcmNotsRepo        = new FCMNotificationsRepositoryImpl()(db)
+  lazy val fcmNotStatsRepo    = new FCMNotificationStatsRepositoryImpl(fcmNotsRepo)(db, Threading.Background)
 
   lazy val convsContent: ConversationsContentUpdaterImpl = wire[ConversationsContentUpdaterImpl]
   lazy val messagesContent: MessagesContentUpdater = wire[MessagesContentUpdater]
@@ -254,6 +256,7 @@ class ZMessaging(val teamId: Option[TeamId], val clientId: ClientId, account: Ac
   lazy val expiringUsers                              = wire[ExpiredUsersService]
   lazy val propertiesSyncHandler                      = wire[PropertiesSyncHandler]
   lazy val propertiesService: PropertiesService       = wire[PropertiesServiceImpl]
+  lazy val fcmNotStatsService                         = wire[FCMNotificationStatsServiceImpl]
 
   lazy val eventPipeline: EventPipeline = new EventPipelineImpl(Vector(), eventScheduler.enqueue)
 

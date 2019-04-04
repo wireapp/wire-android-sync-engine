@@ -33,7 +33,7 @@ import com.waz.service.ZMessaging.{accountTag, clock}
 import com.waz.service._
 import com.waz.service.otr.OtrService
 import com.waz.service.push.PushService.SyncSource
-import com.waz.service.tracking.{MissedPushEvent, ReceivedPushEvent, TrackingService}
+import com.waz.service.tracking.TrackingService
 import com.waz.sync.SyncServiceHandle
 import com.waz.sync.client.PushNotificationsClient.LoadNotificationsResult
 import com.waz.sync.client.{PushNotificationEncoded, PushNotificationsClient}
@@ -44,7 +44,9 @@ import com.waz.utils.{RichInstant, _}
 import com.waz.znet2.http.ResponseCode
 import org.json.JSONObject
 import org.threeten.bp.{Duration, Instant}
+import FCMNotification.{Fetched, StartedPipeline, FinishedPipeline}
 
+import scala.async.Async._
 import scala.concurrent.duration._
 import scala.concurrent.{Future, Promise}
 
@@ -81,7 +83,6 @@ class PushServiceImpl(selfUserId:           UserId,
                       context:              Context,
                       userPrefs:            UserPreferences,
                       prefs:                GlobalPreferences,
-                      receivedPushes:       ReceivedPushStorage,
                       notificationStorage:  PushNotificationEventsStorage,
                       client:               PushNotificationsClient,
                       clientId:             ClientId,
@@ -94,7 +95,8 @@ class PushServiceImpl(selfUserId:           UserId,
                       lifeCycle:            UiLifeCycle,
                       tracking:             TrackingService,
                       sync:                 SyncServiceHandle,
-                      timeouts:             Timeouts)
+                      timeouts:             Timeouts,
+                      fcmService:           FCMNotificationStatsService)
                      (implicit ev: AccountContext) extends PushService { self =>
   import PushService._
 
@@ -165,13 +167,16 @@ class PushServiceImpl(selfUserId:           UserId,
 
     notificationStorage.getDecryptedRows().flatMap { rows =>
       verbose(l"Processing ${rows.size} rows")
-      if (rows.nonEmpty)
+      if (rows.nonEmpty) {
+        val ids = rows.map(_.pushId).toSet
         for {
+          _ <- fcmService.markNotificationsWithState(ids, StartedPipeline)
           _ <- pipeline(rows.flatMap(decodeRow))
           _ <- notificationStorage.removeRows(rows.map(_.index))
+          _ <- fcmService.markNotificationsWithState(ids, FinishedPipeline)
           _ <- processDecryptedRows()
         } yield {}
-      else Future.successful(())
+      } else Future.successful(())
     }
   }
 
@@ -184,8 +189,12 @@ class PushServiceImpl(selfUserId:           UserId,
   wsPushService.connected().onChanged.map(WebSocketChange).on(dispatcher)(syncHistory(_))
 
   private def storeNotifications(notifications: Seq[PushNotificationEncoded]): Future[Unit] =
-    Serialized.future(PipelineKey)(notificationStorage.saveAll(notifications).flatMap { _ =>
-      notifications.lift(notifications.lastIndexWhere(!_.transient)).fold(Future.successful(()))(n => idPref := Some(n.id))
+    Serialized.future(PipelineKey)(async {
+      await { fcmService.markNotificationsWithState(notifications.map(_.id).toSet, Fetched) }
+      await { notificationStorage.saveAll(notifications) }
+      val res = notifications.lift(notifications.lastIndexWhere(!_.transient))
+      if (res.nonEmpty)
+        await { idPref := res.map(_.id) }
     })
 
   private def isOtrEventJson(ev: JSONObject) =
@@ -259,48 +268,8 @@ class PushServiceImpl(selfUserId:           UserId,
               _ <- if (historyLost) sync.performFullSync().map(_ => onHistoryLost ! clock.instant()) else Future.successful({})
               _ <- beDriftPref.mutate(v => time.map(clock.instant.until(_)).getOrElse(v))
             } yield {
-              reportMissing(nots)
               nots
             }).flatMap(storeNotifications)
-      }
-
-    def reportMissing(nots: Vector[PushNotificationEncoded]): Unit =
-      for {
-        now    <- beDrift.head.map(clock.instant + _) //get time at fetch (before waiting)
-        _      <- CancellableFuture.delay(5.seconds).future //wait a few seconds for any lagging FCM notifications before doing comparison
-        nw     <- network.networkMode.head
-        pushes <- receivedPushes.list()
-        _      <- receivedPushes.removeAll(pushes.map(_.id))
-        inBackground <- lifeCycle.uiActive.map(!_).head
-      } {
-        val sourcePush = source match {
-          case FetchFromJob(nId) => nId
-          case FetchFromIdle(nId) => nId
-          case _ => None
-        }
-
-        val notsUntilPush = nots.takeWhile(n => !sourcePush.contains(n.id))
-
-        val missedEvents = notsUntilPush.filterNot(_.transient).map { n =>
-
-          val events =
-            JsonDecoder.array(n.events, { case (arr, i) => arr.getJSONObject(i) })
-              .filter(ev => TrackingEvents(ev.getString("type")))
-              .filter(ev => UserId(ev.getString("from")) != selfUserId)
-              .map(_.getString("type"))
-
-          (n.id, events)
-        }.filter { case (id, evs) => evs.nonEmpty && !pushes.map(_.id).contains(id) }
-
-        val allEvents = missedEvents.toMap.values.flatten
-
-        val eventFrequency = TrackingEvents.map(e => (e, allEvents.count(_ == e))).toMap
-
-        if (missedEvents.nonEmpty) //we didn't get pushes for some returned notifications
-          tracking.track(MissedPushEvent(now, missedEvents.size, inBackground, nw, network.getNetworkOperatorName, eventFrequency, missedEvents.last._1.str))
-
-        if (pushes.nonEmpty)
-          pushes.map(p => p.copy(toFetch = Some(p.receivedAt.until(now)))).foreach(p => tracking.track(ReceivedPushEvent(p)))
       }
 
     if (fetchInProgress.isCompleted) {
