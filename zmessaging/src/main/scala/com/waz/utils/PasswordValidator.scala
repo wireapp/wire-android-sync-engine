@@ -17,37 +17,42 @@
  */
 package com.waz.utils
 
-import com.waz.utils.PasswordValidator._
 
-/// A minimal password validator that enforces length only.
-class PasswordValidator(val minLength: Int, val maxLength: Int) {
+trait PasswordValidator {
+  def isValidPassword(password: String): Boolean
+}
 
-  private val lengthRule: Rule = p => {
+object PasswordValidator {
+  def apply(rule: String => Boolean): PasswordValidator = new PasswordValidator {
+      def isValidPassword(password: String): Boolean = rule(password)
+    }
+
+  def combine(rules: PasswordValidator*): PasswordValidator =
+    apply(p => rules.forall(_.isValidPassword(p)))
+
+  def createStrongPasswordValidator(minLength: Int, maxLength: Int): PasswordValidator = combine(
+    satisfiesPasswordLength(minLength, maxLength),
+    containsLowercaseLetter,
+    containsUppercaseLetter,
+    containsDigit,
+    containsSpecialCharacter
+  )
+
+  def satisfiesPasswordLength(minLength: Int, maxLength: Int): PasswordValidator = apply { p =>
     val length = p.codePointCount(0, p.length)
     length >= minLength && length <= maxLength
   }
 
-  private var rules: Seq[Rule] = Seq(lengthRule)
+  val containsLowercaseLetter: PasswordValidator =
+    apply(p => "[a-z]".r.findFirstIn(p).isDefined)
 
-  def add(rule: Rule): Unit = rules = rules :+ rule
-  def add(rules: Seq[Rule]): Unit = this.rules = this.rules ++ rules
-  def isValidPassword(password: String): Boolean = rules.forall(_(password))
-}
+  val containsUppercaseLetter: PasswordValidator =
+    apply(p => "[A-Z]".r.findFirstIn(p).isDefined)
 
-/// A strong password validator that enforces length and the existence of a lowercase,
-/// uppercase, digit and special character.
-class StrongPasswordValidator(minLength: Int, maxLength: Int = 101)
-  extends PasswordValidator(minLength, maxLength) {
+  val containsDigit: PasswordValidator =
+    apply(p => "[0-9]".r.findFirstIn(p).isDefined)
 
-  add(rules = Seq(
-    p => "[a-z]".r.findFirstIn(p).isDefined,
-    p => "[A-Z]".r.findFirstIn(p).isDefined,
-    p => "[0-9]".r.findFirstIn(p).isDefined,
-    p => "[^a-zA-Z0-9]".r.findFirstIn(p).isDefined
-  ))
+  val containsSpecialCharacter: PasswordValidator =
+    apply(p => "[^a-zA-Z0-9]".r.findFirstIn(p).isDefined)
 
-}
-
-object PasswordValidator {
-  type Rule = String => Boolean
 }
