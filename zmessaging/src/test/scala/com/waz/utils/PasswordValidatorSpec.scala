@@ -33,7 +33,7 @@ class PasswordValidatorSpec extends FeatureSpec with Matchers {
   private val invalidPasswords = Seq(
     "aA1!",                 // too short
     "aA1!aA1!aA1!aA1!aA1!", // too long
-    "A1!A1!A1!A1!",         // no no lowercase
+    "A1!A1!A1!A1!",         // no lowercase
     "a1!a1!a1!a1!",         // no uppercase
     "aA!aA!aA!aA!",         // no numbers
     "aA1aA1aA1aA1"          // no symbols
