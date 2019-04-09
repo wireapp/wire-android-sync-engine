@@ -20,7 +20,7 @@ package com.waz.utils
 import com.waz.utils.PasswordValidator._
 
 /// A minimal password validator that enforces length only.
-class PasswordValidator(minLength: Int, maxLength: Int) {
+class PasswordValidator(val minLength: Int, val maxLength: Int) {
 
   private val lengthRule: Rule = p => {
     val length = p.codePointCount(0, p.length)
