@@ -21,16 +21,22 @@ import org.scalatest.{FeatureSpec, Matchers}
 
 class PasswordValidatorSpec extends FeatureSpec with Matchers {
 
-  private lazy val sut = new StrongPasswordValidator(minLength = 8)
+  private lazy val sut = new StrongPasswordValidator(minLength = 8, maxLength = 16)
 
-  // TODO: Add cases
   private val validPasswords = Seq(
-    "Passw0rd"
+    "Passw0rd!",
+    "Pass w0rd!",
+    "Päss w0rd!",
+    "Päss\uD83D\uDC3Cw0rd!"
   )
 
-  // TODO: Add cases
   private val invalidPasswords = Seq(
-    "short"
+    "aA1!",                 // too short
+    "aA1!aA1!aA1!aA1!aA1!", // too long
+    "A1!A1!A1!A1!",         // no no lowercase
+    "a1!a1!a1!a1!",         // no uppercase
+    "aA!aA!aA!aA!",         // no numbers
+    "aA1aA1aA1aA1"          // no symbols
   )
 
   feature("Strong password") {

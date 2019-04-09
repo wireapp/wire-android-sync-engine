@@ -36,14 +36,16 @@ class PasswordValidator(val minLength: Int, val maxLength: Int) {
 
 /// A strong password validator that enforces length and the existence of a lowercase,
 /// uppercase, digit and special character.
-class StrongPasswordValidator(minLength: Int)
-  extends PasswordValidator(minLength, maxLength = 101) {
+class StrongPasswordValidator(minLength: Int, maxLength: Int = 101)
+  extends PasswordValidator(minLength, maxLength) {
 
   add(rules = Seq(
-    p => p.exists(_.isLower),
-    p => p.exists(_.isUpper),
-    p => p.exists(_.isDigit) // TODO: add special rule
+    p => "[a-z]".r.findFirstIn(p).isDefined,
+    p => "[A-Z]".r.findFirstIn(p).isDefined,
+    p => "[0-9]".r.findFirstIn(p).isDefined,
+    p => "[^a-zA-Z0-9]".r.findFirstIn(p).isDefined
   ))
+
 }
 
 object PasswordValidator {
