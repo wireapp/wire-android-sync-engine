@@ -24,10 +24,10 @@ class PasswordValidatorSpec extends FeatureSpec with Matchers {
   private lazy val sut = new StrongPasswordValidator(minLength = 8, maxLength = 16)
 
   private val validPasswords = Seq(
-    "Passw0rd!",
-    "Pass w0rd!",
-    "Päss w0rd!",
-    "Päss\uD83D\uDC3Cw0rd!"
+    "Passw0rd!",            // plain old vanilla password
+    "Pass w0rd!",           // contains space
+    "Päss w0rd!",           // contains umlaut
+    "Päss\uD83D\uDC3Cw0rd!" // contains emoji
   )
 
   private val invalidPasswords = Seq(
