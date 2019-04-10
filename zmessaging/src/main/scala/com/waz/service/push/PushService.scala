@@ -44,7 +44,7 @@ import com.waz.utils.{RichInstant, _}
 import com.waz.znet2.http.ResponseCode
 import org.json.JSONObject
 import org.threeten.bp.{Duration, Instant}
-import FCMNotification.{Fetched, StartedPipeline, FinishedPipeline}
+import FCMNotification.{Fetched, FinishedPipeline, StartedPipeline}
 
 import scala.async.Async._
 import scala.concurrent.duration._
@@ -116,21 +116,19 @@ class PushServiceImpl(selfUserId:           UserId,
 
   private lazy val idPref = userPrefs.preference(LastStableNotification)
 
-  private var subs = Seq.empty[Subscription]
-
   notificationStorage.registerEventHandler { () =>
-    returning {
-      Serialized.future(PipelineKey) {
-        processing ! true
-        for {
-          _ <- processEncryptedRows()
-          _ <- processDecryptedRows()
-        } yield processing ! false
-      }
-    }(_.failed.foreach { e =>
-      processing ! false
-      throw e
-    })
+    Serialized.future(PipelineKey) {
+      for {
+        _ <- Future.successful(processing ! true)
+        _ <- processEncryptedRows()
+        _ <- processDecryptedRows()
+        _ <- Future.successful(processing ! false)
+      } yield {}
+    }.recover {
+      case ex =>
+        processing ! false
+        error(l"Unable to process events: $ex")
+    }
   }
 
   private def processEncryptedRows() =
@@ -158,10 +156,14 @@ class PushServiceImpl(selfUserId:           UserId,
   private def processDecryptedRows(): Future[Unit] = {
     def decodeRow(event: PushNotificationEvent) =
       if(event.plain.isDefined && isOtrEventJson(event.event)) {
+        verbose(l"decodeRow($event) for an otr event")
         val msg = GenericMessage(event.plain.get)
         val msgEvent = ConversationEvent.ConversationEventDecoder(event.event)
-        otrService.parseGenericMessage(msgEvent.asInstanceOf[OtrMessageEvent], msg)
+        returning(otrService.parseGenericMessage(msgEvent.asInstanceOf[OtrMessageEvent], msg)) { event =>
+          verbose(l"decoded otr event: $event")
+        }
       } else {
+        verbose(l"decodeRow($event) for a non-otr event")
         Some(EventDecoder(event.event))
       }
 
@@ -172,9 +174,13 @@ class PushServiceImpl(selfUserId:           UserId,
         for {
           _ <- fcmService.markNotificationsWithState(ids, StartedPipeline)
           _ <- pipeline(rows.flatMap(decodeRow))
+          _ = verbose(l"pipeline work finished")
           _ <- notificationStorage.removeRows(rows.map(_.index))
+          _ = verbose(l"rows removed from the notification storage")
           _ <- fcmService.markNotificationsWithState(ids, FinishedPipeline)
+          _ = verbose(l"notifications marked")
           _ <- processDecryptedRows()
+          _ = verbose(l"decrypted rows processed")
         } yield {}
       } else Future.successful(())
     }
