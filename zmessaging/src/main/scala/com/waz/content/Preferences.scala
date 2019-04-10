@@ -447,7 +447,7 @@ object UserPreferences {
   //increment number to perform slow sync on particular type
   lazy val ShouldSyncConversations          = PrefKey[Boolean]("should_sync_conversations_1", customDefault = true)
   lazy val ShouldSyncInitial                = PrefKey[Boolean]("should_sync_initial_1", customDefault = true)
-  lazy val ShouldSyncUsers                  = PrefKey[Boolean]("should_sync_users", customDefault = true)
+  lazy val ShouldSyncUsers                  = PrefKey[Boolean]("should_sync_users_1", customDefault = true)
   lazy val ShouldSyncTeam                   = PrefKey[Boolean]("should_sync_team", customDefault = true)
 
   // fix for duplicated entries in the database, left there by a bug from an old version of the app
