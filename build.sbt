@@ -142,7 +142,7 @@ lazy val zmessaging = project
       compilerPlugin("com.github.ghik" %% "silencer-plugin"       % "0.6"),
 
       "org.scala-lang.modules"        %% "scala-async"           % "0.9.7",
-      "com.squareup.okhttp3"          %  "okhttp"                % "3.12.1",
+      "com.squareup.okhttp3"          %  "okhttp"                % "3.10.0",
       "com.googlecode.libphonenumber" %  "libphonenumber"        % "7.1.1", // 7.2.x breaks protobuf
       "com.wire"                      %  "cryptobox-android"     % "1.0.0",
       "com.wire"                      %  "generic-message-proto" % "1.23.0",
