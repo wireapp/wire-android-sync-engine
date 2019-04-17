@@ -105,6 +105,7 @@ trait GlobalModule {
   def trackingService:          TrackingService
 
   def logsService:              LogsService
+  def customBackendClient:      CustomBackendClient
 }
 
 class GlobalModuleImpl(val context:                 AContext,
@@ -182,6 +183,7 @@ class GlobalModuleImpl(val context:                 AContext,
   lazy val mediaManager:        MediaManagerService              = wire[DefaultMediaManagerService]
 
   lazy val logsService:         LogsService                      = new LogsServiceImpl(prefs)
+  lazy val customBackendClient: CustomBackendClient              = new CustomBackendClientImpl()
 }
 
 class EmptyGlobalModule extends GlobalModule {
@@ -233,5 +235,6 @@ class EmptyGlobalModule extends GlobalModule {
   override def syncRequests:             SyncRequestService                                  = ???
   override def syncHandler:              SyncHandler                                         = ???
   override def logsService:              LogsService                                         = ???
+  def customBackendClient:               CustomBackendClient                                 = ???
 }
 
