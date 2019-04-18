@@ -37,7 +37,7 @@ class VersionBlacklistClientImpl(backendConfig: BackendConfig)
   import VersionBlacklistClientImpl._
 
   def loadVersionBlacklist(): ErrorOrResponse[VersionBlacklist] = {
-    Request.create(method = Method.Get, url = blacklistsUrl(backendConfig.environment))
+    Request.create(method = Method.Get, url = blacklistsUrl(backendConfig.getEnvironment))
       .withResultType[VersionBlacklist]
       .withErrorType[ErrorResponse]
       .executeSafe

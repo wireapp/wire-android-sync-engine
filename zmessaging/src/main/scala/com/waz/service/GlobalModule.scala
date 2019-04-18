@@ -148,7 +148,7 @@ class GlobalModuleImpl(val context:                 AContext,
   lazy val loginClient:         LoginClient                      = new LoginClientImpl(trackingService)(urlCreator, httpClient)
   lazy val regClient:           RegistrationClient               = new RegistrationClientImpl()(urlCreator, httpClient)
 
-  lazy val urlCreator:          UrlCreator                       = UrlCreator.simpleAppender(backend.baseUrl.toString)
+  lazy val urlCreator:          UrlCreator                       = UrlCreator.simpleAppender(() => backend.getBaseUrl.toString)
   private val customUserAgentHttpInterceptor: Interceptor        = new OkHttpUserAgentInterceptor(metadata)
   implicit lazy val httpClient: HttpClient                       = HttpClientOkHttpImpl(enableLogging = ZmsVersion.DEBUG, pin = backend.pin, customUserAgentInterceptor = Some(customUserAgentHttpInterceptor))(Threading.BlockingIO)
   lazy val httpClientForLongRunning: HttpClient                  = HttpClientOkHttpImpl(enableLogging = ZmsVersion.DEBUG, timeout = Some(30.seconds), pin = backend.pin, customUserAgentInterceptor = Some(customUserAgentHttpInterceptor))(ExecutionContext.fromExecutor(Executors.newFixedThreadPool(4)))

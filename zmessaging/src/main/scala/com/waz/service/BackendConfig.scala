@@ -17,11 +17,31 @@
  */
 package com.waz.service
 
+import com.waz.sync.client.CustomBackendClient.BackendConfigResponse
 import com.waz.utils.wrappers.URI
 import com.waz.znet.ServerTrust
 
-case class BackendConfig(baseUrl: URI, websocketUrl: URI, firebaseOptions: FirebaseOptions, environment: String, pin: CertificatePin = ServerTrust.wirePin, blacklistHost: URI) {
-  val pushSenderId = firebaseOptions.pushSenderId
+// TODO: Comments
+class BackendConfig(private var environment: String,
+                    private var baseUrl: URI,
+                    private var websocketUrl: URI,
+                    private var blacklistHost: URI,
+                    val firebaseOptions: FirebaseOptions,
+                    val pin: CertificatePin = ServerTrust.wirePin) {
+
+  val pushSenderId: String = firebaseOptions.pushSenderId
+
+  def getEnvironment: String = environment
+  def getBaseUrl: URI = baseUrl
+  def getWebsocketUrl: URI = websocketUrl
+  def getBlacklistHost: URI = blacklistHost
+
+  def update(configResponse: BackendConfigResponse): Unit = {
+    environment = configResponse.title
+    baseUrl = URI.parse(configResponse.endpoints.backendURL.toString)
+    websocketUrl = URI.parse(configResponse.endpoints.backendWSURL.toString)
+    blacklistHost = URI.parse(configResponse.endpoints.blackListURL.toString)
+  }
 }
 
 //cert is expected to be base64-encoded
