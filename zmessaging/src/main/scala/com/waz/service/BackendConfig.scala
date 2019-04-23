@@ -44,6 +44,21 @@ class BackendConfig(private var environment: String,
   }
 }
 
+object BackendConfig {
+  def apply(environment: String,
+            baseUrl: String,
+            websocketUrl: String,
+            blacklistHost: String,
+            firebaseOptions: FirebaseOptions,
+            pin: CertificatePin = ServerTrust.wirePin): BackendConfig = new BackendConfig(
+      environment,
+      URI.parse(baseUrl),
+      URI.parse(websocketUrl),
+      URI.parse(blacklistHost),
+      firebaseOptions,
+      pin)
+}
+
 //cert is expected to be base64-encoded
 case class CertificatePin(domain: String, cert: Array[Byte])
 
