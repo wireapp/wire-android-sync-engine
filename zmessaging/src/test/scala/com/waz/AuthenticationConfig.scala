@@ -40,7 +40,7 @@ trait AuthenticationConfig {
 
   implicit lazy val HttpClient: HttpClient = HttpClientOkHttpImpl(enableLogging = true)
 
-  implicit lazy val urlCreator: UrlCreator = UrlCreator.simpleAppender(BackendUrl)
+  implicit lazy val urlCreator: UrlCreator = UrlCreator.simpleAppender(() => BackendUrl)
 
   private val LoginClient: LoginClient = new LoginClientImpl(DisabledTrackingService)
 
