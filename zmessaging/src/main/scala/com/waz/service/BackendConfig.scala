@@ -22,10 +22,10 @@ import com.waz.utils.wrappers.URI
 import com.waz.znet.ServerTrust
 
 
-class BackendConfig(private var environment: String,
-                    private var baseUrl: URI,
-                    private var websocketUrl: URI,
-                    private var blacklistHost: URI,
+class BackendConfig(private var _environment: String,
+                    private var _baseUrl: URI,
+                    private var _websocketUrl: URI,
+                    private var _blacklistHost: URI,
                     val firebaseOptions: FirebaseOptions,
                     val pin: CertificatePin = ServerTrust.wirePin) {
 
@@ -35,16 +35,16 @@ class BackendConfig(private var environment: String,
   // using it will always have up to date values. This is important when we switch
   // backend configs.
 
-  def getEnvironment: String = environment
-  def getBaseUrl: URI = baseUrl
-  def getWebsocketUrl: URI = websocketUrl
-  def getBlacklistHost: URI = blacklistHost
+  def environment: String = _environment
+  def baseUrl: URI = _baseUrl
+  def websocketUrl: URI = _websocketUrl
+  def blacklistHost: URI = _blacklistHost
 
   def update(configResponse: BackendConfigResponse): Unit = {
-    environment = configResponse.title
-    baseUrl = URI.parse(configResponse.endpoints.backendURL.toString)
-    websocketUrl = URI.parse(configResponse.endpoints.backendWSURL.toString)
-    blacklistHost = URI.parse(configResponse.endpoints.blackListURL.toString)
+    _environment = configResponse.title
+    _baseUrl = URI.parse(configResponse.endpoints.backendURL.toString)
+    _websocketUrl = URI.parse(configResponse.endpoints.backendWSURL.toString)
+    _blacklistHost = URI.parse(configResponse.endpoints.blackListURL.toString)
   }
 }
 
