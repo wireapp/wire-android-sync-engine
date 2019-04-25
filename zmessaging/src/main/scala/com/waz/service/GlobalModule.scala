@@ -235,6 +235,6 @@ class EmptyGlobalModule extends GlobalModule {
   override def syncRequests:             SyncRequestService                                  = ???
   override def syncHandler:              SyncHandler                                         = ???
   override def logsService:              LogsService                                         = ???
-  def customBackendClient:               CustomBackendClient                                 = ???
+  override def customBackendClient:      CustomBackendClient                                 = ???
 }
 

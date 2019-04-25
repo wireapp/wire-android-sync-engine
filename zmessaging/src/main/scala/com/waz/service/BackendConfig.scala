@@ -21,7 +21,7 @@ import com.waz.sync.client.CustomBackendClient.BackendConfigResponse
 import com.waz.utils.wrappers.URI
 import com.waz.znet.ServerTrust
 
-// TODO: Comments
+
 class BackendConfig(private var environment: String,
                     private var baseUrl: URI,
                     private var websocketUrl: URI,
@@ -30,6 +30,10 @@ class BackendConfig(private var environment: String,
                     val pin: CertificatePin = ServerTrust.wirePin) {
 
   val pushSenderId: String = firebaseOptions.pushSenderId
+
+  // We're using getter methods here to ensure after updating the config, any objects
+  // using it will always have up to date values. This is important when we switch
+  // backend configs.
 
   def getEnvironment: String = environment
   def getBaseUrl: URI = baseUrl
