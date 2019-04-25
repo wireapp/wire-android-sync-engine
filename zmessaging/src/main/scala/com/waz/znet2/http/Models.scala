@@ -151,7 +151,7 @@ object Request {
       }
     }
 
-    def simpleAppender(prefix: String): UrlCreator = create(relativeUrl => new URL(prefix + relativeUrl))
+    def simpleAppender(prefix: () => String): UrlCreator = create(relativeUrl => new URL(prefix() + relativeUrl))
   }
 
   def create[T](
