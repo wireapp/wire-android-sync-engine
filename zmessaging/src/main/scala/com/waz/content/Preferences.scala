@@ -19,6 +19,7 @@ package com.waz.content
 
 import android.content.SharedPreferences.OnSharedPreferenceChangeListener
 import android.content.{Context, SharedPreferences}
+import com.waz.api.ZmsVersion
 import com.waz.content.Preferences.Preference.PrefCodec
 import com.waz.content.Preferences.{PrefKey, Preference}
 import com.waz.log.BasicLogging.LogTag
@@ -34,7 +35,6 @@ import com.waz.threading.{DispatchQueue, SerialDispatchQueue, Threading}
 import com.waz.utils.TrimmingLruCache.Fixed
 import com.waz.utils.events.{Signal, SourceSignal}
 import com.waz.utils.{CachedStorageImpl, JsonDecoder, JsonEncoder, Serialized, TrimmingLruCache, returning}
-import com.waz.zms.BuildConfig
 import org.json.JSONObject
 import org.threeten.bp.{Duration, Instant}
 
@@ -379,7 +379,7 @@ object GlobalPreferences {
 
   lazy val ShouldCreateFullConversation = PrefKey[Boolean]("should_create_full_conv", customDefault = false)
 
-  lazy val LogsEnabled: PrefKey[Boolean] = PrefKey[Boolean]("logs_enabled", customDefault = BuildConfig.DEBUG)
+  lazy val LogsEnabled: PrefKey[Boolean] = PrefKey[Boolean]("logs_enabled", customDefault = ZmsVersion.DEBUG)
 
 
   //DEPRECATED!!! Use the UserPreferences instead!!
