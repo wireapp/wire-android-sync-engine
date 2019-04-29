@@ -457,4 +457,7 @@ object UserPreferences {
 
   lazy val ReadReceiptsRemotelyChanged      = PrefKey[Boolean]("read_receipts_remotely_changed", customDefault = false)
 
+  lazy val StatusNotificationsPopupEnabled  = PrefKey[Boolean]("status_notifications_popup_enabled", customDefault = true)
+  lazy val ShouldWarnStatusNotifications    = PrefKey[Boolean]( "should_warn_status_notifications", customDefault = true)
+
 }
