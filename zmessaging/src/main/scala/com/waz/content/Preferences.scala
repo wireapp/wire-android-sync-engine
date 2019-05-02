@@ -379,7 +379,7 @@ object GlobalPreferences {
 
   lazy val ShouldCreateFullConversation = PrefKey[Boolean]("should_create_full_conv", customDefault = false)
 
-  lazy val LogsEnabled: PrefKey[Boolean] = PrefKey[Boolean]("logs_enabled", customDefault = ZmsVersion.DEBUG)
+  lazy val LogsEnabled: PrefKey[Boolean] = PrefKey[Boolean]("save_local_logs", customDefault = ZmsVersion.DEBUG)
 
 
   //DEPRECATED!!! Use the UserPreferences instead!!
