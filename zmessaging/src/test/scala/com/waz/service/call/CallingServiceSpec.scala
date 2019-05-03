@@ -20,7 +20,7 @@ package com.waz.service.call
 import com.sun.jna.Pointer
 import com.waz.api.NetworkMode
 import com.waz.content.GlobalPreferences.SkipTerminatingState
-import com.waz.content.MembersStorage
+import com.waz.content.{MembersStorage, UsersStorage}
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model.ConversationData.ConversationType
 import com.waz.model.otr.ClientId
@@ -61,9 +61,11 @@ class CallingServiceSpec extends AndroidFreeSpec with DerivedLogTag {
   val messages       = mock[MessagesService]
   val permissions    = mock[PermissionsService]
   val push           = mock[PushService]
+  val usersStorage   = mock[UsersStorage]
   val globalPrefs    = new TestGlobalPreferences
 
   val selfUserId = UserId("self-user")
+  val selfUser   = UserData(selfUserId, "")
   val clientId   = ClientId("selfClient")
 
   val otherUser  = UserId("otherUser") //for one to one
@@ -956,9 +958,12 @@ class CallingServiceSpec extends AndroidFreeSpec with DerivedLogTag {
     (push.beDrift _).expects().anyNumberOfTimes().returning(Signal.const(Duration.ZERO))
 
     (avs.registerAccount _).expects(*).once().returning(Future.successful(wCall))
+
+    (usersStorage.get _).expects(selfUserId).anyNumberOfTimes().returning(Future.successful(Some(selfUser)))
+
     val s = new CallingServiceImpl(
       selfUserId, clientId, null, context, avs, convs, convsService, members, null,
-      flows, messages, media, push, network, null, prefs, globalPrefs, permissions, tracking
+      flows, messages, media, push, network, null, prefs, globalPrefs, permissions, usersStorage, tracking
     )
     result(s.wCall)
     s

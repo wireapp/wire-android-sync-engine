@@ -21,7 +21,7 @@ import android.Manifest.permission.CAMERA
 import com.sun.jna.Pointer
 import com.waz.api.impl.ErrorResponse
 import com.waz.content.GlobalPreferences.SkipTerminatingState
-import com.waz.content.{GlobalPreferences, MembersStorage, UserPreferences}
+import com.waz.content.{GlobalPreferences, MembersStorage, UserPreferences, UsersStorage}
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.log.LogShow.SafeToLog
 import com.waz.log.LogSE._
@@ -165,6 +165,7 @@ class CallingServiceImpl(val accountId:       UserId,
                          userPrefs:           UserPreferences,
                          globalPrefs:         GlobalPreferences,
                          permissions:         PermissionsService,
+                         userStorage:         UsersStorage,
                          tracking:            TrackingService)(implicit accountContext: AccountContext) extends CallingService with DerivedLogTag with SafeToLog { self =>
 
   import CallingService._
@@ -211,8 +212,8 @@ class CallingServiceImpl(val accountId:       UserId,
     *                   true if someone called recently for group but false if the call was started more than 30 seconds ago"
     *                                                                                                               - Chris the All-Knowing.
     */
-  def onIncomingCall(convId: RConvId, userId: UserId, videoCall: Boolean, shouldRing: Boolean): Future[Unit] =
-    withConvAndIsGroup(convId) { (_, conv, isGroup) =>
+  def onIncomingCall(convId: RConvId, userId: UserId, videoCall: Boolean, shouldRing: Boolean): Future[Unit] = {
+    def showCall(conv: ConversationData, isGroup: Boolean) = {
       verbose(l"Incoming call from $userId in conv: $convId (should ring: $shouldRing)")
 
       permissions.allPermissions(ListSet(CAMERA)).head.foreach { granted =>
@@ -240,6 +241,25 @@ class CallingServiceImpl(val accountId:       UserId,
         p.copy(calls = p.calls + (call.convId -> call))
       }
     }
+
+    def withConvGroupAvailability(convId: RConvId)(f: (ConversationData, Boolean, Availability) => Unit) = Serialized.future(self) {
+      (for {
+        _          <- wCall
+        Some(conv) <- convs.convByRemoteId(convId)
+        isGroup    <- convsService.isGroupConversation(conv.id)
+        Some(self) <- userStorage.get(accountId)
+      } yield f(conv, isGroup, self.availability))
+        .recover {
+          case NonFatal(e) => error(l"Unknown remote convId: $convId")
+        }
+    }
+
+    withConvGroupAvailability(convId) {
+      case (_, _, Availability.Away)                       =>
+      case (conv, _, Availability.Busy) if conv.isAllMuted =>
+      case (conv, isGroup, _)                              => showCall(conv, isGroup)
+    }
+  }
 
   def onOtherSideAnsweredCall(rConvId: RConvId): Future[Unit] =
     updateCallIfActive(rConvId) { (_, conv, call) =>
@@ -532,18 +552,6 @@ class CallingServiceImpl(val accountId:       UserId,
       }
     }
   }
-
-  private def withConvAndIsGroup(convId: RConvId)(f: (WCall, ConversationData, Boolean) => Unit) =
-    Serialized.future(self) {
-      (for {
-        w          <- wCall
-        Some(conv) <- convs.convByRemoteId(convId)
-        isGroup    <- convsService.isGroupConversation(conv.id)
-      } yield f(w, conv, isGroup))
-        .recover {
-          case NonFatal(e) => error(l"Unknown remote convId: $convId")
-        }
-    }
 
   private def updateCallIfActive(rConvId: RConvId)(f: (WCall, ConversationData, CallInfo) => CallInfo)(caller: String) = {
     withConv(rConvId) { (w, conv) =>
