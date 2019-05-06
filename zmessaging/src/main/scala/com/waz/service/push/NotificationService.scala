@@ -134,36 +134,43 @@ class NotificationService(selfUserId:      UserId,
   })
 
   private def pushNotificationsToUi(): Future[Unit] = {
+    def shouldShowNotification(self: UserData,
+                               n: NotificationData,
+                               conv: ConversationData,
+                               notificationSourceVisible: Map[UserId, Set[ConvId]]): Boolean = {
+      // broken down for better readability
+      val appAllows =
+        n.user != self.id &&
+        conv.lastRead.isBefore(n.time) &&
+        conv.cleared.forall(_.isBefore(n.time)) &&
+        !notificationSourceVisible.get(self.id).exists(_.contains(n.conv))
+      val isReplyOrMention = n.isSelfMentioned || n.isReply
+      if (!appAllows) {
+        false
+      } else {
+        if (self.availability == Availability.Away) {
+          false
+        } else if (self.availability == Availability.Busy) {
+          if (!isReplyOrMention) {
+            false
+          } else {
+            conv.muted.isAllAllowed || conv.muted.onlyMentionsAllowed
+          }
+        } else {
+          conv.muted.isAllAllowed  || (conv.muted.onlyMentionsAllowed && isReplyOrMention)
+        }
+      }
+    }
+
     verbose(l"pushNotificationsToUi")
     for {
       Some(self)                <- userService.getSelfUser
       toShow                    <- storage.list()
       notificationSourceVisible <- uiController.notificationsSourceVisible.head
-      convs                     <- convs.getAll(toShow.map(_.conv).toSet).map(_.collect { case Some(c) => c.id -> c }.toMap)
+      convs                     <- convs.getAll(toShow.map(_.conv).toSet)
+                                        .map(_.collect { case Some(c) => c.id -> c }.toMap)
       (show, ignore)            =  toShow.partition { n =>
-                                     val conv = convs(n.conv)
-                                     // broken down for better readability
-                                     val appAllows =
-                                       n.user != self.id &&
-                                       conv.lastRead.isBefore(n.time) &&
-                                       conv.cleared.forall(_.isBefore(n.time)) &&
-                                       !notificationSourceVisible.get(self.id).exists(_.contains(n.conv))
-                                     val isReplyOrMention = n.isSelfMentioned || n.isReply
-                                     if (!appAllows) {
-                                       false
-                                     } else {
-                                       if (self.availability == Availability.Away) {
-                                         false
-                                       } else if (self.availability == Availability.Busy) {
-                                         if (!isReplyOrMention) {
-                                           false
-                                         } else {
-                                           conv.muted.isAllAllowed || conv.muted.onlyMentionsAllowed
-                                         }
-                                       } else {
-                                         conv.muted.isAllAllowed  || (conv.muted.onlyMentionsAllowed && isReplyOrMention)
-                                       }
-                                     }
+                                     shouldShowNotification(self, n, convs(n.conv), notificationSourceVisible)
                                    }
       _                         =  verbose(l"show: $show, ignore: $ignore")
       _                         <- uiController.onNotificationsChanged(self.id, show.toSet)
