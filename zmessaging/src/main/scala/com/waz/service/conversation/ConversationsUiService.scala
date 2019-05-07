@@ -351,6 +351,9 @@ class ConversationsUiServiceImpl(selfUserId:      UserId,
         onlyUs     = allMembers.groupBy { case (c, _) => c }.map { case (cid, us) => cid -> us.map(_._2).toSet }.collect { case (c, us) if us == Set(other, selfUserId) => c }
         convs      <- convStorage.getAll(onlyUs).map(_.flatten)
       } yield {
+        verbose(l"allConvs size: ${allConvs.size}")
+        verbose(l"allMembers size: ${allMembers.size}")
+        verbose(l"OnlyUs convs size: ${onlyUs.size}")
         if (convs.size > 1)
           warn(l"Found ${convs.size} available team conversations with user: $other, returning first conversation found")
         else verbose(l"Found ${convs.size} convs with other user: $other")
