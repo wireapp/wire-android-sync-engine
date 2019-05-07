@@ -241,8 +241,8 @@ class ConversationsServiceImpl(teamId:          Option[TeamId],
 
   private def updateConversations(responses: Seq[ConversationResponse]): Future[(Seq[ConversationData], Seq[ConversationData])] = {
 
-    def updateConversationData() = {
-      def findExistingId = convsStorage { convsById =>
+    def updateConversationData(): Future[(Set[ConversationData], Seq[ConversationData])] = {
+      def findExistingId: Future[Seq[(ConvId, ConversationResponse)]] = convsStorage { convsById =>
         def byRemoteId(id: RConvId) = convsById.values.find(_.remoteId == id)
 
         responses.map { resp =>
@@ -255,7 +255,9 @@ class ConversationsServiceImpl(teamId:          Option[TeamId],
             }
           }
 
-          (matching.fold(newId)(_.id), resp)
+          val r = (matching.fold(newId)(_.id), resp)
+          verbose(l"Returning conv id pair $r, isOneToOne: ${isOneToOne(resp.convType)}")
+          r
         }
       }
 
