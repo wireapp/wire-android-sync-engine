@@ -233,7 +233,7 @@ class CallingServiceImpl(val accountId:       UserId,
         others = Map(userId -> Some(LocalInstant.Now)),
         startedAsVideoCall = videoCall,
         videoSendState = VideoState.NoCameraPermission,
-        shouldRing = conv.muted.isAllAllowed && shouldRing)
+        shouldRing = !conv.muted.isAllMuted && shouldRing)
 
       callProfile.mutate { p =>
         // If we have a call in the profile with the same id, this incoming call should be just a GROUPCHECK
@@ -242,22 +242,19 @@ class CallingServiceImpl(val accountId:       UserId,
       }
     }
 
-    def withConvGroupAvailability(convId: RConvId)(f: (ConversationData, Boolean, Availability) => Unit) = Serialized.future(self) {
+    def withConvGroup(convId: RConvId)(f: (ConversationData, Boolean) => Unit) = Serialized.future(self) {
       (for {
         _          <- wCall
         Some(conv) <- convs.convByRemoteId(convId)
         isGroup    <- convsService.isGroupConversation(conv.id)
-        Some(self) <- userStorage.get(accountId)
-      } yield f(conv, isGroup, self.availability))
+      } yield f(conv, isGroup))
         .recover {
           case NonFatal(e) => error(l"Unknown remote convId: $convId")
         }
     }
 
-    withConvGroupAvailability(convId) {
-      case (_, _, Availability.Away)                       =>
-      case (conv, _, Availability.Busy) if conv.isAllMuted =>
-      case (conv, isGroup, _)                              => showCall(conv, isGroup)
+    withConvGroup(convId) {
+      case (conv, isGroup) => showCall(conv, isGroup)
     }
   }
 
