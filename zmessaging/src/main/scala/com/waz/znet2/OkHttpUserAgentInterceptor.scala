@@ -31,8 +31,13 @@ class OkHttpUserAgentInterceptor(metadata: MetaDataService) extends Interceptor 
   }
 
   override def intercept(chain: Interceptor.Chain): Response = {
-    val request = chain.request.newBuilder.header("User-Agent", WireUserAgent).build
-    chain.proceed(request)
+    Option(chain.request().header("User-Agent")) match {
+      case Some(_) =>
+        chain.proceed(chain.request())
+      case None =>
+        val request = chain.request.newBuilder.header("User-Agent", WireUserAgent).build
+        chain.proceed(request)
+    }
   }
 
 }
