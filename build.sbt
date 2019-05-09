@@ -170,9 +170,12 @@ lazy val zmessaging = project
       "com.wire"                      %% "robotest"              % "0.7"              % Test exclude("org.scalatest", "scalatest"),
       "org.robolectric"               %  "android-all"           % RobolectricVersion % Test,
       "junit"                         %  "junit"                 % "4.8.2"            % Test, //to override version included in robolectric
-      "io.fabric8"                    %  "mockwebserver"         % "0.1.0"            % Test,
+      "org.apache.httpcomponents"     %  "httpclient"            % "4.5.3"            % Test,
       "com.squareup.okhttp3"          %  "mockwebserver"         % "3.10.0"           % Test, //should match okhttp version
-      "org.apache.httpcomponents"     %  "httpclient"            % "4.5.3"            % Test
+      "com.typesafe.akka"             %% "akka-http"             % "10.1.8"           % Test,
+      "com.typesafe.akka"             %% "akka-http-testkit"     % "10.1.8"           % Test,
+      "com.typesafe.akka"             %% "akka-actor"            % "2.5.22"           % Test,
+      "com.typesafe.akka"             %% "akka-stream"           % "2.5.22"           % Test
 //      "com.wire.cryptobox" % "cryptobox-jni" % cryptoboxVersion % Test % Native classifier "darwin-x86_64",
 //      "com.wire.cryptobox" % "cryptobox-jni" % cryptoboxVersion  % Test % Native classifier "linux-x86_64",
     )
