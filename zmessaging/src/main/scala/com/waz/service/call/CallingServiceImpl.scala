@@ -233,7 +233,7 @@ class CallingServiceImpl(val accountId:       UserId,
         others = Map(userId -> Some(LocalInstant.Now)),
         startedAsVideoCall = videoCall,
         videoSendState = VideoState.NoCameraPermission,
-        shouldRing = conv.muted.isAllAllowed && shouldRing)
+        shouldRing = !conv.muted.isAllMuted && shouldRing)
 
       callProfile.mutate { p =>
         // If we have a call in the profile with the same id, this incoming call should be just a GROUPCHECK
