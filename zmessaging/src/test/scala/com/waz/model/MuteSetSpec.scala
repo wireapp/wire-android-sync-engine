@@ -31,7 +31,7 @@ class MuteSetSpec extends AndroidFreeSpec {
 
     scenario("Parse mentions only") {
       assert(!MuteSet(0).onlyMentionsAllowed)
-      assert(!MuteSet(1).onlyMentionsAllowed)
+      assert(MuteSet(1).onlyMentionsAllowed)
       assert(MuteSet(2).onlyMentionsAllowed)
       assert(!MuteSet(3).onlyMentionsAllowed)
     }
@@ -45,7 +45,7 @@ class MuteSetSpec extends AndroidFreeSpec {
 
     scenario("Parse old muted flag") {
       assert(!MuteSet(0).oldMutedFlag)
-      assert(!MuteSet(1).oldMutedFlag)
+      assert(MuteSet(1).oldMutedFlag)
       assert(MuteSet(2).oldMutedFlag)
       assert(MuteSet(3).oldMutedFlag)
     }
@@ -53,7 +53,7 @@ class MuteSetSpec extends AndroidFreeSpec {
     scenario("Parse and re-parse") {
       assert(MuteSet(0).toInt == 0)
       assert(MuteSet(1).toInt == 1)
-      assert(MuteSet(2).toInt == 2)
+      assert(MuteSet(2).toInt == 1)
       assert(MuteSet(3).toInt == 3)
     }
   }
@@ -117,7 +117,7 @@ class MuteSetSpec extends AndroidFreeSpec {
       assert(!muteSet4.oldMutedFlag)
 
       // now let's say the conversation from the previous example was "muted" again on the device with the old version
-      val cState5 = ConversationState(muted = Some(true), mutedStatus = Some(2))
+      val cState5 = ConversationState(muted = Some(true), mutedStatus = Some(1))
       val muteSet5 = MuteSet.resolveMuted(cState5, isTeam = true)
       assert(muteSet5.onlyMentionsAllowed) // the result is "mentions only" on the new version - the information about the original state was preserved
       assert(muteSet5.oldMutedFlag) // and "muted" on the old

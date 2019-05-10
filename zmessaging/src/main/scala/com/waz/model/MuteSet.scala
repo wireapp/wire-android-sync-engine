@@ -21,10 +21,8 @@ import MuteSet._
 import com.waz.log.LogShow.SafeToLog
 
 case class MuteSet(private val status: Set[MuteMask]) extends SafeToLog {
-  def reverse: MuteSet = MuteSet(MuteSet.AllMuted.status -- status)
-
   def toInt: Int =
-    (if (status.contains(StandardMuted)) 2 else 0) | (if (status.contains(MentionsMuted)) 1 else 0)
+    (if (status.contains(StandardMuted)) 1 else 0) | (if (status.contains(MentionsMuted)) 2 else 0)
 
   lazy val isAllMuted: Boolean          = status == AllMuted.status
   lazy val isAllAllowed: Boolean        = status == AllAllowed.status
@@ -39,23 +37,23 @@ object MuteSet {
   case object MentionsMuted extends MuteMask
 
   val AllMuted: MuteSet            = MuteSet(Set[MuteMask](StandardMuted, MentionsMuted))
-  val OnlyMentionsAllowed: MuteSet = MuteSet(Set[MuteMask](MentionsMuted)).reverse
+  val OnlyMentionsAllowed: MuteSet = MuteSet(Set[MuteMask](StandardMuted))
   val AllAllowed: MuteSet          = MuteSet(Set.empty[MuteMask])
 
   // 0 -> `00` -> All notifications are displayed
-  // 1 -> `01` -> Only normal notifications are displayed (mentions are muted) -- not used
-  // 2 -> `10` -> Only mentions are displayed (normal messages muted)
+  // 1 -> `01` -> Only mentions are displayed (normal messages muted)
+  // 2 -> `10` -> Only normal notifications are displayed (mentions are muted) -- not used
   // 3 -> `11` -> No notifications are displayed
-  def apply(status: Int): MuteSet =
-    MuteSet(
-      (if ((status & 1) != 0) Set[MuteMask](MentionsMuted) else Set.empty[MuteMask]) ++
-        (if ((status & 2) != 0) Set[MuteMask](StandardMuted) else Set.empty[MuteMask])
-    )
+  def apply(status: Int): MuteSet = MuteSet(status match {
+    case 1 | 2 => Set[MuteMask](StandardMuted) // fix for AN-6210, can be removed after some time (Maciek)
+    case 3 => Set[MuteMask](MentionsMuted, StandardMuted)
+    case _ => Set.empty[MuteMask]
+  })
 
   def resolveMuted(convState: ConversationState, isTeam: Boolean): MuteSet = (convState.muted, convState.mutedStatus) match {
     case (Some(true),  None) if isTeam => OnlyMentionsAllowed
     case (Some(true),  _) if !isTeam   => AllMuted
-    case (Some(true),  Some(status))   => MuteSet(status | 2)
+    case (Some(true),  Some(status))   => MuteSet(status | 1)
     case (Some(false), _)              => AllAllowed
     case (None,        Some(status))   => MuteSet(status)
     case (None,        None)           => AllAllowed
