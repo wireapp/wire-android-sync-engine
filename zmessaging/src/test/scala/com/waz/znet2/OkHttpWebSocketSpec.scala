@@ -39,15 +39,16 @@ import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.model.ws.{ TextMessage, Message, BinaryMessage }
 import akka.http.scaladsl.model.{ HttpRequest, HttpResponse }
 import akka.http.scaladsl.server.Directives
-import scala.concurrent.{ Future, Promise }
+import scala.concurrent.{ Future, Promise, Await }
+import scala.concurrent.duration._
 
 class OkHttpWebSocketSpec extends WordSpec with MustMatchers with Inside with BeforeAndAfterEach {
 
   import EventContext.Implicits.global
   import com.waz.BlockingSyntax.toBlocking
 
-  private val wsPort = 31030 // hopefully this is unused!
-  private val testPath = s"http://localhost:${wsPort}/test"
+  private var wsPort: Int = _
+  private def testPath(): String = s"http://localhost:${wsPort}/test"
   private def testWebSocketRequest(url: String): Request[Body] = Request.create(method = Method.Get, url = new URL(url))
 
   import Directives._
@@ -58,8 +59,10 @@ class OkHttpWebSocketSpec extends WordSpec with MustMatchers with Inside with Be
     implicit val materializer = ActorMaterializer()
 
     def start(route: Route): Unit = {
-      println(s"Akka-http websocket server starting at ${testPath} ...")
-      bindingFuture = Http().bindAndHandle(route, "localhost", wsPort)
+      // binding to port 0 means the OS can choose a free port
+      bindingFuture = Http().bindAndHandle(route, "localhost", 0)
+      wsPort = Await.result(bindingFuture, 5.seconds).localAddress.getPort()
+      println(s"Akka-http websocket server started at ${testPath}")
     }
 
     def stop(): Unit = {
@@ -100,7 +103,6 @@ class OkHttpWebSocketSpec extends WordSpec with MustMatchers with Inside with Be
           }
         }
       wsServer.start(route)
-      Thread.sleep(100) // wait a little for server to come up
 
       // -- connect and assert --
       toBlocking(znet2.OkHttpWebSocketFactory.openWebSocket(testWebSocketRequest(testPath))) { stream =>
@@ -132,7 +134,6 @@ class OkHttpWebSocketSpec extends WordSpec with MustMatchers with Inside with Be
           }
         }
       wsServer.start(route)
-      Thread.sleep(100) // wait a little for server to come up
 
       // -- connect and assert --
       toBlocking(znet2.OkHttpWebSocketFactory.openWebSocket(testWebSocketRequest(testPath))) { stream =>
