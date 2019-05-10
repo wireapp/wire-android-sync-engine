@@ -23,53 +23,61 @@ import com.waz.utils.events.EventContext
 import com.waz.znet2
 import com.waz.znet2.WebSocketFactory.SocketEvent
 import com.waz.znet2.http.{Body, Method, Request}
-import org.scalatest.{BeforeAndAfterEach, Inside, MustMatchers, WordSpec}
+import org.scalatest.{BeforeAndAfterEach, Inside, MustMatchers, WordSpec, BeforeAndAfterAll}
 
 import scala.concurrent.duration._
 import scala.util.Try
+
+// imports for akka-http's websocket server
+import akka.NotUsed
+import akka.util.ByteString
+import akka.actor.ActorSystem
+import akka.stream.ActorMaterializer
+import akka.stream.scaladsl.{ Flow, Source, Sink, Keep }
+import akka.http.scaladsl.Http
+import akka.http.scaladsl.server.Route
+import akka.http.scaladsl.model.ws.{ TextMessage, Message, BinaryMessage }
+import akka.http.scaladsl.model.{ HttpRequest, HttpResponse }
+import akka.http.scaladsl.server.Directives
+import scala.concurrent.{ Future, Promise }
 
 class OkHttpWebSocketSpec extends WordSpec with MustMatchers with Inside with BeforeAndAfterEach {
 
   import EventContext.Implicits.global
   import com.waz.BlockingSyntax.toBlocking
 
-  private val wsPort = 8080
-  private val testPath = "http://localhost:8080/test"
-  private val defaultWaiting = 100
+  private val wsPort = 31030 // hopefully this is unused!
+  private val testPath = s"http://localhost:${wsPort}/test"
   private def testWebSocketRequest(url: String): Request[Body] = Request.create(method = Method.Get, url = new URL(url))
-
-
-  import akka.NotUsed
-  import akka.util.ByteString
-  import akka.actor.ActorSystem
-  import akka.stream.ActorMaterializer
-  import akka.stream.scaladsl.{ Flow, Source, Sink, Keep }
-  import akka.http.scaladsl.Http
-  import akka.http.scaladsl.model.ws.{ TextMessage, Message, BinaryMessage }
-  import akka.http.scaladsl.server.Directives
-  import scala.io.StdIn
-  import scala.concurrent.{ Future, Promise }
-
-  implicit val system = ActorSystem()
-  implicit val materializer = ActorMaterializer()
 
   import Directives._
 
-  private var bindingFuture: Future[Http.ServerBinding] = _
+  class WSServer {
+    private var bindingFuture: Future[Http.ServerBinding] = _
+    implicit val system = ActorSystem()
+    implicit val materializer = ActorMaterializer()
+
+    def start(route: Route): Unit = {
+      println(s"Akka-http websocket server starting at ${testPath} ...")
+      bindingFuture = Http().bindAndHandle(route, "localhost", wsPort)
+    }
+
+    def stop(): Unit = {
+      import system.dispatcher // executionContext for the future transformations
+      bindingFuture
+          .flatMap(_.unbind()) // trigger unbinding from the port
+          .onComplete(_ => system.terminate()) // and shutdown when done
+    }
+
+  }
+
+  private var wsServer: WSServer = _
 
   override protected def beforeEach(): Unit = {
-    println(s"Akka-http websocket server online at http://localhost:8080/")
+    wsServer = new WSServer()
   }
-
-  private def stopWebsocketServer(): Unit = {
-    import system.dispatcher // for the future transformations
-    bindingFuture
-        .flatMap(_.unbind()) // trigger unbinding from the port
-        .onComplete(_ => system.terminate()) // and shutdown when done
-  }
-
   override protected def afterEach(): Unit = {
-    stopWebsocketServer()
+    wsServer.stop()
   }
 
   "OkHttp events stream" should {
@@ -91,7 +99,8 @@ class OkHttpWebSocketSpec extends WordSpec with MustMatchers with Inside with Be
             handleWebSocketMessages(flowTwoMessageClose)
           }
         }
-      bindingFuture = Http().bindAndHandle(route, "localhost", wsPort)
+      wsServer.start(route)
+      Thread.sleep(100) // wait a little for server to come up
 
       // -- connect and assert --
       toBlocking(znet2.OkHttpWebSocketFactory.openWebSocket(testWebSocketRequest(testPath))) { stream =>
@@ -110,7 +119,7 @@ class OkHttpWebSocketSpec extends WordSpec with MustMatchers with Inside with Be
 
     "provide all okHttp events properly when socket closed with error." in {
       // -- set up websocket server --
-      // emit nothing and then keep the connection open
+      // emit nothing but keep the connection open
       val flowWait: Flow[Message, Message, Promise[Option[Message]]] =
         Flow.fromSinkAndSourceMat(
           Sink.foreach[Message](println),
@@ -122,11 +131,13 @@ class OkHttpWebSocketSpec extends WordSpec with MustMatchers with Inside with Be
             handleWebSocketMessages(flowWait)
           }
         }
-      bindingFuture = Http().bindAndHandle(route, "localhost", wsPort)
+      wsServer.start(route)
+      Thread.sleep(100) // wait a little for server to come up
 
+      // -- connect and assert --
       toBlocking(znet2.OkHttpWebSocketFactory.openWebSocket(testWebSocketRequest(testPath))) { stream =>
         val firstEvent = stream.getEvent(0)
-        Try { stopWebsocketServer() } //we do not care about this error
+        Try { wsServer.stop() } //we do not care about this error
         val secondEvent = stream.getEvent(1)
 
         firstEvent mustBe an[SocketEvent.Opened]
