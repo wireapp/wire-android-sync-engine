@@ -58,7 +58,14 @@ class OkHttpWebSocketSpec extends WordSpec with MustMatchers with Inside with Be
     implicit val system = ActorSystem()
     implicit val materializer = ActorMaterializer()
 
-    def start(route: Route): Unit = {
+    def start[A](flow: Flow[Message, Message, A]): Unit = {
+      val route =
+        path("test") {
+          get {
+            handleWebSocketMessages(flow)
+          }
+        }
+
       // binding to port 0 means the OS can choose a free port
       bindingFuture = Http().bindAndHandle(route, "localhost", 0)
       wsPort = Await.result(bindingFuture, 5.seconds).localAddress.getPort()
@@ -96,13 +103,7 @@ class OkHttpWebSocketSpec extends WordSpec with MustMatchers with Inside with Be
             Sink.foreach[Message](println),
             Source(List(TextMessage(textMessage), BinaryMessage(bytesMessage)))
           )
-      val route =
-        path("test") {
-          get {
-            handleWebSocketMessages(flowTwoMessageClose)
-          }
-        }
-      wsServer.start(route)
+      wsServer.start(flowTwoMessageClose)
 
       // -- connect and assert --
       toBlocking(znet2.OkHttpWebSocketFactory.openWebSocket(testWebSocketRequest(testPath))) { stream =>
@@ -127,13 +128,7 @@ class OkHttpWebSocketSpec extends WordSpec with MustMatchers with Inside with Be
           Sink.foreach[Message](println),
           Source.empty
             .concatMat(Source.maybe[Message])(Keep.right))(Keep.right)
-      val route =
-        path("test") {
-          get {
-            handleWebSocketMessages(flowWait)
-          }
-        }
-      wsServer.start(route)
+      wsServer.start(flowWait)
 
       // -- connect and assert --
       toBlocking(znet2.OkHttpWebSocketFactory.openWebSocket(testWebSocketRequest(testPath))) { stream =>
