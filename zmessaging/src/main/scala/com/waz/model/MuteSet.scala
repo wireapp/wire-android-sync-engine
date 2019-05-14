@@ -45,7 +45,7 @@ object MuteSet {
   // 2 -> `10` -> Only normal notifications are displayed (mentions are muted) -- not used
   // 3 -> `11` -> No notifications are displayed
   def apply(status: Int): MuteSet = MuteSet(status match {
-    case 1 | 2 => Set[MuteMask](StandardMuted) // fix for AN-6210, can be removed after some time (Maciek)
+    case 1 => Set[MuteMask](StandardMuted)
     case 3 => Set[MuteMask](MentionsMuted, StandardMuted)
     case _ => Set.empty[MuteMask]
   })
