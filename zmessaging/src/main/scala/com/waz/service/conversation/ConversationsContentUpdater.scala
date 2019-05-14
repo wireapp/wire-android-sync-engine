@@ -124,6 +124,7 @@ class ConversationsContentUpdaterImpl(val storage:     ConversationStorage,
   })
 
   override def updateConversationMuted(conv: ConvId, muted: MuteSet) = storage.update(conv, { c =>
+    verbose(l"updateConversationMuted($conv, $muted), muteTime = ${c.lastEventTime}")
     c.copy(muteTime = c.lastEventTime, muted = muted)
   })
 
@@ -159,7 +160,6 @@ class ConversationsContentUpdaterImpl(val storage:     ConversationStorage,
 
   override def updateLastEvent(id: ConvId, time: RemoteInstant) = storage.update(id, { conv =>
     verbose(l"updateLastEvent($conv, $time)")
-
     if (conv.lastEventTime.isAfter(time)) conv
     else {
       debug(l"updating: $conv, lastEventTime: $time")

@@ -233,14 +233,16 @@ class ConversationsUiServiceImpl(selfUserId:      UserId,
   override def setConversationArchived(id: ConvId, archived: Boolean): Future[Option[ConversationData]] = convs.setConversationArchived(id, archived)
 
   override def setConversationMuted(id: ConvId, muted: MuteSet): Future[Option[ConversationData]] =
-    convsContent.updateConversationMuted(id, muted) map {
-      case Some((_, conv)) =>
-        sync.postConversationState(
-          id,
-          ConversationState(muted = Some(conv.muted.oldMutedFlag), muteTime = Some(conv.muteTime), mutedStatus = Some(conv.muted.toInt))
-        )
-        Some(conv)
-      case None => None
+    convsContent.updateLastEvent(id, LocalInstant.Now.toRemote(currentBeDrift)).flatMap { _ =>
+      convsContent.updateConversationMuted(id, muted) map {
+        case Some((_, conv)) =>
+          sync.postConversationState(
+            id,
+            ConversationState(muted = Some(conv.muted.oldMutedFlag), muteTime = Some(conv.muteTime), mutedStatus = Some(conv.muted.toInt))
+          )
+          Some(conv)
+        case None => None
+      }
     }
 
   override def setConversationName(id: ConvId, name: Name): Future[Option[ConversationData]] = {
