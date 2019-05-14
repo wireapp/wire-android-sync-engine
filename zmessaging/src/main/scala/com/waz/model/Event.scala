@@ -147,13 +147,13 @@ case class ConversationState(archived:    Option[Boolean] = None,
                              mutedStatus: Option[Int] = None) extends SafeToLog
 
 object ConversationState {
-
   private def encode(state: ConversationState, o: JSONObject) = {
     state.archived foreach { o.put("otr_archived", _) }
     state.archiveTime foreach { time =>
       o.put("otr_archived_ref", JsonEncoder.encodeISOInstant(time.instant))
     }
     state.muted.foreach(o.put("otr_muted", _))
+
     state.muteTime foreach { time =>
       o.put("otr_muted_ref", JsonEncoder.encodeISOInstant(time.instant))
     }
