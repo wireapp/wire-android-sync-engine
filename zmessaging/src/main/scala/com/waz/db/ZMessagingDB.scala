@@ -296,6 +296,9 @@ object ZMessagingDB {
     },
     Migration(118, 119) { db =>
       db.execSQL(FCMNotificationStatsDao.table.createSql)
+    },
+    Migration(199,120) { db =>
+      db.execSQL("UPDATE Conversations SET muted_status = 1 WHERE muted_status = 2") //fix for AN-6210
     }
   )
 }
