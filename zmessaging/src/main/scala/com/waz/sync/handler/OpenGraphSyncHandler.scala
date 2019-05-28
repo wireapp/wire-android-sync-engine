@@ -170,7 +170,7 @@ class OpenGraphSyncHandler(convs:           ConversationStorage,
       case Some(image) => client.downloadImage(image).map(Option.apply).recover { case err => None }
     }
 
-    def uploadImage(imageFile: File): CancellableFuture[Asset2[General]] = {
+    def uploadImage(imageFile: File): CancellableFuture[Asset2] = {
       val content = ContentForUpload(s"open_graph_image_${prev.permanentUrl}", Content.File(Mime.Image.Jpg, imageFile))
       val encryption = AES_CBC_Encryption.random
       for {

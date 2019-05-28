@@ -48,14 +48,14 @@ trait AssetService {
   def cancelUpload(id: UploadAssetId, message: MessageData): Future[Unit]
   def cancelDownload(id: DownloadAssetId): Unit
 
-  def getAsset(id: AssetId): Future[Asset[General]]
+  def getAsset(id: AssetId): Future[Asset]
 
   def save(asset: GeneralAsset): Future[Unit]
   def delete(id: GeneralAssetId): Future[Unit]
 
   def loadContentById(assetId: AssetId, callback: Option[ProgressCallback] = None): CancellableFuture[InputStream]
-  def loadContent(asset: Asset[General], callback: Option[ProgressCallback] = None): CancellableFuture[InputStream]
-  def uploadAsset(id: UploadAssetId): CancellableFuture[Asset[General]]
+  def loadContent(asset: Asset, callback: Option[ProgressCallback] = None): CancellableFuture[InputStream]
+  def uploadAsset(id: UploadAssetId): CancellableFuture[Asset]
   def createAndSavePreview(asset: UploadAsset[General]): Future[UploadAsset[General]]
   def createAndSaveUploadAsset(content: ContentForUpload,
                                targetEncryption: Encryption,
@@ -90,7 +90,7 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
 
   override def assetStatusSignal(idGeneral: GeneralAssetId): Signal[(AssetStatus, Option[Progress])] =
     assetSignal(idGeneral) map {
-      case _: Asset[General] => AssetStatus.Done -> None
+      case _: Asset => AssetStatus.Done -> None
       case asset: UploadAsset[UploadGeneral] =>
         asset.status match {
           case AssetStatus.Done => asset.status -> None
@@ -126,11 +126,11 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
 
   override def cancelDownload(id: DownloadAssetId): Unit = () //TODO
 
-  override def getAsset(id: AssetId): Future[Asset[General]] =
+  override def getAsset(id: AssetId): Future[Asset] =
     assetsStorage.get(id)
 
   override def save(asset: GeneralAsset): Future[Unit] = asset match {
-    case a: Asset[General] => assetsStorage.save(a)
+    case a: Asset => assetsStorage.save(a)
     case a: UploadAsset[UploadGeneral] => uploadAssetStorage.save(a)
     case a: DownloadAsset => downloadAssetStorage.save(a)
   }
@@ -142,7 +142,7 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
     case id: DownloadAssetId => downloadAssetStorage.deleteByKey(id)
   }
 
-  private def loadFromBackend(asset: Asset[General], callback: Option[ProgressCallback]): CancellableFuture[InputStream] = {
+  private def loadFromBackend(asset: Asset, callback: Option[ProgressCallback]): CancellableFuture[InputStream] = {
     verbose(l"Load asset content from backend. $asset")
     assetClient.loadAssetContent(asset, callback)
       .flatMap {
@@ -167,7 +167,7 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
       }
   }
 
-  private def loadFromCache(asset: Asset[General], callback: Option[ProgressCallback]): CancellableFuture[InputStream] = {
+  private def loadFromCache(asset: Asset, callback: Option[ProgressCallback]): CancellableFuture[InputStream] = {
     verbose(l"Load asset content from cache. $asset")
     contentCache.getStream(asset.id).map(asset.encryption.decrypt(_))
       .recoverWith { case err =>
@@ -177,7 +177,7 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
       .toCancellable
   }
 
-  private def loadFromFileSystem(asset: Asset[General],
+  private def loadFromFileSystem(asset: Asset,
                                  localSource: LocalSource,
                                  callback: Option[ProgressCallback]): CancellableFuture[InputStream] = {
     verbose(l"Load asset content from file system. $asset")
@@ -215,7 +215,7 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
   override def loadContentById(assetId: AssetId, callback: Option[ProgressCallback] = None): CancellableFuture[InputStream] =
     assetsStorage.get(assetId).flatMap(asset => loadContent(asset, callback)).toCancellable
 
-  override def loadContent(asset: Asset[General], callback: Option[ProgressCallback] = None): CancellableFuture[InputStream] =
+  override def loadContent(asset: Asset, callback: Option[ProgressCallback] = None): CancellableFuture[InputStream] =
     assetsStorage.find(asset.id)
       .flatMap { fromStorage =>
         if (fromStorage.isEmpty)
@@ -229,7 +229,7 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
       }
       .toCancellable
 
-  override def uploadAsset(assetId: UploadAssetId): CancellableFuture[Asset[General]] = {
+  override def uploadAsset(assetId: UploadAssetId): CancellableFuture[Asset] = {
     import com.waz.api.impl.ErrorResponse
 
     def getUploadAssetContent(asset: UploadAsset[General]): Future[InputStream] = asset.localSource match {
@@ -271,7 +271,7 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
       assetClient.uploadAsset(metadata, content, Some(uploadCallback))
     }
 
-    def handleUploadResult(result: Either[ErrorResponse, UploadResponse2], uploadAsset: UploadAsset[General]): Future[Asset[General]] =
+    def handleUploadResult(result: Either[ErrorResponse, UploadResponse2], uploadAsset: UploadAsset[General]): Future[Asset] =
       result match {
         case Left(err) =>
           uploadAssetStorage.update(uploadAsset.id, _.copy(status = UploadAssetStatus.Failed)).flatMap(_ => Future.failed(err))
@@ -283,7 +283,7 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
           } yield asset
       }
 
-    def encryptAssetContentAndMoveToCache(asset: Asset[General]): Future[Unit] =
+    def encryptAssetContentAndMoveToCache(asset: Asset): Future[Unit] =
       if (asset.localSource.nonEmpty) Future.successful(())
       else for {
         contentStream <- uploadContentCache.getStream(assetId)

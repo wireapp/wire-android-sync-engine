@@ -23,7 +23,6 @@ import java.security.{DigestOutputStream, MessageDigest}
 import com.waz.api.impl.ErrorResponse
 import com.waz.cache.Expiration
 import com.waz.model._
-import com.waz.service.assets2.Asset.General
 import com.waz.service.assets2.{Asset, NoEncryption}
 import com.waz.utils.{CirceJSONSupport, IoUtils, SafeBase64}
 import com.waz.znet2.http.HttpClient.AutoDerivation._
@@ -41,7 +40,7 @@ import scala.concurrent.{Await, Future}
 trait AssetClient2 {
   import com.waz.sync.client.AssetClient2._
 
-  def loadAssetContent(asset: Asset[General], callback: Option[ProgressCallback]): ErrorOrResponse[FileWithSha]
+  def loadAssetContent(asset: Asset, callback: Option[ProgressCallback]): ErrorOrResponse[FileWithSha]
   def uploadAsset(metadata: Metadata, asset: AssetContent, callback: Option[ProgressCallback]): ErrorOrResponse[UploadResponse2]
   def deleteAsset(assetId: AssetId): ErrorOrResponse[Boolean]
 
@@ -72,7 +71,7 @@ class AssetClient2Impl(implicit
 
   private implicit def inputStreamBodyDeserializer: RawBodyDeserializer[InputStream] = RawBodyDeserializer.create(_.data())
 
-  override def loadAssetContent(asset: Asset[General], callback: Option[ProgressCallback]): ErrorOrResponse[FileWithSha] = {
+  override def loadAssetContent(asset: Asset, callback: Option[ProgressCallback]): ErrorOrResponse[FileWithSha] = {
     val assetPath = (asset.convId, asset.encryption) match {
       case (None, _)                     => s"/assets/v3/${asset.id.str}"
       case (Some(convId), NoEncryption)  => s"/conversations/${convId.str}/assets/${asset.id.str}"

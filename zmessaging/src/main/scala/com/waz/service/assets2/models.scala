@@ -135,7 +135,7 @@ object DownloadAssetStatus {
   case object Failed     extends DownloadAssetStatus
 }
 
-case class Asset[+T <: AssetDetails](
+case class Asset(
     override val id: AssetId,
     token: Option[AssetToken], //all not public assets should have an AssetToken
     sha: Sha256,
@@ -145,7 +145,7 @@ case class Asset[+T <: AssetDetails](
     preview: Option[AssetId],
     name: String,
     size: Long,
-    details: T,
+    details: AssetDetails,
     @deprecated
     convId: Option[RConvId]
 ) extends GeneralAsset
@@ -232,7 +232,7 @@ object Asset {
           BlobDetails
       }
 
-  def create(asset: DownloadAsset, remote: RemoteData): Asset[General] =
+  def create(asset: DownloadAsset, remote: RemoteData): Asset =
     Asset(
       id = AssetId(remote.assetId),
       token = if (remote.assetToken.isEmpty) None else Some(AssetToken(remote.assetToken)),
@@ -247,7 +247,7 @@ object Asset {
       convId = None
     )
 
-  def create(preview: GPreview): Asset[General] = {
+  def create(preview: GPreview): Asset = {
     val remote = preview.remote
     Asset(
       id = AssetId(remote.assetId),
@@ -264,7 +264,7 @@ object Asset {
     )
   }
 
-  def create(assetId: AssetId, token: Option[AssetToken], uploadAsset: UploadAsset[General]): Asset[General] =
+  def create(assetId: AssetId, token: Option[AssetToken], uploadAsset: UploadAsset[General]): Asset =
     Asset(
       id = assetId,
       token = token,

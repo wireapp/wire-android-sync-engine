@@ -310,7 +310,7 @@ object ZMessagingDB {
       db.execSQL("UPDATE KeyValues SET value = 'true' WHERE key = 'should_sync_users'")
 
       //Convert old assets to new assets (public assets won't be converted)
-      def convertAsset(old: AssetData): Try[Asset[AssetDetails]] = Try {
+      def convertAsset(old: AssetData): Try[Asset] = Try {
         val encryption = old.otrKey.map(k => AES_CBC_Encryption(AESKey2(k.bytes)))
 
         Asset(

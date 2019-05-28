@@ -45,7 +45,7 @@ class AssetClient2Spec extends ZIntegrationSpec with AuthenticationConfig with D
   private val testAssetMime = Mime.Default
   private val testRawAsset = AssetContent(testAssetMime, testAssetContentMd5, () => Future.successful(new ByteArrayInputStream(testAssetContent)), Some(testAssetContent.length))
 
-  private def createBlobAsset(response: UploadResponse2): Asset[BlobDetails.type] = {
+  private def createBlobAsset(response: UploadResponse2): Asset = {
     Asset(
       id = AssetId(response.key.str),
       token = response.token,

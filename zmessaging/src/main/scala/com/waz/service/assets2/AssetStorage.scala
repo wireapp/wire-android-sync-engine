@@ -20,7 +20,6 @@ package com.waz.service.assets2
 import android.content.Context
 import com.waz.db.{ ColumnBuilders, Dao }
 import com.waz.model._
-import com.waz.service.assets2.Asset._
 import com.waz.service.assets2.AssetStorageImpl.AssetDao
 import com.waz.utils.TrimmingLruCache.Fixed
 import com.waz.utils.wrappers.{ DB, DBCursor }
@@ -37,13 +36,13 @@ import io.circe.Decoder
 
 import scala.concurrent.ExecutionContext
 
-trait AssetStorage extends ReactiveStorage2[AssetId, Asset[General]]
+trait AssetStorage extends ReactiveStorage2[AssetId, Asset]
 
 class AssetStorageImpl(context: Context, db: DB, ec: ExecutionContext)
     extends ReactiveStorageImpl2(
-      new CachedStorage2[AssetId, Asset[General]](
+      new CachedStorage2[AssetId, Asset](
         new DbStorage2(AssetDao)(ec, db),
-        new InMemoryStorage2[AssetId, Asset[General]](new TrimmingLruCache(context, Fixed(8)))(ec)
+        new InMemoryStorage2[AssetId, Asset](new TrimmingLruCache(context, Fixed(8)))(ec)
       )(ec)
     )
     with AssetStorage
@@ -51,8 +50,8 @@ class AssetStorageImpl(context: Context, db: DB, ec: ExecutionContext)
 object AssetStorageImpl {
 
   object AssetDao
-      extends Dao[Asset[General], AssetId]
-      with ColumnBuilders[Asset[General]]
+      extends Dao[Asset, AssetId]
+      with ColumnBuilders[Asset]
       with StorageCodecs
       with CirceJSONSupport {
 
@@ -74,7 +73,7 @@ object AssetStorageImpl {
     override val table =
       Table("Assets2", Id, Token, Name, Encryption, Mime, Sha, Size, Source, Preview, Details, ConvId)
 
-    override def apply(implicit cursor: DBCursor): Asset[General] =
+    override def apply(implicit cursor: DBCursor): Asset =
       Asset(Id, Token, Sha, Mime, Encryption, Source, Preview, Name, Size, Details, ConvId)
 
   }

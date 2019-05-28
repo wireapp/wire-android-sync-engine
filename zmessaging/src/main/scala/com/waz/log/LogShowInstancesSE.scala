@@ -167,7 +167,7 @@ trait LogShowInstancesSE {
       l"Mention(userId: $userId, start: $start, length: $length)"
     }
 
-  implicit val AssetLogShow: LogShow[Asset[AssetDetails]] =
+  implicit val AssetLogShow: LogShow[Asset] =
     LogShow.createFrom { a =>
       import a._
       l"Asset(id: $id | token: $token | sha: $sha | encryption: $encryption | localSource: $localSource | preview: $preview | details: $details | convId: $convId)"
