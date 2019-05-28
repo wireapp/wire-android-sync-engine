@@ -254,7 +254,7 @@ class AssetServiceSpec extends ZIntegrationMockSpec with AuthenticationConfig wi
       for {
         _ <- Future.successful(())
         client = new AssetClient2Impl
-        rawAssetStorage = new ReactiveStorageImpl2(new UnlimitedInMemoryStorage[UploadAssetId, UploadAsset[UploadGeneral]]()) with UploadAssetStorage
+        rawAssetStorage = new ReactiveStorageImpl2(new UnlimitedInMemoryStorage[UploadAssetId, UploadAsset]()) with UploadAssetStorage
         assetService = service(rawAssetStorage, client)
 
         rawAsset <- assetService.createAndSaveUploadAsset(contentForUpload, encryption, public = false, Retention.Persistent, None)

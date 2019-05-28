@@ -20,12 +20,12 @@ package com.waz.service.assets2
 import java.io.{FileOutputStream, InputStream}
 import java.security.{DigestInputStream, MessageDigest}
 
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
+import com.waz.log.LogSE._
 import com.waz.model.AssetData.UploadTaskKey
 import com.waz.model._
-import com.waz.log.LogSE._
-import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model.errors._
-import com.waz.service.assets2.Asset.{General, UploadGeneral, Video}
+import com.waz.service.assets2.Asset.{General, Video}
 import com.waz.sync.SyncServiceHandle
 import com.waz.sync.client.AssetClient2.{AssetContent, Metadata, Retention, UploadResponse2}
 import com.waz.sync.client.{AssetClient2, ErrorOrResponse}
@@ -56,12 +56,12 @@ trait AssetService {
   def loadContentById(assetId: AssetId, callback: Option[ProgressCallback] = None): CancellableFuture[InputStream]
   def loadContent(asset: Asset, callback: Option[ProgressCallback] = None): CancellableFuture[InputStream]
   def uploadAsset(id: UploadAssetId): CancellableFuture[Asset]
-  def createAndSavePreview(asset: UploadAsset[General]): Future[UploadAsset[General]]
+  def createAndSavePreview(asset: UploadAsset): Future[UploadAsset]
   def createAndSaveUploadAsset(content: ContentForUpload,
                                targetEncryption: Encryption,
                                public: Boolean,
                                retention: Retention,
-                               messageId: Option[MessageId]): Future[UploadAsset[General]]
+                               messageId: Option[MessageId]): Future[UploadAsset]
   def loadPublicContentById(assetId: AssetId, convId: Option[ConvId], callback: Option[ProgressCallback] = None): CancellableFuture[InputStream]
   def loadUploadContentById(uploadAssetId: UploadAssetId, callback: Option[ProgressCallback] = None): CancellableFuture[InputStream]
 }
@@ -91,7 +91,7 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
   override def assetStatusSignal(idGeneral: GeneralAssetId): Signal[(AssetStatus, Option[Progress])] =
     assetSignal(idGeneral) map {
       case _: Asset => AssetStatus.Done -> None
-      case asset: UploadAsset[UploadGeneral] =>
+      case asset: UploadAsset =>
         asset.status match {
           case AssetStatus.Done => asset.status -> None
           case UploadAssetStatus.NotStarted => asset.status -> None
@@ -131,7 +131,7 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
 
   override def save(asset: GeneralAsset): Future[Unit] = asset match {
     case a: Asset => assetsStorage.save(a)
-    case a: UploadAsset[UploadGeneral] => uploadAssetStorage.save(a)
+    case a: UploadAsset => uploadAssetStorage.save(a)
     case a: DownloadAsset => downloadAssetStorage.save(a)
   }
 
@@ -232,7 +232,7 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
   override def uploadAsset(assetId: UploadAssetId): CancellableFuture[Asset] = {
     import com.waz.api.impl.ErrorResponse
 
-    def getUploadAssetContent(asset: UploadAsset[General]): Future[InputStream] = asset.localSource match {
+    def getUploadAssetContent(asset: UploadAsset): Future[InputStream] = asset.localSource match {
       case Some(LocalSource(uri, _)) => Future.fromTry(uriHelper.openInputStream(uri))
       case None => uploadContentCache.getStream(asset.id)
     }
@@ -242,7 +242,7 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
       uploadAssetStorage.update(assetId, _.copy(status = UploadAssetStatus.Cancelled))
     }
 
-    def loadUploadAsset: Future[UploadAsset[General]] = uploadAssetStorage.get(assetId).flatMap { asset =>
+    def loadUploadAsset: Future[UploadAsset] = uploadAssetStorage.get(assetId).flatMap { asset =>
       asset.details match {
         case details: General =>
           CancellableFuture.successful(asset.copy(details = details))
@@ -251,7 +251,7 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
       }
     }
 
-    def doUpload(asset: UploadAsset[General]): ErrorOrResponse[UploadResponse2] = {
+    def doUpload(asset: UploadAsset): ErrorOrResponse[UploadResponse2] = {
       val metadata = Metadata(asset.public, asset.retention)
       val content = AssetContent(
         asset.mime,
@@ -271,7 +271,7 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
       assetClient.uploadAsset(metadata, content, Some(uploadCallback))
     }
 
-    def handleUploadResult(result: Either[ErrorResponse, UploadResponse2], uploadAsset: UploadAsset[General]): Future[Asset] =
+    def handleUploadResult(result: Either[ErrorResponse, UploadResponse2], uploadAsset: UploadAsset): Future[Asset] =
       result match {
         case Left(err) =>
           uploadAssetStorage.update(uploadAsset.id, _.copy(status = UploadAssetStatus.Failed)).flatMap(_ => Future.failed(err))
@@ -294,14 +294,14 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
     for {
       _ <- CancellableFuture.lift(Future.successful(()), actionsOnCancellation())
       uploadAsset <- loadUploadAsset.toCancellable
-      Some((_, uploadAsset: UploadAsset[General])) <- uploadAssetStorage.update(uploadAsset.id, _.copy(uploaded = 0, status = UploadAssetStatus.InProgress)).toCancellable
+      Some((_, uploadAsset)) <- uploadAssetStorage.update(uploadAsset.id, _.copy(uploaded = 0, status = UploadAssetStatus.InProgress)).toCancellable
       uploadResult <- doUpload(uploadAsset)
       asset <- handleUploadResult(uploadResult, uploadAsset).toCancellable
       _ <- encryptAssetContentAndMoveToCache(asset).toCancellable
     } yield asset
   }
 
-  override def createAndSavePreview(uploadAsset: UploadAsset[General]): Future[UploadAsset[General]] = {
+  override def createAndSavePreview(uploadAsset: UploadAsset): Future[UploadAsset] = {
     def shouldAssetContainPreview: Boolean = uploadAsset.details match {
       case _: Video => true
       case _ => false
@@ -319,13 +319,13 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
         previewName = s"preview_for_${ uploadAsset.id.str}"
         contentForUpload = ContentForUpload(previewName, content)
         previewUploadAsset <- createUploadAsset(contentForUpload, uploadAsset.encryption, uploadAsset.public, uploadAsset.retention)
-        updatedUploadAsset = uploadAsset.copy(preview = Preview.NotUploaded(previewUploadAsset.id))
+        updatedUploadAsset = uploadAsset.copy(preview = NotUploaded(previewUploadAsset.id))
         _ <- uploadAssetStorage.save(previewUploadAsset)
         _ <- uploadAssetStorage.save(updatedUploadAsset)
       } yield updatedUploadAsset
     } else {
       for {
-        updatedUploadAsset <- Future.successful(uploadAsset.copy(preview = Preview.Empty))
+        updatedUploadAsset <- Future.successful(uploadAsset.copy(preview = Empty))
         _ <- uploadAssetStorage.save(updatedUploadAsset)
       } yield updatedUploadAsset
     }
@@ -335,7 +335,7 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
                                         targetEncryption: Encryption,
                                         public: Boolean,
                                         retention: Retention,
-                                        messageId: Option[MessageId] = None): Future[UploadAsset[General]] = {
+                                        messageId: Option[MessageId] = None): Future[UploadAsset] = {
     val t0 = System.nanoTime()
     for {
       asset <- createUploadAsset(content, targetEncryption, public, retention, messageId)
@@ -350,7 +350,7 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
                                 targetEncryption: Encryption,
                                 public: Boolean,
                                 retention: Retention,
-                                messageId: Option[MessageId] = None): Future[UploadAsset[General]] = {
+                                messageId: Option[MessageId] = None): Future[UploadAsset] = {
 
     val assetId = UploadAssetId()
     val encryptionSalt = targetEncryption.randomSalt
@@ -430,7 +430,7 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
       md5 = encryptedMd5,
       sha = encryptedSha,
       mime = transformedMime,
-      preview = Preview.NotReady,
+      preview = NotReady,
       uploaded = 0,
       size = encryptedSize,
       retention = retention,

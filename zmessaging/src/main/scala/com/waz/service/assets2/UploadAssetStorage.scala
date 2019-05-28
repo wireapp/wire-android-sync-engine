@@ -20,7 +20,6 @@ package com.waz.service.assets2
 import android.content.Context
 import com.waz.db.{ColumnBuilders, Dao}
 import com.waz.model.UploadAssetId
-import com.waz.service.assets2.Asset._
 import com.waz.service.assets2.UploadAssetStorage.UploadAssetDao
 import com.waz.utils.TrimmingLruCache.Fixed
 import com.waz.utils.wrappers.{DB, DBCursor}
@@ -28,13 +27,13 @@ import com.waz.utils.{CachedStorage2, CirceJSONSupport, DbStorage2, InMemoryStor
 
 import scala.concurrent.ExecutionContext
 
-trait UploadAssetStorage extends ReactiveStorage2[UploadAssetId, UploadAsset[UploadGeneral]]
+trait UploadAssetStorage extends ReactiveStorage2[UploadAssetId, UploadAsset]
 
 class UploadAssetStorageImpl(context: Context, db: DB)(implicit ec: ExecutionContext)
     extends ReactiveStorageImpl2(
       new CachedStorage2(
         new DbStorage2(UploadAssetDao)(ec, db),
-        new InMemoryStorage2[UploadAssetId, UploadAsset[UploadGeneral]](new TrimmingLruCache(context, Fixed(8)))(ec)
+        new InMemoryStorage2[UploadAssetId, UploadAsset](new TrimmingLruCache(context, Fixed(8)))(ec)
       )(ec)
     )
     with UploadAssetStorage
@@ -42,8 +41,8 @@ class UploadAssetStorageImpl(context: Context, db: DB)(implicit ec: ExecutionCon
 object UploadAssetStorage {
 
   object UploadAssetDao
-      extends Dao[UploadAsset[UploadGeneral], UploadAssetId]
-      with ColumnBuilders[UploadAsset[UploadGeneral]]
+      extends Dao[UploadAsset, UploadAssetId]
+      with ColumnBuilders[UploadAsset]
       with StorageCodecs
       with CirceJSONSupport {
 
@@ -85,7 +84,7 @@ object UploadAssetStorage {
       AssetId
     )
 
-    override def apply(implicit cursor: DBCursor): UploadAsset[UploadGeneral] =
+    override def apply(implicit cursor: DBCursor): UploadAsset =
       UploadAsset(Id,
         Source,
         Name,

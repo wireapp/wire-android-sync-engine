@@ -79,12 +79,10 @@ case class ContentForUpload(name: String, content: Content)
 case class LocalSource(uri: URI, sha: Sha256)
 
 sealed trait Preview
-object Preview {
-  case object NotReady                              extends Preview
-  case object Empty                                 extends Preview
-  case class NotUploaded(rawAssetId: UploadAssetId) extends Preview
-  case class Uploaded(assetId: AssetId)             extends Preview
-}
+case object NotReady                              extends Preview
+case object Empty                                 extends Preview
+case class NotUploaded(rawAssetId: UploadAssetId) extends Preview
+case class Uploaded(assetId: AssetId)             extends Preview
 
 sealed trait GeneralAsset {
   def id: GeneralAssetId
@@ -94,7 +92,7 @@ sealed trait GeneralAsset {
   def details: UploadAssetDetails
 }
 
-case class UploadAsset[+T <: UploadAssetDetails](
+case class UploadAsset(
     id: UploadAssetId,
     localSource: Option[LocalSource],
     name: String,
@@ -108,7 +106,7 @@ case class UploadAsset[+T <: UploadAssetDetails](
     public: Boolean,
     encryption: Encryption,
     encryptionSalt: Option[Salt],
-    details: T,
+    details: UploadAssetDetails,
     status: UploadAssetStatus,
     assetId: Option[AssetId]
 ) extends GeneralAsset
@@ -264,7 +262,8 @@ object Asset {
     )
   }
 
-  def create(assetId: AssetId, token: Option[AssetToken], uploadAsset: UploadAsset[General]): Asset =
+  def create(assetId: AssetId, token: Option[AssetToken], uploadAsset: UploadAsset): Asset = {
+    require(uploadAsset.details.isInstanceOf[AssetDetails])
     Asset(
       id = assetId,
       token = token,
@@ -275,12 +274,13 @@ object Asset {
       encryption = uploadAsset.encryption,
       localSource = uploadAsset.localSource,
       preview = uploadAsset.preview match {
-        case Preview.Uploaded(previewId) => Some(previewId)
-        case _                           => None
+        case Uploaded(previewId) => Some(previewId)
+        case _ => None
       },
-      details = uploadAsset.details,
+      details = uploadAsset.details.asInstanceOf[AssetDetails],
       convId = None
     )
+  }
 
 }
 

@@ -78,25 +78,25 @@ trait StorageCodecs {
   }
 
   implicit val RawPreviewCodec: Codec[Preview, String] = new Codec[Preview, String] {
-    val NotReady = "not_ready"
-    val WithoutPreview = "without"
+    val NotReadyStr = "not_ready"
+    val WithoutPreviewStr = "without"
     val NotUploadedPrefix = "not_uploaded__"
     val UploadedPrefix = "uploaded__"
 
     override def serialize(value: Preview): String = value match {
-      case Preview.NotReady => NotReady
-      case Preview.Empty => WithoutPreview
-      case Preview.NotUploaded(rawAssetId) => NotUploadedPrefix + rawAssetId.str
-      case Preview.Uploaded(assetId) => UploadedPrefix + assetId.str
+      case NotReady => NotReadyStr
+      case Empty => WithoutPreviewStr
+      case NotUploaded(rawAssetId) => NotUploadedPrefix + rawAssetId.str
+      case Uploaded(assetId) => UploadedPrefix + assetId.str
     }
 
     override def deserialize(value: String): Preview = value match {
-      case NotReady => Preview.NotReady
-      case WithoutPreview => Preview.Empty
+      case NotReadyStr => NotReady
+      case WithoutPreviewStr => Empty
       case str if str.startsWith(NotUploadedPrefix) =>
-        Preview.NotUploaded(UploadAssetId(str.substring(NotUploadedPrefix.length)))
+        NotUploaded(UploadAssetId(str.substring(NotUploadedPrefix.length)))
       case str if str.startsWith(UploadedPrefix) =>
-        Preview.Uploaded(AssetId(str.substring(UploadedPrefix.length)))
+        Uploaded(AssetId(str.substring(UploadedPrefix.length)))
     }
   }
 

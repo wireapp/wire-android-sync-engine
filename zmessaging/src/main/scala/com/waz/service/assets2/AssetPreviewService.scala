@@ -17,10 +17,8 @@
  */
 package com.waz.service.assets2
 
-import com.waz.service.assets2.Asset.General
-
 import scala.concurrent.Future
 
 trait AssetPreviewService {
-  def extractPreview(rawAsset: UploadAsset[General], content: PreparedContent): Future[Content]
+  def extractPreview(rawAsset: UploadAsset, content: PreparedContent): Future[Content]
 }

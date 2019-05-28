@@ -173,7 +173,7 @@ trait LogShowInstancesSE {
       l"Asset(id: $id | token: $token | sha: $sha | encryption: $encryption | localSource: $localSource | preview: $preview | details: $details | convId: $convId)"
     }
 
-  implicit val UploadAssetLogShow: LogShow[UploadAsset[UploadAssetDetails]] =
+  implicit val UploadAssetLogShow: LogShow[UploadAsset] =
     LogShow.createFrom { a =>
       import a._
       l"UploadAsset(id: $id)"

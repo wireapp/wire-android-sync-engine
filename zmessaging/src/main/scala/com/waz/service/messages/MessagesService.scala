@@ -51,7 +51,7 @@ trait MessagesService {
 
   def addTextMessage(convId: ConvId, content: String, expectsReadReceipt: ReadReceiptSettings = AllDisabled, mentions: Seq[Mention] = Nil, exp: Option[Option[FiniteDuration]] = None): Future[MessageData]
   def addKnockMessage(convId: ConvId, selfUserId: UserId, expectsReadReceipt: ReadReceiptSettings = AllDisabled): Future[MessageData]
-  def addAssetMessage(convId: ConvId, msgId: MessageId, asset: UploadAsset[General], expectsReadReceipt: ReadReceiptSettings = AllDisabled, exp: Option[Option[FiniteDuration]] = None): Future[MessageData]
+  def addAssetMessage(convId: ConvId, msgId: MessageId, asset: UploadAsset, expectsReadReceipt: ReadReceiptSettings = AllDisabled, exp: Option[Option[FiniteDuration]] = None): Future[MessageData]
   def addLocationMessage(convId: ConvId, content: Location, expectsReadReceipt: ReadReceiptSettings = AllDisabled): Future[MessageData]
   def addReplyMessage(quote: MessageId, content: String, expectsReadReceipt: ReadReceiptSettings = AllDisabled, mentions: Seq[Mention] = Nil, exp: Option[Option[FiniteDuration]] = None): Future[Option[MessageData]]
 
@@ -235,7 +235,7 @@ class MessagesServiceImpl(selfUserId:   UserId,
 
   override def addAssetMessage(convId: ConvId,
                                msgId: MessageId,
-                               asset: UploadAsset[General],
+                               asset: UploadAsset,
                                expectsReadReceipt: ReadReceiptSettings = AllDisabled,
                                exp: Option[Option[FiniteDuration]] = None): Future[MessageData] = {
     import assets2.Asset

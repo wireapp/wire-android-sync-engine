@@ -438,7 +438,7 @@ class ConversationsUiServiceImpl(selfUserId:      UserId,
     } yield resp
 
   //TODO Refactor this. Maybe move some part of this method into UI project
-  private def checkSize(convId: ConvId, rawAsset: UploadAsset[General], message: MessageData, confirmation: WifiWarningConfirmation) = {
+  private def checkSize(convId: ConvId, rawAsset: UploadAsset, message: MessageData, confirmation: WifiWarningConfirmation) = {
     val isAssetLarge = rawAsset.size > LargeAssetWarningThresholdInBytes
     val isAssetTooLarge: Boolean = rawAsset.details match {
       case _: Video => false

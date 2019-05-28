@@ -68,7 +68,7 @@ object GenericContent {
           //TODO Dean giphy source and caption
         }
 
-      def apply(asset: UploadAsset[General]): Original =
+      def apply(asset: UploadAsset): Original =
         returning(new Messages.Asset.Original) { o =>
           o.mimeType = asset.mime.str
           o.size = asset.size
@@ -253,7 +253,7 @@ object GenericContent {
       proto.expectsReadConfirmation = expectsReadConfirmation
     }
 
-    def apply(asset: UploadAsset[General], preview: Option[Asset2], expectsReadConfirmation: Boolean): Messages.Asset =
+    def apply(asset: UploadAsset, preview: Option[Asset2], expectsReadConfirmation: Boolean): Messages.Asset =
       returning(new Messages.Asset) { proto =>
         proto.original = Original(asset)
         preview.foreach(p => proto.preview = Preview(p))

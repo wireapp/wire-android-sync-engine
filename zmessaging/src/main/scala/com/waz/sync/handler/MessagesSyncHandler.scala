@@ -30,7 +30,7 @@ import com.waz.model.GenericMessage.TextMessage
 import com.waz.model._
 import com.waz.model.errors._
 import com.waz.model.sync.ReceiptType
-import com.waz.service.assets2.Asset.{General, Image, UploadGeneral}
+import com.waz.service.assets2.Asset.{General, Image}
 import com.waz.service.assets2.{AssetService, _}
 import com.waz.service.conversation.ConversationsContentUpdater
 import com.waz.service.messages.{MessagesContentUpdater, MessagesService}
@@ -246,14 +246,14 @@ class MessagesSyncHandler(selfUserId: UserId,
     }
 
     //TODO Dean: Update asset status to UploadInProgress after posting original - what about images...?
-    def postOriginal(rawAsset: UploadAsset[General]): CancellableFuture[RemoteInstant] =
+    def postOriginal(rawAsset: UploadAsset): CancellableFuture[RemoteInstant] =
       if (rawAsset.status != UploadAssetStatus.NotStarted) CancellableFuture.successful(msg.time)
       else rawAsset.details match {
         case _: Image => CancellableFuture.successful(msg.time)
         case _ => postAssetMessage(GenericMessage(msg.id.uid, msg.ephemeral, Proto.Asset(rawAsset, None, expectsReadConfirmation = msg.expectsRead.contains(true))), rawAsset.id)
       }
 
-    def sendWithV3(uploadAssetOriginal: UploadAsset[UploadGeneral]): CancellableFuture[RemoteInstant] = {
+    def sendWithV3(uploadAssetOriginal: UploadAsset): CancellableFuture[RemoteInstant] = {
       for {
         rawAssetWithMetadata <- uploadAssetOriginal.details match {
           case details: General => CancellableFuture.successful(uploadAssetOriginal.copy(details = details))
@@ -261,11 +261,11 @@ class MessagesSyncHandler(selfUserId: UserId,
         }
         time <- postOriginal(rawAssetWithMetadata)
         uploadAssetOriginal <- uploadAssetOriginal.preview match {
-          case Preview.NotReady => assets.createAndSavePreview(rawAssetWithMetadata).toCancellable
+          case NotReady => assets.createAndSavePreview(rawAssetWithMetadata).toCancellable
           case _ => CancellableFuture.successful(rawAssetWithMetadata)
         }
         previewAsset <- uploadAssetOriginal.preview match {
-          case Preview.NotUploaded(uploadAssetPreviewId) =>
+          case NotUploaded(uploadAssetPreviewId) =>
             for {
               previewAsset <- assets.uploadAsset(uploadAssetPreviewId)
               proto = GenericMessage(
@@ -275,15 +275,15 @@ class MessagesSyncHandler(selfUserId: UserId,
               )
               _ <- postAssetMessage(proto, uploadAssetOriginal.id)
             } yield Some(previewAsset)
-          case Preview.Uploaded(assetId) =>
+          case Uploaded(assetId) =>
             assetStorage.get(assetId).map(Some.apply).toCancellable
-          case Preview.Empty =>
+          case Empty =>
             CancellableFuture.successful(None)
-          case Preview.NotReady =>
+          case NotReady =>
             CancellableFuture.failed(FailedExpectationsError("We should never get not ready preview in this place"))
         }
         _ <- (previewAsset match {
-          case Some(p) => uploadAssetStorage.update(uploadAssetOriginal.id, _.copy(preview = Preview.Uploaded(p.id)))
+          case Some(p) => uploadAssetStorage.update(uploadAssetOriginal.id, _.copy(preview = Uploaded(p.id)))
           case None => Future.successful(())
         }).toCancellable
         asset <- assets.uploadAsset(uploadAssetOriginal.id)
@@ -342,12 +342,12 @@ class MessagesSyncHandler(selfUserId: UserId,
         case _ => Future.failed(FailedExpectationsError(s"We expect not uploaded asset id. Got ${msg.assetId}."))
       }
       uploadAssetPreview <- uploadAsset.preview match {
-        case Preview.Uploaded(id) => assetStorage.find(id)
+        case Uploaded(id) => assetStorage.find(id)
         case _ => Future.successful(None)
       }
       genericAsset <- uploadAsset.status match {
         case assetStatus if assetStatus == statusToPost =>
-          Future.successful(Proto.Asset(uploadAsset.asInstanceOf[UploadAsset[General]], uploadAssetPreview, expectsReadConfirmation = false))
+          Future.successful(Proto.Asset(uploadAsset.asInstanceOf[UploadAsset], uploadAssetPreview, expectsReadConfirmation = false))
         case assetStatus =>
           Future.failed(FailedExpectationsError(s"We expect uploaded asset status $statusToPost. Got $assetStatus."))
       }
