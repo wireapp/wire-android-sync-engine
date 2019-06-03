@@ -25,6 +25,7 @@ import com.waz.znet2.WebSocketFactory.SocketEvent
 import com.waz.znet2.http.{Body, Request}
 import okio.ByteString
 import org.json.JSONObject
+import java.util.concurrent.TimeUnit
 
 import scala.util.Try
 
@@ -56,7 +57,9 @@ object OkHttpWebSocketFactory extends WebSocketFactory with DerivedLogTag {
   import HttpClientOkHttpImpl.convertHttpRequest
 
   //TODO Should be created somewhere outside
-  private lazy val okHttpClient = new OkHttpClient()
+  private lazy val okHttpClient = new OkHttpClient.Builder()
+                                      .pingInterval(30000,  TimeUnit.MILLISECONDS)
+                                      .build();
 
   override def openWebSocket(request: Request[Body]): EventStream[SocketEvent] = {
     new EventStream[SocketEvent] {
