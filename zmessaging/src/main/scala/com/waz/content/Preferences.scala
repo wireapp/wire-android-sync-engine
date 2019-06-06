@@ -19,6 +19,7 @@ package com.waz.content
 
 import android.content.SharedPreferences.OnSharedPreferenceChangeListener
 import android.content.{Context, SharedPreferences}
+import com.waz.api.ZmsVersion
 import com.waz.content.Preferences.Preference.PrefCodec
 import com.waz.content.Preferences.{PrefKey, Preference}
 import com.waz.log.BasicLogging.LogTag
@@ -378,7 +379,7 @@ object GlobalPreferences {
 
   lazy val ShouldCreateFullConversation = PrefKey[Boolean]("should_create_full_conv", customDefault = false)
 
-  lazy val LogsEnabled: PrefKey[Boolean] = PrefKey[Boolean]("logs_enabled", customDefault = false)
+  lazy val LogsEnabled: PrefKey[Boolean] = PrefKey[Boolean]("save_local_logs", customDefault = ZmsVersion.DEBUG)
 
 
   //DEPRECATED!!! Use the UserPreferences instead!!
@@ -446,7 +447,7 @@ object UserPreferences {
   //increment number to perform slow sync on particular type
   lazy val ShouldSyncConversations          = PrefKey[Boolean]("should_sync_conversations_1", customDefault = true)
   lazy val ShouldSyncInitial                = PrefKey[Boolean]("should_sync_initial_1", customDefault = true)
-  lazy val ShouldSyncUsers                  = PrefKey[Boolean]("should_sync_users", customDefault = true)
+  lazy val ShouldSyncUsers                  = PrefKey[Boolean]("should_sync_users_1", customDefault = true)
   lazy val ShouldSyncTeam                   = PrefKey[Boolean]("should_sync_team", customDefault = true)
 
   // fix for duplicated entries in the database, left there by a bug from an old version of the app
@@ -455,5 +456,8 @@ object UserPreferences {
   lazy val CheckMutedStatus                 = PrefKey[Boolean]("check_muted_status", customDefault = true)
 
   lazy val ReadReceiptsRemotelyChanged      = PrefKey[Boolean]("read_receipts_remotely_changed", customDefault = false)
+
+  lazy val StatusNotificationsBitmask       = PrefKey[Int]("status_notifications_bitmask", customDefault = 0)
+  lazy val ShouldWarnStatusNotifications    = PrefKey[Boolean]( "should_warn_status_notifications", customDefault = true)
 
 }

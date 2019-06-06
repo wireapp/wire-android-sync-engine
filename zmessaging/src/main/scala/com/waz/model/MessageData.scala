@@ -483,11 +483,7 @@ object MessageData extends ((MessageId, ConvId, Message.Type, UserId, Seq[Messag
           case (1, Message.Part.Type.TEXT_EMOJI_ONLY) => (Message.Type.TEXT_EMOJI_ONLY, ct)
           case _ => (Message.Type.RICH_MEDIA, ct)
         }
-        (ct.size, ct.head.tpe) match {
-          case (1, Message.Part.Type.TEXT) => (Message.Type.TEXT, ct)
-          case (1, Message.Part.Type.TEXT_EMOJI_ONLY) => (Message.Type.TEXT_EMOJI_ONLY, ct)
-          case _ => (Message.Type.RICH_MEDIA, ct)
-        }
+        
       } else {
         // apply links
         def linkEnd(offset: Int) = {

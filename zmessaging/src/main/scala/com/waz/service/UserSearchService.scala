@@ -29,8 +29,8 @@ import com.waz.service.ZMessaging.clock
 import com.waz.service.conversation.{ConversationsService, ConversationsUiService}
 import com.waz.service.teams.TeamsService
 import com.waz.sync.SyncServiceHandle
-import com.waz.sync.client.UserSearchClient.UserSearchEntry
-import com.waz.threading.Threading
+import com.waz.sync.client.UserSearchClient.UserSearchResponse
+import com.waz.threading.{CancellableFuture, Threading}
 import com.waz.utils._
 import com.waz.utils.events._
 
@@ -255,20 +255,21 @@ class UserSearchService(selfUserId:           UserId,
     } yield SearchResults(top, local, convs, dir)
   }
 
-  def updateSearchResults(query: SearchQuery, results: Seq[UserSearchEntry]) = {
+  def updateSearchResults(query: SearchQuery, results: UserSearchResponse) = {
 
     def updating(ids: Vector[UserId])(cached: SearchQueryCache) =
       cached.copy(query, clock.instant(), if (ids.nonEmpty || cached.entries.isEmpty) Some(ids) else cached.entries)
 
-    val ids = results.map(_.id)(breakOut): Vector[UserId]
+    val users = unapply(results)
+    val ids = users.map(_.id)(breakOut): Vector[UserId]
 
     for {
-      updated <- userService.updateUsers(results)
+      updated <- userService.updateUsers(users)
       _       <- userService.syncIfNeeded(updated.map(_.id), Duration.Zero)
       _       <- queryCache.updateOrCreate(query, updating(ids), SearchQueryCache(query, clock.instant(), Some(ids)))
     } yield ()
 
-    if (!results.map(_.handle).exists(_.exactMatchQuery(query.filter))) {
+    if (!users.map(_.handle).exists(_.exactMatchQuery(query.filter))) {
       sync.exactMatchHandle(Handle(query.filter))
     }
 
@@ -347,4 +348,23 @@ object UserSearchService {
 
   val MinCommonConnections = 4
   val MaxTopPeople = 10
+
+  /**
+    * Model object extracted from `UserSearchResponse`.
+    */
+  case class UserSearchEntry(id: UserId, name: Name, colorId: Option[Int], handle: Handle)
+
+  object UserSearchEntry {
+    def apply(searchUser: UserSearchResponse.User): UserSearchEntry = {
+      import searchUser._
+      UserSearchEntry(UserId(id), Name(name), accent_id, Handle(handle))
+    }
+  }
+
+  /**
+    * Extracts `UserSearchEntry` objects contained within the given search response.
+    */
+  def unapply(response: UserSearchResponse): Seq[UserSearchEntry] = {
+    response.documents.map(UserSearchEntry.apply)
+  }
 }

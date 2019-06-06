@@ -20,32 +20,32 @@ package com.waz.sync.client
 import java.net.URL
 
 import com.waz.api.impl.ErrorResponse
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model._
 import com.waz.service.BackendConfig
-import com.waz.utils.wrappers.URI
 import com.waz.znet2.http.{HttpClient, Method, Request}
+import com.waz.log.LogSE._
 
 trait VersionBlacklistClient {
   def loadVersionBlacklist(): ErrorOrResponse[VersionBlacklist]
 }
 
 class VersionBlacklistClientImpl(backendConfig: BackendConfig)
-                                (implicit httpClient: HttpClient) extends VersionBlacklistClient {
+                                (implicit httpClient: HttpClient) extends VersionBlacklistClient with DerivedLogTag {
 
   import HttpClient.dsl._
   import HttpClient.AutoDerivationOld._
-  import VersionBlacklistClientImpl._
 
   def loadVersionBlacklist(): ErrorOrResponse[VersionBlacklist] = {
-    Request.create(method = Method.Get, url = blacklistsUrl(backendConfig.environment))
+    val url = blacklistsUrl
+    verbose(l"Loading blacklist from: $url")
+    Request.create(method = Method.Get, url)
       .withResultType[VersionBlacklist]
       .withErrorType[ErrorResponse]
       .executeSafe
   }
-}
 
-object VersionBlacklistClientImpl {
-  def blacklistsUrl(env: String): URL = new URL(
-    URI.parse(s"https://clientblacklist.wire.com/${Option(env) filterNot (_.isEmpty) getOrElse "prod"}/android").toString
-  )
+  def blacklistsUrl: URL = {
+    new URL(backendConfig.blacklistHost.buildUpon.appendPath("android").build.toString)
+  }
 }

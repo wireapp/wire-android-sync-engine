@@ -18,19 +18,19 @@
 package com.waz.service
 
 import com.waz.log.LogSE._
-import com.waz.content._
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
+import com.waz.content._
 import com.waz.model.AccountData.Password
 import com.waz.model.UserData.{ConnectionStatus, Picture}
 import com.waz.model.{AccentColor, _}
 import com.waz.service.EventScheduler.Stage
+import com.waz.service.UserSearchService.UserSearchEntry
 import com.waz.service.UserService._
 import com.waz.service.assets2._
 import com.waz.service.conversation.SelectedConversationService
 import com.waz.service.push.PushService
 import com.waz.sync.SyncServiceHandle
 import com.waz.sync.client.AssetClient2.Retention
-import com.waz.sync.client.UserSearchClient.UserSearchEntry
 import com.waz.sync.client.{CredentialsUpdateClient, ErrorOr, UsersClient}
 import com.waz.threading.{CancellableFuture, SerialDispatchQueue, Threading}
 import com.waz.utils._

@@ -224,14 +224,16 @@ class ConversationsUiServiceImpl(selfUserId:      UserId,
   override def setConversationArchived(id: ConvId, archived: Boolean): Future[Option[ConversationData]] = convs.setConversationArchived(id, archived)
 
   override def setConversationMuted(id: ConvId, muted: MuteSet): Future[Option[ConversationData]] =
-    convsContent.updateConversationMuted(id, muted) map {
-      case Some((_, conv)) =>
-        sync.postConversationState(
-          id,
-          ConversationState(muted = Some(conv.muted.oldMutedFlag), muteTime = Some(conv.muteTime), mutedStatus = Some(conv.muted.toInt))
-        )
-        Some(conv)
-      case None => None
+    convsContent.updateLastEvent(id, LocalInstant.Now.toRemote(currentBeDrift)).flatMap { _ =>
+      convsContent.updateConversationMuted(id, muted) map {
+        case Some((_, conv)) =>
+          sync.postConversationState(
+            id,
+            ConversationState(muted = Some(conv.muted.oldMutedFlag), muteTime = Some(conv.muteTime), mutedStatus = Some(conv.muted.toInt))
+          )
+          Some(conv)
+        case None => None
+      }
     }
 
   override def setConversationName(id: ConvId, name: Name): Future[Option[ConversationData]] = {
@@ -342,6 +344,9 @@ class ConversationsUiServiceImpl(selfUserId:      UserId,
         onlyUs     = allMembers.groupBy { case (c, _) => c }.map { case (cid, us) => cid -> us.map(_._2).toSet }.collect { case (c, us) if us == Set(other, selfUserId) => c }
         convs      <- convStorage.getAll(onlyUs).map(_.flatten)
       } yield {
+        verbose(l"allConvs size: ${allConvs.size}")
+        verbose(l"allMembers size: ${allMembers.size}")
+        verbose(l"OnlyUs convs size: ${onlyUs.size}")
         if (convs.size > 1)
           warn(l"Found ${convs.size} available team conversations with user: $other, returning first conversation found")
         else verbose(l"Found ${convs.size} convs with other user: $other")
