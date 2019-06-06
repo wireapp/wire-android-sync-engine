@@ -358,7 +358,8 @@ object GlobalPreferences {
   //TODO think of a nicer way of ensuring that these key values are used in UI - right now, we need to manually check they're correct
   lazy val AutoAnswerCallPrefKey   = PrefKey[Boolean]("PREF_KEY_AUTO_ANSWER_ENABLED")
   lazy val V31AssetsEnabledKey     = PrefKey[Boolean]("PREF_V31_ASSETS_ENABLED")
-  lazy val WsForegroundKey         = PrefKey[Boolean]("websocket_foreground_service_enabled", customDefault = true)
+  lazy val WsForegroundKey         = PrefKey[Boolean]("websocket_foreground_service_enabled_1", customDefault = false)
+  lazy val CheckedForPlayServices  = PrefKey[Boolean]("checked_for_google_play_services", customDefault = false)
   lazy val SkipTerminatingState    = PrefKey[Boolean]("skip_terminating_state") //for calling
 
   lazy val PushEnabledKey          = PrefKey[Boolean]("PUSH_ENABLED", customDefault = true)
