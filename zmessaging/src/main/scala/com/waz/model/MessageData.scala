@@ -44,6 +44,7 @@ import org.threeten.bp.Instant.now
 
 import scala.collection.breakOut
 import scala.concurrent.duration._
+import scala.util.matching.Regex
 
 case class MessageData(override val id: MessageId              = MessageId(),
                        convId:          ConvId                 = ConvId(),
@@ -117,16 +118,13 @@ case class MessageData(override val id: MessageId              = MessageId(),
 
   def hasMentionOf(userId: UserId): Boolean = mentions.exists(_.userId.forall(_ == userId)) // a mention with userId == None is a "mention" of everyone, so it counts
 
-  lazy val imageDimensions: Option[Dim2] = {
-    val dims = protos.collectFirst {
+  lazy val imageDimensions: Option[Dim2] =
+    protos.collectFirst {
       case GenericMessageContent(Asset(AssetData.WithDimensions(d), _)) => d
       case GenericMessageContent(ImageAsset(AssetData.WithDimensions(d))) => d
     } orElse content.headOption.collect {
       case MessageContent(_, _, _, _, Some(_), w, h, _, _) => Dim2(w, h)
     }
-    verbose(l"dims $dims")
-    dims
-  }
 
   lazy val location =
     protos.collectFirst {
@@ -283,16 +281,22 @@ object MessageContent extends ((Message.Part.Type, String, Option[MediaAssetData
   }
 }
 
-object MessageData extends ((MessageId, ConvId, Message.Type, UserId, Seq[MessageContent], Seq[GenericMessage], Boolean,
+object MessageData extends
+  ((MessageId, ConvId, Message.Type, UserId, Seq[MessageContent], Seq[GenericMessage], Boolean,
   Set[UserId], Option[UserId], Option[String], Option[Name], Message.Status, RemoteInstant, LocalInstant, RemoteInstant,
   Option[FiniteDuration], Option[LocalInstant], Boolean, Option[FiniteDuration], Option[GeneralAssetId], Option[QuoteContent],
-  Option[Int]) => MessageData) {
+  Option[Int]) => MessageData) with DerivedLogTag {
 
   val Empty = new MessageData(MessageId(""), ConvId(""), Message.Type.UNKNOWN, UserId(""))
   val Deleted = new MessageData(MessageId(""), ConvId(""), Message.Type.UNKNOWN, UserId(""), state = Message.Status.DELETED)
   val isUserContent = Set(TEXT, TEXT_EMOJI_ONLY, ASSET, ANY_ASSET, VIDEO_ASSET, AUDIO_ASSET, RICH_MEDIA, LOCATION, KNOCK)
 
   val EphemeralMessageTypes = Set(TEXT, TEXT_EMOJI_ONLY, KNOCK, ASSET, ANY_ASSET, VIDEO_ASSET, AUDIO_ASSET, RICH_MEDIA, LOCATION)
+
+  // A markdown link looks like that: [place for the text](here.goes.the.link)
+  // Links of this type will be handled by our Markdown library, we should ignore them here.
+  val markdownLinkPattern = """\[.+?\]\((.+?)\)""".r
+  val markdownReferencePattern = """(?m)^\[.+?\]:\s*(\S+)(\s+\".+\")?$""".r
 
   type MessageState = Message.Status
   import GenericMessage._
@@ -493,8 +497,12 @@ object MessageData extends ((MessageId, ConvId, Message.Type, UserId, Seq[Messag
 
         val res = new MessageContentBuilder
 
-        val end = links.sortBy(_.urlOffset).foldLeft(0) { case (prevEnd, link) =>
-          if (link.urlOffset > prevEnd) res ++= RichMediaContentParser.splitContent(message.substring(prevEnd, link.urlOffset), mentions, prevEnd)
+        val markdownLinks = markdownLinkPattern.findAllMatchIn(message).map(_.group(1)).toSet ++ markdownReferencePattern.findAllMatchIn(message).map(_.group(1)).toSet
+        verbose(l"ignored markdown links: $markdownLinks")
+
+        val end = links.filterNot(l => markdownLinks.contains(l.url)).sortBy(_.urlOffset).foldLeft(0) {
+          case (prevEnd, link) =>
+            if (link.urlOffset > prevEnd) res ++= RichMediaContentParser.splitContent(message.substring(prevEnd, link.urlOffset), mentions, prevEnd)
 
           returning(linkEnd(link.urlOffset)) { end =>
             if (end > link.urlOffset) {
