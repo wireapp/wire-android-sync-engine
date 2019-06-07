@@ -17,6 +17,8 @@
  */
 package com.waz.utils
 
+import java.util.concurrent.{BlockingQueue, LinkedBlockingQueue}
+
 import android.support.v4.util.LruCache
 import com.waz.content.Database
 import com.waz.db.DaoIdOps
@@ -208,6 +210,8 @@ trait CachedStorage[K, V <: Identifiable[K]] {
   def onDeleted: EventStream[Seq[K]]
   def onChanged: EventStream[Seq[V]]
 
+  def blockStreams(block: Boolean): Unit
+
   protected def load(key: K)(implicit db: DB): Option[V]
   protected def load(keys: Set[K])(implicit db: DB): Seq[V]
   protected def save(values: Seq[V])(implicit db: DB): Unit
@@ -266,6 +270,29 @@ class CachedStorageImpl[K, V <: Identifiable[K]](cache: LruCache[K, Option[V]], 
   val onAdded = EventStream[Seq[V]]()
   val onUpdated = EventStream[Seq[(V, V)]]()
   val onDeleted = EventStream[Seq[K]]()
+
+  private val onAddedQueue:   BlockingQueue[Seq[V]]     = new LinkedBlockingQueue[Seq[V]]
+  private val onUpdatedQueue: BlockingQueue[Seq[(V,V)]] = new LinkedBlockingQueue[Seq[(V,V)]]
+  private val onDeletedQueue: BlockingQueue[Seq[K]]     = new LinkedBlockingQueue[Seq[K]]
+  private var streamsBlocked = false
+
+  override def blockStreams(block: Boolean): Unit = if (block != streamsBlocked) {
+    if (!block) {
+      while(!onAddedQueue.isEmpty) onAdded ! onAddedQueue.take()
+      while(!onUpdatedQueue.isEmpty) onUpdated ! onUpdatedQueue.take()
+      while(!onDeletedQueue.isEmpty) onDeleted ! onDeletedQueue.take()
+    }
+    streamsBlocked = block
+  }
+
+  private def tellAdded(events: Seq[V]): Unit =
+    if (!streamsBlocked) onAdded ! events else onAddedQueue.put(events)
+
+  private def tellUpdated(events: Seq[(V,V)]): Unit =
+    if (!streamsBlocked) onUpdated ! events else onUpdatedQueue.put(events)
+
+  private def tellDeleted(events: Seq[K]): Unit =
+    if (!streamsBlocked) onDeleted ! events else onDeletedQueue.put(events)
 
   val onChanged = onAdded.union(onUpdated.map(_.map(_._2)))
 
@@ -400,7 +427,7 @@ class CachedStorageImpl[K, V <: Identifiable[K]](cache: LruCache[K, Option[V]], 
         if (updated.isEmpty) Future.successful(Vector.empty)
         else
           db(save(updated.map(_._2))(_)).future.map { _ =>
-            onUpdated ! updated
+            tellUpdated(updated)
             updated
           }
       }
@@ -443,8 +470,8 @@ class CachedStorageImpl[K, V <: Identifiable[K]](cache: LruCache[K, Option[V]], 
         val updatedResult = updated.result
 
         db(save(toSave.result)(_)).future.map { _ =>
-          if (addedResult.nonEmpty) onAdded ! addedResult
-          if (updatedResult.nonEmpty) onUpdated ! updatedResult
+          if (addedResult.nonEmpty) tellAdded(addedResult)
+          if (updatedResult.nonEmpty) tellUpdated(updatedResult)
           result
         }
       }
@@ -453,7 +480,7 @@ class CachedStorageImpl[K, V <: Identifiable[K]](cache: LruCache[K, Option[V]], 
   private def addInternal(key: K, value: V): Future[V] = {
     cache.put(key, Some(value))
     db(save(Seq(value))(_)).future.map { _ =>
-      onAdded ! Seq(value)
+      tellAdded(Seq(value))
       value
     }
   }
@@ -464,7 +491,7 @@ class CachedStorageImpl[K, V <: Identifiable[K]](cache: LruCache[K, Option[V]], 
     else {
       cache.put(key, Some(updated))
       db(save(Seq(updated))(_)).future.map { _ =>
-        onUpdated ! Seq((current, updated))
+        tellUpdated(Seq((current, updated)))
         Some((current, updated))
       }
     }
@@ -477,22 +504,16 @@ class CachedStorageImpl[K, V <: Identifiable[K]](cache: LruCache[K, Option[V]], 
   def remove(key: K): Future[Unit] = Future {
     cache.put(key, None)
     db(delete(Seq(key))(_)).future.map { _ =>
-      onDeleted ! Seq(key)
+      tellDeleted(Seq(key))
     }
   } .flatten
 
   def removeAll(keys: Iterable[K]): Future[Unit] = Future {
     keys foreach { key => cache.put(key, None) }
     db(delete(keys)(_)).future.map { _ =>
-      onDeleted ! keys.toVector
+      tellDeleted(keys.toVector)
     }
   } .flatten
-
-  private val changesStream = EventStream.union[Seq[ContentChange[K, V]]](
-    onAdded.map(_.map(d => Added(d.id, d))),
-    onUpdated.map(_.map { case (prv, curr) => Updated(prv.id, prv, curr) }),
-    onDeleted.map(_.map(Removed(_)))
-  )
 
   def cacheIfNotPresent(key: K, value: V) = cachedOrElse(key, Future {
     Option(cache.get(key)).getOrElse { returning(Some(value))(cache.put(key, _)) }

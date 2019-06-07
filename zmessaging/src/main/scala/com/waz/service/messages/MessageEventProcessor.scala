@@ -56,11 +56,11 @@ class MessageEventProcessor(selfUserId:          UserId,
   private implicit val ec = EventContext.Global
 
   val messageEventProcessingStage = EventScheduler.Stage[MessageEvent] { (convId, events) =>
-    verbose(l"got events to process: $events")
     convs.processConvWithRemoteId(convId, retryAsync = true) { conv =>
       verbose(l"processing events for conv: $conv, events: $events")
       convsService.isGroupConversation(conv.id).flatMap { isGroup =>
-        processEvents(conv, isGroup, events)
+        storage.blockStreams(true)
+        returning(processEvents(conv, isGroup, events)){ _ => storage.blockStreams(false) }
       }
     }
   }
@@ -116,10 +116,13 @@ class MessageEventProcessor(selfUserId:          UserId,
       case _ => true
     }.map(_.from).toSet
 
+    verbose(l"SYNC process events")
+
     for {
       eventData <- localDataForEvents(toProcess)
       modifications = eventData.map(eald => createModifications(conv, isGroup, eald))
       msgs = modifications.collect { case m if m.message != MessageData.Empty => m.message }
+      _     = verbose(l"SYNC messages from events: ${msgs.map(m => m.id -> m.msgType)}")
       _     <- convsService.addUnexpectedMembersToConv(conv.id, potentiallyUnexpectedMembers)
       res   <- content.addMessages(conv.id, msgs)
       _     <- Future.traverse(modifications.flatMap(_.assets))(assets.save)
@@ -127,6 +130,7 @@ class MessageEventProcessor(selfUserId:          UserId,
       _     <- deleteCancelled(modifications)
       _     <- Future.traverse(recalls) { case (GenericMessage(id, MsgRecall(ref)), user, time) => msgsService.recallMessage(conv.id, ref, user, MessageId(id.str), time, Message.Status.SENT) }
       _     <- RichFuture.traverseSequential(edits) { case (gm @ GenericMessage(_, MsgEdit(_, Text(_, _, _, _))), user, time) => msgsService.applyMessageEdit(conv.id, user, time, gm) } // TODO: handle mentions in case of MsgEdit
+      _ = verbose(l"SYNC processing events finished")
     } yield res
   }
 

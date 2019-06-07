@@ -61,7 +61,7 @@ class SyncExecutor(account:     UserId,
         withJob(execute)
       }.flatMap {
         case Retry(_) => apply(job)
-        case res => Future.successful(res)
+        case res      => Future.successful(res)
       }
     }
   }

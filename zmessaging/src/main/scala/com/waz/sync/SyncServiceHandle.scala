@@ -21,6 +21,7 @@ import com.waz.api.IConversation.{Access, AccessRole}
 import com.waz.api.NetworkMode
 import com.waz.content.UserPreferences
 import com.waz.content.UserPreferences.{ShouldSyncConversations, ShouldSyncInitial}
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model.UserData.ConnectionStatus
 import com.waz.model.otr.ClientId
 import com.waz.model.sync.SyncJob.Priority
@@ -31,6 +32,8 @@ import com.waz.service.assets2.UploadAssetStatus
 import com.waz.sync.SyncResult.Failure
 import com.waz.threading.Threading
 import org.threeten.bp.Instant
+
+import com.waz.log.LogSE._
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
@@ -94,7 +97,8 @@ trait SyncServiceHandle {
   def performFullSync(): Future[Unit]
 }
 
-class AndroidSyncServiceHandle(account: UserId, service: SyncRequestService, timeouts: Timeouts, userPreferences: UserPreferences) extends SyncServiceHandle {
+class AndroidSyncServiceHandle(account: UserId, service: SyncRequestService, timeouts: Timeouts, userPreferences: UserPreferences)
+  extends SyncServiceHandle with DerivedLogTag {
 
   import Threading.Implicits.Background
   import com.waz.model.sync.SyncRequest._
@@ -175,16 +179,21 @@ class AndroidSyncServiceHandle(account: UserId, service: SyncRequestService, tim
 
   def postSessionReset(conv: ConvId, user: UserId, client: ClientId) = addRequest(PostSessionReset(conv, user, client))
 
-  override def performFullSync(): Future[Unit] = for {
-    id1 <- syncSelfUser()
-    id2 <- syncSelfClients()
-    id3 <- syncSelfPermissions()
-    id4 <- syncTeam()
-    id5 <- syncConversations()
-    id6 <- syncConnections()
-    id7 <- syncProperties()
-    _ <- service.await(Set(id1, id2, id3, id4, id5, id6, id7))
-  } yield ()
+  override def performFullSync(): Future[Unit] = {
+    verbose(l"SYNC performFullSync")
+    for {
+      id1 <- syncSelfUser()
+      id2 <- syncSelfClients()
+      id3 <- syncSelfPermissions()
+      id4 <- syncTeam()
+      id5 <- syncConversations()
+      id6 <- syncConnections()
+      id7 <- syncProperties()
+      _ = verbose(l"SYNC waiting for full sync to finish...")
+      _ <- service.await(Set(id1, id2, id3, id4, id5, id6, id7))
+      _ = verbose(l"SYNC ... and done")
+    } yield ()
+  }
 }
 
 trait SyncHandler {

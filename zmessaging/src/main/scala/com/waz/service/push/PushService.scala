@@ -118,16 +118,19 @@ class PushServiceImpl(selfUserId:           UserId,
 
   notificationStorage.registerEventHandler { () =>
     Serialized.future(PipelineKey) {
+      verbose(l"SYNC events processing started")
+      val t = System.currentTimeMillis()
       for {
         _ <- Future.successful(processing ! true)
         _ <- processEncryptedRows()
         _ <- processDecryptedRows()
         _ <- Future.successful(processing ! false)
+        _ = verbose(l"SYNC events processing finished, time: ${System.currentTimeMillis() - t}ms")
       } yield {}
     }.recover {
       case ex =>
         processing ! false
-        error(l"Unable to process events: $ex")
+        error(l"SYNC Unable to process events: $ex")
     }
   }
 
@@ -192,7 +195,10 @@ class PushServiceImpl(selfUserId:           UserId,
       else fetchInProgress.flatMap(_ => storeNotifications(notifications))
   }
 
-  wsPushService.connected().onChanged.map(WebSocketChange).on(dispatcher)(syncHistory(_))
+  wsPushService.connected().onChanged.map(WebSocketChange).on(dispatcher){ source =>
+    verbose(l"sync history due to web socket change")
+    syncHistory(source)
+  }
 
   private def storeNotifications(notifications: Seq[PushNotificationEncoded]): Future[Unit] =
     Serialized.future(PipelineKey)(async {
@@ -218,7 +224,7 @@ class PushServiceImpl(selfUserId:           UserId,
   protected[push] val waitingForRetry: SourceSignal[Boolean] = Signal(false).disableAutowiring()
 
   override def syncHistory(source: SyncSource, withRetries: Boolean = true): Future[Unit] = {
-
+    verbose(l"SYNC syncHistory($source, $withRetries)")
     def load(lastId: Option[Uid], firstSync: Boolean = false, attempts: Int = 0): CancellableFuture[Results] =
       (lastId match {
         case None => if (firstSync) client.loadLastNotification(clientId) else client.loadNotifications(None, clientId)
