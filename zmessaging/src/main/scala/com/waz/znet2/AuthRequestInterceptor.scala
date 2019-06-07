@@ -24,8 +24,11 @@ import com.waz.znet2.http.HttpClient.ProgressCallback
 import com.waz.znet2.http._
 import com.waz.log.LogSE._
 
-class AuthRequestInterceptor(authManager: AuthenticationManager, httpClient: HttpClient, attеmptsIfAuthFailed: Int = 1)
-    extends RequestInterceptor with DerivedLogTag {
+trait AuthRequestInterceptor extends RequestInterceptor
+
+@deprecated("Use [com.waz.znet2.AuthRequestInterceptorImpl] instead.", "?")
+class AuthRequestInterceptorOld(authManager: AuthenticationManager, httpClient: HttpClient, attеmptsIfAuthFailed: Int = 1)
+    extends AuthRequestInterceptor with DerivedLogTag {
 
   import com.waz.threading.Threading.Implicits.Background
 
@@ -47,7 +50,7 @@ class AuthRequestInterceptor(authManager: AuthenticationManager, httpClient: Htt
       verbose(l"Got 'Unauthorized' error. Retrying... Attempts left: ${attеmptsIfAuthFailed - 1}")
       CancellableFuture.lift(authManager.invalidateToken()).flatMap { _ =>
         httpClient.execute(
-          request.copy(interceptor = new AuthRequestInterceptor(authManager, httpClient, attеmptsIfAuthFailed - 1)),
+          request.copy(interceptor = new AuthRequestInterceptorOld(authManager, httpClient, attеmptsIfAuthFailed - 1)),
           uploadCallback,
           downloadCallback
         )
@@ -56,10 +59,10 @@ class AuthRequestInterceptor(authManager: AuthenticationManager, httpClient: Htt
 
 }
 
-class AuthRequestInterceptor2(authManager: AuthenticationManager2,
-                              httpClient: HttpClient,
-                              attеmptsIfAuthFailed: Int = 1)
-    extends RequestInterceptor with DerivedLogTag {
+class AuthRequestInterceptorImpl(authManager: AuthenticationManager2,
+                                 httpClient: HttpClient,
+                                 attеmptsIfAuthFailed: Int = 1)
+    extends AuthRequestInterceptor with DerivedLogTag {
 
   import com.waz.threading.Threading.Implicits.Background
 
@@ -81,7 +84,7 @@ class AuthRequestInterceptor2(authManager: AuthenticationManager2,
       verbose(l"Got 'Unauthorized' error. Retrying... Attempts left: ${attеmptsIfAuthFailed - 1}")
       CancellableFuture.lift(authManager.invalidateToken()).flatMap { _ =>
         httpClient.execute(
-          request.copy(interceptor = new AuthRequestInterceptor2(authManager, httpClient, attеmptsIfAuthFailed - 1)),
+          request.copy(interceptor = new AuthRequestInterceptorImpl(authManager, httpClient, attеmptsIfAuthFailed - 1)),
           uploadCallback,
           downloadCallback
         )

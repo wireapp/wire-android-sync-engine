@@ -17,110 +17,65 @@
  */
 package com.waz.service.assets2
 
-import java.net.URI
-
 import android.content.Context
-import com.waz.cache2.CacheService.{AES_CBC_Encryption, Encryption, NoEncryption}
-import com.waz.db.{ColumnBuilders, Dao}
+import com.waz.db.{ ColumnBuilders, Dao }
 import com.waz.model._
-import com.waz.service.assets2.Asset._
-import com.waz.service.assets2.AssetStorageImpl.{AssetDao, Codec}
+import com.waz.service.assets2.AssetStorageImpl.AssetDao
 import com.waz.utils.TrimmingLruCache.Fixed
-import com.waz.utils.wrappers.{DB, DBCursor}
-import com.waz.utils.{CachedStorage2, CirceJSONSupport, DbStorage2, InMemoryStorage2, ReactiveStorage2, ReactiveStorageImpl2, Storage2, TrimmingLruCache}
-import io.circe.parser.decode
-import io.circe.syntax._
-import io.circe.{Decoder, Encoder}
+import com.waz.utils.wrappers.{ DB, DBCursor }
+import com.waz.utils.{
+  CachedStorage2,
+  CirceJSONSupport,
+  DbStorage2,
+  InMemoryStorage2,
+  ReactiveStorage2,
+  ReactiveStorageImpl2,
+  TrimmingLruCache
+}
+import io.circe.Decoder
 
 import scala.concurrent.ExecutionContext
 
-trait AssetStorage extends ReactiveStorage2[AssetId, Asset[General]]
+trait AssetStorage extends ReactiveStorage2[AssetId, Asset]
 
-class AssetStorageImpl(context: Context, db: DB, ec: ExecutionContext) extends ReactiveStorageImpl2(
-  new CachedStorage2[AssetId, Asset[General]](
-    new DbStorage2(AssetDao)(ec, db),
-    new InMemoryStorage2[AssetId, Asset[General]](new TrimmingLruCache(context, Fixed(8)))(ec)
-  )(ec)
-) with AssetStorage
+class AssetStorageImpl(context: Context, db: DB, ec: ExecutionContext)
+    extends ReactiveStorageImpl2(
+      new CachedStorage2[AssetId, Asset](
+        new DbStorage2(AssetDao)(ec, db),
+        new InMemoryStorage2[AssetId, Asset](new TrimmingLruCache(context, Fixed(8)))(ec)
+      )(ec)
+    )
+    with AssetStorage
 
 object AssetStorageImpl {
 
-  trait Codec[From, To] {
-    def serialize(value: From): To
-    def deserialize(value: To): From
-  }
+  object AssetDao
+      extends Dao[Asset, AssetId]
+      with ColumnBuilders[Asset]
+      with StorageCodecs
+      with CirceJSONSupport {
 
-  object Codec {
-    def create[From, To](to: From => To, from: To => From): Codec[From, To] =
-      new Codec[From, To] {
-        override def serialize(value: From): To   = to(value)
-        override def deserialize(value: To): From = from(value)
-      }
-  }
-
-  object AssetDao extends Dao[Asset[General], AssetId] with ColumnBuilders[Asset[General]] with StorageCodecs with CirceJSONSupport {
+    val dec = Decoder[LocalSource]
 
     val Id         = asText(_.id)('_id, "PRIMARY KEY")
     val Token      = asTextOpt(_.token)('token)
-    val Type       = text(getAssetTypeString)('type)
+    val Name       = text(_.name)('name)
     val Encryption = asText(_.encryption)('encryption)
+    val Mime       = asText(_.mime)('mime)
     val Sha        = asBlob(_.sha)('sha)
+    val Size       = long(_.size)('size)
     val Source     = asTextOpt(_.localSource)('source)
     val Preview    = asTextOpt(_.preview)('preview)
     val Details    = asText(_.details)('details)
     val ConvId     = asTextOpt(_.convId)('conversation_id)
 
     override val idCol = Id
-    override val table = Table("Assets", Id, Token, Type, Encryption, Sha, Source, Details, ConvId)
+    override val table =
+      Table("Assets2", Id, Token, Name, Encryption, Mime, Sha, Size, Source, Preview, Details, ConvId)
 
-    private val Image = "image"
-    private val Audio = "audio"
-    private val Video = "video"
-    private val Blob  = "blob"
-
-    override def apply(implicit cursor: DBCursor): Asset[General] = {
-      Asset(Id, Token, Sha, Encryption, Source, Preview, Details, ConvId)
-    }
-
-    private def getAssetTypeString(asset: Asset[General]): String = asset.details match {
-      case _: Image => Image
-      case _: Audio => Audio
-      case _: Video => Video
-      case _: Blob  => Blob
-    }
+    override def apply(implicit cursor: DBCursor): Asset =
+      Asset(Id, Token, Sha, Mime, Encryption, Source, Preview, Name, Size, Details, ConvId)
 
   }
-
-}
-
-trait StorageCodecs {
-
-  implicit val EncryptionCodec: Codec[Encryption, String] = new Codec[Encryption, String] {
-    val Unencrypted    = ""
-    val AES_CBC_Prefix = "AES_CBS__"
-    val AES_GCM_Prefix = "AES_GCM__"
-
-    override def serialize(value: Encryption): String = value match {
-      case NoEncryption => Unencrypted
-      case AES_CBC_Encryption(key) => AES_CBC_Prefix + key.str
-    }
-
-    override def deserialize(value: String): Encryption = value match {
-      case Unencrypted => NoEncryption
-      case str if str.startsWith(AES_CBC_Prefix) =>
-        AES_CBC_Encryption(AESKey(str.substring(AES_CBC_Prefix.length)))
-    }
-  }
-
-  implicit val AssetIdCodec: Codec[AssetId, String] = Codec.create(_.str, AssetId.apply)
-
-  implicit val Sha256Codec: Codec[Sha256, Array[Byte]] = Codec.create(_.bytes, Sha256.apply)
-
-  implicit val AssetTokenCodec: Codec[AssetToken, String] = Codec.create(_.str, AssetToken.apply)
-
-  implicit val URICodec: Codec[URI, String] = Codec.create(_.toString, new URI(_))
-
-  implicit def JsonCodec[T: Encoder: Decoder]: Codec[T, String] =
-    Codec.create(_.asJson.noSpaces, str => decode[T](str).right.get)
 
 }

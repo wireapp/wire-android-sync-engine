@@ -150,16 +150,15 @@ class EphemeralMessagesService(selfUserId: UserId,
 
   private def shouldStartTimer(msg: MessageData) = {
     if (msg.ephemeral.isEmpty || msg.expiryTime.isDefined || msg.state != Message.Status.SENT) false
-    else msg.msgType match {
-      case MessageData.IsAsset() | Message.Type.ASSET =>
-        // check if asset was fully uploaded
-        msg.protos.exists {
-          case GenericMessage(_, Ephemeral(_, Asset(AssetData.WithStatus(UploadDone | UploadFailed), _))) => true
-          case GenericMessage(_, Ephemeral(_, ImageAsset(AssetData.WithStatus(UploadDone | UploadFailed)))) => true
-          case _ => false
-        }
-      case _ => true
+    else if (msg.isAssetMessage) {
+      // check if asset was fully uploaded
+      msg.protos.exists {
+        case GenericMessage(_, Ephemeral(_, Asset(AssetData.WithStatus(UploadDone | UploadFailed), _))) => true
+        case GenericMessage(_, Ephemeral(_, ImageAsset(AssetData.WithStatus(UploadDone | UploadFailed)))) => true
+        case _ => false
+      }
     }
+    else true
   }
 }
 

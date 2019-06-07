@@ -25,7 +25,7 @@ import com.waz.model.ConversationData.ConversationType
 import com.waz.model.GenericContent.Text
 import com.waz.model._
 import com.waz.model.otr.UserClients
-import com.waz.service.assets.AssetService
+import com.waz.service.assets2.{AssetService, DownloadAssetStorage}
 import com.waz.service.conversation.{ConversationsContentUpdater, ConversationsService}
 import com.waz.service.messages.{MessageEventProcessor, MessagesContentUpdater, MessagesService}
 import com.waz.service.otr.OtrService
@@ -53,6 +53,7 @@ class MessageEventProcessorSpec extends AndroidFreeSpec with Inside with Derived
   val convs             = mock[ConversationsContentUpdater]
   val otr               = mock[OtrService]
   val convsService      = mock[ConversationsService]
+  val downloadStorage   = mock[DownloadAssetStorage]
   val prefs             = new TestGlobalPreferences()
 
   val messagesInStorage = Signal[Seq[MessageData]](Seq.empty)
@@ -77,6 +78,7 @@ class MessageEventProcessorSpec extends AndroidFreeSpec with Inside with Derived
       (storage.updateOrCreateAll _).expects(*).onCall { updaters: Map[MessageId, Option[MessageData] => MessageData] =>
         Future.successful(updaters.values.map(_.apply(None)).toSet)
       }
+      (storage.get _).expects(*).once().returns(Future.successful(None))
 
       val processor = getProcessor
       inside(result(processor.processEvents(conv, isGroup = false, Seq(event))).head) {
@@ -193,7 +195,7 @@ class MessageEventProcessorSpec extends AndroidFreeSpec with Inside with Derived
     //often repeated mocks
     (deletions.getAll _).expects(*).anyNumberOfTimes().returning(Future.successful(Seq.empty))
 
-    new MessageEventProcessor(selfUserId, storage, content, assets, replyHashing, msgsService, convsService, convs, otr)
+    new MessageEventProcessor(selfUserId, storage, content, assets, replyHashing, msgsService, convsService, convs, otr, downloadStorage)
   }
 
 }

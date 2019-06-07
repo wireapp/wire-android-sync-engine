@@ -18,10 +18,11 @@
 package com.waz.sync.handler
 import com.waz.api.{Message, NetworkMode}
 import com.waz.api.impl.ErrorResponse
-import com.waz.content.MessagesStorage
+import com.waz.cache.CacheService
+import com.waz.content.{MembersStorage, MessagesStorage}
 import com.waz.model._
-import com.waz.service.ErrorsService
-import com.waz.service.assets.AssetService
+import com.waz.service.{ErrorsService, Timeouts}
+import com.waz.service.assets2.{AssetService, AssetStorage, UploadAssetStorage}
 import com.waz.service.conversation.ConversationsContentUpdater
 import com.waz.service.messages.{MessagesContentUpdater, MessagesService}
 import com.waz.service.otr.OtrClientsService
@@ -35,19 +36,24 @@ import scala.concurrent.Future
 
 class MessagesSyncHandlerSpec extends AndroidFreeSpec {
 
-  val service    = mock[MessagesService]
-  val msgContent = mock[MessagesContentUpdater]
-  val clients    = mock[OtrClientsService]
-  val otrSync    = mock[OtrSyncHandler]
-  val convs      = mock[ConversationsContentUpdater]
-  val storage    = mock[MessagesStorage]
-  val assetSync  = mock[AssetSyncHandler]
-  val sync       = mock[SyncServiceHandle]
-  val assets     = mock[AssetService]
-  val errors     = mock[ErrorsService]
+  val service       = mock[MessagesService]
+  val msgContent    = mock[MessagesContentUpdater]
+  val clients       = mock[OtrClientsService]
+  val otrSync       = mock[OtrSyncHandler]
+  val convs         = mock[ConversationsContentUpdater]
+  val storage       = mock[MessagesStorage]
+  val assetSync     = mock[AssetSyncHandler]
+  val sync          = mock[SyncServiceHandle]
+  val assets        = mock[AssetService]
+  val errors        = mock[ErrorsService]
+  val assetStorage  = mock[AssetStorage]
+  val uploads       = mock[UploadAssetStorage]
+  val cache         = mock[CacheService]
+  val members       = mock[MembersStorage]
+  val timeouts      = new Timeouts()
 
   def getHandler: MessagesSyncHandler = {
-    new MessagesSyncHandler(account1Id, service, msgContent, clients, otrSync, convs, storage, assetSync, sync, assets, errors)
+    new MessagesSyncHandler(account1Id, service, msgContent, clients, otrSync, convs, storage, assetSync, sync, assets, assetStorage, uploads, cache, members, tracking, errors, timeouts)
   }
 
   scenario("post invalid message should fail immediately") {

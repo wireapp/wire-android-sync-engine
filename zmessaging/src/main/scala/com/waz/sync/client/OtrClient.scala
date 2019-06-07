@@ -58,7 +58,7 @@ class OtrClientImpl(implicit
                     httpClient: HttpClient,
                     authRequestInterceptor: AuthRequestInterceptor) extends OtrClient with DerivedLogTag {
 
-  import HttpClient.AutoDerivation._
+  import HttpClient.AutoDerivationOld._
   import HttpClient.dsl._
   import MessagesClient.OtrMessageSerializer
   import OtrClient._

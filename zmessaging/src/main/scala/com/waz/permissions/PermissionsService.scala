@@ -20,6 +20,7 @@ package com.waz.permissions
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.log.LogShow.SafeToLog
 import com.waz.log.LogSE._
+import com.waz.model.errors.PermissionDeniedError
 import com.waz.threading.{SerialDispatchQueue, Threading}
 import com.waz.utils.events.{EventStream, RefreshingSignal, Signal}
 
@@ -129,6 +130,13 @@ class PermissionsService extends DerivedLogTag {
   //Convenience method that returns (a Future of) true if all permissions were granted, and false if not.
   def requestAllPermissions(keys: ListSet[String]): Future[Boolean] =
     if (keys.isEmpty) Future.successful(true) else requestPermissions(keys).map(ps => ps.forall(_.granted) && ps.nonEmpty)(Threading.Background)
+
+  def ensurePermissions(keys: ListSet[PermissionKey]): Future[Unit] =
+    requestPermissions(keys).flatMap { ps =>
+      val denied = ps.toSeq.filter(!_.granted)
+      if (denied.isEmpty) Future.successful(())
+      else Future.failed(PermissionDeniedError(denied.map(_.key)))
+    }(Threading.Background)
 
   //Non-blocking getter for java
   def checkPermission(key: String): Boolean = permissions.currentValue.map(_.filter(_.key == key)).exists(ps => ps.nonEmpty && ps.forall(_.granted))

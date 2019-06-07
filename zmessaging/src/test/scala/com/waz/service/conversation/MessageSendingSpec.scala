@@ -33,111 +33,79 @@ import com.waz.utils.events.Signal
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 
-class MessageSendingSpec extends AndroidFreeSpec { test =>
-  implicit lazy val dispatcher = Threading.Background
-
-  lazy val selfUser = UserData("self user")
-  lazy val conv = ConversationData(ConvId(), RConvId(), Some(Name("convName")), selfUser.id, ConversationType.Group)
-
-  lazy val assets           = mock[AssetService]
-  lazy val users            = mock[UserService]
-  lazy val usersStorage     = mock[UsersStorage]
-  lazy val messages         = mock[MessagesService]
-  lazy val messagesStorage  = mock[MessagesStorage]
-  lazy val messagesContent: MessagesContentUpdater = null //mock[MessagesContentUpdater]
-  lazy val members          = mock[MembersStorage]
-  lazy val assetStorage     = mock[AssetsStorage]
-  lazy val convsContent     = mock[ConversationsContentUpdater]
-  lazy val convStorage      = mock[ConversationStorage]
-  lazy val network          = mock[NetworkModeService]
-  lazy val convs            = mock[ConversationsService]
-  lazy val sync             = mock[SyncServiceHandle]
-  lazy val errors           = mock[ErrorsService]
-  lazy val properties       = mock[PropertiesService]
-
-  private def stubService() = new ConversationsUiServiceImpl(account1Id, None, assets, usersStorage, messages,
-    messagesStorage, messagesContent, members, assetStorage, convsContent, convStorage, network, convs, sync, null, accounts, tracking, errors, properties)
-
-  feature("Text messages") {
-    scenario("Add text message") {
-
-      val mId = MessageId()
-      val msgData = MessageData(mId, conv.id, Message.Type.TEXT, UserId(), MessageData.textContent("test"), protos = Seq(GenericMessage(mId.uid, Text("test"))))
-      val syncId = SyncId()
-
-      (properties.readReceiptsEnabled _).expects().anyNumberOfTimes().returning(Signal.const(false))
-
-      (convs.isGroupConversation _).expects(conv.id).anyNumberOfTimes().returning(Future.successful(false))
-
-      (messages.addTextMessage _).expects(conv.id, "test", AllDisabled, Nil, None).once().returning(Future.successful(msgData))
-
-      (convsContent.updateConversationLastRead _).expects(conv.id, msgData.time).once().returning(Future.successful(Some((conv, conv))))
-
-      (sync.postMessage _).expects(msgData.id, conv.id, msgData.editTime).once().returning(Future.successful(syncId))
-      val convsUi = stubService()
-
-      val msg = Await.result(convsUi.sendTextMessage(conv.id, "test"), 1.second).get
-      msg.contentString shouldEqual "test"
-    }
-
-    scenario("Add text message with a mention") {
-      val handle = "@user"
-      val text = s"aaa $handle bbb"
-      val mention = Mention(Some(UserId()), text.indexOf(handle), handle.length)
-      val mentions = Seq(mention)
-
-      val mId = MessageId()
-      val msgData = MessageData(
-        mId,
-        conv.id,
-        Message.Type.TEXT,
-        UserId(),
-        MessageData.messageContent(text, mentions)._2,
-        protos = Seq(GenericMessage(mId.uid, Text(text, mentions, Nil, expectsReadConfirmation = false)))
-      )
-      val syncId = SyncId()
-
-      (properties.readReceiptsEnabled _).expects().anyNumberOfTimes().returning(Signal.const(false))
-
-      (convs.isGroupConversation _).expects(conv.id).anyNumberOfTimes().returning(Future.successful(false))
-
-      (messages.addTextMessage _).expects(conv.id, text, AllDisabled, mentions, None).once().returning(Future.successful(msgData))
-
-      (convsContent.updateConversationLastRead _).expects(conv.id, msgData.time).once().returning(Future.successful(Some((conv, conv))))
-
-      (sync.postMessage _).expects(msgData.id, conv.id, msgData.editTime).once().returning(Future.successful(syncId))
-      val convsUi = stubService()
-
-      val msg = Await.result(convsUi.sendTextMessage(conv.id, text, mentions), 1.second).get
-      msg.contentString shouldEqual text
-      msg.content.size shouldEqual 1
-      msg.content.head.mentions shouldEqual mentions
-    }
-
-    scenario("Add text message in 1:1 with read receipts on") {
-
-      val mId = MessageId()
-      val syncId = SyncId()
-
-      (properties.readReceiptsEnabled _).expects().anyNumberOfTimes().returning(Signal.const(true))
-
-      (convs.isGroupConversation _).expects(conv.id).anyNumberOfTimes().returning(Future.successful(false))
-
-      (messages.addTextMessage _).expects(conv.id, "test", ReadReceiptSettings(selfSettings = true, None), Nil, None).once().onCall {
-        (cId: ConvId, text: String, rr: ReadReceiptSettings, _: Seq[Mention], _: Option[Option[FiniteDuration]]) =>
-          Future.successful(MessageData(mId, cId, Message.Type.TEXT, UserId(), MessageData.textContent(text), protos = Seq(GenericMessage(mId.uid, Text(text, Nil, Nil, expectsReadConfirmation = rr.selfSettings)))))
-      }
-
-      (convsContent.updateConversationLastRead _).expects(conv.id, *).once().returning(Future.successful(Some((conv, conv))))
-
-      (sync.postMessage _).expects(mId, conv.id, *).once().returning(Future.successful(syncId))
-      val convsUi = stubService()
-
-      val msg = Await.result(convsUi.sendTextMessage(conv.id, "test"), 1.second).get
-      msg.contentString shouldEqual "test"
-      msg.expectsRead shouldEqual Some(true)
-    }
-  }
+//class MessageSendingSpec extends AndroidFreeSpec { test =>
+//  implicit lazy val dispatcher = Threading.Background
+//
+//  lazy val selfUser = UserData("self user")
+//  lazy val conv = ConversationData(ConvId(), RConvId(), Some("convName"), selfUser.id, ConversationType.Group)
+//
+//  lazy val assets           = mock[AssetService]
+//  lazy val users            = mock[UserService]
+//  lazy val usersStorage     = mock[UsersStorage]
+//  lazy val messages         = mock[MessagesService]
+//  lazy val messagesStorage  = mock[MessagesStorage]
+//  lazy val messagesContent: MessagesContentUpdater = null //mock[MessagesContentUpdater]
+//  lazy val members          = mock[MembersStorage]
+//  lazy val assetStorage     = mock[AssetsStorage]
+//  lazy val convsContent     = mock[ConversationsContentUpdater]
+//  lazy val convStorage      = mock[ConversationStorage]
+//  lazy val network          = mock[NetworkModeService]
+//  lazy val convs            = mock[ConversationsService]
+//  lazy val sync             = mock[SyncServiceHandle]
+//  lazy val errors           = mock[ErrorsService]
+//
+//  private def stubService() = new ConversationsUiServiceImpl(account1Id, None, assets, usersStorage, messages,
+//    messagesStorage, messagesContent, members, assetStorage, convsContent, convStorage, network, convs, sync, null, accounts, tracking, errors)
+//
+//  feature("Text messages") {
+//    scenario("Add text message") {
+//
+//      val mId = MessageId()
+//      val msgData = MessageData(mId, conv.id, Message.Type.TEXT, UserId(), MessageData.textContent("test"), protos = Seq(GenericMessage(mId.uid, Text("test", Nil, Nil))))
+//      val syncId = SyncId()
+//
+//      (messages.addTextMessage _).expects(conv.id, "test", Nil, None).once().returning(Future.successful(msgData))
+//
+//      (convsContent.updateConversationLastRead _).expects(conv.id, msgData.time).once().returning(Future.successful(Some((conv, conv))))
+//
+//
+//      (sync.postMessage _).expects(msgData.id, conv.id, msgData.editTime).once().returning(Future.successful(syncId))
+//      val convsUi = stubService()
+//
+//      val msg = Await.result(convsUi.sendTextMessage(conv.id, "test"), 1.second).get
+//      msg.contentString shouldEqual "test"
+//    }
+//
+//    scenario("Add text message with a mention") {
+//      val handle = "@user"
+//      val text = s"aaa $handle bbb"
+//      val mention = Mention(Some(UserId()), text.indexOf(handle), handle.length)
+//      val mentions = Seq(mention)
+//
+//      val mId = MessageId()
+//      val msgData = MessageData(
+//        mId,
+//        conv.id,
+//        Message.Type.TEXT,
+//        UserId(),
+//        MessageData.messageContent(text, mentions)._2,
+//        protos = Seq(GenericMessage(mId.uid, Text(text, mentions, Nil)))
+//      )
+//      val syncId = SyncId()
+//
+//      (messages.addTextMessage _).expects(conv.id, text, mentions, None).once().returning(Future.successful(msgData))
+//
+//      (convsContent.updateConversationLastRead _).expects(conv.id, msgData.time).once().returning(Future.successful(Some((conv, conv))))
+//
+//      (sync.postMessage _).expects(msgData.id, conv.id, msgData.editTime).once().returning(Future.successful(syncId))
+//      val convsUi = stubService()
+//
+//      val msg = Await.result(convsUi.sendTextMessage(conv.id, text, mentions), 1.second).get
+//      msg.contentString shouldEqual text
+//      msg.content.size shouldEqual 1
+//      msg.content.head.mentions shouldEqual mentions
+//    }
+//  }
 /*
   feature("Image messages") {
     def imageStream = getClass.getResourceAsStream("/images/penguin.png")
@@ -284,4 +252,4 @@ class MessageSendingSpec extends AndroidFreeSpec { test =>
       lastReadSync shouldEqual None
     }
   }*/
-}
+//}

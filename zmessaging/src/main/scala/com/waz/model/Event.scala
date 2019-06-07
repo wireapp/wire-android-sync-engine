@@ -112,8 +112,6 @@ case class UnknownOtrErrorEvent(json: JSONObject) extends OtrError
 
 case class OtrErrorEvent(convId: RConvId, time: RemoteInstant, from: UserId, error: OtrError) extends MessageEvent
 
-case class GenericAssetEvent(convId: RConvId, time: RemoteInstant, from: UserId, content: GenericMessage, dataId: RAssetId, data: Option[Array[Byte]]) extends MessageEvent
-
 case class TypingEvent(convId: RConvId, time: RemoteInstant, from: UserId, isTyping: Boolean) extends ConversationEvent
 
 case class MemberJoinEvent(convId: RConvId, time: RemoteInstant, from: UserId, userIds: Seq[UserId], firstEvent: Boolean = false) extends MessageEvent with ConversationStateEvent with ConversationEvent
@@ -258,7 +256,6 @@ object ConversationEvent extends DerivedLogTag {
 
           //Note, the following events are not from the backend, but are the result of decrypting and re-encoding conversation.otr-message-add events - hence the different name for `convId
         case "conversation.generic-message"      => GenericMessageEvent('convId, time, 'from, 'content)
-        case "conversation.generic-asset"        => GenericAssetEvent('convId, time, 'from, 'content, 'dataId, decodeOptByteString('data))
         case "conversation.otr-error"            => OtrErrorEvent('convId, time, 'from, decodeOtrError('error))
         case _ =>
           error(l"unhandled event: $js")
@@ -310,14 +307,6 @@ object MessageEvent {
       event match {
         case GenericMessageEvent(convId, time, from, content) =>
           setFields(json, convId, time, from, "conversation.generic-message")
-            .put("content", AESUtils.base64(GenericMessage.toByteArray(content)))
-        case GenericAssetEvent(convId, time, from, content, dataId, data) =>
-          setFields(json, convId, time, from, "conversation.generic-asset")
-            .put("dataId", dataId.str)
-            .put("data", data match {
-              case None => null
-              case Some(d) => AESUtils.base64(d)
-            })
             .put("content", AESUtils.base64(GenericMessage.toByteArray(content)))
         case OtrErrorEvent(convId, time, from, error) =>
           setFields(json, convId, time, from, "conversation.otr-error")

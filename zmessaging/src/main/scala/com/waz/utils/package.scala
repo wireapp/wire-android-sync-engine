@@ -69,6 +69,7 @@ package object utils {
     def apply(s: String): String
   }
 
+
   def withCleanupOnFailure[A](f: => A)(pf: Throwable => Unit): A = try f catch { case cause: Throwable => pf(cause); throw cause }
 
   def force[A](s: Seq[A]) = s match {

@@ -18,6 +18,7 @@
 package com.waz
 
 import java.lang.System.currentTimeMillis
+import java.net.URL
 import java.util.concurrent.atomic.AtomicLong
 import java.util.{Date, Locale}
 
@@ -25,16 +26,19 @@ import com.waz.model.AssetMetaData.Image.Tag.{Medium, Preview}
 import com.waz.model.ConversationData.{ConversationType, UnreadCount}
 import com.waz.model.GenericContent.{EncryptionAlgorithm, Text}
 import com.waz.model.SearchQuery.{Recommended, TopPeople}
+import com.waz.model.UserData.Picture
 import com.waz.model.UserData.ConnectionStatus
+import com.waz.model.UserInfo.ProfilePicture
 import com.waz.model._
 import com.waz.model.messages.media._
 import com.waz.model.otr.ClientId
 import com.waz.model.sync.SyncRequest._
 import com.waz.model.sync.{SyncJob, SyncRequest}
 import com.waz.service.SearchKey
+import com.waz.service.assets2.UploadAssetStatus
 import com.waz.service.messages.MessageAndLikes
 import com.waz.sync.client.AuthenticationManager.AccessToken
-import com.waz.sync.client.OpenGraphClient.OpenGraphData
+import com.waz.sync.client.OpenGraphClient.{OpenGraphData, OpenGraphImage}
 import com.waz.utils.Locales.bcp47
 import com.waz.utils.sha2
 import com.waz.utils.wrappers.URI
@@ -56,6 +60,7 @@ object Generators {
   } yield URI.parse(s"$scheme://$path"))
 
   implicit lazy val arbName = Arbitrary(resultOf((Name)))
+  implicit lazy val arbUrl: Arbitrary[URL] = Arbitrary(alphaNumStr.map(s => new URL("http://" + s)))
 
   implicit lazy val arbConversationData: Arbitrary[ConversationData] = Arbitrary(for {
     id            <- arbitrary[ConvId]
@@ -87,7 +92,7 @@ object Generators {
     email                 <- arbitrary[Option[EmailAddress]]
     phone                 <- arbitrary[Option[PhoneNumber]]
     trackingId            <- arbitrary[Option[TrackingId]]
-    picture               <- arbitrary[Option[AssetId]]
+    picture               <- arbitrary[Option[Picture]]
     accent                <- arbitrary[Int]
     searchKey             = SearchKey(name)
     connection            <- arbitrary[ConnectionStatus]
@@ -100,6 +105,11 @@ object Generators {
     handle                <- arbitrary[Option[Handle]]
   } yield UserData(id, teamId, name, email, phone, trackingId, picture, accent, searchKey, connection, connectionLastUpdated, connectionMessage, conversation, relation, syncTimestamp, displayName, handle = handle))
 
+  implicit lazy val arbOpenGraphDataImage: Arbitrary[OpenGraphImage] = Arbitrary(
+    for {
+      url <- arbitrary[URL]
+    } yield OpenGraphImage(url)
+  )
   implicit lazy val arbOpenGraphData: Arbitrary[OpenGraphData] = Arbitrary(resultOf(OpenGraphData))
 
   implicit lazy val arbMessageContent: Arbitrary[MessageContent] = Arbitrary(resultOf(MessageContent))
@@ -147,6 +157,7 @@ object Generators {
   implicit lazy val arbAssetStatus: Arbitrary[AssetStatus] = Arbitrary(frequency((2, oneOf[AssetStatus](AssetStatus.UploadNotStarted,
     AssetStatus.UploadInProgress, AssetStatus.UploadCancelled, AssetStatus.UploadFailed, AssetStatus.UploadDone, AssetStatus.DownloadFailed))))
   implicit lazy val arbSyncableAssetStatus: Arbitrary[AssetStatus.Syncable] = Arbitrary(oneOf(AssetStatus.UploadCancelled, AssetStatus.UploadFailed))
+  implicit lazy val arbUploadAssetStatus: Arbitrary[UploadAssetStatus] = Arbitrary(oneOf(UploadAssetStatus.Cancelled, UploadAssetStatus.InProgress))
   implicit lazy val arbAssetToken: Arbitrary[AssetToken] = Arbitrary(resultOf(AssetToken))
   implicit lazy val arbOtrKey: Arbitrary[AESKey] = Arbitrary(sideEffect(AESKey()))
   implicit lazy val arbSha256: Arbitrary[Sha256] = Arbitrary(arbitrary[Array[Byte]].map(b => Sha256(sha2(b))))
@@ -231,7 +242,9 @@ object Generators {
   implicit lazy val arbUserId: Arbitrary[UserId]         = Arbitrary(sideEffect(UserId()))
   implicit lazy val arbTeamId: Arbitrary[TeamId]         = Arbitrary(sideEffect(TeamId()))
   implicit lazy val arbRAssetDataId: Arbitrary[RAssetId] = Arbitrary(sideEffect(RAssetId()))
+  implicit lazy val arbAssetIdGeneral: Arbitrary[GeneralAssetId] = Arbitrary(sideEffect(AssetId()))
   implicit lazy val arbAssetId: Arbitrary[AssetId]       = Arbitrary(sideEffect(AssetId()))
+  implicit lazy val arbPublicAssetId: Arbitrary[Picture]       = Arbitrary(sideEffect(Picture.Uploaded(AssetId())))
   implicit lazy val arbSyncId: Arbitrary[SyncId]         = Arbitrary(sideEffect(SyncId()))
   implicit lazy val arbGcmId: Arbitrary[PushToken]           = Arbitrary(sideEffect(PushToken()))
   implicit lazy val arbMessageId: Arbitrary[MessageId]   = Arbitrary(sideEffect(MessageId()))
@@ -265,6 +278,8 @@ object Generators {
   implicit lazy val arbDim2: Arbitrary[Dim2] = Arbitrary(for (w <- genDimension; h <- genDimension) yield Dim2(w, h))
   lazy val genDimension = chooseNum(0, 10000)
   implicit lazy val arbSearchQuery: Arbitrary[SearchQuery] = Arbitrary(frequency((1, Gen.const(TopPeople)), (3, Gen.alphaStr.map(Recommended))))
+  implicit lazy val arbTag: Arbitrary[AssetMetaData.Image.Tag] = Arbitrary(oneOf(AssetMetaData.Image.Tag.Preview, AssetMetaData.Image.Tag.Medium, AssetMetaData.Image.Tag.Empty))
+  implicit lazy val profilePicture: Arbitrary[ProfilePicture] = Arbitrary(resultOf(ProfilePicture))
 
   implicit def optGen[T](implicit gen: Gen[T]): Gen[Option[T]] = frequency((1, Gen.const(None)), (2, gen.map(Some(_))))
 
@@ -273,7 +288,7 @@ object Generators {
     name <- optGen(alphaNumStr)
     email <- arbitrary[Option[EmailAddress]]
     phone <- arbitrary[Option[PhoneNumber]]
-    picture <- arbitrary[Option[AssetData]]
+    picture <- arbitrary[Option[ProfilePicture]]
     trackingId <- arbitrary[Option[TrackingId]]
     accent <- arbitrary[Option[Int]]
   } yield UserInfo(userId, name.map(Name), accent, email, phone, Some(picture.toSeq), trackingId))

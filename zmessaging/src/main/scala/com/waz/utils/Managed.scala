@@ -28,6 +28,7 @@ sealed trait Managed[+A] {
 
 object Managed {
   def apply[A: Cleanup](create: => A): Managed[A] = new ManagedCleanup[A](create)
+  def create[A](create: => A)(clean: A => Unit): Managed[A] = new ManagedCleanup[A](create)(Cleanup.create(clean))
 }
 
 class ManagedCleanup[A](create: => A)(implicit cleanup: Cleanup[A]) extends Managed[A] {
@@ -49,11 +50,11 @@ trait Cleanup[-A] {
   def apply(a: A): Unit
 }
 object Cleanup {
-  def empty[A] = new Cleanup[A] {
-    override def apply(a: A): Unit = ()
+  def create[A](clean: A => Unit): Cleanup[A] = new Cleanup[A] {
+    override def apply(a: A): Unit = clean(a)
   }
 
-  implicit lazy val CloseableCleanup: Cleanup[Closeable] = new Cleanup[Closeable] {
-    def apply(a: Closeable): Unit = a.close()
-  }
+  val empty: Cleanup[Any] = create(_ => ())
+
+  implicit lazy val CloseableCleanup: Cleanup[Closeable] = create(_.close())
 }

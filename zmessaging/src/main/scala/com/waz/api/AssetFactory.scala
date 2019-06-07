@@ -18,9 +18,9 @@
 package com.waz.api
 
 import com.waz.api.impl.{ContentUriAssetForUpload, RecordingLevels}
-import com.waz.model.{AssetData, AssetId}
+import com.waz.model.AssetId
 import com.waz.service.ZMessaging
-import com.waz.service.assets.GlobalRecordAndPlayService.{AssetMediaKey, RecordingCancelled, RecordingSuccessful}
+import com.waz.service.assets.GlobalRecordAndPlayService.{AssetMediaKey, Audio, RecordingCancelled, RecordingSuccessful}
 import com.waz.threading.Threading
 import com.waz.utils.wrappers.URI
 import org.threeten.bp.Instant
@@ -47,8 +47,8 @@ object AssetFactory {
       case Success((instantOfStart, futureAsset)) =>
         react.onStart(instantOfStart)
         futureAsset.onComplete {
-          case Success(RecordingSuccessful(asset, lengthLimitReached)) =>
-            react.onComplete(asset, lengthLimitReached, levels.overview)
+          case Success(RecordingSuccessful(audio, lengthLimitReached)) =>
+            react.onComplete(audio, lengthLimitReached, levels.overview)
           case Success(RecordingCancelled) | Failure(_) =>
             react.onCancel()
         }(Threading.Ui)
@@ -67,7 +67,7 @@ object AssetFactory {
 
 trait RecordingCallback {
   def onStart(timestamp: Instant): Unit
-  def onComplete(recording: AudioAssetForUpload, fileSizeLimitReached: Boolean, overview: AudioOverview): Unit
+  def onComplete(audio: Audio, fileSizeLimitReached: Boolean, overview: AudioOverview): Unit
   def onCancel(): Unit
 }
 

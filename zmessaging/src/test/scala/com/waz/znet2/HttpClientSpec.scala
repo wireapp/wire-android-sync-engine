@@ -21,13 +21,13 @@ import java.io.{ByteArrayInputStream, File}
 
 import com.waz.specs.ZSpec
 import com.waz.utils.{JsonDecoder, JsonEncoder}
-import com.waz.znet2.http.HttpClient.{CustomErrorConstructor, Progress}
+import com.waz.znet2.http.HttpClient.{CustomErrorConstructor, Progress, ProgressCallback}
 import com.waz.znet2.http.Request.UrlCreator
 import com.waz.znet2.http._
 import okhttp3.mockwebserver.{MockResponse, MockWebServer}
 import okio.{Buffer, Okio}
 import org.json.JSONObject
-import com.waz.znet2.http.HttpClient.AutoDerivation._
+import com.waz.znet2.http.HttpClient.AutoDerivationOld._
 
 import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -230,8 +230,11 @@ class HttpClientSpec extends ZSpec {
     val request = Request.Post("/test", body = testRequestBody)
 
     val progressAcc = ArrayBuffer.empty[Progress]
+    val callback = new ProgressCallback {
+      override def updated(progress: Long, total: Option[Long]): Unit = progressAcc.append(Progress(progress, total))
+    }
     noException shouldBe thrownBy {
-      await { client.result[Array[Byte], Response[String]](request, uploadCallback = Some(p => progressAcc.append(p))) }
+      await { client.result[Array[Byte], Response[String]](request, uploadCallback = Some(callback)) }
     }
 
     checkProgressSequence(
@@ -258,8 +261,11 @@ class HttpClientSpec extends ZSpec {
     implicit val deserializer: RawBodyDeserializer[File] = tempFileBodyDeserializer
 
     val progressAcc = ArrayBuffer.empty[Progress]
+    val callback = new ProgressCallback {
+      override def updated(progress: Long, total: Option[Long]): Unit = progressAcc.append(Progress(progress, total))
+    }
     noException shouldBe thrownBy {
-      await { client.result[EmptyBody, Response[File]](request, downloadCallback = Some(p => progressAcc.append(p))) }
+      await { client.result[EmptyBody, Response[File]](request, downloadCallback = Some(callback)) }
     }
 
     checkProgressSequence(

@@ -26,7 +26,7 @@ import com.waz.cache.{CacheEntry, CacheService, Expiration, LocalData}
 import com.waz.model.{Mime, _}
 import com.waz.utils.crypto.AESUtils
 import com.waz.utils.{IoUtils, JsonDecoder, JsonEncoder}
-import com.waz.znet2.http.HttpClient.AutoDerivation._
+import com.waz.znet2.http.HttpClient.AutoDerivationOld._
 import com.waz.znet2.http.HttpClient.dsl._
 import com.waz.znet2.http.HttpClient.{Progress, ProgressCallback}
 import com.waz.znet2.http.MultipartBodyMixed.Part
@@ -91,21 +91,13 @@ class AssetClientImpl(cacheService: CacheService)
       RawBody(mediaType = Some(mime.str), () => data.inputStream, dataLength = Some(data.length))
     }
 
-  private def convertProgressData(data: Progress): ProgressData =
-    data match {
-      case p @ Progress(progress, Some(total)) if p.isCompleted =>
-        ProgressData(progress, total, com.waz.api.ProgressIndicator.State.COMPLETED)
-      case Progress(progress, Some(total)) =>
-        ProgressData(progress, total, com.waz.api.ProgressIndicator.State.RUNNING)
-      case Progress(_, None) =>
-        ProgressData.Indefinite
-    }
-
   override def loadAsset[T: RequestSerializer](request: Request[T],
                                                key: Option[AESKey] = None,
                                                sha: Option[Sha256] = None,
                                                callback: Callback): ErrorOrResponse[CacheEntry] = {
-    val progressCallback: ProgressCallback                         = progress => callback(convertProgressData(progress))
+    val progressCallback: ProgressCallback = new ProgressCallback {
+      override def updated(progress: Long, total: Option[Long]): Unit = callback(ProgressData(progress, total))
+    }
     implicit val bodyDeserializer: RawBodyDeserializer[CacheEntry] = cacheEntryBodyDeserializer(key, sha)
 
     request
@@ -138,8 +130,6 @@ object AssetClient {
   case class FileWithSha(file: File, sha256: Sha256)
 
   case class RawAsset(mime: Mime, data: () => InputStream, dataLength: Option[Long])
-
-  case class UploadResponse2(key: RAssetId, expires: Option[Instant], token: Option[AssetToken])
 
   implicit val DefaultExpiryTime: Expiration = 1.hour
 

@@ -47,7 +47,6 @@ class ConversationOrderEventsService(selfUserId: UserId,
       case _: CreateConversationEvent => true
       case _: CallMessageEvent        => true
       case _: OtrErrorEvent           => true
-      case _: GenericAssetEvent       => true
       case _: ConnectRequestEvent     => true
       case _: OtrMessageEvent         => true
       case MemberJoinEvent(_, _, _, added, _) if added.contains(selfUserId)   => true

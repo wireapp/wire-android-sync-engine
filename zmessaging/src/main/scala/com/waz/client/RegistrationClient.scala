@@ -41,7 +41,7 @@ class RegistrationClientImpl(implicit
                              httpClient: HttpClient) extends RegistrationClient {
 
   import HttpClient.dsl._
-  import HttpClient.AutoDerivation._
+  import HttpClient.AutoDerivationOld._
   import RegistrationClientImpl._
   import com.waz.threading.Threading.Implicits.Background
 

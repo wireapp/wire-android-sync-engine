@@ -17,11 +17,11 @@
  */
 package com.waz.sync.queue
 
-import com.waz.model.AssetStatus.UploadFailed
 import com.waz.model.sync.{SyncJob, SyncRequest}
 import com.waz.model.sync.SyncJob.Priority
 import com.waz.model.sync.SyncRequest.{PostAssetStatus, RegisterPushToken}
 import com.waz.model.{ConvId, MessageId, PushToken, SyncId}
+import com.waz.service.assets2.UploadAssetStatus
 import com.waz.specs.AndroidFreeSpec
 import com.waz.sync.queue.SyncJobMerger.Merged
 
@@ -38,7 +38,7 @@ class SyncRequestSpec extends AndroidFreeSpec {
   }
 
   scenario("PostAssetStatus encoding decoding") {
-    val request = PostAssetStatus(ConvId(), MessageId(), Some(10.minutes), UploadFailed)
+    val request = PostAssetStatus(ConvId(), MessageId(), Some(10.minutes), UploadAssetStatus.Failed)
     SyncRequest.Decoder.apply(SyncRequest.Encoder(request)) shouldEqual request
   }
 

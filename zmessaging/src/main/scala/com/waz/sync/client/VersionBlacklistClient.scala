@@ -34,7 +34,7 @@ class VersionBlacklistClientImpl(backendConfig: BackendConfig)
                                 (implicit httpClient: HttpClient) extends VersionBlacklistClient with DerivedLogTag {
 
   import HttpClient.dsl._
-  import HttpClient.AutoDerivation._
+  import HttpClient.AutoDerivationOld._
 
   def loadVersionBlacklist(): ErrorOrResponse[VersionBlacklist] = {
     val url = blacklistsUrl

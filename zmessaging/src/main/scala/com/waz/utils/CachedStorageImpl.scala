@@ -22,7 +22,7 @@ import com.waz.content.Database
 import com.waz.db.DaoIdOps
 import com.waz.log.BasicLogging.LogTag
 import com.waz.model.errors.NotFoundLocal
-import com.waz.threading.{SerialDispatchQueue, Threading}
+import com.waz.threading.SerialDispatchQueue
 import com.waz.utils.ContentChange.{Added, Removed, Updated}
 import com.waz.utils.events._
 import com.waz.utils.wrappers.DB
@@ -94,7 +94,7 @@ trait ReactiveStorage2[K, V <: Identifiable[K]] extends Storage2[K, V] {
   def onRemoved(key: K): EventStream[K] =
     onDeleted.map(_.view.find(_ == key)).collect { case Some(k) => k }
 
-  def optSignal(key: K): Signal[Option[V]] ={
+  def optSignal(key: K): Signal[Option[V]] = {
     val changeOrDelete = onChanged(key).map(Option(_)).union(onRemoved(key).map(_ => Option.empty[V]))
     new AggregatingSignal[Option[V], Option[V]](changeOrDelete, find(key), { (_, v) => v })
   }
@@ -108,6 +108,7 @@ class DbStorage2[K, V <: Identifiable[K]](dao: StorageDao[K, V])
                       override val ec: ExecutionContext,
                       db: DB) extends Storage2[K,V] {
 
+  def loadAll: Future[Seq[V]] = Future(dao.list) //TODO Should we add this method to the Storage2 contract?
   override def loadAll(keys: Set[K]): Future[Seq[V]] = Future(dao.getAll(keys))
   override def saveAll(values: Iterable[V]): Future[Unit] = Future(dao.insertOrReplace(values))
   override def deleteAllByKey(keys: Set[K]): Future[Unit] = Future(dao.deleteEvery(keys))

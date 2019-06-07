@@ -97,7 +97,7 @@ class SyncExecutor(account:     UserId,
       case Success =>
         debug(l"SyncRequest: $job completed successfully")
         content.removeSyncJob(job.id).map(_ => result)
-      case res@SyncResult.Failure(error) =>
+      case res @ SyncResult.Failure(error) =>
         warn(l"SyncRequest: $job, failed permanently with error: $error")
         if (error.shouldReportError) {
           tracking.exception(new RuntimeException(s"Request ${job.request.cmd} failed permanently with error: ${error.code}") with NoStackTrace, s"Got fatal error, dropping request: $job\n error: $error")

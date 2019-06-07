@@ -27,10 +27,13 @@ import com.waz.model.ConversationData.ConversationType
 import com.waz.model.GenericContent._
 import com.waz.model.{Mention, MessageId, _}
 import com.waz.service._
+import com.waz.service.assets2.Asset.General
+import com.waz.service.assets2.UploadAsset
 import com.waz.service.conversation.ConversationsContentUpdater
 import com.waz.service.otr.VerificationStateUpdater.{ClientUnverified, MemberAdded, VerificationChange}
 import com.waz.sync.SyncServiceHandle
 import com.waz.sync.client.AssetClient.Retention
+import com.waz.sync.client.{AssetClient2, AssetClient2Impl}
 import com.waz.threading.{CancellableFuture, Threading}
 import com.waz.utils.RichFuture.traverseSequential
 import com.waz.utils._
@@ -48,7 +51,7 @@ trait MessagesService {
 
   def addTextMessage(convId: ConvId, content: String, expectsReadReceipt: ReadReceiptSettings = AllDisabled, mentions: Seq[Mention] = Nil, exp: Option[Option[FiniteDuration]] = None): Future[MessageData]
   def addKnockMessage(convId: ConvId, selfUserId: UserId, expectsReadReceipt: ReadReceiptSettings = AllDisabled): Future[MessageData]
-  def addAssetMessage(convId: ConvId, asset: AssetData, expectsReadReceipt: ReadReceiptSettings = AllDisabled, exp: Option[Option[FiniteDuration]] = None): Future[MessageData]
+  def addAssetMessage(convId: ConvId, msgId: MessageId, asset: UploadAsset, expectsReadReceipt: ReadReceiptSettings = AllDisabled, exp: Option[Option[FiniteDuration]] = None): Future[MessageData]
   def addLocationMessage(convId: ConvId, content: Location, expectsReadReceipt: ReadReceiptSettings = AllDisabled): Future[MessageData]
   def addReplyMessage(quote: MessageId, content: String, expectsReadReceipt: ReadReceiptSettings = AllDisabled, mentions: Seq[Mention] = Nil, exp: Option[Option[FiniteDuration]] = None): Future[Option[MessageData]]
 
@@ -83,6 +86,7 @@ trait MessagesService {
   def messageSent(convId: ConvId, msgId: MessageId, newTime: RemoteInstant): Future[Option[MessageData]]
   def messageDeliveryFailed(convId: ConvId, msg: MessageData, error: ErrorResponse): Future[Option[MessageData]]
   def retentionPolicy(convData: ConversationData): CancellableFuture[Retention]
+  def retentionPolicy2(convData: ConversationData): Future[AssetClient2.Retention]
 }
 
 class MessagesServiceImpl(selfUserId:   UserId,
@@ -229,15 +233,31 @@ class MessagesServiceImpl(selfUserId:   UserId,
     updater.addLocalMessage(MessageData(id, convId, Type.LOCATION, selfUserId, protos = Seq(GenericMessage(id.uid, content)), forceReadReceipts = expectsReadReceipt.convSetting))
   }
 
-  override def addAssetMessage(convId: ConvId, asset: AssetData, expectsReadReceipt: ReadReceiptSettings = AllDisabled, exp: Option[Option[FiniteDuration]] = None) = {
-    val tpe = asset match {
-      case AssetData.IsImage() => Message.Type.ASSET
-      case AssetData.IsVideo() => Message.Type.VIDEO_ASSET
-      case AssetData.IsAudio() => Message.Type.AUDIO_ASSET
-      case _                   => Message.Type.ANY_ASSET
+  override def addAssetMessage(convId: ConvId,
+                               msgId: MessageId,
+                               asset: UploadAsset,
+                               expectsReadReceipt: ReadReceiptSettings = AllDisabled,
+                               exp: Option[Option[FiniteDuration]] = None): Future[MessageData] = {
+    import assets2.Asset
+    import com.waz.model.GenericContent.{Asset => GenericAsset}
+
+    val tpe = asset.details match {
+      case _: Asset.Image => Message.Type.ASSET
+      case _: Asset.Video => Message.Type.VIDEO_ASSET
+      case _: Asset.Audio => Message.Type.AUDIO_ASSET
+      case _              => Message.Type.ANY_ASSET
     }
-    val mid = MessageId(asset.id.str)
-    updater.addLocalMessage(MessageData(mid, convId, tpe, selfUserId, protos = Seq(GenericMessage(mid.uid, Asset(asset, expectsReadConfirmation = expectsReadReceipt.selfSettings))), forceReadReceipts = expectsReadReceipt.convSetting), exp = exp)
+    val msgData = MessageData(
+      msgId,
+      convId,
+      tpe,
+      selfUserId,
+      content = Seq(),
+      protos = Seq(GenericMessage(msgId.uid, GenericAsset(asset, None, expectsReadConfirmation = expectsReadReceipt.selfSettings))),
+      forceReadReceipts = expectsReadReceipt.convSetting,
+      assetId = Some(asset.id)
+    )
+    updater.addLocalMessage(msgData, exp = exp)
   }
 
   override def addRenameConversationMessage(convId: ConvId, from: UserId, name: Name) = {
@@ -439,6 +459,7 @@ class MessagesServiceImpl(selfUserId:   UserId,
         else msg
       }
 
+  //TODO Remove this method and use retentionPolicy2 instead
   override def retentionPolicy(convData: ConversationData): CancellableFuture[Retention] = {
     def checkConv(convId: ConvId) =
       members
@@ -456,4 +477,22 @@ class MessagesServiceImpl(selfUserId:   UserId,
     }
     CancellableFuture.lift(result.head)
   }
+
+  override def retentionPolicy2(convData: ConversationData): Future[AssetClient2.Retention] = {
+    import AssetClient2.Retention
+
+    if (teamId.isDefined || convData.team.isDefined) {
+      members
+        .activeMembers(convData.id).head
+        .flatMap(memberIds => usersStorage.getAll(memberIds))
+        .map(_.forall(_.exists(_.teamId.isDefined)))
+        .map {
+          case true => Retention.EternalInfrequentAccess
+          case false => Retention.Expiring
+        }
+    } else {
+      Future.successful(Retention.Expiring)
+    }
+  }
+
 }

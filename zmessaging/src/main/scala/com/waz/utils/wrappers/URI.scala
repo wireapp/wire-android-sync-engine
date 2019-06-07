@@ -105,4 +105,7 @@ object URI {
   def fromFile(file: File) = util.fromFile(file)
 
   def unwrap(uri: URI) = util.unwrap(uri)
+
+  def toJava(uri: URI): java.net.URI = java.net.URI.create(util.unwrap(uri).toString)
+
 }
