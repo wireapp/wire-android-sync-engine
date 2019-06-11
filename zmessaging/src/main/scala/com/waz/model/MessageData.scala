@@ -514,7 +514,7 @@ object MessageData extends
 
         if (end < message.length) res ++= RichMediaContentParser.splitContent(message.substring(end), mentions, end)
 
-        (Message.Type.RICH_MEDIA, res.result())
+        (Message.Type.RICH_MEDIA, res.result)
       }
     }
 

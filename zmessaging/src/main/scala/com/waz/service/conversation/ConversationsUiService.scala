@@ -400,9 +400,7 @@ class ConversationsUiServiceImpl(selfUserId:      UserId,
   } yield Some(msg)
 
   override def setLastRead(convId: ConvId, msg: MessageData): Future[Option[ConversationData]] = {
-
     def sendReadReceipts(from: RemoteInstant, to: RemoteInstant, readReceiptSettings: ReadReceiptSettings): Future[Seq[SyncId]] = {
-      verbose(l"sendReadReceipts($from, $to, $readReceiptSettings)")
       if (!readReceiptSettings.selfSettings && readReceiptSettings.convSetting.isEmpty) {
         Future.successful(Seq())
       } else {

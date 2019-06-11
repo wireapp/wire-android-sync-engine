@@ -515,9 +515,10 @@ class CallingServiceImpl(val accountId:       UserId,
     }("setVideoSendState")
 
   val callMessagesStage: Stage.Atomic = EventScheduler.Stage[CallMessageEvent] {
-    case (_, events) => Future.successful(events.sortBy(_.time).foreach { e =>
-      receiveCallEvent(e.content, e.time, e.convId, e.from, e.sender)
-    })
+    case (_, events) =>
+      Future.successful(events.sortBy(_.time).foreach { e =>
+        receiveCallEvent(e.content, e.time, e.convId, e.from, e.sender)
+      })
   }
 
   private def receiveCallEvent(msg: String, msgTime: RemoteInstant, convId: RConvId, from: UserId, sender: ClientId): Unit =

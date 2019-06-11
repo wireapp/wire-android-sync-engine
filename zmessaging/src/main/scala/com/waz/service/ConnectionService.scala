@@ -69,7 +69,6 @@ class ConnectionServiceImpl(selfUserId:      UserId,
   }
 
   def handleUserConnectionEvents(events: Seq[UserConnectionEvent]) = {
-    verbose(l"handleUserConnectionEvents: $events")
     def updateOrCreate(event: UserConnectionEvent)(user: Option[UserData]): UserData =
       user.fold {
         UserData(event.to, None, event.fromUserName.getOrElse(Name.Empty), None, None, connection = event.status, conversation = Some(event.convId), connectionMessage = event.message, searchKey = SearchKey.Empty, connectionLastUpdated = event.lastUpdated,

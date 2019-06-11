@@ -114,7 +114,7 @@ class ConversationsServiceImpl(teamId:          Option[TeamId],
   }
 
   push.onHistoryLost { req =>
-    verbose(l"onSlowSyncNeeded($req)")
+    verbose(l"SYNC onSlowSyncNeeded($req)")
     // TODO: this is just very basic implementation creating empty message
     // This should be updated to include information about possibly missed changes
     // this message will be shown rarely (when notifications stream skips data)

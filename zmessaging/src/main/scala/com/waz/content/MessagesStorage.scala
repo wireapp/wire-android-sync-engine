@@ -122,9 +122,10 @@ class MessagesStorageImpl(context:     Context,
   def msgsFilteredIndex(conv: ConvId): Seq[ConvMessagesIndex] = filteredIndexes.get(conv).values.toSeq
 
   onAdded { added =>
+    verbose(l"SYNC onAdded: ${added.map(_.id)}")
     Future.traverse(added.groupBy(_.convId)) { case (convId, msgs) =>
       msgsFilteredIndex(convId).foreach(_.add(msgs))
-      msgsIndex(convId).flatMap { index =>
+      returning(msgsIndex(convId).flatMap { index =>
         index.add(msgs).flatMap(_ => index.firstMessageId) map { first =>
           // XXX: calling update here is a bit ugly
           val ms = msgs.map {
@@ -134,16 +135,18 @@ class MessagesStorageImpl(context:     Context,
             case msg => msg
           }
         }
-      }
+      }){ _ => verbose(l"SYNC onAdded finished") }
     } .recoverWithLog()
   }
 
   onUpdated { updates =>
+    verbose(l"SYNC onUpdated: ${updates.size}")
     Future.traverse(updates.groupBy(_._1.convId)) { case (convId, msgs) =>{
         msgsFilteredIndex(convId).foreach(_.update(msgs))
         for {
           index <- msgsIndex(convId)
-          _ <- index.update(msgs)
+          _     <- index.update(msgs)
+          _     =  verbose(l"SYNC onUpdated finished")
         } yield ()
       } .recoverWithLog()
     }
@@ -151,7 +154,6 @@ class MessagesStorageImpl(context:     Context,
 
   convs.onUpdated.on(dispatcher) { _.foreach {
     case (prev, updated) if updated.lastRead != prev.lastRead =>
-      verbose(l"lastRead of conversation ${updated.id} updated to ${updated.lastRead}, will update unread count")
       msgsIndex(updated.id).map(_.updateLastRead(updated)).recoverWithLog()
     case _ => // ignore
   } }
@@ -185,7 +187,6 @@ class MessagesStorageImpl(context:     Context,
         }
       }
     }
-
   }
 
   override def findQuotesOf(msgId: MessageId): Future[Seq[MessageData]] = storage(MessageDataDao.findQuotesOf(msgId)(_))
