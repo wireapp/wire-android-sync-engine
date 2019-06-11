@@ -63,6 +63,15 @@ class ZLog2Spec extends ZSpec with DerivedLogTag {
       personLog.buildMessageUnsafe shouldBe s"person: ${nonImplicitPersonLogShow.showUnsafe(testPerson)}"
     }
 
-  }
+    scenario("compile and create Log for types in a collection") {
+      implicit val PersonLogShow: LogShow[Person] = new LogShow[Person] {
+        override def showSafe(value: Person): String   = "Safe"
+        override def showUnsafe(value: Person): String = "Unsafe"
+      }
 
+      val collectionLog = l"${List(testPerson, testPerson, testPerson, testPerson)}"
+      collectionLog.buildMessageSafe shouldBe "Safe, Safe, Safe and 1 other elements..."
+      collectionLog.buildMessageUnsafe shouldBe "Unsafe, Unsafe, Unsafe and 1 other elements..."
+    }
+  }
 }
