@@ -9,7 +9,7 @@ import sbt._
 import scala.util.Random
 
 val MajorVersion = "141"
-val MinorVersion = "0" // hotfix release
+val MinorVersion = "1" // hotfix release
 
 lazy val buildType =
   sys.props.getOrElse("build_type", "local").toLowerCase match {
