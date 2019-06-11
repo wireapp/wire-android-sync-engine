@@ -113,9 +113,9 @@ object LogShow {
   }
 
   implicit def traversableShow[T](implicit show: LogShow[T]): LogShow[Traversable[T]] = {
-    def createString(xs: Traversable[T], toString: T => String, elemsToPrint: Int = 3): String = {
+    def createString(xs: Traversable[T], obfuscate: T => String, elemsToPrint: Int = 3): String = {
       val end = if (xs.size > elemsToPrint) s" and ${xs.size - elemsToPrint} other elements..." else ""
-      xs.take(elemsToPrint).mkString("", ", ", end)
+      xs.take(elemsToPrint).map(e => obfuscate(e)).mkString("", ", ", end)
     }
 
     create(
