@@ -113,7 +113,7 @@ class LruFileCacheSpec extends ZIntegrationSpec {
       }
     }
 
-    ignore("Putting file directly in cache should trigger cache cleanup if it is needed") {
+    scenario("Putting file directly in cache should trigger cache cleanup if it is needed") {
       val fileKey       = "key"
       val (key1, key2)  = ("key1", "key2")
       val content       = TestData.bytes(200)
@@ -139,6 +139,7 @@ class LruFileCacheSpec extends ZIntegrationSpec {
         fromCacheFile.get shouldBe content
       }
     }
+
 
     scenario("Lru functionality.") {
       val puttingTimeout                        = 1.second //https://bugs.openjdk.java.net/browse/JDK-8177809
