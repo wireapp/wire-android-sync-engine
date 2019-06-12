@@ -17,8 +17,8 @@
  */
 package com.waz.service.otr
 
-import com.waz.ZLog.ImplicitTag._
-import com.waz.log.ZLog2._
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
+import com.waz.log.LogSE._
 import com.waz.service.otr.OtrService.SessionId
 import com.waz.service.push.PushNotificationEventsStorage.PlainWriter
 import com.waz.threading.Threading
@@ -30,7 +30,7 @@ import com.wire.cryptobox.{CryptoBox, CryptoSession, PreKey}
 import scala.concurrent.Future
 import scala.util.Try
 
-class CryptoSessionService(cryptoBox: CryptoBoxService) {
+class CryptoSessionService(cryptoBox: CryptoBoxService) extends DerivedLogTag {
 
   implicit val dis = Threading.Background
 
@@ -79,7 +79,7 @@ class CryptoSessionService(cryptoBox: CryptoBoxService) {
     def decrypt(arg: Option[CryptoBox]): (CryptoSession, Array[Byte]) = arg match {
       case None => throw new Exception("CryptoBox missing")
       case Some(cb) =>
-        verbose(l"decryptMessage($sessionId for message: ${msg.length} = ${showString(AESUtils.base64(msg))})")
+        verbose(l"decryptMessage($sessionId. Message length: ${msg.length})")
         loadSession(cb, sessionId).fold {
           val sm = cb.initSessionFromMessage(sessionId.toString, msg)
           onCreate ! sessionId

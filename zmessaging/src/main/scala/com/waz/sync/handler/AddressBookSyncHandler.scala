@@ -17,8 +17,8 @@
  */
 package com.waz.sync.handler
 
-import com.waz.ZLog.ImplicitTag._
-import com.waz.log.ZLog2._
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
+import com.waz.log.LogSE._
 import com.waz.model.AddressBook
 import com.waz.service._
 import com.waz.service.tracking.TrackingService
@@ -28,7 +28,9 @@ import com.waz.threading.Threading
 
 import scala.concurrent.Future
 
-class AddressBookSyncHandler(contacts: ContactsServiceImpl, client: AddressBookClient, tracking: TrackingService) {
+class AddressBookSyncHandler(contacts: ContactsServiceImpl,
+                             client: AddressBookClient,
+                             tracking: TrackingService) extends DerivedLogTag {
 
   import Threading.Implicits.Background
   def postAddressBook(ab: AddressBook): Future[SyncResult] = {

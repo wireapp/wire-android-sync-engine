@@ -17,11 +17,11 @@
  */
 package com.waz.service
 
-import com.waz.ZLog.ImplicitTag._
 import com.waz.api.IConversation
 import com.waz.api.IConversation.{Access, AccessRole}
 import com.waz.content._
-import com.waz.log.ZLog2._
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
+import com.waz.log.LogSE._
 import com.waz.model.ConversationData.ConversationType
 import com.waz.model.UserData.ConnectionStatus
 import com.waz.model._
@@ -52,7 +52,7 @@ class ConnectionServiceImpl(selfUserId:      UserId,
                             messagesStorage: MessagesStorage,
                             users:           UserService,
                             usersStorage:    UsersStorage,
-                            sync:            SyncServiceHandle) extends ConnectionService {
+                            sync:            SyncServiceHandle) extends ConnectionService with DerivedLogTag {
 
   import Threading.Implicits.Background
   private implicit val ec = EventContext.Global

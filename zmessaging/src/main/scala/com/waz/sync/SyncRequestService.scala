@@ -17,8 +17,8 @@
  */
 package com.waz.sync
 
-import com.waz.ZLog._
 import com.waz.api.SyncState
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model.sync.SyncJob.Priority
 import com.waz.model.sync._
 import com.waz.model.{SyncId, UserId}
@@ -53,9 +53,8 @@ class SyncRequestServiceImpl(accountId: UserId,
                              reporting: ReportingService,
                              accounts:  AccountsService,
                              tracking:  TrackingService
-                            )(implicit accountContext: AccountContext) extends SyncRequestService {
+                            )(implicit accountContext: AccountContext) extends SyncRequestService with DerivedLogTag {
 
-  private implicit val tag = logTagFor[SyncRequestServiceImpl]
   private implicit val dispatcher = new SerialDispatchQueue(name = "SyncDispatcher")
 
   private val scheduler: SyncScheduler = new SyncSchedulerImpl(accountId, content, network, this, sync, accounts, tracking)

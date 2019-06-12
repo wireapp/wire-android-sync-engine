@@ -17,12 +17,12 @@
  */
 package com.waz.sync.handler
 
-import com.waz.ZLog.ImplicitTag._
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.api.Message
 import com.waz.api.Message.Part
 import com.waz.api.impl.ErrorResponse
 import com.waz.content._
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model.AssetMetaData.Image.Tag.Medium
 import com.waz.model.GenericContent.{Asset, LinkPreview, Text}
 import com.waz.model.GenericMessage.TextMessage
@@ -53,7 +53,8 @@ class OpenGraphSyncHandler(convs:           ConversationStorage,
                            imageGenerator:  ImageAssetGenerator,
                            imageLoader:     ImageLoader,
                            messagesService: MessagesService,
-                           assetClient:     AssetClient) { //TODO assetClient not used
+                           assetClient:     AssetClient) extends DerivedLogTag { //TODO assetClient not used
+
   import com.waz.threading.Threading.Implicits.Background
 
   def postMessageMeta(convId: ConvId, msgId: MessageId, editTime: RemoteInstant): Future[SyncResult] =

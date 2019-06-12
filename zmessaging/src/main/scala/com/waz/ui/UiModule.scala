@@ -18,7 +18,7 @@
 package com.waz.ui
 
 import android.os.{Handler, Looper}
-import com.waz.ZLog.ImplicitTag._
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.service._
 import com.waz.threading.{CancellableFuture, Threading}
 import com.waz.utils.events._
@@ -72,7 +72,7 @@ trait UiEventContext {
   }
 }
 
-class UiModule(val global: GlobalModule) extends UiEventContext with ZMessagingResolverComponent {
+class UiModule(val global: GlobalModule) extends UiEventContext with ZMessagingResolverComponent with DerivedLogTag {
 
   private implicit val ui: UiModule = this
 
@@ -85,7 +85,7 @@ class UiModule(val global: GlobalModule) extends UiEventContext with ZMessagingR
 
   currentZms.onChanged { _ => onReset ! true }
 
-  def getCurrent = accounts.activeZms.head
+  def getCurrent: Future[Option[ZMessaging]] = accounts.activeZms.head
   
 
 }

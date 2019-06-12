@@ -19,10 +19,11 @@ package com.waz.content
 
 import android.content.SharedPreferences.OnSharedPreferenceChangeListener
 import android.content.{Context, SharedPreferences}
-import com.waz.ZLog.{LogTag, logTagFor}
+import com.waz.api.ZmsVersion
 import com.waz.content.Preferences.Preference.PrefCodec
 import com.waz.content.Preferences.{PrefKey, Preference}
-import com.waz.log.ZLog2._
+import com.waz.log.BasicLogging.LogTag
+import com.waz.log.LogSE._
 import com.waz.media.manager.context.IntensityLevel
 import com.waz.model.KeyValueData.KeyValueDataDao
 import com.waz.model._
@@ -30,7 +31,7 @@ import com.waz.model.otr.ClientId
 import com.waz.service.AccountManager.ClientRegistrationState
 import com.waz.sync.client.AuthenticationManager.{AccessToken, Cookie}
 import com.waz.sync.client.OAuth2Client.RefreshToken
-import com.waz.threading.{SerialDispatchQueue, Threading}
+import com.waz.threading.{DispatchQueue, SerialDispatchQueue, Threading}
 import com.waz.utils.TrimmingLruCache.Fixed
 import com.waz.utils.events.{Signal, SourceSignal}
 import com.waz.utils.{CachedStorageImpl, JsonDecoder, JsonEncoder, Serialized, TrimmingLruCache, returning}
@@ -168,7 +169,7 @@ object Preferences {
 class GlobalPreferences(context: Context, prefs: SharedPreferences) extends Preferences {
 
   override protected implicit val dispatcher = new SerialDispatchQueue(name = "GlobalPreferencesDispatcher")
-  override protected implicit val logTag = logTagFor[GlobalPreferences]
+  override protected implicit val logTag = LogTag[GlobalPreferences]
 
   def v31AssetsEnabled = false
 
@@ -261,10 +262,12 @@ class GlobalPreferences(context: Context, prefs: SharedPreferences) extends Pref
 /**
   * Per-user preference storage in user db.
   */
-class UserPreferences(context: Context, storage: ZmsDatabase) extends CachedStorageImpl[String, KeyValueData](new TrimmingLruCache(context, Fixed(128)), storage)(KeyValueDataDao, "KeyValueStorage_Cached") with Preferences {
+class UserPreferences(context: Context, storage: ZmsDatabase)
+  extends CachedStorageImpl[String, KeyValueData](new TrimmingLruCache(context, Fixed(128)), storage)(KeyValueDataDao, LogTag("KeyValueStorage_Cached"))
+    with Preferences {
 
-  override protected implicit val dispatcher = Threading.Background
-  override protected implicit val logTag = logTagFor[UserPreferences]
+  override protected implicit val dispatcher: DispatchQueue = Threading.Background
+  override protected implicit val logTag: LogTag = LogTag[UserPreferences]
 
   override protected def getValue[A: PrefCodec](key: PrefKey[A]) = {
     get(key.str).map(_.map(_.value)).map(_.map(implicitly[PrefCodec[A]].decode).getOrElse(key.default))
@@ -376,6 +379,9 @@ object GlobalPreferences {
 
   lazy val ShouldCreateFullConversation = PrefKey[Boolean]("should_create_full_conv", customDefault = false)
 
+  lazy val LogsEnabled: PrefKey[Boolean] = PrefKey[Boolean]("save_local_logs", customDefault = ZmsVersion.DEBUG)
+
+
   //DEPRECATED!!! Use the UserPreferences instead!!
   lazy val _ShareContacts          = PrefKey[Boolean]("PREF_KEY_PRIVACY_CONTACTS")
   lazy val _DarkTheme              = PrefKey[Boolean]("DarkTheme")
@@ -441,7 +447,8 @@ object UserPreferences {
   //increment number to perform slow sync on particular type
   lazy val ShouldSyncConversations          = PrefKey[Boolean]("should_sync_conversations_1", customDefault = true)
   lazy val ShouldSyncInitial                = PrefKey[Boolean]("should_sync_initial_1", customDefault = true)
-  lazy val ShouldSyncUsers                  = PrefKey[Boolean]("should_sync_users", customDefault = true)
+  lazy val ShouldSyncUsers                  = PrefKey[Boolean]("should_sync_users_1", customDefault = true)
+  lazy val ShouldSyncTeam                   = PrefKey[Boolean]("should_sync_team", customDefault = true)
 
   // fix for duplicated entries in the database, left there by a bug from an old version of the app
   lazy val FixDuplicatedConversations       = PrefKey[Boolean]("fix_duplicated_conversations", customDefault = true)
@@ -449,4 +456,8 @@ object UserPreferences {
   lazy val CheckMutedStatus                 = PrefKey[Boolean]("check_muted_status", customDefault = true)
 
   lazy val ReadReceiptsRemotelyChanged      = PrefKey[Boolean]("read_receipts_remotely_changed", customDefault = false)
+
+  lazy val StatusNotificationsBitmask       = PrefKey[Int]("status_notifications_bitmask", customDefault = 0)
+  lazy val ShouldWarnStatusNotifications    = PrefKey[Boolean]( "should_warn_status_notifications", customDefault = true)
+
 }

@@ -18,6 +18,7 @@
 package com.waz.content
 
 import android.content.Context
+import com.waz.log.BasicLogging.LogTag
 import com.waz.model.MsgDeletion.MsgDeletionDao
 import com.waz.model.{MessageId, MsgDeletion}
 import com.waz.threading.{CancellableFuture, Threading}
@@ -35,7 +36,10 @@ trait MsgDeletionStorage extends CachedStorage[MessageId, MsgDeletion]
   * We need that to discard new versions of previously deleted messages.
   * We don't want to store it permanently, so will drop items older than 2 weeks.
   */
-class MsgDeletionStorageImpl(context: Context, storage: Database) extends CachedStorageImpl[MessageId, MsgDeletion](new TrimmingLruCache(context, Fixed(512)), storage)(MsgDeletionDao, "MsgDeletionStorage_Cached") with MsgDeletionStorage {
+class MsgDeletionStorageImpl(context: Context, storage: Database)
+  extends CachedStorageImpl[MessageId, MsgDeletion](new TrimmingLruCache(context, Fixed(512)), storage)(MsgDeletionDao, LogTag("MsgDeletionStorage_Cached"))
+    with MsgDeletionStorage {
+
   import MsgDeletionStorage._
   import Threading.Implicits.Background
 

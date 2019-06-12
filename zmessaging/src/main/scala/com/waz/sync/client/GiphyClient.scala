@@ -19,8 +19,8 @@ package com.waz.sync.client
 
 import java.net.URLEncoder
 
-import com.waz.ZLog.ImplicitTag._
-import com.waz.ZLog._
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
+import com.waz.log.LogSE._
 import com.waz.model.AssetMetaData.Image.Tag
 import com.waz.model.AssetMetaData.Image.Tag.{Medium, Preview}
 import com.waz.model.{AssetData, AssetMetaData, Dim2, Mime}
@@ -43,7 +43,7 @@ trait GiphyClient {
 class GiphyClientImpl(implicit
                       urlCreator: UrlCreator,
                       httpClient: HttpClient,
-                      authRequestInterceptor: AuthRequestInterceptor) extends GiphyClient {
+                      authRequestInterceptor: AuthRequestInterceptor) extends GiphyClient with DerivedLogTag {
 
   import GiphyClient._
   import HttpClient.AutoDerivation._
@@ -58,7 +58,7 @@ class GiphyClientImpl(implicit
       .withResultType[Seq[(Option[AssetData], AssetData)]]
       .execute
       .recover { case err =>
-        warn(s"unexpected response for trending: $err")
+        warn(l"unexpected response for trending: $err")
         Nil
       }
   }
@@ -68,7 +68,7 @@ class GiphyClientImpl(implicit
       .withResultType[Seq[(Option[AssetData], AssetData)]]
       .execute
       .recover { case err =>
-        warn(s"unexpected response for search keyword '$keyword': $err")
+        warn(l"unexpected response for search keyword '${showString(keyword)}': $err")
         Nil
       }
   }
@@ -111,7 +111,7 @@ object GiphyClient {
       }
     } catch {
       case NonFatal(e) =>
-        warn(s"response: $response parsing failed", e)
+//        warn(l"response: $response parsing failed", e)
         None
     }
 

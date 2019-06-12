@@ -17,10 +17,10 @@
  */
 package com.waz.sync.client
 
-import com.waz.ZLog.ImplicitTag._
-import com.waz.ZLog._
+import com.waz.log.LogSE._
 import com.waz.api.IConversation.{Access, AccessRole}
 import com.waz.api.impl.ErrorResponse
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model.ConversationData.{ConversationType, Link}
 import com.waz.model._
 import com.waz.sync.client.ConversationsClient.ConversationResponse.ConversationsResult
@@ -56,7 +56,7 @@ trait ConversationsClient {
 class ConversationsClientImpl(implicit
                               urlCreator: UrlCreator,
                               httpClient: HttpClient,
-                              authRequestInterceptor: AuthRequestInterceptor) extends ConversationsClient {
+                              authRequestInterceptor: AuthRequestInterceptor) extends ConversationsClient with DerivedLogTag {
 
   import ConversationsClient._
   import HttpClient.AutoDerivation._
@@ -212,7 +212,7 @@ class ConversationsClientImpl(implicit
   }
 
   def postConversation(state: ConversationInitState): ErrorOrResponse[ConversationResponse] = {
-    debug(s"postConversation(${state.users}, ${state.name})")
+    debug(l"postConversation(${state.users}, ${state.name})")
     Request.Post(relativePath = ConversationsPath, body = state)
       .withResultType[ConversationsResult]
       .withErrorType[ErrorResponse]
@@ -302,7 +302,7 @@ object ConversationsClient {
 
     case class ConversationsResult(conversations: Seq[ConversationResponse], hasMore: Boolean)
     
-    object ConversationsResult {
+    object ConversationsResult extends DerivedLogTag {
 
       def unapply(response: ResponseContent): Option[(List[ConversationResponse], Boolean)] = try {
         response match {
@@ -314,14 +314,14 @@ object ConversationsClient {
         }
       } catch {
         case NonFatal(e) =>
-          warn(s"couldn't parse conversations response: $response", e)
-          warn("json decoding failed", e)
+          warn(l"couldn't parse conversations response", e)
+          warn(l"json decoding failed", e)
           None
       }
     }
   }
 
-  object EventsResponse {
+  object EventsResponse extends DerivedLogTag {
     import com.waz.utils.JsonDecoder._
 
     def unapplySeq(response: ResponseContent): Option[List[ConversationEvent]] = try {
@@ -333,7 +333,7 @@ object ConversationsClient {
       }
     } catch {
       case NonFatal(e) =>
-        warn(s"couldn't parse events response $response", e)
+        warn(l"couldn't parse events response", e)
         None
     }
   }

@@ -17,10 +17,10 @@
  */
 package com.waz.sync.queue
 
-import com.waz.ZLog.ImplicitTag._
 import com.waz.api.SyncState
 import com.waz.api.impl.ErrorResponse
-import com.waz.log.ZLog2._
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
+import com.waz.log.LogSE._
 import com.waz.model.UserId
 import com.waz.model.sync.SyncJob
 import com.waz.model.sync.SyncRequest.Serialized
@@ -43,7 +43,8 @@ class SyncExecutor(account:     UserId,
                    content:     SyncContentUpdater,
                    network:     NetworkModeService,
                    handler: =>  SyncHandler,
-                   tracking:    TrackingService) {
+                   tracking:    TrackingService) extends DerivedLogTag {
+
   import SyncExecutor._
   private implicit val dispatcher = new SerialDispatchQueue(name = "SyncExecutorQueue")
 
@@ -67,7 +68,8 @@ class SyncExecutor(account:     UserId,
 
   private def execute(job: SyncJob): Future[SyncResult] = {
     verbose(l"executeJob: $job")
-    val future = content.updateSyncJob(job.id)(job => job.copy(attempts = job.attempts + 1, state = SyncState.SYNCING, error = None, offline = !network.isOnlineMode))
+    val future =
+      content.updateSyncJob(job.id)(job => job.copy(attempts = job.attempts + 1, state = SyncState.SYNCING, error = None, offline = !network.isOnlineMode))
       .flatMap {
         case None => Future.successful(SyncResult(ErrorResponse.internalError(s"Could not update job: $job")))
         case Some(updated) =>
@@ -81,7 +83,9 @@ class SyncExecutor(account:     UserId,
 
     // this is only to check for any long running sync requests, which could mean very serious problem
     CancellableFuture.lift(future).withTimeout(10.minutes).onComplete {
-      case Failure(e: TimeoutException) => tracking.exception(new RuntimeException(s"SyncRequest: ${job.request.cmd} runs for over 10 minutes", e), s"SyncRequest taking too long: $job")
+      case Failure(e: TimeoutException) =>
+        tracking.exception(new RuntimeException(s"SyncRequest: ${job.request.cmd} runs for over 10 minutes", e), s"SyncRequest taking too long: $job")
+        // TODO: Think about removing the sync job at this point
       case _ =>
     }
     future

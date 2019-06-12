@@ -19,8 +19,8 @@ package com.waz.service.push
 
 import java.net.URL
 
-import com.waz.ZLog.ImplicitTag._
 import com.waz.api.impl.ErrorResponse
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model.{Uid, UserId}
 import com.waz.service.push.WSPushServiceImpl.RequestCreator
 import com.waz.specs.AndroidFreeSpec
@@ -37,8 +37,7 @@ import org.scalatest.Ignore
 import scala.concurrent.Future
 import scala.concurrent.duration._
 
-
-@Ignore class WSPushServiceSpec extends AndroidFreeSpec {
+@Ignore class WSPushServiceSpec extends AndroidFreeSpec with DerivedLogTag {
 
   private val accessTokenProvider = mock[AccessTokenProvider]
   private val webSocketFactory = mock[WebSocketFactory]

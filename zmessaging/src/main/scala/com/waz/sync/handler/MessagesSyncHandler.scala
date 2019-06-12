@@ -17,12 +17,12 @@
  */
 package com.waz.sync.handler
 
-import com.waz.ZLog.ImplicitTag._
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.api.Message
 import com.waz.api.impl.ErrorResponse
 import com.waz.api.impl.ErrorResponse.{Cancelled, internalError}
 import com.waz.content.MessagesStorage
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model.AssetData.{ProcessingTaskKey, UploadTaskKey}
 import com.waz.model.AssetStatus.{Syncable, UploadCancelled, UploadFailed}
 import com.waz.model.GenericContent.{Ephemeral, Knock, Location, MsgEdit}
@@ -57,7 +57,8 @@ class MessagesSyncHandler(selfUserId: UserId,
                           assetSync:  AssetSyncHandler,
                           sync:       SyncServiceHandle,
                           assets:     AssetService,
-                          errors:     ErrorsService) {
+                          errors:     ErrorsService) extends DerivedLogTag {
+
   import com.waz.threading.Threading.Implicits.Background
 
   def postDeleted(convId: ConvId, msgId: MessageId): Future[SyncResult] =

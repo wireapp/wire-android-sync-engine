@@ -18,11 +18,10 @@
 package com.waz.content
 
 import android.support.v4.util.LruCache
-import com.waz.ZLog.ImplicitTag._
-import com.waz.ZLog.logTime
 import com.waz.content.MessagesCursor.Entry
 import com.waz.db.{CursorIterator, Reader, ReverseCursorIterator}
-import com.waz.log.ZLog2._
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
+import com.waz.log.LogSE._
 import com.waz.model._
 import com.waz.service.messages.MessageAndLikes
 import com.waz.service.tracking.TrackingService
@@ -48,7 +47,7 @@ class MessagesCursor(cursor: DBCursor,
                      override val lastReadIndex: Int,
                      val lastReadTime: RemoteInstant,
                      loader: MessageAndLikesStorage,
-                     tracking: TrackingService)(implicit ordering: Ordering[RemoteInstant]) extends MsgCursor { self =>
+                     tracking: TrackingService)(implicit ordering: Ordering[RemoteInstant]) extends MsgCursor with DerivedLogTag { self =>
   import MessagesCursor._
   import com.waz.utils.events.EventContext.Implicits.global
 
@@ -108,7 +107,7 @@ class MessagesCursor(cursor: DBCursor,
 
   def asyncIndexOf(time: RemoteInstant, binarySearch: Boolean = false): Future[Int] = {
     def cursorSearch(from: Int, to: Int) = Future {
-      logTime(s"time: $time not found in pre-fetched window, had to go through cursor, binarySearch: $binarySearch") {
+      logTime(l"time: $time not found in pre-fetched window, had to go through cursor, binarySearch: $binarySearch") {
         val index = if (binarySearch) cursorBinarySearch(time, from, to) else cursorLinearSearch(time, from, to)
         verbose(l"index in cursor: $index")
         index
@@ -153,7 +152,7 @@ class MessagesCursor(cursor: DBCursor,
 
     windowFuture.value match {
       case Some(Success(result)) => result
-      case _ => logTime(s"loading window for index: $index")(Try(Await.result(windowFuture, 5.seconds)).getOrElse(new IndexWindow(index, IndexedSeq.empty)))
+      case _ => logTime(l"loading window for index: $index")(Try(Await.result(windowFuture, 5.seconds)).getOrElse(new IndexWindow(index, IndexedSeq.empty)))
     }
   }
 
@@ -175,9 +174,9 @@ class MessagesCursor(cursor: DBCursor,
 
       val msg = messages.get(id)
       if (msg ne null) msg else {
-        logTime("waiting for window to prefetch")(Try(Await.result(fetching, 5.seconds)))
+        logTime(l"waiting for window to prefetch")(Try(Await.result(fetching, 5.seconds)))
         Option(messages.get(id)).getOrElse {
-          logTime(s"loading message for id: $id, position: $index") {
+          logTime(l"loading message for id: $id, position: $index") {
             val m = Try(Await.result(loader(Seq(id)), 500.millis).headOption).toOption.flatten
             m.foreach(putMessage)
             m.getOrElse(MessageAndLikes.Empty)
@@ -266,7 +265,7 @@ object MessagesCursor {
   }
 }
 
-class WindowLoader(cursor: DBCursor)(implicit dispatcher: SerialDispatchQueue) {
+class WindowLoader(cursor: DBCursor)(implicit dispatcher: SerialDispatchQueue) extends DerivedLogTag {
   import MessagesCursor._
 
   @volatile private[this] var window = IndexWindow.Empty

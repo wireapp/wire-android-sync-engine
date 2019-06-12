@@ -20,7 +20,7 @@ package com.waz.utils.events
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.{ConcurrentLinkedQueue, CountDownLatch, CyclicBarrier, TimeUnit}
 
-import com.waz.ZLog.ImplicitTag._
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.specs.AndroidFreeSpec
 import com.waz.specs.AndroidFreeSpec.DefaultTimeout
 import com.waz.testutils.Implicits._
@@ -30,7 +30,7 @@ import scala.collection.JavaConverters._
 import scala.concurrent._
 import scala.concurrent.duration._
 
-class SignalSpec extends AndroidFreeSpec {
+class SignalSpec extends AndroidFreeSpec with DerivedLogTag {
   import scala.concurrent.ExecutionContext.Implicits.global
 
   var received = Seq[Int]()

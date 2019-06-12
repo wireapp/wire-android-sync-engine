@@ -17,9 +17,9 @@
  */
 package com.waz.sync.client
 
-import com.waz.ZLog.ImplicitTag._
-import com.waz.ZLog._
+import com.waz.log.LogSE._
 import com.waz.api.impl.ErrorResponse
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model.UserData.ConnectionStatus
 import com.waz.model._
 import com.waz.sync.client.ConnectionsClient.PageSize
@@ -101,15 +101,15 @@ class ConnectionsClientImpl(implicit
   }
 }
 
-object ConnectionsClient {
+object ConnectionsClient extends DerivedLogTag {
   val ConnectionsPath = "/connections"
   val PageSize = 100
 
-  object ConnectionResponseExtractor {
+  object ConnectionResponseExtractor extends DerivedLogTag {
     def unapply(resp: ResponseContent): Option[UserConnectionEvent] = resp match {
       case JsonObjectResponse(js) => Try(UserConnectionEvent.Decoder(js)).toOption
       case _ =>
-        warn(s"unknown response format for connection response: $resp")
+        warn(l"unknown response format for connection response:")
         None
     }
   }
@@ -120,12 +120,12 @@ object ConnectionsClient {
         case JsonObjectResponse(js) =>
           Some((if (js.has("connections")) array[UserConnectionEvent](js.getJSONArray("connections")).toList else Nil, decodeBool('has_more)(js)))
         case _ =>
-          warn(s"unknown response format for connections response: $response")
+          warn(l"unknown response format for connections response:")
           None
       }
     } catch {
       case NonFatal(e) =>
-        warn(s"couldn't parse connections response: $response", e)
+        warn(l"couldn't parse connections response:", e)
         None
     }
   }

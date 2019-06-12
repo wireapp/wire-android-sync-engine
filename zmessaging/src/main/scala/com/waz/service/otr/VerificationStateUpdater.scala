@@ -17,12 +17,11 @@
  */
 package com.waz.service.otr
 
-import com.waz.ZLog
-import com.waz.ZLog.LogTag
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.api.Verification
 import com.waz.content._
-import com.waz.log.ZLog2.SafeToLog
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
+import com.waz.log.LogShow.SafeToLog
 import com.waz.model.ConversationData.ConversationType
 import com.waz.model._
 import com.waz.model.otr.UserClients
@@ -44,7 +43,7 @@ class VerificationStateUpdater(selfUserId:        UserId,
                                clientsStorage:    OtrClientsStorage,
                                convs:             ConversationStorage,
                                membersStorage:    MembersStorage,
-                               msgEventProcessor: MessageEventProcessor) {
+                               msgEventProcessor: MessageEventProcessor) extends DerivedLogTag {
   import Verification._
   import VerificationStateUpdater._
   import com.waz.threading.Threading.Implicits.Background
@@ -150,8 +149,7 @@ class VerificationStateUpdater(selfUserId:        UserId,
   }
 }
 
-object VerificationStateUpdater {
-  private implicit val tag: LogTag = ZLog.logTagFor[VerificationStateUpdater]
+object VerificationStateUpdater extends DerivedLogTag {
 
   def serializationKey(userId: UserId) = (userId, "verification-state-update")
 

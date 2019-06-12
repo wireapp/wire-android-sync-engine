@@ -17,9 +17,9 @@
  */
 package com.waz.sync.handler
 
-import com.waz.ZLog.ImplicitTag._
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.content.UsersStorage
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model.UserData.ConnectionStatus
 import com.waz.model.{Name, UserId}
 import com.waz.service.ConnectionServiceImpl
@@ -33,7 +33,7 @@ import scala.concurrent.Future
 
 class ConnectionsSyncHandler(usersStorage:      UsersStorage,
                              connectionService: ConnectionServiceImpl,
-                             connectionsClient: ConnectionsClient) {
+                             connectionsClient: ConnectionsClient) extends DerivedLogTag {
 
   import Threading.Implicits.Background
   private implicit val ec = EventContext.Global

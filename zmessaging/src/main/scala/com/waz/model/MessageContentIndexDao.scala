@@ -17,10 +17,10 @@
  */
 package com.waz.model
 
-import com.waz.ZLog._
 import com.waz.api.{ContentSearchQuery, Message}
 import com.waz.db.Col._
 import com.waz.db.Dao
+import com.waz.log.BasicLogging.LogTag
 import com.waz.utils.Identifiable
 import com.waz.utils.wrappers.{DB, DBCursor}
 
@@ -30,7 +30,7 @@ case class MessageContentIndexEntry(messageId: MessageId, convId: ConvId, conten
 
 object MessageContentIndexDao extends Dao[MessageContentIndexEntry, MessageId] {
   import MessageContentIndex._
-  private implicit val logTag: LogTag = "MessageContentIndex"
+  private implicit val tag: LogTag = LogTag("MessageContentIndex")
 
   val MessageId = id[MessageId]('message_id).apply(_.messageId)
   val Conv = id[ConvId]('conv_id).apply(_.convId)

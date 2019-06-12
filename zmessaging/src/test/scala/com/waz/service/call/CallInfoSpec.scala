@@ -17,14 +17,14 @@
  */
 package com.waz.service.call
 
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model.{ConvId, LocalInstant, UserId}
-import com.waz.ZLog.ImplicitTag._
 import com.waz.service.call.CallInfo.CallState.{Ended, SelfConnected}
 import com.waz.specs.AndroidFreeSpec
 
 import scala.concurrent.duration._
 
-class CallInfoSpec extends AndroidFreeSpec {
+class CallInfoSpec extends AndroidFreeSpec with DerivedLogTag {
 
   scenario("Test duration advances once every second") {
     val call = callInfo()

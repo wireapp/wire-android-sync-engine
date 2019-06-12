@@ -18,7 +18,7 @@
 package com.waz.model
 
 import android.webkit.MimeTypeMap
-import com.waz.log.ZLog2.SafeToLog
+import com.waz.log.LogShow.SafeToLog
 import com.waz.utils._
 
 import scala.PartialFunction.cond

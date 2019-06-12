@@ -20,11 +20,12 @@ package com.waz.cache
 import java.io.File
 
 import android.content.Context
-import com.waz.log.ZLog2._
-import com.waz.ZLog.ImplicitTag._
+import com.waz.log.LogSE._
 import com.waz.cache.CacheEntryData.CacheEntryDao
 import com.waz.cache.CacheStorage.EntryCache
 import com.waz.content.Database
+import com.waz.log.BasicLogging.LogTag
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model.{CacheKey, Uid}
 import com.waz.threading.{SerialDispatchQueue, Threading}
 import com.waz.utils.TrimmingLruCache.{Fixed, Relative}
@@ -35,7 +36,10 @@ import scala.concurrent.duration._
 
 trait CacheStorage extends CachedStorage[CacheKey, CacheEntryData]
 
-class CacheStorageImpl(storage: Database, context: Context) extends CachedStorageImpl[CacheKey, CacheEntryData](new EntryCache(context), storage)(CacheEntryDao, "CacheStorage") with CacheStorage {
+class CacheStorageImpl(storage: Database, context: Context)
+  extends CachedStorageImpl[CacheKey, CacheEntryData](new EntryCache(context), storage)(CacheEntryDao, LogTag("CacheStorage"))
+    with CacheStorage
+    with DerivedLogTag {
 
   import com.waz.cache.CacheStorage._
   import com.waz.utils.events.EventContext.Implicits.global

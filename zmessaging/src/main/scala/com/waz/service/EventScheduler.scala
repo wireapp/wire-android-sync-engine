@@ -17,9 +17,9 @@
  */
 package com.waz.service
 
-import com.waz.ZLog.ImplicitTag._
-import com.waz.ZLog.{LogTag, logTagFor}
-import com.waz.log.ZLog2._
+import com.waz.log.BasicLogging.LogTag
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
+import com.waz.log.LogSE._
 import com.waz.model.{Event, RConvEvent, RConvId}
 import com.waz.threading.Threading
 import com.waz.utils._
@@ -29,7 +29,7 @@ import scala.concurrent.Future.{successful, traverse}
 import scala.concurrent.{Future, Promise}
 import scala.reflect.ClassTag
 
-class EventScheduler(layout: EventScheduler.Stage) {
+class EventScheduler(layout: EventScheduler.Stage) extends DerivedLogTag {
   import EventScheduler._
 
   private val queue = new GroupedEventProcessingQueue[Event, RConvId](RConvEvent, (c, e) => executeSchedule(c, createSchedule(e)), "EventScheduler")
@@ -45,9 +45,9 @@ class EventScheduler(layout: EventScheduler.Stage) {
 
     val logTag: LogTag = stage match {
       case s: Stage.Atomic => s.eventTag
-      case Stage.Composite(strat: Strategy, _) => strat.getClass.getSimpleName
+      case Stage.Composite(strat: Strategy, _) => LogTag(strat.getClass.getSimpleName)
     }
-    verbose(l"scheduling ${eligible.size} eligible events from total ${events.size}")(s"${logTagFor[Stage]}[$logTag]")
+    verbose(l"scheduling ${eligible.size} eligible events from total ${events.size}")(LogTag(s"${LogTag[Stage].value}[${logTag.value}]"))
 
     if (eligible.isEmpty) NOP else stage match {
       case s: Stage.Atomic =>
@@ -94,7 +94,7 @@ object EventScheduler {
 
     trait Atomic extends Stage {
 
-      val eventTag: String = "Event"
+      val eventTag: LogTag = LogTag("Event")
 
       def apply(conv: RConvId, es: Traversable[Event]): Future[Any]
     }
@@ -103,7 +103,7 @@ object EventScheduler {
 
     def apply[A <: Event](processor: (RConvId, Vector[A]) => Future[Any], include: A => Boolean = (_: A) => true)(implicit EligibleEvent: ClassTag[A]): Atomic = new Atomic {
 
-      override val eventTag = EligibleEvent.runtimeClass.getSimpleName
+      override val eventTag = LogTag(EligibleEvent.runtimeClass.getSimpleName)
 
       def isEligible(e: Event): Boolean = e match {
         case EligibleEvent(a) if include(a) => true
@@ -112,7 +112,7 @@ object EventScheduler {
 
       def apply(conv: RConvId, es: Traversable[Event]): Future[Any] = {
         val events: Vector[A] = es.collect { case EligibleEvent(a) if include(a) => a }(breakOut)
-        verbose(l"processing ${events.size} ${showString(if (events.size == 1) "event" else "events")}: ${events.take(10)} ${showString(if (events.size > 10) "..." else "")}")(s"${logTagFor[Stage]}[$eventTag]")
+        verbose(l"processing ${events.size} ${showString(if (events.size == 1) "event" else "events")}: ${events.take(10)} ${showString(if (events.size > 10) "..." else "")}")(LogTag(s"${LogTag[Stage].value}[${eventTag.value}]"))
         processor(conv, events)
       }
     }

@@ -20,9 +20,9 @@ package com.waz.service.push
 import java.io.IOException
 
 import com.waz.DisabledTrackingService
-import com.waz.ZLog.ImplicitTag._
 import com.waz.api.NetworkMode
 import com.waz.content.{AccountStorage, GlobalPreferences}
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model._
 import com.waz.model.otr.ClientId
 import com.waz.service.AccountsService.{InBackground, LoggedOut}
@@ -39,7 +39,7 @@ import com.waz.utils.wrappers.GoogleApi
 
 import scala.concurrent.Future
 
-class PushTokenServiceSpec extends AndroidFreeSpec {
+class PushTokenServiceSpec extends AndroidFreeSpec with DerivedLogTag {
 
   import Threading.Implicits.Background
 
@@ -174,7 +174,7 @@ class PushTokenServiceSpec extends AndroidFreeSpec {
 
       (accStorage.update _).expects(*, *).anyNumberOfTimes().onCall { (id, f) =>
         Future.successful {
-          val account = loggedInAccounts.currentValue("").flatMap(_.find(_.id == id))
+          val account = loggedInAccounts.currentValue.flatMap(_.find(_.id == id))
 
           returning(account.fold(Option.empty[(AccountData, AccountData)])(p => Some((p, f(p))))) {
             case Some((_, updated)) => loggedInAccounts.mutate { accs =>

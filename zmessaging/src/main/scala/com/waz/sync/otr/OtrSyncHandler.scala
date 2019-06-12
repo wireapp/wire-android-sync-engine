@@ -17,13 +17,13 @@
  */
 package com.waz.sync.otr
 
-import com.waz.ZLog.ImplicitTag._
 import com.waz.api.Verification
 import com.waz.api.impl.ErrorResponse
 import com.waz.api.impl.ErrorResponse.internalError
 import com.waz.cache.LocalData
 import com.waz.content.{ConversationStorage, MembersStorage, UsersStorage}
-import com.waz.log.ZLog2._
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
+import com.waz.log.LogSE._
 import com.waz.model.AssetData.RemoteData
 import com.waz.model._
 import com.waz.model.otr.ClientId
@@ -63,7 +63,7 @@ class OtrSyncHandlerImpl(teamId:             Option[TeamId],
                          errors:             ErrorsService,
                          clientsSyncHandler: OtrClientsSyncHandler,
                          push:               PushService,
-                         usersStorage:       UsersStorage) extends OtrSyncHandler {
+                         usersStorage:       UsersStorage) extends OtrSyncHandler with DerivedLogTag {
 
   import OtrSyncHandler._
   import com.waz.threading.Threading.Implicits.Background

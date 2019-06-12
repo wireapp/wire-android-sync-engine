@@ -20,7 +20,7 @@ package com.waz.service.assets2
 import java.net.URI
 
 import com.waz.cache2.CacheService.Encryption
-import com.waz.log.ZLog2.SafeToLog
+import com.waz.log.LogShow.SafeToLog
 import com.waz.model._
 import com.waz.sync.client.AssetClient2.Retention
 import com.waz.utils.Identifiable

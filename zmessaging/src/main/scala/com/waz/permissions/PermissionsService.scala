@@ -17,8 +17,9 @@
  */
 package com.waz.permissions
 
-import com.waz.ZLog.ImplicitTag._
-import com.waz.log.ZLog2._
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
+import com.waz.log.LogShow.SafeToLog
+import com.waz.log.LogSE._
 import com.waz.threading.{SerialDispatchQueue, Threading}
 import com.waz.utils.events.{EventStream, RefreshingSignal, Signal}
 
@@ -26,7 +27,7 @@ import scala.collection.immutable.ListSet
 import scala.concurrent.{Future, Promise}
 import scala.util.Try
 
-class PermissionsService() {
+class PermissionsService extends DerivedLogTag {
 
   import PermissionsService._
   private implicit val ec = new SerialDispatchQueue(name = "PermissionsService")

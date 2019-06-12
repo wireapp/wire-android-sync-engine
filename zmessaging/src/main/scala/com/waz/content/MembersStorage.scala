@@ -18,6 +18,7 @@
 package com.waz.content
 
 import android.content.Context
+import com.waz.log.BasicLogging.LogTag
 import com.waz.model.ConversationMemberData.ConversationMemberDataDao
 import com.waz.model._
 import com.waz.threading.SerialDispatchQueue
@@ -46,7 +47,10 @@ trait MembersStorage extends CachedStorage[(UserId, ConvId), ConversationMemberD
   def delete(conv: ConvId): Future[Unit]
 }
 
-class MembersStorageImpl(context: Context, storage: ZmsDatabase) extends CachedStorageImpl[(UserId, ConvId), ConversationMemberData](new TrimmingLruCache(context, Fixed(1024)), storage)(ConversationMemberDataDao, "MembersStorage_Cached") with MembersStorage {
+class MembersStorageImpl(context: Context, storage: ZmsDatabase)
+  extends CachedStorageImpl[(UserId, ConvId), ConversationMemberData](new TrimmingLruCache(context, Fixed(1024)), storage)(ConversationMemberDataDao, LogTag("MembersStorage_Cached"))
+    with MembersStorage {
+
   private implicit val dispatcher = new SerialDispatchQueue(name = "MembersStorage")
 
   def getByConv(conv: ConvId) = find(_.convId == conv, ConversationMemberDataDao.findForConv(conv)(_), identity)

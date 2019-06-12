@@ -41,7 +41,8 @@ import com.waz.model.SearchQueryCache.SearchQueryCacheDao
 import com.waz.model.UserData.UserDataDao
 import com.waz.model.otr.UserClients.UserClientsDao
 import com.waz.model.sync.SyncJob.SyncJobDao
-import com.waz.service.push.ReceivedPushData.ReceivedPushDataDao
+import com.waz.repository.FCMNotificationStatsRepository.FCMNotificationStatsDao
+import com.waz.repository.FCMNotificationsRepository.FCMNotificationsDao
 import com.waz.service.tracking.TrackingService
 
 class ZMessagingDB(context: Context, dbName: String, tracking: TrackingService) extends DaoDB(context.getApplicationContext, dbName, null, DbVersion, daos, migrations, tracking) {
@@ -55,16 +56,15 @@ class ZMessagingDB(context: Context, dbName: String, tracking: TrackingService) 
 }
 
 object ZMessagingDB {
-  val DbVersion = 114
+  val DbVersion = 119
 
   lazy val daos = Seq (
-    UserDataDao, SearchQueryCacheDao, AssetDataDao, ConversationDataDao,
-    ConversationMemberDataDao, MessageDataDao, KeyValueDataDao,
-    SyncJobDao, ErrorDataDao, NotificationDataDao, ReceivedPushDataDao,
-    ContactHashesDao, ContactsOnWireDao, UserClientsDao, LikingDao,
-    ContactsDao, EmailAddressesDao, PhoneNumbersDao, MsgDeletionDao,
-    EditHistoryDao, MessageContentIndexDao, PushNotificationEventsDao,
-    ReadReceiptDao, PropertiesDao
+    UserDataDao, SearchQueryCacheDao, AssetDataDao, ConversationDataDao, ConversationMemberDataDao,
+    MessageDataDao, KeyValueDataDao, SyncJobDao, ErrorDataDao, NotificationDataDao,
+    ContactHashesDao, ContactsOnWireDao, UserClientsDao, LikingDao, ContactsDao, EmailAddressesDao,
+    PhoneNumbersDao, MsgDeletionDao, EditHistoryDao, MessageContentIndexDao,
+    PushNotificationEventsDao, ReadReceiptDao, PropertiesDao, FCMNotificationsDao,
+    FCMNotificationStatsDao
   )
 
   lazy val migrations = Seq(
@@ -281,6 +281,24 @@ object ZMessagingDB {
     },
     Migration(114, 115) { db =>
       db.execSQL("ALTER TABLE Users ADD COLUMN fields TEXT DEFAULT null")
+    },
+    Migration(115, 116) { db =>
+      db.execSQL("ALTER TABLE Users ADD COLUMN self_permissions INTEGER DEFAULT 0")
+      db.execSQL("ALTER TABLE Users ADD COLUMN copy_permissions INTEGER DEFAULT 0")
+      db.execSQL("ALTER TABLE Users ADD COLUMN created_by TEXT DEFAULT null")
+      db.execSQL("UPDATE KeyValues SET value = 'true' WHERE key = 'should_sync_teams'")
+    },
+    Migration(116, 117) { db =>
+      db.execSQL(FCMNotificationsDao.table.createSql)
+    },
+    Migration(117, 118) { db =>
+      db.execSQL("DROP TABLE ReceivedPushes")
+    },
+    Migration(118, 119) { db =>
+      db.execSQL(FCMNotificationStatsDao.table.createSql)
+    },
+    Migration(199,120) { db =>
+      db.execSQL("UPDATE Conversations SET muted_status = 1 WHERE muted_status = 2") //fix for AN-6210
     }
   )
 }

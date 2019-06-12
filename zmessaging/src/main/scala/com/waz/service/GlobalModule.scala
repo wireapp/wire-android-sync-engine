@@ -27,6 +27,7 @@ import com.waz.bitmap.video.VideoTranscoder
 import com.waz.cache.CacheService
 import com.waz.client.{RegistrationClient, RegistrationClientImpl}
 import com.waz.content._
+import com.waz.log.{LogsService, LogsServiceImpl}
 import com.waz.permissions.PermissionsService
 import com.waz.service.assets.{AudioTranscoder, GlobalRecordAndPlayService}
 import com.waz.service.call._
@@ -41,6 +42,7 @@ import com.waz.ui.MemoryImageCache
 import com.waz.ui.MemoryImageCache.{Entry, Key}
 import com.waz.utils.Cache
 import com.waz.utils.wrappers.{Context, GoogleApi}
+import com.waz.zms.BuildConfig
 import com.waz.znet2.http.Request.UrlCreator
 import com.waz.znet2.http.{HttpClient, RequestInterceptor}
 import com.waz.znet2.{HttpClientOkHttpImpl, OkHttpUserAgentInterceptor}
@@ -101,6 +103,9 @@ trait GlobalModule {
   def mediaManager:             MediaManagerService
 
   def trackingService:          TrackingService
+
+  def logsService:              LogsService
+  def customBackendClient:      CustomBackendClient
 }
 
 class GlobalModuleImpl(val context:                 AContext,
@@ -143,7 +148,7 @@ class GlobalModuleImpl(val context:                 AContext,
   lazy val loginClient:         LoginClient                      = new LoginClientImpl(trackingService)(urlCreator, httpClient)
   lazy val regClient:           RegistrationClient               = new RegistrationClientImpl()(urlCreator, httpClient)
 
-  lazy val urlCreator:          UrlCreator                       = UrlCreator.simpleAppender(backend.baseUrl.toString)
+  lazy val urlCreator:          UrlCreator                       = UrlCreator.simpleAppender(() => backend.baseUrl.toString)
   private val customUserAgentHttpInterceptor: Interceptor        = new OkHttpUserAgentInterceptor(metadata)
   implicit lazy val httpClient: HttpClient                       = HttpClientOkHttpImpl(enableLogging = ZmsVersion.DEBUG, pin = backend.pin, customUserAgentInterceptor = Some(customUserAgentHttpInterceptor))(Threading.BlockingIO)
   lazy val httpClientForLongRunning: HttpClient                  = HttpClientOkHttpImpl(enableLogging = ZmsVersion.DEBUG, timeout = Some(30.seconds), pin = backend.pin, customUserAgentInterceptor = Some(customUserAgentHttpInterceptor))(ExecutionContext.fromExecutor(Executors.newFixedThreadPool(4)))
@@ -176,6 +181,9 @@ class GlobalModuleImpl(val context:                 AContext,
 
   lazy val flowmanager:         FlowManagerService               = wire[DefaultFlowManagerService]
   lazy val mediaManager:        MediaManagerService              = wire[DefaultMediaManagerService]
+
+  lazy val logsService:         LogsService                      = new LogsServiceImpl(prefs)
+  lazy val customBackendClient: CustomBackendClient              = new CustomBackendClientImpl()
 }
 
 class EmptyGlobalModule extends GlobalModule {
@@ -226,5 +234,7 @@ class EmptyGlobalModule extends GlobalModule {
   override def httpClientForLongRunning: HttpClient                                          = ???
   override def syncRequests:             SyncRequestService                                  = ???
   override def syncHandler:              SyncHandler                                         = ???
+  override def logsService:              LogsService                                         = ???
+  override def customBackendClient:      CustomBackendClient                                 = ???
 }
 

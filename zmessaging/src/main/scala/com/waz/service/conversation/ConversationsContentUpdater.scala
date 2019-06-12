@@ -17,11 +17,11 @@
  */
 package com.waz.service.conversation
 
-import com.waz.ZLog.ImplicitTag._
-import com.waz.ZLog.LogTag
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.api.IConversation.{Access, AccessRole}
 import com.waz.content._
+import com.waz.log.BasicLogging.LogTag
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model.ConversationData.ConversationType
 import com.waz.model.sync.ReceiptType
 import com.waz.model.{UserId, _}
@@ -73,7 +73,7 @@ class ConversationsContentUpdaterImpl(val storage:     ConversationStorage,
                                       membersStorage:  MembersStorage,
                                       messagesStorage: => MessagesStorage,
                                       tracking:        TrackingService,
-                                      syncHandler:     SyncServiceHandle) extends ConversationsContentUpdater {
+                                      syncHandler:     SyncServiceHandle) extends ConversationsContentUpdater with DerivedLogTag {
   import com.waz.utils.events.EventContext.Implicits.global
 
   private implicit val dispatcher = new SerialDispatchQueue(name = "ConversationContentUpdater")
@@ -124,6 +124,7 @@ class ConversationsContentUpdaterImpl(val storage:     ConversationStorage,
   })
 
   override def updateConversationMuted(conv: ConvId, muted: MuteSet) = storage.update(conv, { c =>
+    verbose(l"updateConversationMuted($conv, $muted), muteTime = ${c.lastEventTime}")
     c.copy(muteTime = c.lastEventTime, muted = muted)
   })
 
@@ -159,7 +160,6 @@ class ConversationsContentUpdaterImpl(val storage:     ConversationStorage,
 
   override def updateLastEvent(id: ConvId, time: RemoteInstant) = storage.update(id, { conv =>
     verbose(l"updateLastEvent($conv, $time)")
-
     if (conv.lastEventTime.isAfter(time)) conv
     else {
       debug(l"updating: $conv, lastEventTime: $time")

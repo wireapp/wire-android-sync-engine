@@ -17,12 +17,12 @@
  */
 package com.waz.service.push
 
-import com.waz.ZLog.LogTag
 import com.waz.api.Message
 import com.waz.api.NotificationsHandler.NotificationType
 import com.waz.api.NotificationsHandler.NotificationType._
 import com.waz.content._
-import com.waz.log.ZLog2._
+import com.waz.log.BasicLogging.LogTag
+import com.waz.log.LogSE._
 import com.waz.model.GenericContent.{MsgDeleted, MsgEdit, MsgRecall, Reaction, Text}
 import com.waz.model.UserData.ConnectionStatus
 import com.waz.model._
@@ -62,6 +62,7 @@ class NotificationService(selfUserId:      UserId,
                           convs:           ConversationStorage,
                           pushService:     PushService,
                           uiController:    NotificationUiController,
+                          userService:     UserService,
                           clock:           Clock) {
 
   import Threading.Implicits.Background
@@ -133,23 +134,48 @@ class NotificationService(selfUserId:      UserId,
   })
 
   private def pushNotificationsToUi(): Future[Unit] = {
+    def shouldShowNotification(self: UserData,
+                               n: NotificationData,
+                               conv: ConversationData,
+                               notificationSourceVisible: Map[UserId, Set[ConvId]]): Boolean = {
+      // broken down for better readability
+      val appAllows =
+        n.user != self.id &&
+        conv.lastRead.isBefore(n.time) &&
+        conv.cleared.forall(_.isBefore(n.time)) &&
+        !notificationSourceVisible.get(self.id).exists(_.contains(n.conv))
+      val isReplyOrMention = n.isSelfMentioned || n.isReply
+      if (!appAllows) {
+        false
+      } else {
+        if (self.availability == Availability.Away) {
+          false
+        } else if (self.availability == Availability.Busy) {
+          if (!isReplyOrMention) {
+            false
+          } else {
+            conv.muted.isAllAllowed || conv.muted.onlyMentionsAllowed
+          }
+        } else {
+          conv.muted.isAllAllowed  || (conv.muted.onlyMentionsAllowed && isReplyOrMention)
+        }
+      }
+    }
+
     verbose(l"pushNotificationsToUi")
     for {
-      toShow <- storage.list().map(_.toSet)
+      Some(self)                <- userService.getSelfUser
+      toShow                    <- storage.list()
       notificationSourceVisible <- uiController.notificationsSourceVisible.head
-      convs <- convs.getAll(toShow.map(_.conv)).map(_.collect { case Some(c) => c.id -> c }.toMap)
-      (filteredShow, seen) = toShow.partition { n =>
-        val conv = convs(n.conv)
-        n.user != selfUserId &&
-          (conv.muted.isAllAllowed || (conv.muted.onlyMentionsAllowed && (n.isSelfMentioned || n.isReply))) &&
-          conv.lastRead.isBefore(n.time) &&
-          conv.cleared.forall(_.isBefore(n.time)) &&
-          !notificationSourceVisible.get(selfUserId).exists(_.contains(n.conv))
-      }
-      _ = verbose(l"filteredShow: $filteredShow, seen: $seen")
-      _ <- uiController.onNotificationsChanged(selfUserId, filteredShow)
-      _ <- storage.insertAll(filteredShow.map(_.copy(hasBeenDisplayed = true)))
-      _ <- storage.removeAll(seen.map(_.id))
+      convs                     <- convs.getAll(toShow.map(_.conv).toSet)
+                                        .map(_.collect { case Some(c) => c.id -> c }.toMap)
+      (show, ignore)            =  toShow.partition { n =>
+                                     shouldShowNotification(self, n, convs(n.conv), notificationSourceVisible)
+                                   }
+      _                         =  verbose(l"show: $show, ignore: $ignore")
+      _                         <- uiController.onNotificationsChanged(self.id, show.toSet)
+      _                         <- storage.insertAll(show.map(_.copy(hasBeenDisplayed = true)))
+      _                         <- storage.removeAll(ignore.map(_.id))
     } yield {}
   }
 
@@ -161,7 +187,7 @@ class NotificationService(selfUserId:      UserId,
         drift      <- pushService.beDrift.head
         msgs       <- messages.findMessagesFrom(conv.id, eventTimes.min).map(_.filterNot(_.userId == selfUserId))
         quoteIds   <- messages
-          .getAll(msgs.filter(!_.hasMentionOf(selfUserId)).flatMap(_.quote.map(_.message)))
+          .getAll(msgs.filter(!_.hasMentionOf(selfUserId)).flatMap(_.quote.map(_.message)).toSet)
           .map(_.flatten.filter(_.userId == selfUserId).map(_.id).toSet)
       } yield {
         msgs.flatMap { msg =>
@@ -186,6 +212,7 @@ class NotificationService(selfUserId:      UserId,
           }
 
           tpe.map { tp =>
+            verbose(l"quoteIds: $quoteIds, message: $msg")
             NotificationData(
               id              = NotId(msg.id),
               msg             = if (msg.isEphemeral) "" else msg.contentString, msg.convId,

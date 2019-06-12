@@ -18,27 +18,27 @@
 package com.waz.log
 
 import android.util.Log
-import com.waz.ZLog.LogTag
-
-import scala.concurrent.Future
+import com.waz.log.BasicLogging.LogTag
 
 class AndroidLogOutput(override val showSafeOnly: Boolean = false) extends LogOutput {
 
-  override val id = AndroidLogOutput.id
+  override val id: String = AndroidLogOutput.id
 
   import com.waz.log.InternalLog.LogLevel._
   override def log(str: String, level: InternalLog.LogLevel, tag: LogTag, ex: Option[Throwable] = None): Unit =
     level match {
-      case Error   => ex.fold(Log.e(tag, str))(e => Log.e(tag, str, e))
-      case Warn    => ex.fold(Log.w(tag, str))(e => Log.w(tag, str, e))
-      case Info    => Log.i(tag, str)
-      case Debug   => Log.d(tag, str)
-      case Verbose => Log.v(tag, str)
+      case Error   => ex.fold(Log.e(tag.value, str))(e => Log.e(tag.value, str, e))
+      case Warn    => ex.fold(Log.w(tag.value, str))(e => Log.w(tag.value, str, e))
+      case Info    => Log.i(tag.value, str)
+      case Debug   => Log.d(tag.value, str)
+      case Verbose => Log.v(tag.value, str)
       case _ =>
     }
 
-  override def close(): Future[Unit] = Future.successful {}
-  override def flush(): Future[Unit] = Future.successful {}
+  override def clear(): Unit = {
+    import scala.sys.process._
+    Process(Seq("logcat", "-c")).run()
+  }
 }
 
 object AndroidLogOutput {

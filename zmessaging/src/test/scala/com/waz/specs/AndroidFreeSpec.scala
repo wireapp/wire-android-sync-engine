@@ -19,9 +19,10 @@ package com.waz.specs
 
 import java.util.concurrent.{Executors, ThreadFactory, TimeoutException}
 
-import com.waz.{SystemLogOutput, ZLog}
-import com.waz.ZLog.LogTag
-import com.waz.log.InternalLog
+import com.waz.SystemLogOutput
+import com.waz.log.BasicLogging.LogTag
+import com.waz.log.LogSE._
+import com.waz.log.{InternalLog, LogSE, LogsService}
 import com.waz.model.UserId
 import com.waz.service.AccountsService.{AccountState, InForeground, LoggedOut}
 import com.waz.service._
@@ -67,6 +68,7 @@ trait ZSpec extends FeatureSpec
 
     InternalLog.reset()
     InternalLog.add(new SystemLogOutput)
+    InternalLog.setLogsService(new DummyLogsService)
   }
 }
 
@@ -86,7 +88,7 @@ abstract class AndroidFreeSpec extends ZMockSpec { this: Suite =>
     Future {
       t match {
         case e: exceptions.TestFailedException => swallowedFailure = Some(e)
-        case _ => ZLog.error(s"Exception sent: $description", t)(tag)
+        case _ => LogSE.error(l"Exception sent: ${showString(description)}", t)(tag)
       }
     } (Threading.Background)
   }
@@ -131,7 +133,7 @@ abstract class AndroidFreeSpec extends ZMockSpec { this: Suite =>
         override def newThread(r: Runnable) = {
           new Thread(r, Threading.testUiThreadName)
         }
-      }))(Threading.testUiThreadName)
+      }))(LogTag(Threading.testUiThreadName))
     }, Threading.testUiThreadName))
   }
 
@@ -180,4 +182,10 @@ object AndroidFreeSpec {
 
   val DefaultTimeout = 5.seconds
   @volatile private var swallowedFailure = Option.empty[exceptions.TestFailedException]
+}
+
+class DummyLogsService extends LogsService {
+  override def logsEnabledGlobally: Signal[Boolean] = Signal.const(true)
+  override def logsEnabled: Future[Boolean] = ???
+  override def setLogsEnabled(enabled: Boolean): Future[Unit] = ???
 }

@@ -17,6 +17,7 @@
  */
 package com.waz.content
 import android.content.Context
+import com.waz.log.BasicLogging.LogTag
 import com.waz.model.ReadReceipt.ReadReceiptDao
 import com.waz.model.{MessageId, ReadReceipt}
 import com.waz.service.messages.MessagesService
@@ -34,7 +35,7 @@ trait ReadReceiptsStorage extends CachedStorage[ReadReceipt.Id, ReadReceipt] {
 }
 
 class ReadReceiptsStorageImpl(context: Context, storage: Database, msgStorage: MessagesStorage, msgService: MessagesService)
-  extends CachedStorageImpl[ReadReceipt.Id, ReadReceipt](new TrimmingLruCache(context, Fixed(ReadReceiptsStorage.cacheSize)), storage)(ReadReceiptDao, "ReadReceiptsStorage")
+  extends CachedStorageImpl[ReadReceipt.Id, ReadReceipt](new TrimmingLruCache(context, Fixed(ReadReceiptsStorage.cacheSize)), storage)(ReadReceiptDao, LogTag("ReadReceiptsStorage"))
   with ReadReceiptsStorage {
   import com.waz.utils.events.EventContext.Implicits.global
   private implicit val dispatcher: ExecutionContext = new SerialDispatchQueue()

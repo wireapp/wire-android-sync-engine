@@ -17,12 +17,12 @@
  */
 package com.waz.sync.client
 
-import com.waz.ZLog.LogTag
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.api.EmailCredentials
 import com.waz.api.impl.ErrorResponse
 import com.waz.api.impl.ErrorResponse.Cancelled
 import com.waz.content.{AccountStorage, AccountStorage2}
+import com.waz.log.BasicLogging.LogTag
 import com.waz.model.{AccountData, UserId}
 import com.waz.service.ZMessaging.{accountTag, clock}
 import com.waz.service.tracking.TrackingService
@@ -51,7 +51,7 @@ trait AccessTokenProvider {
  */
 class AuthenticationManager(id: UserId, accStorage: AccountStorage, client: LoginClient, tracking: TrackingService) extends AccessTokenProvider {
 
-  lazy implicit val logTag: LogTag = accountTag[AuthenticationManager](id)
+  implicit val tag: LogTag = accountTag[AuthenticationManager](id)
 
   import AuthenticationManager._
 

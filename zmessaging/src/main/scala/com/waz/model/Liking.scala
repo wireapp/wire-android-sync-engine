@@ -20,7 +20,7 @@ package com.waz.model
 import android.database.DatabaseUtils.{sqlEscapeString => escape}
 import com.waz.db.Col._
 import com.waz.db.{Dao2, Reader, iteratingWithReader}
-import com.waz.log.ZLog2.SafeToLog
+import com.waz.log.LogShow.SafeToLog
 import com.waz.utils.JsonEncoder.encodeInstant
 import com.waz.utils.wrappers.{DB, DBCursor}
 import com.waz.utils.{Identifiable, JsonDecoder, JsonEncoder, RichWireInstant}

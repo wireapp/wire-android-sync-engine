@@ -18,12 +18,12 @@
 package com.waz.service.conversation
 
 import com.softwaremill.macwire._
-import com.waz.ZLog.ImplicitTag._
-import com.waz.log.ZLog2._
+import com.waz.log.LogSE._
 import com.waz.api.ErrorType
 import com.waz.api.IConversation.Access
 import com.waz.api.impl.ErrorResponse
 import com.waz.content._
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model.ConversationData.ConversationType.isOneToOne
 import com.waz.model.ConversationData.{ConversationType, Link, getAccessAndRoleForGroupConv}
 import com.waz.model._
@@ -86,7 +86,7 @@ class ConversationsServiceImpl(teamId:          Option[TeamId],
                                tracking:        TrackingService,
                                client:          ConversationsClient,
                                selectedConv:    SelectedConversationService,
-                               syncReqService:  SyncRequestService) extends ConversationsService {
+                               syncReqService:  SyncRequestService) extends ConversationsService with DerivedLogTag {
 
   private implicit val ev = EventContext.Global
   import Threading.Implicits.Background
@@ -241,8 +241,8 @@ class ConversationsServiceImpl(teamId:          Option[TeamId],
 
   private def updateConversations(responses: Seq[ConversationResponse]): Future[(Seq[ConversationData], Seq[ConversationData])] = {
 
-    def updateConversationData() = {
-      def findExistingId = convsStorage { convsById =>
+    def updateConversationData(): Future[(Set[ConversationData], Seq[ConversationData])] = {
+      def findExistingId: Future[Seq[(ConvId, ConversationResponse)]] = convsStorage { convsById =>
         def byRemoteId(id: RConvId) = convsById.values.find(_.remoteId == id)
 
         responses.map { resp =>
@@ -255,7 +255,9 @@ class ConversationsServiceImpl(teamId:          Option[TeamId],
             }
           }
 
-          (matching.fold(newId)(_.id), resp)
+          val r = (matching.fold(newId)(_.id), resp)
+          verbose(l"Returning conv id pair $r, isOneToOne: ${isOneToOne(resp.convType)}")
+          r
         }
       }
 

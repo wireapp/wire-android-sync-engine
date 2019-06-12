@@ -17,10 +17,10 @@
  */
 package com.waz.model
 
-import com.waz.ZLog.ImplicitTag._
 import com.waz.api.IConversation.{Access, AccessRole}
-import com.waz.log.ZLog2.SafeToLog
-import com.waz.log.ZLog2._
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
+import com.waz.log.LogShow.SafeToLog
+import com.waz.log.LogSE._
 import com.waz.model.ConversationEvent.ConversationEventDecoder
 import com.waz.model.Event.EventDecoder
 import com.waz.model.UserData.ConnectionStatus
@@ -147,13 +147,13 @@ case class ConversationState(archived:    Option[Boolean] = None,
                              mutedStatus: Option[Int] = None) extends SafeToLog
 
 object ConversationState {
-
   private def encode(state: ConversationState, o: JSONObject) = {
     state.archived foreach { o.put("otr_archived", _) }
     state.archiveTime foreach { time =>
       o.put("otr_archived_ref", JsonEncoder.encodeISOInstant(time.instant))
     }
     state.muted.foreach(o.put("otr_muted", _))
+
     state.muteTime foreach { time =>
       o.put("otr_muted_ref", JsonEncoder.encodeISOInstant(time.instant))
     }
@@ -189,7 +189,7 @@ object ConversationState {
 
 object Event {
 
-  implicit object EventDecoder extends JsonDecoder[Event] {
+  implicit object EventDecoder extends JsonDecoder[Event] with DerivedLogTag {
 
     import com.waz.utils.JsonDecoder._
 
@@ -227,7 +227,7 @@ object UserConnectionEvent {
   }
 }
 
-object ConversationEvent {
+object ConversationEvent extends DerivedLogTag {
 
   import OtrErrorEvent._
 
@@ -271,7 +271,7 @@ object ConversationEvent {
   }
 }
 
-object OtrErrorEvent {
+object OtrErrorEvent extends DerivedLogTag {
 
   def decodeOtrError(s: Symbol)(implicit js: JSONObject): OtrError =
     OtrErrorDecoder(js.getJSONObject(s.name))
@@ -360,7 +360,7 @@ sealed trait TeamEvent extends Event {
   val teamId: TeamId
 }
 
-object TeamEvent {
+object TeamEvent extends DerivedLogTag {
 
   /**
     * See: https://github.com/wireapp/architecture/blob/master/teams/backend.md

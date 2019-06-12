@@ -17,7 +17,6 @@
  */
 package com.waz.service.media
 
-import com.waz.ZLog.ImplicitTag._
 import com.waz.model.AssetData
 import com.waz.service.images.ImageAssetGenerator
 import com.waz.sync.client.GiphyClient

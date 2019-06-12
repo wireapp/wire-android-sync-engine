@@ -17,10 +17,10 @@
  */
 package com.waz.utils.events
 
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.specs.AndroidFreeSpec
-import com.waz.ZLog.ImplicitTag._
 
-class ButtonSignalSpec extends AndroidFreeSpec {
+class ButtonSignalSpec extends AndroidFreeSpec with DerivedLogTag {
 
   scenario("Simple button press") {
 
@@ -34,10 +34,10 @@ class ButtonSignalSpec extends AndroidFreeSpec {
       }
     }.disableAutowiring()
 
-    button.press()("test")
+    button.press()
     result(button.filter(_ == true).head)
 
-    button.press()("test")
+    button.press()
     result(button.filter(_ == false).head)
   }
 
@@ -51,7 +51,7 @@ class ButtonSignalSpec extends AndroidFreeSpec {
       }
     }
 
-    button.press()("test")
+    button.press()
     result(button.filter(_ == false).head)
   }
 

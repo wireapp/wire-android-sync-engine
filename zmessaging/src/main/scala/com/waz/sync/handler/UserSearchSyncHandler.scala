@@ -17,8 +17,8 @@
  */
 package com.waz.sync.handler
 
-import com.waz.ZLog.ImplicitTag._
-import com.waz.log.ZLog2._
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
+import com.waz.log.LogSE._
 import com.waz.model.{Handle, SearchQuery}
 import com.waz.service.UserSearchService
 import com.waz.sync.SyncResult
@@ -28,7 +28,10 @@ import com.waz.threading.Threading
 import scala.concurrent.Future
 import scala.concurrent.Future.successful
 
-class UserSearchSyncHandler(userSearch: UserSearchService, client: UserSearchClient, usersSyncHandler: UsersSyncHandler) {
+class UserSearchSyncHandler(userSearch: UserSearchService,
+                            client: UserSearchClient,
+                            usersSyncHandler: UsersSyncHandler) extends DerivedLogTag {
+
   import Threading.Implicits.Background
 
   def syncSearchQuery(query: SearchQuery): Future[SyncResult] = {

@@ -17,8 +17,9 @@
  */
 package com.waz.service.conversation
 
-import com.waz.ZLog
 import com.waz.content.{ConversationStorage, MessagesStorage}
+import com.waz.log.BasicLogging.LogTag
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model.ConversationData.ConversationType
 import com.waz.model.{ConversationData, GenericMessage, GenericMessageEvent, MemberJoinEvent, _}
 import com.waz.service.EventScheduler.{Interleaved, Parallel, Sequential, Stage}
@@ -29,12 +30,11 @@ import com.waz.sync.SyncServiceHandle
 import com.waz.threading.SerialDispatchQueue
 import com.waz.utils.events.Signal
 import org.threeten.bp.Instant
-import com.waz.ZLog.ImplicitTag.implicitLogTag
 import com.waz.model.GenericContent.Quote
 
 import scala.concurrent.{ExecutionContext, Future}
 
-class ConversationOrderEventsServiceSpec extends AndroidFreeSpec {
+class ConversationOrderEventsServiceSpec extends AndroidFreeSpec with DerivedLogTag {
 
   implicit val outputDispatcher = new SerialDispatchQueue(name = "OutputWriter")
 
@@ -99,7 +99,7 @@ class ConversationOrderEventsServiceSpec extends AndroidFreeSpec {
   val convsInStorage = Signal[Map[ConvId, ConversationData]]()
 
   (storage.getByRemoteIds _).expects(*).anyNumberOfTimes().returning(Future.successful(Seq(convId)))
-  (convs.processConvWithRemoteId[Unit] (_: RConvId, _: Boolean, _: Int)(_: ConversationData => Future[Unit])(_:ZLog.LogTag, _:ExecutionContext)).expects(*, *, *, *, *, *).anyNumberOfTimes.onCall {
+  (convs.processConvWithRemoteId[Unit] (_: RConvId, _: Boolean, _: Int)(_: ConversationData => Future[Unit])(_:LogTag, _:ExecutionContext)).expects(*, *, *, *, *, *).anyNumberOfTimes.onCall {
     p: Product =>
       convsInStorage.head.map(_.head._2).flatMap { conv =>
         p.productElement(3).asInstanceOf[ConversationData => Future[Unit]].apply(conv)

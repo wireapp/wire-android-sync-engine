@@ -17,7 +17,6 @@
  */
 package com.waz.sync.handler
 
-import com.waz.ZLog._
 import com.waz.model.MessageId
 import com.waz.service.media.RichMediaService
 import com.waz.sync.SyncResult
@@ -26,8 +25,6 @@ import com.waz.threading.Threading
 import scala.concurrent.Future
 
 class RichMediaSyncHandler(richMediaService: RichMediaService) {
-
-  private implicit val logTag: LogTag = logTagFor[RichMediaSyncHandler]
   import Threading.Implicits.Background
 
   def syncRichMedia(id: MessageId): Future[SyncResult] =

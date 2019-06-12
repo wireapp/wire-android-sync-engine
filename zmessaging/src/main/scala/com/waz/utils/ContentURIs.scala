@@ -19,8 +19,8 @@ package com.waz.utils
 
 import android.content.Context
 import android.provider.OpenableColumns._
-import com.waz.ZLog.ImplicitTag._
-import com.waz.log.ZLog2._
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
+import com.waz.log.LogSE._
 import com.waz.model.Mime
 import com.waz.threading.Threading
 import com.waz.utils.wrappers.URI
@@ -28,7 +28,7 @@ import com.waz.utils.wrappers.URI
 import scala.concurrent.Future
 import scala.util.Try
 
-object ContentURIs {
+object ContentURIs extends DerivedLogTag {
 
   def queryContentUriMetaData(context: Context, uri: URI): Future[MetaData] = Future {
     def mimeFromResolver = Try(Option(context.getContentResolver.getType(URI.unwrap(uri)))).toOption.flatten.map(Mime(_)).filterNot(_.isEmpty)

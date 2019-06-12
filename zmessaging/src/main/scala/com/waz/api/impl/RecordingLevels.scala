@@ -18,15 +18,15 @@
 package com.waz.api.impl
 
 import com.waz.api
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.utils.events.{AggregatingSignal, EventStream, Signal}
 import com.waz.utils.returning
-import com.waz.log.ZLog2._
-import com.waz.ZLog.ImplicitTag._
+import com.waz.log.LogSE._
 
 import scala.concurrent.Future
 import scala.math.max
 
-class RecordingLevels(liveLevels: EventStream[Float]) {
+class RecordingLevels(liveLevels: EventStream[Float]) extends DerivedLogTag {
   private val allLevels = returning(new AggregatingSignal[Float, Vector[Float]](liveLevels,
     Future.successful(Vector.empty), _ :+ _))(_.disableAutowiring())
 
@@ -41,7 +41,7 @@ class RecordingLevels(liveLevels: EventStream[Float]) {
   def overview: api.AudioOverview = AudioOverview(allLevels.currentValue)
 }
 
-case class AudioOverview(allLevels: Option[Vector[Float]]) extends api.AudioOverview {
+case class AudioOverview(allLevels: Option[Vector[Float]]) extends api.AudioOverview with DerivedLogTag {
   override def isEmpty: Boolean = allLevels.forall(_.isEmpty)
 
   override def getLevels(numberOfLevels: Int): Array[Float] = {

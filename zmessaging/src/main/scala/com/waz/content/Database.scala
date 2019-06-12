@@ -17,8 +17,8 @@
  */
 package com.waz.content
 
-import com.waz.ZLog._
 import com.waz.db.{DaoDB, inReadTransaction, inTransaction}
+import com.waz.log.BasicLogging.LogTag
 import com.waz.threading._
 import com.waz.utils.wrappers.DB
 
@@ -31,12 +31,12 @@ trait Database {
 
   lazy val readExecutionContext: DispatchQueue = new UnlimitedDispatchQueue(Threading.IO, name = "Database_readQueue_" + hashCode().toHexString)
 
-  def apply[A](f: DB => A)(implicit logTag: LogTag = ""): CancellableFuture[A] = dispatcher {
+  def apply[A](f: DB => A)(implicit logTag: LogTag = LogTag("")): CancellableFuture[A] = dispatcher {
     implicit val db:DB = dbHelper.getWritableDatabase
     inTransaction(f(db))
-  } ("Database_" + logTag)
+  } (LogTag("Database_" + logTag.value))
 
-  def withTransaction[A](f: DB => A)(implicit logTag: LogTag = ""): CancellableFuture[A] = apply(f)
+  def withTransaction[A](f: DB => A)(implicit logTag: LogTag = LogTag("")): CancellableFuture[A] = apply(f)
 
   def read[A](f: DB => A): Future[A] = Future {
     implicit val db:DB = dbHelper.getWritableDatabase

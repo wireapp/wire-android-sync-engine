@@ -17,41 +17,27 @@
  */
 package com.waz.znet2
 
-import java.io.{ ByteArrayInputStream, InputStream }
+import java.io.{ByteArrayInputStream, InputStream}
 import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
 
-import com.waz.ZLog.ImplicitTag._
-import com.waz.ZLog._
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
+import com.waz.log.LogSE._
 import com.waz.service.CertificatePin
 import com.waz.threading.CancellableFuture
 import com.waz.utils.crypto.AESUtils
-import com.waz.utils.{ ExecutorServiceWrapper, IoUtils, RichOption }
+import com.waz.utils.{ExecutorServiceWrapper, IoUtils, RichOption}
 import com.waz.znet.ServerTrust
-import com.waz.znet2.http.HttpClient.{ Progress, ProgressCallback }
+import com.waz.znet2.http.HttpClient.{Progress, ProgressCallback}
 import com.waz.znet2.http.Method._
-import com.waz.znet2.http.{ Headers, _ }
-import okhttp3.MultipartBody.{ Part => OkMultipartBodyPart }
-import okhttp3.{
-  CertificatePinner,
-  CipherSuite,
-  ConnectionSpec,
-  Dispatcher,
-  Interceptor,
-  OkHttpClient,
-  TlsVersion,
-  Headers => OkHeaders,
-  MediaType => OkMediaType,
-  MultipartBody => OkMultipartBody,
-  Request => OkRequest,
-  RequestBody => OkRequestBody,
-  Response => OkResponse
-}
+import com.waz.znet2.http.{Headers, _}
+import okhttp3.MultipartBody.{Part => OkMultipartBodyPart}
+import okhttp3.{CertificatePinner, CipherSuite, ConnectionSpec, Dispatcher, Interceptor, OkHttpClient, TlsVersion, Headers => OkHeaders, MediaType => OkMediaType, MultipartBody => OkMultipartBody, Request => OkRequest, RequestBody => OkRequestBody, Response => OkResponse}
 import okio.BufferedSink
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration.FiniteDuration
-import scala.concurrent.{ ExecutionContext, Future }
+import scala.concurrent.{ExecutionContext, Future}
 
 /**
   * According to OkHttp response body parsing logic, we get an OkHttp Body object with empty content in case,
@@ -60,7 +46,8 @@ import scala.concurrent.{ ExecutionContext, Future }
   * For achieving this, we always check response Content-Type header, and, if it is not present,
   * we ignore the parsed OkHttp response body. This is done in HttpClientOkHttpImpl.convertOkHttpResponse
   */
-class HttpClientOkHttpImpl(client: OkHttpClient)(implicit protected val ec: ExecutionContext) extends HttpClient {
+class HttpClientOkHttpImpl(client: OkHttpClient)(implicit protected val ec: ExecutionContext)
+  extends HttpClient with DerivedLogTag {
 
   import HttpClient._
   import HttpClientOkHttpImpl._
@@ -76,12 +63,12 @@ class HttpClientOkHttpImpl(client: OkHttpClient)(implicit protected val ec: Exec
           future = Future { okCall.execute() }
             .recoverWith {
               case err =>
-                error("failure while getting okHttp response.", err)
+                error(l"failure while getting okHttp response.", err)
                 Future.failed(ConnectionError(err))
             }
             .map(convertOkHttpResponse(_, downloadCallback)),
           onCancel = {
-            verbose(s"cancel executing okHttp request: $request")
+            verbose(l"cancel executing okHttp request: $request")
             okCall.cancel()
           }
         )

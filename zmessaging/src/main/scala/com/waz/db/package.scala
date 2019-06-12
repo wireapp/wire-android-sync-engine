@@ -18,8 +18,7 @@
 package com.waz
 
 import com.waz.utils._
-import com.waz.log.ZLog2._
-import com.waz.ZLog.ImplicitTag._
+import com.waz.log.LogSE._
 import com.waz.utils.wrappers._
 import com.waz.utils.wrappers.DB
 
@@ -99,7 +98,9 @@ package object db {
 }
 
 package db {
-  /** See https://www.sqlite.org/isolation.html - "Isolation And Concurrency", par. 4 and following.
+  import com.waz.log.BasicLogging.LogTag.DerivedLogTag
+
+/** See https://www.sqlite.org/isolation.html - "Isolation And Concurrency", par. 4 and following.
     * TL;DR: the Android SQLite classes fail to support WAL mode correctly, we are forced to hack our way into them
     */
   trait ReadTransactionSupport {
@@ -110,7 +111,7 @@ package db {
     def chooseImplementation(): ReadTransactionSupport = Try(DeferredModeReadTransactionSupport.create).getOrElse(FallbackReadTransactionSupport.create)
   }
 
-  object DeferredModeReadTransactionSupport {
+  object DeferredModeReadTransactionSupport extends DerivedLogTag {
     def create: ReadTransactionSupport = new ReadTransactionSupport {
       verbose(l"using deferred mode read transactions")
 
@@ -126,7 +127,7 @@ package db {
     }
   }
 
-  object FallbackReadTransactionSupport {
+  object FallbackReadTransactionSupport extends DerivedLogTag {
     def create: ReadTransactionSupport = new ReadTransactionSupport {
       verbose(l"using fallback support for read transactions")
       override def beginReadTransaction(db: DB): Unit = db.beginTransactionNonExclusive()

@@ -19,9 +19,9 @@ package com.waz.sync.queue
 
 import java.io.PrintWriter
 
-import com.waz.ZLog.ImplicitTag._
 import com.waz.api.NetworkMode
-import com.waz.log.ZLog2._
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
+import com.waz.log.LogSE._
 import com.waz.model.sync.SyncJob
 import com.waz.model.{ConvId, SyncId, UserId}
 import com.waz.service.AccountsService.{Active, LoggedOut}
@@ -58,9 +58,7 @@ class SyncSchedulerImpl(accountId:   UserId,
                         handler:     => SyncHandler,
                         accounts:    AccountsService,
                         tracking:    TrackingService)
-                       (implicit accountContext: AccountContext) extends SyncScheduler {
-
-
+                       (implicit accountContext: AccountContext) extends SyncScheduler with DerivedLogTag {
 
   private implicit val dispatcher = new SerialDispatchQueue(name = "SyncSchedulerQueue")
 
@@ -154,7 +152,7 @@ class SyncSchedulerImpl(accountId:   UserId,
     else job.startTime
 
 
-  class WaitEntry(private var job: SyncJob) { self =>
+  class WaitEntry(private var job: SyncJob) extends DerivedLogTag { self =>
     private val promise = Promise[Unit]()
 
     private var delayFuture: CancellableFuture[Unit] = setup(job)

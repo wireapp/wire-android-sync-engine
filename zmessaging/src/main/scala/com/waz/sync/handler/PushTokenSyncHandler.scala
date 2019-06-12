@@ -17,8 +17,8 @@
  */
 package com.waz.sync.handler
 
-import com.waz.ZLog.ImplicitTag._
-import com.waz.log.ZLog2._
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
+import com.waz.log.LogSE._
 import com.waz.model.otr.ClientId
 import com.waz.model.PushToken
 import com.waz.service.BackendConfig
@@ -31,7 +31,10 @@ import com.waz.threading.{CancellableFuture, Threading}
 
 import scala.concurrent.Future
 
-class PushTokenSyncHandler(pushTokenService: PushTokenService, backend: BackendConfig, clientId: ClientId, client: PushTokenClient) {
+class PushTokenSyncHandler(pushTokenService: PushTokenService,
+                           backend: BackendConfig,
+                           clientId: ClientId,
+                           client: PushTokenClient) extends DerivedLogTag {
 
   import Threading.Implicits.Background
 

@@ -17,11 +17,11 @@
  */
 package com.waz.log
 
-import com.waz.log.ZLog2._
-import com.waz.ZLog.ImplicitTag._
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
+import com.waz.log.LogSE._
 import com.waz.specs.ZSpec
 
-class ZLog2Spec extends ZSpec {
+class ZLog2Spec extends ZSpec with DerivedLogTag {
 
   case class Person(name: String, age: Int)
 
@@ -34,6 +34,7 @@ class ZLog2Spec extends ZSpec {
         override def showSafe(value: Person): String   = value.toString + " Safe"
         override def showUnsafe(value: Person): String = value.toString + " Unsafe"
       }
+
       val personLog = l"$testPerson"
       debug(l"Check the current debug mode: Person = $testPerson")
       personLog.buildMessageSafe shouldBe PersonLogShow.showSafe(testPerson)
@@ -54,15 +55,23 @@ class ZLog2Spec extends ZSpec {
       personLog.buildMessageSafe shouldBe s"person: ${testPerson.toString}"
     }
 
-    scenario("not compile for String") {
-      val str = "str"
-      "l\"string: $str\"" shouldNot compile
+    scenario("compile and create default Log for type if LogShow instance is not in scope") {
+      val nonImplicitPersonLogShow: LogShow[Person] = LogShow.logShowWithHash
+
+      val personLog = l"person: $testPerson"
+      personLog.buildMessageSafe shouldBe s"person: ${nonImplicitPersonLogShow.showSafe(testPerson)}"
+      personLog.buildMessageUnsafe shouldBe s"person: ${nonImplicitPersonLogShow.showUnsafe(testPerson)}"
     }
 
-    scenario("not compile for type if LogShow instance is not in scope") {
-      "l\"person: $testPerson\"" shouldNot compile
-    }
+    scenario("compile and create Log for types in a collection") {
+      implicit val PersonLogShow: LogShow[Person] = new LogShow[Person] {
+        override def showSafe(value: Person): String   = "Safe"
+        override def showUnsafe(value: Person): String = "Unsafe"
+      }
 
+      val collectionLog = l"${List(testPerson, testPerson, testPerson, testPerson)}"
+      collectionLog.buildMessageSafe shouldBe "Safe, Safe, Safe and 1 other elements..."
+      collectionLog.buildMessageUnsafe shouldBe "Unsafe, Unsafe, Unsafe and 1 other elements..."
+    }
   }
-
 }
