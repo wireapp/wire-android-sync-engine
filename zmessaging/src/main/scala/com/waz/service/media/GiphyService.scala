@@ -17,26 +17,55 @@
  */
 package com.waz.service.media
 
-import com.waz.model.AssetData
+import java.net.URL
+
+import com.waz.model.Dim2
 import com.waz.service.images.ImageAssetGenerator
+import com.waz.service.media.GiphyService.{Gif, GifObject}
 import com.waz.sync.client.GiphyClient
-import com.waz.threading.{CancellableFuture, Threading}
+import com.waz.sync.client.GiphyClient.GiphyResponse
 
-class GiphyService(client: GiphyClient) {
-  import Threading.Implicits.Background
+import scala.concurrent.{ExecutionContext, Future}
 
-  def searchGiphyImage(keyword: String, offset: Int = 0, limit: Int = 25): CancellableFuture[Seq[(Option[AssetData], AssetData)]] = {
-    client.search(keyword, offset, limit).map {
-      case Nil => Nil
-      case images => images.filter{case (prev, med) => med.size <= ImageAssetGenerator.MaxGifSize}
+trait GiphyService {
+  def search(keyword: String, offset: Int = 0, limit: Int = 25): Future[Seq[GifObject]]
+  def trending(offset: Int = 0, limit: Int = 25): Future[Seq[GifObject]]
+}
+
+object GiphyService {
+  case class GifObject(id: String, original: Gif, preview: Option[Gif])
+  case class Gif(dimensions: Dim2, sizeInBytes: Long, source: URL)
+}
+
+class GiphyServiceImpl(client: GiphyClient)(implicit ec: ExecutionContext) extends GiphyService {
+
+  override def search(keyword: String, offset: Int = 0, limit: Int = 25): Future[Seq[GifObject]] =
+    for {
+      response <- client.search(keyword, offset, limit)
+      objects = createGifObjects(response)
+    } yield objects.filter(isGifValid)
+
+  override def trending(offset: Int = 0, limit: Int = 25): Future[Seq[GifObject]] =
+    for {
+      response <- client.trending(offset, limit)
+      objects = createGifObjects(response)
+    } yield objects.filter(isGifValid)
+
+  private def createGifObjects(response: GiphyResponse): Seq[GifObject] = {
+    response.data.filter(_.`type` == "gif").map { obj =>
+      GifObject(
+        id = obj.id,
+        original = createGif(obj.images.original),
+        preview = obj.images.fixed_width_downsampled.map(createGif)
+      )
     }
   }
 
-  def trending(offset: Int = 0, limit: Int = 25): CancellableFuture[Seq[(Option[AssetData], AssetData)]] = {
-    client.loadTrending(offset, limit).map {
-      case Nil => Nil
-      case images => images.filter{case (prev, med) => med.size <= ImageAssetGenerator.MaxGifSize}
-    }
+  private def createGif(img: GiphyResponse.Image): Gif = {
+    Gif(Dim2(img.width, img.height), img.size, img.url)
   }
+
+  private def isGifValid(gifObject: GifObject): Boolean =
+    gifObject.original.sizeInBytes <= ImageAssetGenerator.MaxGifSize
 
 }

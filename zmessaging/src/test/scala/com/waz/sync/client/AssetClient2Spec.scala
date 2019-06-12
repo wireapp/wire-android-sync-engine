@@ -22,15 +22,15 @@ import java.io.ByteArrayInputStream
 import com.waz.{AuthenticationConfig, ZIntegrationSpec}
 import com.waz.log.LogSE._
 import com.waz.api.impl.ErrorResponse
-import com.waz.cache2.CacheService.NoEncryption
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
-import com.waz.model.{AssetId, Mime, Sha256}
-import com.waz.service.assets2.{Asset, BlobDetails}
+import com.waz.model.{AssetId, MD5, Mime, Sha256}
+import com.waz.service.assets2.{Asset, BlobDetails, NoEncryption}
 import com.waz.sync.client.AssetClient.FileWithSha
-import com.waz.sync.client.AssetClient2.{AssetContent, Metadata, Retention, UploadResponse}
-import com.waz.utils.returning
+import com.waz.sync.client.AssetClient2.{AssetContent, Metadata, Retention, UploadResponse2}
+import com.waz.utils.{IoUtils, returning}
 import org.scalatest.Ignore
 
+import scala.concurrent.Future
 import scala.util.Random
 
 //TODO Think about tests resources cleanup
@@ -38,19 +38,24 @@ import scala.util.Random
 class AssetClient2Spec extends ZIntegrationSpec with AuthenticationConfig with DerivedLogTag {
 
   private lazy val assetClient = new AssetClient2Impl()
+
   private val testAssetContent = returning(Array.ofDim[Byte](1024))(Random.nextBytes)
+  private val testAssetContentMd5 = MD5(IoUtils.md5(new ByteArrayInputStream(testAssetContent)))
   private val testAssetMetadata = Metadata(retention = Retention.Volatile)
   private val testAssetMime = Mime.Default
-  private val testRawAsset = AssetContent(testAssetMime, () => new ByteArrayInputStream(testAssetContent), Some(testAssetContent.length))
+  private val testRawAsset = AssetContent(testAssetMime, testAssetContentMd5, () => Future.successful(new ByteArrayInputStream(testAssetContent)), Some(testAssetContent.length))
 
-  private def createBlobAsset(response: UploadResponse): Asset[BlobDetails.type] = {
+  private def createBlobAsset(response: UploadResponse2): Asset = {
     Asset(
-      id = AssetId(response.rId.str),
+      id = AssetId(response.key.str),
       token = response.token,
       sha = Sha256.calculate(testAssetContent),
+      mime = Mime.Default,
       encryption = NoEncryption,
       localSource = None,
       preview = None,
+      name = "test_content",
+      size = testAssetContent.length,
       details = BlobDetails,
       convId = None
     )
@@ -62,7 +67,7 @@ class AssetClient2Spec extends ZIntegrationSpec with AuthenticationConfig with D
       for {
         result <- assetClient.uploadAsset(testAssetMetadata, testRawAsset, callback = None)
         _ = verbose(l"Uploading asset result: $result")
-      } yield result shouldBe an[Right[ErrorResponse, UploadResponse]]
+      } yield result shouldBe an[Right[ErrorResponse, UploadResponse2]]
     }
 
     scenario("upload and load asset") {

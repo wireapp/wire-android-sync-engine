@@ -17,8 +17,17 @@
  */
 package com.waz.service.assets2
 
-import com.waz.model.AssetId
-import com.waz.service.assets2.Asset.General
-import com.waz.utils.Storage2
+import java.io.File
 
-trait RawAssetStorage extends Storage2[AssetId, RawAsset[General]]
+import com.waz.cache2.{FileCache, SimpleFileCache}
+
+import scala.concurrent.ExecutionContext
+
+trait GeneralFileCache extends FileCache[String]
+
+class GeneralFileCacheImpl(val cacheDirectory: File)
+                          (implicit val ec: ExecutionContext) extends SimpleFileCache[String] with GeneralFileCache {
+
+  override protected def createFileName(key: String): String = key
+
+}

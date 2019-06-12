@@ -17,70 +17,159 @@
  */
 package com.waz.service.assets2
 
-import java.io.InputStream
-import java.net.URI
+import java.io.{FileOutputStream, InputStream}
+import java.security.{DigestInputStream, MessageDigest}
 
-import com.waz.log.LogSE._
-import com.waz.cache2.CacheService
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
+import com.waz.log.LogSE._
+import com.waz.model.AssetData.UploadTaskKey
+import com.waz.model._
 import com.waz.model.errors._
-import com.waz.model.{AssetId, Mime}
-import com.waz.service.assets2.Asset.General
-import com.waz.sync.client.AssetClient2
-import com.waz.sync.client.AssetClient2.{AssetContent, Metadata}
+import com.waz.service.assets2.Asset.{General, Video}
+import com.waz.sync.SyncServiceHandle
+import com.waz.sync.client.AssetClient2.{AssetContent, Metadata, Retention, UploadResponse2}
+import com.waz.sync.client.{AssetClient2, ErrorOrResponse}
 import com.waz.threading.CancellableFuture
+import com.waz.utils.events.Signal
+import com.waz.utils.streams.CountInputStream
+import com.waz.utils.{Cancellable, IoUtils}
 import com.waz.znet2.http.HttpClient._
 import com.waz.znet2.http.ResponseCode
 
 import scala.concurrent.{ExecutionContext, Future}
-import scala.util.Failure
+import scala.util.{Failure, Try}
 
 trait AssetService {
+  def assetSignal(id: GeneralAssetId): Signal[GeneralAsset]
+  def assetStatusSignal(id: GeneralAssetId): Signal[(AssetStatus, Option[Progress])]
+  def downloadProgress(id: DownloadAssetId): Signal[Progress]
+  def uploadProgress(id: UploadAssetId): Signal[Progress]
+
+  def cancelUpload(id: UploadAssetId, message: MessageData): Future[Unit]
+  def cancelDownload(id: DownloadAssetId): Unit
+
+  def getAsset(id: AssetId): Future[Asset]
+
+  def save(asset: GeneralAsset): Future[Unit]
+  def delete(id: GeneralAssetId): Future[Unit]
+
   def loadContentById(assetId: AssetId, callback: Option[ProgressCallback] = None): CancellableFuture[InputStream]
-  def loadContent(asset: Asset[General], callback: Option[ProgressCallback] = None): CancellableFuture[InputStream]
-  def uploadAsset(rawAsset: RawAsset[General], callback: Option[ProgressCallback] = None): CancellableFuture[Asset[General]]
-}
-
-object AssetService {
-
-  case class MetaData(mime: Mime, name: Option[String], size: Option[Long])
-
-  trait MetaDataExtractor {
-    def extractMetadata(uri: URI): Future[MetaData]
-  }
-
+  def loadContent(asset: Asset, callback: Option[ProgressCallback] = None): CancellableFuture[InputStream]
+  def uploadAsset(id: UploadAssetId): CancellableFuture[Asset]
+  def createAndSavePreview(asset: UploadAsset): Future[UploadAsset]
+  def createAndSaveUploadAsset(content: ContentForUpload,
+                               targetEncryption: Encryption,
+                               public: Boolean,
+                               retention: Retention,
+                               messageId: Option[MessageId]): Future[UploadAsset]
+  def loadPublicContentById(assetId: AssetId, convId: Option[ConvId], callback: Option[ProgressCallback] = None): CancellableFuture[InputStream]
+  def loadUploadContentById(uploadAssetId: UploadAssetId, callback: Option[ProgressCallback] = None): CancellableFuture[InputStream]
 }
 
 class AssetServiceImpl(assetsStorage: AssetStorage,
+                       uploadAssetStorage: UploadAssetStorage,
+                       downloadAssetStorage: DownloadAssetStorage,
+                       assetDetailsService: AssetDetailsService,
+                       previewService: AssetPreviewService,
+                       transformations: AssetTransformationsService,
+                       restrictions: AssetRestrictionsService,
                        uriHelper: UriHelper,
-                       cache: CacheService,
-                       assetClient: AssetClient2)
+                       contentCache: AssetContentCache,
+                       uploadContentCache: UploadAssetContentCache,
+                       assetClient: AssetClient2,
+                       sync: SyncServiceHandle)
                       (implicit ec: ExecutionContext) extends AssetService with DerivedLogTag {
 
-  protected def cacheKey(asset: Asset[General]): String = asset.id.str
 
-  private def loadFromBackend(asset: Asset[General], callback: Option[ProgressCallback]): CancellableFuture[InputStream] = {
-    verbose(l"Load asset content from backend. $asset")
-    assetClient.loadAssetContent(asset, callback).flatMap {
-      case Left(err) if err.code == ResponseCode.NotFound =>
-        cache
-          .remove(cacheKey(asset))
-          .flatMap(_ => CancellableFuture.failed(NotFoundRemote(s"Asset '$asset'")))
-          .toCancellable
-      case Left(err) =>
-        CancellableFuture.failed(NetworkError(err))
-      case Right(fileWithSha) if fileWithSha.sha256 != asset.sha =>
-        CancellableFuture.failed(ValidationError(s"SHA256 is not equal. Asset: $asset"))
-      case Right(fileWithSha) =>
-        cache.putEncrypted(cacheKey(asset), fileWithSha.file)
-          .flatMap(_ => cache.get(cacheKey(asset))(asset.encryption))
-          .toCancellable
+  override def assetSignal(idGeneral: GeneralAssetId): Signal[GeneralAsset] =
+    (idGeneral match {
+      case id: AssetId => assetsStorage.signal(id)
+      case id: UploadAssetId => uploadAssetStorage.signal(id)
+      case id: DownloadAssetId => downloadAssetStorage.signal(id)
+    }).map(a => a: GeneralAsset)
+
+  override def assetStatusSignal(idGeneral: GeneralAssetId): Signal[(AssetStatus, Option[Progress])] =
+    assetSignal(idGeneral) map {
+      case _: Asset => AssetStatus.Done -> None
+      case asset: UploadAsset =>
+        asset.status match {
+          case AssetStatus.Done => asset.status -> None
+          case UploadAssetStatus.NotStarted => asset.status -> None
+          case _ => asset.status -> Some(Progress(asset.uploaded, Some(asset.size)))
+        }
+      case asset: DownloadAsset =>
+        asset.status match {
+          case AssetStatus.Done => asset.status -> None
+          case DownloadAssetStatus.NotStarted => asset.status -> None
+          case _ => asset.status -> Some(Progress(asset.downloaded, Some(asset.size)))
+        }
     }
+
+  override def downloadProgress(id: DownloadAssetId): Signal[Progress] =
+    assetStatusSignal(id).collect { case (_, Some(progress)) => progress }
+
+  override def uploadProgress(id: UploadAssetId): Signal[Progress] =
+    assetStatusSignal(id).collect { case (_, Some(progress)) => progress }
+
+  override def cancelUpload(id: UploadAssetId, message: MessageData): Future[Unit] = {
+    import scala.concurrent.duration._
+    for {
+      _ <- Cancellable.cancel(UploadTaskKey(id))
+      _ <- CancellableFuture.timeout(3.seconds).future
+      _ <- uploadAssetStorage.update(id, asset => {
+        if (asset.status == AssetStatus.Done) asset
+        else asset.copy(status = UploadAssetStatus.Cancelled)
+      })
+      _ <- sync.postAssetStatus(message.id, message.convId, message.ephemeral, UploadAssetStatus.Cancelled)
+    } yield ()
   }
 
-  private def loadFromCache(asset: Asset[General], callback: Option[ProgressCallback]): CancellableFuture[InputStream] = {
+  override def cancelDownload(id: DownloadAssetId): Unit = () //TODO
+
+  override def getAsset(id: AssetId): Future[Asset] =
+    assetsStorage.get(id)
+
+  override def save(asset: GeneralAsset): Future[Unit] = asset match {
+    case a: Asset => assetsStorage.save(a)
+    case a: UploadAsset => uploadAssetStorage.save(a)
+    case a: DownloadAsset => downloadAssetStorage.save(a)
+  }
+
+
+  override def delete(idGeneral: GeneralAssetId): Future[Unit] = idGeneral match {
+    case id: AssetId => assetsStorage.deleteByKey(id)
+    case id: UploadAssetId => uploadAssetStorage.deleteByKey(id)
+    case id: DownloadAssetId => downloadAssetStorage.deleteByKey(id)
+  }
+
+  private def loadFromBackend(asset: Asset, callback: Option[ProgressCallback]): CancellableFuture[InputStream] = {
+    verbose(l"Load asset content from backend. $asset")
+    assetClient.loadAssetContent(asset, callback)
+      .flatMap {
+        case Left(err) if err.code == ResponseCode.NotFound =>
+          contentCache
+            .remove(asset.id)
+            .flatMap(_ => CancellableFuture.failed(NotFoundRemote(s"Asset '$asset'")))
+            .toCancellable
+        case Left(err) =>
+          CancellableFuture.failed(NetworkError(err))
+        case Right(fileWithSha) if fileWithSha.sha256 != asset.sha =>
+          debug(l"Loaded file size ${fileWithSha.file.length()}")
+          CancellableFuture.failed(new ValidationError(s"SHA256 is not equal. Expected: ${asset.sha} Actual: ${fileWithSha.sha256} AssetId: ${asset.id}"))
+        case Right(fileWithSha) =>
+          contentCache.put(asset.id, fileWithSha.file, removeOriginal = true)
+            .flatMap(_ => contentCache.getStream(asset.id).map(asset.encryption.decrypt(_)))
+            .toCancellable
+      }
+      .recoverWith { case err =>
+        verbose(l"Can not load asset content from backend. ${showString(err.getMessage)}")
+        CancellableFuture.failed(err)
+      }
+  }
+
+  private def loadFromCache(asset: Asset, callback: Option[ProgressCallback]): CancellableFuture[InputStream] = {
     verbose(l"Load asset content from cache. $asset")
-    cache.get(cacheKey(asset))(asset.encryption)
+    contentCache.getStream(asset.id).map(asset.encryption.decrypt(_))
       .recoverWith { case err =>
         verbose(l"Can not load asset content from cache. $err")
         Future.failed(err)
@@ -88,49 +177,270 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
       .toCancellable
   }
 
-  private def loadFromFileSystem(asset: Asset[General], callback: Option[ProgressCallback]): CancellableFuture[InputStream] = {
+  private def loadFromFileSystem(asset: Asset,
+                                 localSource: LocalSource,
+                                 callback: Option[ProgressCallback]): CancellableFuture[InputStream] = {
     verbose(l"Load asset content from file system. $asset")
     lazy val emptyUriError = new NoSuchElementException("Asset does not have local source property.")
-    Future { asset.localSource.map(uriHelper.openInputStream).getOrElse(Failure(throw emptyUriError)) }
-      .flatMap(Future.fromTry)
+    val openInputStream = () => asset.localSource.map(ls => uriHelper.openInputStream(ls.uri)).getOrElse(Failure(throw emptyUriError))
+    Future.fromTry(openInputStream())
+      .flatMap(is => Future.fromTry(Sha256.calculate(is)))
+      .flatMap { sha =>
+        if (localSource.sha == sha) Future.fromTry(openInputStream())
+        else Future.failed(new ValidationError(s"SHA256 is not equal. Expected: ${localSource.sha} Actual: $sha AssetId: ${asset.id}"))
+      }
       .recoverWith { case err =>
-        debug(l"Can not load content from file system. $err")
+        debug(l"Can not load content from file system. ${showString(err.getMessage)}")
         verbose(l"Clearing local source asset property. $asset")
         assetsStorage.save(asset.copy(localSource = None)).flatMap(_ => Future.failed(err))
       }
       .toCancellable
   }
 
+  override def loadPublicContentById(assetId: AssetId, convId: Option[ConvId], callback: Option[ProgressCallback] = None): CancellableFuture[InputStream] =
+    assetClient.loadPublicAssetContent(assetId, convId, callback).flatMap{
+      case Left(err) => CancellableFuture.failed(err)
+      case Right(i) => CancellableFuture.successful(i)
+    }
+
+  override def loadUploadContentById(uploadAssetId: UploadAssetId, callback: Option[ProgressCallback] = None): CancellableFuture[InputStream] =
+    uploadAssetStorage.get(uploadAssetId).flatMap { asset =>
+      (asset.assetId, asset.localSource) match {
+        case (Some(aId), _) => loadContentById(aId, callback)
+        case (_, Some(ls)) => Future.fromTry(uriHelper.openInputStream(ls.uri))
+        case _ => uploadContentCache.getStream(uploadAssetId)
+      }
+    }.toCancellable
+
   override def loadContentById(assetId: AssetId, callback: Option[ProgressCallback] = None): CancellableFuture[InputStream] =
     assetsStorage.get(assetId).flatMap(asset => loadContent(asset, callback)).toCancellable
 
-  override def loadContent(asset: Asset[General], callback: Option[ProgressCallback] = None): CancellableFuture[InputStream] =
+  override def loadContent(asset: Asset, callback: Option[ProgressCallback] = None): CancellableFuture[InputStream] =
     assetsStorage.find(asset.id)
       .flatMap { fromStorage =>
         if (fromStorage.isEmpty)
           assetsStorage.save(asset).flatMap(_ => loadFromBackend(asset, callback))
-        else if (asset.localSource.isEmpty)
-          loadFromCache(asset, callback).recoverWith { case _ => loadFromBackend(asset, callback) }
-        else
-          loadFromFileSystem(asset, callback).recoverWith { case _ => loadFromBackend(asset, callback) }
+        else asset.localSource match {
+          case Some(source) =>
+            loadFromFileSystem(asset, source, callback).recoverWith { case _ => loadFromBackend(asset, callback) }
+          case None =>
+            loadFromCache(asset, callback).recoverWith { case _ => loadFromBackend(asset, callback) }
+        }
       }
       .toCancellable
 
-  //TODO We should do something with asset source. In some cases we can delete it.
-  override def uploadAsset(rawAsset: RawAsset[General], callback: Option[ProgressCallback]): CancellableFuture[Asset[General]] = {
-    val content = AssetContent(rawAsset.mime, () => uriHelper.openInputStream(rawAsset.uri).get, Some(rawAsset.size))
-    val metadata = Metadata(public = rawAsset.public, retention = rawAsset.retention)
+  override def uploadAsset(assetId: UploadAssetId): CancellableFuture[Asset] = {
+    import com.waz.api.impl.ErrorResponse
 
-    assetClient.uploadAsset(metadata, content, callback).flatMap {
-      case Right(response) =>
-        val asset = Asset(AssetId(response.rId.str), response.token, rawAsset)
-        assetsStorage.save(asset).map(_ => asset).toCancellable
-      case Left(err) =>
-        verbose(l"Error while uploading asset: $err")
-        CancellableFuture.failed(NetworkError(err))
+    def getUploadAssetContent(asset: UploadAsset): Future[InputStream] = asset.localSource match {
+      case Some(LocalSource(uri, _)) => Future.fromTry(uriHelper.openInputStream(uri))
+      case None => uploadContentCache.getStream(asset.id)
+    }
+
+    def actionsOnCancellation(): Unit = {
+      info(l"Asset uploading cancelled: $assetId")
+      uploadAssetStorage.update(assetId, _.copy(status = UploadAssetStatus.Cancelled))
+    }
+
+    def loadUploadAsset: Future[UploadAsset] = uploadAssetStorage.get(assetId).flatMap { asset =>
+      asset.details match {
+        case details: General =>
+          CancellableFuture.successful(asset.copy(details = details))
+        case details =>
+          CancellableFuture.failed(FailedExpectationsError(s"We expect that metadata already extracted. Got $details"))
+      }
+    }
+
+    def doUpload(asset: UploadAsset): ErrorOrResponse[UploadResponse2] = {
+      val metadata = Metadata(asset.public, asset.retention)
+      val content = AssetContent(
+        asset.mime,
+        asset.md5,
+        () => getUploadAssetContent(asset).map(asset.encryption.encrypt(_, asset.encryptionSalt)),
+        Some(asset.size)
+      )
+      val uploadCallback: ProgressCallback = new FilteredProgressCallback(
+        ProgressFilter.steps(100, asset.size),
+        new ProgressCallback {
+          override def updated(progress: Long, total: Option[Long]): Unit = {
+            uploadAssetStorage.update(asset.id, _.copy(uploaded = progress))
+            ()
+          }
+        }
+      )
+      assetClient.uploadAsset(metadata, content, Some(uploadCallback))
+    }
+
+    def handleUploadResult(result: Either[ErrorResponse, UploadResponse2], uploadAsset: UploadAsset): Future[Asset] =
+      result match {
+        case Left(err) =>
+          uploadAssetStorage.update(uploadAsset.id, _.copy(status = UploadAssetStatus.Failed)).flatMap(_ => Future.failed(err))
+        case Right(response) =>
+          val asset = Asset.create(response.key, response.token, uploadAsset)
+          for {
+            _ <- assetsStorage.save(asset)
+            _ <- uploadAssetStorage.update(uploadAsset.id, _.copy(status = AssetStatus.Done, assetId = Some(asset.id)))
+          } yield asset
+      }
+
+    def encryptAssetContentAndMoveToCache(asset: Asset): Future[Unit] =
+      if (asset.localSource.nonEmpty) Future.successful(())
+      else for {
+        contentStream <- uploadContentCache.getStream(assetId)
+        _ <- contentCache.putStream(asset.id, asset.encryption.encrypt(contentStream))
+        _ <- uploadContentCache.remove(assetId)
+      } yield ()
+
+    for {
+      _ <- CancellableFuture.lift(Future.successful(()), actionsOnCancellation())
+      uploadAsset <- loadUploadAsset.toCancellable
+      Some((_, uploadAsset)) <- uploadAssetStorage.update(uploadAsset.id, _.copy(uploaded = 0, status = UploadAssetStatus.InProgress)).toCancellable
+      uploadResult <- doUpload(uploadAsset)
+      asset <- handleUploadResult(uploadResult, uploadAsset).toCancellable
+      _ <- encryptAssetContentAndMoveToCache(asset).toCancellable
+    } yield asset
+  }
+
+  override def createAndSavePreview(uploadAsset: UploadAsset): Future[UploadAsset] = {
+    def shouldAssetContainPreview: Boolean = uploadAsset.details match {
+      case _: Video => true
+      case _ => false
+    }
+
+    def getPreparedAssetContent: Future[PreparedContent] = uploadAsset.localSource match {
+      case Some(LocalSource(uri, _)) => Future.successful(Content.Uri(uri))
+      case None => uploadContentCache.get(uploadAsset.id).map(Content.File(uploadAsset.mime, _))
+    }
+
+    if (shouldAssetContainPreview) {
+      for {
+        uploadAssetContent <- getPreparedAssetContent
+        content <- previewService.extractPreview(uploadAsset, uploadAssetContent)
+        previewName = s"preview_for_${ uploadAsset.id.str}"
+        contentForUpload = ContentForUpload(previewName, content)
+        previewUploadAsset <- createUploadAsset(contentForUpload, uploadAsset.encryption, uploadAsset.public, uploadAsset.retention)
+        updatedUploadAsset = uploadAsset.copy(preview = NotUploaded(previewUploadAsset.id))
+        _ <- uploadAssetStorage.save(previewUploadAsset)
+        _ <- uploadAssetStorage.save(updatedUploadAsset)
+      } yield updatedUploadAsset
+    } else {
+      for {
+        updatedUploadAsset <- Future.successful(uploadAsset.copy(preview = Empty))
+        _ <- uploadAssetStorage.save(updatedUploadAsset)
+      } yield updatedUploadAsset
     }
   }
 
-}
+  override def createAndSaveUploadAsset(content: ContentForUpload,
+                                        targetEncryption: Encryption,
+                                        public: Boolean,
+                                        retention: Retention,
+                                        messageId: Option[MessageId] = None): Future[UploadAsset] = {
+    val t0 = System.nanoTime()
+    for {
+      asset <- createUploadAsset(content, targetEncryption, public, retention, messageId)
+      _ = debug(l"Upload asset created: $asset")
+      _ <- uploadAssetStorage.save(asset)
+      t1 = System.nanoTime()
+      _ = println("Asset creation time: " + (t1 - t0) + " ns")
+    } yield asset
+  }
 
-object AssetServiceImpl {}
+  private def createUploadAsset(contentForUpload: ContentForUpload,
+                                targetEncryption: Encryption,
+                                public: Boolean,
+                                retention: Retention,
+                                messageId: Option[MessageId] = None): Future[UploadAsset] = {
+
+    val assetId = UploadAssetId()
+    val encryptionSalt = targetEncryption.randomSalt
+
+    def prepareContent(content: Content): Future[PreparedContent] = {
+      content match {
+        case content: Content.Uri => Future.successful(content)
+        case Content.File(mime, file) =>
+          for {
+            _ <- uploadContentCache.put(assetId, file, removeOriginal = true)
+            cacheFile <- uploadContentCache.get(assetId)
+          } yield Content.File(mime, cacheFile)
+        case Content.Bytes(mime, bytes) =>
+          for {
+            _ <- uploadContentCache.putBytes(assetId, bytes)
+            file <- uploadContentCache.get(assetId)
+          } yield Content.File(mime, file)
+        case Content.AsBlob(content) => prepareContent(content)
+      }
+    }
+
+    def extractDetails(content: PreparedContent, mime: Mime): Future[AssetDetails] = contentForUpload.content match {
+      case _: Content.AsBlob => Future.successful(BlobDetails)
+      case _                 => assetDetailsService.extract(mime, content)
+    }
+
+    def extractLocalSourceAndEncryptedHashesAndSize(content: PreparedContent): Try[(Option[LocalSource], Sha256, MD5, Long)] = {
+      val sha256DigestWithUri = content match {
+        case Content.Uri(uri) => Some(MessageDigest.getInstance("SHA-256") -> uri)
+        case _ => None
+      }
+      val sha256EncryptedDigest = MessageDigest.getInstance("SHA-256")
+      val md5EncryptedDigest = MessageDigest.getInstance("MD5")
+
+      for {
+        source <- content.openInputStream(uriHelper)
+
+        stream1 = sha256DigestWithUri.fold(source) { case (digest, _) => new DigestInputStream(source, digest) }
+        stream2 = targetEncryption.encrypt(stream1, encryptionSalt)
+        stream3 = new DigestInputStream(stream2, sha256EncryptedDigest)
+        stream4 = new DigestInputStream(stream3, md5EncryptedDigest)
+        stream5 = new CountInputStream(stream4)
+
+        _ = IoUtils.readFully(stream5)
+
+        localSource = sha256DigestWithUri.map { case (digest, uri) => LocalSource(uri, Sha256(digest.digest())) }
+        encryptedSha = Sha256(sha256EncryptedDigest.digest())
+        encryptedMd5 = MD5(md5EncryptedDigest.digest())
+        encryptedSize = stream5.getBytesRead
+      } yield (localSource, encryptedSha, encryptedMd5, encryptedSize)
+    }
+
+    for {
+      initialContent <- prepareContent(contentForUpload.content)
+      initialMime <- Future.fromTry(initialContent.getMime(uriHelper))
+      initialDetails <- extractDetails(initialContent, initialMime)
+      ts = transformations.getTransformations(initialMime, initialDetails)
+      //TODO Handle not only the first transformation
+      (transformedContent, transformedMime, transformedDetails) <- ts.headOption match {
+        case Some(transformation) => for {
+          cacheFile <- uploadContentCache.getOrCreateEmpty(assetId)
+          mime <- Future { transformation(() =>
+            initialContent.openInputStream(uriHelper).get, () => new FileOutputStream(cacheFile))
+          }
+          content = Content.File(mime, cacheFile)
+          details <- extractDetails(content, mime)
+        } yield (content, mime, details)
+        case _ =>
+          Future.successful((initialContent, initialMime, initialDetails))
+      }
+      _ <- Future.fromTry(restrictions.validate(transformedContent))
+      (localSource, encryptedSha, encryptedMd5, encryptedSize) <- Future.fromTry(extractLocalSourceAndEncryptedHashesAndSize(transformedContent))
+    } yield UploadAsset(
+      id = assetId,
+      localSource = localSource,
+      name = contentForUpload.name,
+      md5 = encryptedMd5,
+      sha = encryptedSha,
+      mime = transformedMime,
+      preview = NotReady,
+      uploaded = 0,
+      size = encryptedSize,
+      retention = retention,
+      public = public,
+      encryption = targetEncryption,
+      encryptionSalt = encryptionSalt,
+      details = transformedDetails,
+      status = UploadAssetStatus.NotStarted,
+      assetId = None
+    )
+  }
+
+}

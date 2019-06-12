@@ -39,7 +39,7 @@ class InvitationClientImpl(implicit
                            authRequestInterceptor: AuthRequestInterceptor) extends InvitationClient {
 
   import HttpClient.dsl._
-  import HttpClient.AutoDerivation._
+  import HttpClient.AutoDerivationOld._
   import com.waz.sync.client.InvitationClient._
 
   override def postTeamInvitation(invitation: TeamInvitation): ErrorOrResponse[ConfirmedTeamInvitation] = {

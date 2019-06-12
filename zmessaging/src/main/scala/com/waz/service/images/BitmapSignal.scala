@@ -105,7 +105,7 @@ object BitmapSignal {
   }
 
   def apply(zms: ZMessaging, asset: AssetData, req: BitmapRequest): Signal[BitmapResult] =
-    apply(asset, req, zms.imageLoader, zms.network, zms.assetsStorage.get, zms.userPrefs.preference(UserPreferences.DownloadImagesAlways).signal)
+    apply(asset, req, zms.imageLoader, zms.network, zms.oldAssetStorage.get, zms.userPrefs.preference(UserPreferences.DownloadImagesAlways).signal)
 
   sealed trait Loader {
     type Data

@@ -39,7 +39,7 @@ class PushTokenClientImpl(implicit
                           authRequestInterceptor: AuthRequestInterceptor) extends PushTokenClient {
 
   import HttpClient.dsl._
-  import HttpClient.AutoDerivation._
+  import HttpClient.AutoDerivationOld._
   import PushTokenClient._
 
   override def postPushToken(token: PushTokenRegistration) = {

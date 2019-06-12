@@ -111,11 +111,35 @@ object AccountId extends (String => AccountId) {
   }
 }
 
-case class AssetId(str: String) {
+sealed trait GeneralAssetId
+
+case class DownloadAssetId(str: String) extends GeneralAssetId
+
+object DownloadAssetId {
+  def apply(): DownloadAssetId = Id.random()
+
+  implicit object Id extends Id[DownloadAssetId] {
+    override def random() = DownloadAssetId(Uid().toString)
+    override def decode(str: String) = DownloadAssetId(str)
+  }
+}
+
+case class UploadAssetId(str: String) extends GeneralAssetId
+
+object UploadAssetId {
+  def apply(): UploadAssetId = Id.random()
+
+  implicit object Id extends Id[UploadAssetId] {
+    override def random() = UploadAssetId(Uid().toString)
+    override def decode(str: String) = UploadAssetId(str)
+  }
+}
+
+case class AssetId(str: String) extends GeneralAssetId {
   override def toString: String = str
 }
 
-object AssetId extends (String => AssetId) {
+object AssetId {
   def apply(): AssetId = Id.random()
 
   implicit object Id extends Id[AssetId] {

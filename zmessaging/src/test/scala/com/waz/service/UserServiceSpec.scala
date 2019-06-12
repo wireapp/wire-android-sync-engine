@@ -20,7 +20,7 @@ package com.waz.service
 import com.waz.content._
 import com.waz.model.UserData.ConnectionStatus
 import com.waz.model.{Availability, _}
-import com.waz.service.assets.AssetService
+import com.waz.service.assets2.{AssetService, AssetStorage}
 import com.waz.service.conversation.SelectedConversationService
 import com.waz.service.push.PushService
 import com.waz.specs.AndroidFreeSpec
@@ -51,7 +51,7 @@ class UserServiceSpec extends AndroidFreeSpec {
   val usersClient     = mock[UsersClient]
   val sync            = mock[SyncServiceHandle]
   val database        = mock[Database]
-  val assetsStorage   = mock[AssetsStorage]
+  val assetsStorage   = mock[AssetStorage]
   val credentials     = mock[CredentialsUpdateClient]
   val selectedConv    = mock[SelectedConversationService]
   val userPrefs       = new TestUserPreferences
@@ -60,7 +60,6 @@ class UserServiceSpec extends AndroidFreeSpec {
   (accountsService.accountsWithManagers _).expects().anyNumberOfTimes().returning(Signal.empty)
   (pushService.onHistoryLost _).expects().anyNumberOfTimes().returning(new SourceSignal(Some(Instant.now())) with BgEventSource)
   (sync.syncUsers _).expects(*).anyNumberOfTimes().returning(Future.successful(SyncId()))
-  (assetService.updateAssets _).expects(*).anyNumberOfTimes().returning(Future.successful(Set.empty))
   (usersStorage.updateOrCreateAll _).expects(*).anyNumberOfTimes().returning(Future.successful(Set.empty))
   (selectedConv.selectedConversationId _).expects().anyNumberOfTimes().returning(Signal.const(None))
 

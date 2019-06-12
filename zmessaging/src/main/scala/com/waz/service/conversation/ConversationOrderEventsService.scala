@@ -47,7 +47,6 @@ class ConversationOrderEventsService(selfUserId: UserId,
       case _: CreateConversationEvent => true
       case _: CallMessageEvent        => true
       case _: OtrErrorEvent           => true
-      case _: GenericAssetEvent       => true
       case _: ConnectRequestEvent     => true
       case _: OtrMessageEvent         => true
       case MemberJoinEvent(_, _, _, added, _) if added.contains(selfUserId)   => true
@@ -82,10 +81,10 @@ class ConversationOrderEventsService(selfUserId: UserId,
       case _ => shouldChangeOrder(event)
     }
 
-  val conversationOrderEventsStage: Stage.Atomic = EventScheduler.Stage[ConversationEvent] { (convId, es) =>
+  val conversationOrderEventsStage: Stage.Atomic = EventScheduler.Stage[ConversationEvent] { (convId, events) =>
 
-    val orderChanges    = processConversationOrderEvents(convId, es.filter(shouldChangeOrder))
-    val unarchiveConvs  = processConversationUnarchiveEvents(convId, es.filter(shouldUnarchive))
+    val orderChanges    = processConversationOrderEvents(convId, events.filter(shouldChangeOrder))
+    val unarchiveConvs  = processConversationUnarchiveEvents(convId, events.filter(shouldUnarchive))
 
     for {
       _ <- orderChanges

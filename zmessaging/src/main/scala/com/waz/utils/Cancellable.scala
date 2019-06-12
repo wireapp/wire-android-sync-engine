@@ -31,7 +31,7 @@ import scala.concurrent.Future
   * Global registry of cancellable tasks.
   */
 object Cancellable {
-  private implicit val dispatcher = new SerialDispatchQueue(name = "Cancellable")
+  private implicit val dispatcher: SerialDispatchQueue = new SerialDispatchQueue(name = "Cancellable")
 
   private val tasks = new mutable.HashMap[Any, CancellableFuture[_]]
 

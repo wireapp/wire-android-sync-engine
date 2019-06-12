@@ -30,9 +30,11 @@ class OkHttpUserAgentInterceptor(metadata: MetaDataService) extends Interceptor 
     s"Android $androidVersion / Wire $wireVersion / HttpLibrary $okHttpDefaultUserAgent"
   }
 
-  override def intercept(chain: Interceptor.Chain): Response = {
-    val request = chain.request.newBuilder.header("User-Agent", WireUserAgent).build
-    chain.proceed(request)
-  }
-
+  override def intercept(chain: Interceptor.Chain): Response = 
+    chain.proceed(
+      if (Option(chain.request.header("User-Agent")).isDefined) 
+        chain.request
+      else 
+        chain.request.newBuilder.header("User-Agent", WireUserAgent).build
+    )
 }

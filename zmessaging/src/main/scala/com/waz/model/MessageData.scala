@@ -17,9 +17,9 @@
  */
 package com.waz.model
 
+import java.net.URL
 import java.nio.ByteBuffer
 import java.nio.charset.Charset
-
 import android.database.DatabaseUtils.queryNumEntries
 import android.database.sqlite.SQLiteQueryBuilder
 import com.waz.{api, model}
@@ -34,6 +34,7 @@ import com.waz.model.GenericMessage.{GenericMessageContent, TextMessage}
 import com.waz.model.MessageData.MessageState
 import com.waz.model.messages.media.{MediaAssetData, MediaAssetDataProtocol}
 import com.waz.service.ZMessaging.clock
+import com.waz.service.assets2.StorageCodecs
 import com.waz.service.media.{MessageContentBuilder, RichMediaContentParser}
 import com.waz.sync.client.OpenGraphClient.OpenGraphData
 import com.waz.utils.wrappers.{DB, DBCursor, URI}
@@ -43,26 +44,28 @@ import org.threeten.bp.Instant.now
 
 import scala.collection.breakOut
 import scala.concurrent.duration._
+import scala.util.matching.Regex
 
-case class MessageData(override val id:   MessageId              = MessageId(),
-                       convId:            ConvId                 = ConvId(),
-                       msgType:           Message.Type           = Message.Type.TEXT,
-                       userId:            UserId                 = UserId(),
-                       content:           Seq[MessageContent]    = Seq.empty,
-                       protos:            Seq[GenericMessage]    = Seq.empty,
-                       firstMessage:      Boolean                = false,
-                       members:           Set[UserId]            = Set.empty[UserId],
-                       recipient:         Option[UserId]         = None,
-                       email:             Option[String]         = None,
-                       name:              Option[Name]           = None,
-                       state:             MessageState           = Message.Status.SENT,
-                       time:              RemoteInstant          = RemoteInstant(now(clock)), //TODO: now is local...
-                       localTime:         LocalInstant           = LocalInstant.Epoch,
-                       editTime:          RemoteInstant          = RemoteInstant.Epoch,
-                       ephemeral:         Option[FiniteDuration] = None,
-                       expiryTime:        Option[LocalInstant]   = None, // local expiration time
-                       expired:           Boolean                = false,
-                       duration:          Option[FiniteDuration] = None, //for successful calls and message_timer changes
+case class MessageData(override val id: MessageId              = MessageId(),
+                       convId:          ConvId                 = ConvId(),
+                       msgType:         Message.Type           = Message.Type.TEXT,
+                       userId:          UserId                 = UserId(),
+                       content:         Seq[MessageContent]    = Seq.empty,
+                       protos:          Seq[GenericMessage]    = Seq.empty,
+                       firstMessage:    Boolean                = false,
+                       members:         Set[UserId]            = Set.empty[UserId],
+                       recipient:       Option[UserId]         = None,
+                       email:           Option[String]         = None,
+                       name:            Option[Name]           = None,
+                       state:           MessageState           = Message.Status.SENT,
+                       time:            RemoteInstant          = RemoteInstant(now(clock)), //TODO: now is local...
+                       localTime:       LocalInstant           = LocalInstant.Epoch,
+                       editTime:        RemoteInstant          = RemoteInstant.Epoch,
+                       ephemeral:       Option[FiniteDuration] = None,
+                       expiryTime:      Option[LocalInstant]   = None, // local expiration time
+                       expired:         Boolean                = false,
+                       duration:        Option[FiniteDuration] = None, //for successful calls and message_timer changes
+                       assetId:         Option[GeneralAssetId] = None,
                        quote:             Option[QuoteContent]   = None,
                        forceReadReceipts: Option[Int]    = None
                       ) extends Identifiable[MessageId] with DerivedLogTag {
@@ -107,8 +110,6 @@ case class MessageData(override val id:   MessageId              = MessageId(),
     copy(quote = Some(QuoteContent(quoteId, validity = true, None)), protos = newProtos)
   }
 
-  def assetId = AssetId(id.str)
-
   def isLocal = state == Message.Status.DEFAULT || state == Message.Status.PENDING || state == Message.Status.FAILED || state == Message.Status.FAILED_READ
 
   def isDeleted = msgType == Message.Type.RECALLED
@@ -117,16 +118,13 @@ case class MessageData(override val id:   MessageId              = MessageId(),
 
   def hasMentionOf(userId: UserId): Boolean = mentions.exists(_.userId.forall(_ == userId)) // a mention with userId == None is a "mention" of everyone, so it counts
 
-  lazy val imageDimensions: Option[Dim2] = {
-    val dims = protos.collectFirst {
+  lazy val imageDimensions: Option[Dim2] =
+    protos.collectFirst {
       case GenericMessageContent(Asset(AssetData.WithDimensions(d), _)) => d
       case GenericMessageContent(ImageAsset(AssetData.WithDimensions(d))) => d
     } orElse content.headOption.collect {
       case MessageContent(_, _, _, _, Some(_), w, h, _, _) => Dim2(w, h)
     }
-    verbose(l"dims $dims")
-    dims
-  }
 
   lazy val location =
     protos.collectFirst {
@@ -284,15 +282,21 @@ object MessageContent extends ((Message.Part.Type, String, Option[MediaAssetData
 }
 
 object MessageData extends
-  ((MessageId, ConvId, Message.Type, UserId, Seq[MessageContent], Seq[GenericMessage], Boolean, Set[UserId], Option[UserId],
-    Option[String], Option[Name], Message.Status, RemoteInstant, LocalInstant, RemoteInstant, Option[FiniteDuration],
-    Option[LocalInstant], Boolean, Option[FiniteDuration], Option[QuoteContent], Option[Int]) => MessageData) {
+  ((MessageId, ConvId, Message.Type, UserId, Seq[MessageContent], Seq[GenericMessage], Boolean,
+  Set[UserId], Option[UserId], Option[String], Option[Name], Message.Status, RemoteInstant, LocalInstant, RemoteInstant,
+  Option[FiniteDuration], Option[LocalInstant], Boolean, Option[FiniteDuration], Option[GeneralAssetId], Option[QuoteContent],
+  Option[Int]) => MessageData) with DerivedLogTag {
 
   val Empty = new MessageData(MessageId(""), ConvId(""), Message.Type.UNKNOWN, UserId(""))
   val Deleted = new MessageData(MessageId(""), ConvId(""), Message.Type.UNKNOWN, UserId(""), state = Message.Status.DELETED)
   val isUserContent = Set(TEXT, TEXT_EMOJI_ONLY, ASSET, ANY_ASSET, VIDEO_ASSET, AUDIO_ASSET, RICH_MEDIA, LOCATION, KNOCK)
 
   val EphemeralMessageTypes = Set(TEXT, TEXT_EMOJI_ONLY, KNOCK, ASSET, ANY_ASSET, VIDEO_ASSET, AUDIO_ASSET, RICH_MEDIA, LOCATION)
+
+  // A markdown link looks like that: [place for the text](here.goes.the.link)
+  // Links of this type will be handled by our Markdown library, we should ignore them here.
+  val markdownLinkPattern = """\[.+?\]\((.+?)\)""".r
+  val markdownReferencePattern = """(?m)^\[.+?\]:\s*(\S+)(\s+\".+\")?$""".r
 
   type MessageState = Message.Status
   import GenericMessage._
@@ -329,7 +333,7 @@ object MessageData extends
     case Message.Type.MESSAGE_TIMER        => "MessageTimer"
   }
 
-  implicit object MessageDataDao extends Dao[MessageData, MessageId]  {
+  implicit object MessageDataDao extends Dao[MessageData, MessageId] with StorageCodecs {
     import com.waz.db._
 
     val Id = id[MessageId]('_id, "PRIMARY KEY").apply(_.id)
@@ -355,11 +359,11 @@ object MessageData extends
     val Quote         = opt(id[MessageId]('quote))(_.quote.map(_.message))
     val QuoteValidity = bool('quote_validity)(_.quote.exists(_.validity))
     val ForceReadReceipts = opt(int('force_read_receipts))(_.forceReadReceipts)
+    val AssetId = opt(text('asset_id, GeneralAssetIdCodec.serialize, GeneralAssetIdCodec.deserialize))(_.assetId)
 
     override val idCol = Id
 
-    override val table =
-      Table("Messages", Id, Conv, Type, User, Content, Protos, Time, LocalTime, FirstMessage, Members, Recipient, Email, Name, State, ContentSize, EditTime, Ephemeral, ExpiryTime, Expired, Duration, Quote, QuoteValidity, ForceReadReceipts)
+    override val table = Table("Messages", Id, Conv, Type, User, Content, Protos, Time, LocalTime, FirstMessage, Members, Recipient, Email, Name, State, ContentSize, EditTime, Ephemeral, ExpiryTime, Expired, Duration, Quote, QuoteValidity, ForceReadReceipts, AssetId)
 
     override def onCreate(db: DB): Unit = {
       super.onCreate(db)
@@ -367,7 +371,7 @@ object MessageData extends
     }
 
     override def apply(implicit cursor: DBCursor): MessageData =
-      MessageData(Id, Conv, Type, User, Content, Protos, FirstMessage, Members, Recipient, Email, Name, State, Time, LocalTime, EditTime, Ephemeral, ExpiryTime, Expired, Duration, Quote.map(QuoteContent(_, QuoteValidity, None)), ForceReadReceipts)
+      MessageData(Id, Conv, Type, User, Content, Protos, FirstMessage, Members, Recipient, Email, Name, State, Time, LocalTime, EditTime, Ephemeral, ExpiryTime, Expired, Duration, AssetId, Quote.map(QuoteContent(_, QuoteValidity, None)), ForceReadReceipts)
 
     def deleteForConv(id: ConvId)(implicit db: DB) = delete(Conv, id)
 
@@ -451,6 +455,11 @@ object MessageData extends
     def findByType(conv: ConvId, tpe: Message.Type)(implicit db: DB) =
       iterating(db.query(table.name, null, s"${Conv.name} = '$conv' AND ${Type.name} = '${Type(tpe)}'", null, null, null, s"${Time.name} ASC"))
 
+    def findByTypes(types: Set[Message.Type])(implicit db: DB) = {
+      val typesString = types.map(t => s"'${Type(t)}'").mkString("(", "," , ")")
+      list(db.query(table.name, null, s"${Type.name} IN $typesString", null, null, null, s"${Time.name} ASC"))
+    }
+
     def findQuotesOf(msgId: MessageId)(implicit db: DB) = list(db.query(table.name, null, s"${Quote.name} = '$msgId'", null, null, null, null))
 
     def msgIndexCursorFiltered(conv: ConvId, types: Seq[TypeFilter], limit: Option[Int] = None)(implicit db: DB): DBCursor = {
@@ -478,11 +487,7 @@ object MessageData extends
           case (1, Message.Part.Type.TEXT_EMOJI_ONLY) => (Message.Type.TEXT_EMOJI_ONLY, ct)
           case _ => (Message.Type.RICH_MEDIA, ct)
         }
-        (ct.size, ct.head.tpe) match {
-          case (1, Message.Part.Type.TEXT) => (Message.Type.TEXT, ct)
-          case (1, Message.Part.Type.TEXT_EMOJI_ONLY) => (Message.Type.TEXT_EMOJI_ONLY, ct)
-          case _ => (Message.Type.RICH_MEDIA, ct)
-        }
+        
       } else {
         // apply links
         def linkEnd(offset: Int) = {
@@ -492,12 +497,16 @@ object MessageData extends
 
         val res = new MessageContentBuilder
 
-        val end = links.sortBy(_.urlOffset).foldLeft(0) { case (prevEnd, link) =>
-          if (link.urlOffset > prevEnd) res ++= RichMediaContentParser.splitContent(message.substring(prevEnd, link.urlOffset), mentions, prevEnd)
+        val markdownLinks = markdownLinkPattern.findAllMatchIn(message).map(_.group(1)).toSet ++ markdownReferencePattern.findAllMatchIn(message).map(_.group(1)).toSet
+        verbose(l"ignored markdown links: $markdownLinks")
+
+        val end = links.filterNot(l => markdownLinks.contains(l.url)).sortBy(_.urlOffset).foldLeft(0) {
+          case (prevEnd, link) =>
+            if (link.urlOffset > prevEnd) res ++= RichMediaContentParser.splitContent(message.substring(prevEnd, link.urlOffset), mentions, prevEnd)
 
           returning(linkEnd(link.urlOffset)) { end =>
             if (end > link.urlOffset) {
-              val openGraph = Option(link.getArticle).map { a => OpenGraphData(a.title, a.summary, None, "", Option(a.permanentUrl).filter(_.nonEmpty).map(URI.parse)) }
+              val openGraph = Option(link.getArticle).map { a => OpenGraphData(a.title, a.summary, None, "", Option(a.permanentUrl).filter(_.nonEmpty).map(new URL(_))) }
               res += MessageContent(Message.Part.Type.WEB_LINK, message.substring(link.urlOffset, end), openGraph)
             }
           }
@@ -505,7 +514,7 @@ object MessageData extends
 
         if (end < message.length) res ++= RichMediaContentParser.splitContent(message.substring(end), mentions, end)
 
-        (Message.Type.RICH_MEDIA, res.result())
+        (Message.Type.RICH_MEDIA, res.result)
       }
     }
 
@@ -517,6 +526,19 @@ object MessageData extends
       case ANY_ASSET | VIDEO_ASSET | AUDIO_ASSET | ASSET => true
       case _ => false
     }
+  }
+
+  private val UTF_16_CHARSET  = Charset.forName("UTF-16")
+
+  private def encode(text: String) = {
+    val bytes = UTF_16_CHARSET.encode(text).array
+
+    if (bytes.length < 3 || bytes.slice(2, bytes.length).forall(_ == 0))
+      Array.empty[Byte]
+    else if (bytes(2) == 0)
+      bytes.slice(2, bytes.lastIndexWhere(_ > 0) + 1)
+    else
+      Array[Byte](0) ++ bytes.slice(2, bytes.lastIndexWhere(_ > 0) + 1)
   }
 
   def adjustMentions(text: String, mentions: Seq[Mention], forSending: Boolean, offset: Int = 0): Seq[Mention] = {
@@ -536,20 +558,7 @@ object MessageData extends
     }.sortBy(_.start)
   }
 
-  val UTF_16_CHARSET  = Charset.forName("UTF-16")
-
-  def encode(text: String) = {
-    val bytes = UTF_16_CHARSET.encode(text).array
-
-    if (bytes.length < 3 || bytes.slice(2, bytes.length).forall(_ == 0))
-      Array.empty[Byte]
-    else if (bytes(2) == 0)
-      bytes.slice(2, bytes.lastIndexWhere(_ > 0) + 1)
-    else
-      Array[Byte](0) ++ bytes.slice(2, bytes.lastIndexWhere(_ > 0) + 1)
-  }
-
-  def decode(array: Array[Byte]) = UTF_16_CHARSET.decode(ByteBuffer.wrap(array)).toString
+  private def decode(array: Array[Byte]) = UTF_16_CHARSET.decode(ByteBuffer.wrap(array)).toString
 
   def readReceiptMode(enabled: Boolean) = if (enabled) Some(1) else Some(0)
 }

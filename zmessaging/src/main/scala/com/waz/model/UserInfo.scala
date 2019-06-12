@@ -22,8 +22,8 @@ import com.waz.model.AssetMetaData.Image
 import com.waz.model.AssetMetaData.Image.Tag
 import com.waz.model.AssetMetaData.Image.Tag.{Medium, Preview}
 import com.waz.model.AssetStatus.UploadDone
+import com.waz.model.UserInfo.{ProfilePicture, Service}
 import com.waz.model.ManagedBy.ManagedBy
-import com.waz.model.UserInfo.Service
 import com.waz.utils.{JsonDecoder, JsonEncoder}
 import org.json
 import org.json.{JSONArray, JSONObject}
@@ -35,7 +35,7 @@ case class UserInfo(id:           UserId,
                     accentId:     Option[Int]             = None,
                     email:        Option[EmailAddress]    = None,
                     phone:        Option[PhoneNumber]     = None,
-                    picture:      Option[Seq[AssetData]]  = None, //the empty sequence is used to delete pictures
+                    picture:      Option[Seq[ProfilePicture]]  = None, //the empty sequence is used to delete pictures
                     trackingId:   Option[TrackingId]      = None,
                     deleted:      Boolean                 = false,
                     handle:       Option[Handle]          = None,
@@ -49,13 +49,15 @@ case class UserInfo(id:           UserId,
                    ) {
   //TODO Dean - this will actually prevent deleting profile pictures, since the empty seq will be mapped to a None,
   //And so in UserData, the current picture will be used instead...
-  def mediumPicture = picture.flatMap(_.collectFirst { case a@AssetData.IsImageWithTag(Medium) => a })
+  def mediumPicture: Option[ProfilePicture] = picture.flatMap(_.collectFirst { case a if a.tag == Medium => a })
 }
 
 object UserInfo {
   import JsonDecoder._
 
   case class Service(id: IntegrationId, provider: ProviderId)
+
+  case class ProfilePicture(id: AssetId, tag: Tag)
 
   def decodeService(s: Symbol)(implicit js: JSONObject): Service = Service(decodeId[IntegrationId]('id), decodeId[ProviderId]('provider))
 
@@ -85,16 +87,17 @@ object UserInfo {
 
     }
 
-    def getAssets(implicit js: JSONObject): Option[AssetData] = fromArray(js, "assets") flatMap { assets =>
+    def getAssets(implicit js: JSONObject): Seq[ProfilePicture] = fromArray(js, "assets").map { assets =>
       Seq.tabulate(assets.length())(assets.getJSONObject).map { js =>
-        AssetData(
-          remoteId = decodeOptRAssetId('key)(js),
-          metaData = Some(AssetMetaData.Image(Dim2(0, 0), Image.Tag(decodeString('size)(js))))
-        )
-      }.collectFirst { case a@AssetData.IsImageWithTag(Tag.Medium) => a } //discard preview
-    }
+        val id = AssetId(decodeString('key)(js))
+        val tag = Image.Tag(decodeString('size)(js))
+        ProfilePicture(id, tag)
+      }
+    }.getOrElse(Seq())
 
-    def getPicture(userId: UserId)(implicit js: JSONObject): Option[AssetData] = fromArray(js, "picture") flatMap { pic =>
+
+    //TODO: Do we still need this?
+    def getPictureV2(userId: UserId)(implicit js: JSONObject): Option[AssetData] = fromArray(js, "picture") flatMap { pic =>
       val id = decodeOptString('correlation_id)(pic.getJSONObject(0).getJSONObject("info")).fold(AssetId())(AssetId(_))
 
       Seq.tabulate(pic.length())(i => imageData(userId, pic.getJSONObject(i))).collectFirst {
@@ -113,7 +116,7 @@ object UserInfo {
       }
       val id = UserId('id)
       //prefer v3 ("assets") over v2 ("picture") - this will prevent unnecessary uploading of v3 if a v2 also exists.
-      val pic = getAssets.orElse(getPicture(id)).toSeq
+      val pic = getAssets //TODO: get V2 pictures too
       val privateMode = decodeOptBoolean('privateMode)
       val ssoId = SSOId.decodeOptSSOId('sso_id)
       val managedBy = ManagedBy.decodeOptManagedBy('managed_by)
@@ -125,21 +128,23 @@ object UserInfo {
     }
   }
 
-  def encodeAsset(assets: Seq[AssetData]): JSONArray = {
+  def encodeAsset(assets: Seq[ProfilePicture]): JSONArray = {
     val arr = new json.JSONArray()
-    assets.collect {
-      case a@AssetData.WithRemoteId(rId) =>
-        val size = a.tag match {
+    assets
+      .map { pic =>
+        val size = pic.tag match {
           case Preview => "preview"
-          case Medium => "complete"
-          case _ => ""
+          case Medium  => "complete"
+          case _       => ""
         }
+
         JsonEncoder { o =>
           o.put("size", size)
-          o.put("key", rId.str)
+          o.put("key", pic.id.str)
           o.put("type", "image")
         }
-    }.foreach(arr.put)
+      }
+      .foreach(arr.put)
     arr
   }
 

@@ -21,37 +21,41 @@ import java.io.{BufferedOutputStream, File, FileOutputStream, InputStream}
 import java.security.{DigestOutputStream, MessageDigest}
 
 import com.waz.api.impl.ErrorResponse
-import com.waz.cache.{Expiration, LocalData}
-import com.waz.cache2.CacheService.NoEncryption
+import com.waz.cache.Expiration
 import com.waz.model._
-import com.waz.service.assets2.Asset
-import com.waz.service.assets2.Asset.General
-import com.waz.utils.crypto.AESUtils
-import com.waz.utils.{IoUtils, JsonDecoder, JsonEncoder}
+import com.waz.service.assets2.{Asset, NoEncryption}
+import com.waz.utils.{CirceJSONSupport, IoUtils, SafeBase64}
 import com.waz.znet2.http.HttpClient.AutoDerivation._
 import com.waz.znet2.http.HttpClient.ProgressCallback
 import com.waz.znet2.http.HttpClient.dsl._
 import com.waz.znet2.http.MultipartBodyMixed.Part
 import com.waz.znet2.http.Request.UrlCreator
 import com.waz.znet2.http._
-import org.json.JSONObject
+import io.circe.Encoder
 import org.threeten.bp.Instant
 
 import scala.concurrent.duration._
+import scala.concurrent.{Await, Future}
 
 trait AssetClient2 {
   import com.waz.sync.client.AssetClient2._
 
-  def loadAssetContent(asset: Asset[General], callback: Option[ProgressCallback]): ErrorOrResponse[FileWithSha]
-  def uploadAsset(metadata: Metadata, asset: AssetContent, callback: Option[ProgressCallback]): ErrorOrResponse[UploadResponse]
+  def loadAssetContent(asset: Asset, callback: Option[ProgressCallback]): ErrorOrResponse[FileWithSha]
+  def uploadAsset(metadata: Metadata, asset: AssetContent, callback: Option[ProgressCallback]): ErrorOrResponse[UploadResponse2]
   def deleteAsset(assetId: AssetId): ErrorOrResponse[Boolean]
+
+  /**
+    * Loads a public asset with no checksum/encryption/name/size/mime.
+    * Usually reserved for profile pictures.
+    */
+  def loadPublicAssetContent(assetId: AssetId, convId: Option[ConvId], callback: Option[ProgressCallback]): ErrorOrResponse[InputStream]
 }
 
 class AssetClient2Impl(implicit
                        urlCreator: UrlCreator,
                        client: HttpClient,
                        authRequestInterceptor: RequestInterceptor = RequestInterceptor.identity)
-  extends AssetClient2 {
+  extends AssetClient2 with CirceJSONSupport {
 
   import AssetClient2._
   import com.waz.threading.Threading.Implicits.Background
@@ -65,7 +69,9 @@ class AssetClient2Impl(implicit
       FileWithSha(tempFile, Sha256(out.getMessageDigest.digest()))
     }
 
-  override def loadAssetContent(asset: Asset[General], callback: Option[ProgressCallback]): ErrorOrResponse[FileWithSha] = {
+  private implicit def inputStreamBodyDeserializer: RawBodyDeserializer[InputStream] = RawBodyDeserializer.create(_.data())
+
+  override def loadAssetContent(asset: Asset, callback: Option[ProgressCallback]): ErrorOrResponse[FileWithSha] = {
     val assetPath = (asset.convId, asset.encryption) match {
       case (None, _)                     => s"/assets/v3/${asset.id.str}"
       case (Some(convId), NoEncryption)  => s"/conversations/${convId.str}/assets/${asset.id.str}"
@@ -82,23 +88,39 @@ class AssetClient2Impl(implicit
       .withErrorType[ErrorResponse]
       .executeSafe
   }
-
-  private implicit def RawAssetRawBodySerializer: RawBodySerializer[AssetContent] =
-    RawBodySerializer.create { asset =>
-      RawBody(mediaType = Some(asset.mime.str), asset.data, dataLength = asset.dataLength)
+  override def loadPublicAssetContent(assetId: AssetId,
+                                      convId: Option[ConvId],
+                                      callback: Option[ProgressCallback]): ErrorOrResponse[InputStream] = {
+    val assetPath = convId.fold(
+      s"/assets/v3/${assetId.str}"
+    ) { cId =>
+      s"/conversations/${cId.str}/assets/${assetId.str}"
     }
 
-  override def uploadAsset(metadata: Metadata, content: AssetContent, callback: Option[ProgressCallback]): ErrorOrResponse[UploadResponse] = {
     Request
-      .Post(
-        relativePath = AssetsV3Path,
-        body = MultipartBodyMixed(Part(metadata), Part(content, Headers("Content-MD5" -> md5(content.data()))))
-      )
-      .withUploadCallback(callback)
-      .withResultType[UploadResponse]
+      .Get(relativePath = assetPath)
+      .withDownloadCallback(callback)
+      .withResultType[InputStream]
       .withErrorType[ErrorResponse]
       .executeSafe
   }
+
+  private implicit def RawAssetRawBodySerializer: RawBodySerializer[AssetContent] =
+    RawBodySerializer.create { asset =>
+      val data = () => Await.result(asset.data(), Duration.Inf) //TODO RawBody should take () => Future[_] as data
+      RawBody(mediaType = Some(asset.mime.str), data, dataLength = asset.dataLength)
+    }
+
+  override def uploadAsset(metadata: Metadata, content: AssetContent, callback: Option[ProgressCallback]): ErrorOrResponse[UploadResponse2] =
+    Request
+      .Post(
+        relativePath = AssetsV3Path,
+        body = MultipartBodyMixed(Part(metadata), Part(content, Headers("Content-MD5" -> SafeBase64.encode(content.md5.bytes))))
+      )
+      .withUploadCallback(callback)
+      .withResultType[UploadResponse2]
+      .withErrorType[ErrorResponse]
+      .executeSafe
 
   override def deleteAsset(assetId: AssetId): ErrorOrResponse[Boolean] = {
     Request.Delete(relativePath = s"$AssetsV3Path/${assetId.str}")
@@ -113,39 +135,32 @@ object AssetClient2 {
 
   case class FileWithSha(file: File, sha256: Sha256)
 
-  case class AssetContent(mime: Mime, data: () => InputStream, dataLength: Option[Long])
+  case class AssetContent(mime: Mime, md5: MD5, data: () => Future[InputStream], dataLength: Option[Long])
+
+  case class UploadResponse2(key: AssetId, expires: Option[Instant], token: Option[AssetToken])
 
   implicit val DefaultExpiryTime: Expiration = 1.hour
 
   val AssetsV3Path = "/assets/v3"
 
-  sealed abstract class Retention(val value: String)
+  sealed trait Retention
   object Retention {
-    case object Eternal                 extends Retention("eternal") //Only used for profile pics currently
-    case object EternalInfrequentAccess extends Retention("eternal-infrequent_access")
-    case object Persistent              extends Retention("persistent")
-    case object Expiring                extends Retention("expiring")
-    case object Volatile                extends Retention("volatile")
+    case object Eternal                 extends Retention //Only used for profile pics currently
+    case object EternalInfrequentAccess extends Retention
+    case object Persistent              extends Retention
+    case object Expiring                extends Retention
+    case object Volatile                extends Retention
+  }
+
+  implicit def retentionEncoder: Encoder[Retention] = Encoder[String].contramap {
+    case Retention.Eternal => "eternal"
+    case Retention.EternalInfrequentAccess => "eternal-infrequent_access"
+    case Retention.Persistent => "persistent"
+    case Retention.Expiring => "expiring"
+    case Retention.Volatile => "volatile"
   }
 
   case class Metadata(public: Boolean = false, retention: Retention = Retention.Persistent)
-
-  object Metadata {
-    implicit val jsonEncoder: JsonEncoder[Metadata] = JsonEncoder.build[Metadata] { metadata => o =>
-      o.put("public", metadata.public)
-      o.put("retention", metadata.retention.value)
-    }
-  }
-
-  case class UploadResponse(rId: RAssetId, expires: Option[Instant], token: Option[AssetToken])
-
-  case object UploadResponse {
-    implicit val jsonDecoder: JsonDecoder[UploadResponse] = new JsonDecoder[UploadResponse] {
-      import JsonDecoder._
-      override def apply(implicit js: JSONObject): UploadResponse =
-        UploadResponse(RAssetId('key), decodeOptISOInstant('expires), decodeOptString('token).map(AssetToken))
-    }
-  }
 
   def getAssetPath(rId: RAssetId, otrKey: Option[AESKey], conv: Option[RConvId]): String =
     (conv, otrKey) match {
@@ -153,12 +168,5 @@ object AssetClient2 {
       case (Some(c), None)    => s"/conversations/${c.str}/assets/${rId.str}"
       case (Some(c), Some(_)) => s"/conversations/${c.str}/otr/assets/${rId.str}"
     }
-
-  /**
-    * Computes base64 encoded md5 sum of image data.
-    */
-  def md5(data: LocalData): String = md5(data.inputStream)
-
-  def md5(is: InputStream): String = AESUtils.base64(IoUtils.md5(is))
 
 }

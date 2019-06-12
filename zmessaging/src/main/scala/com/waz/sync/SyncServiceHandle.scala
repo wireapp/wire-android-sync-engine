@@ -21,15 +21,19 @@ import com.waz.api.IConversation.{Access, AccessRole}
 import com.waz.api.NetworkMode
 import com.waz.content.UserPreferences
 import com.waz.content.UserPreferences.{ShouldSyncConversations, ShouldSyncInitial}
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model.UserData.ConnectionStatus
 import com.waz.model.otr.ClientId
 import com.waz.model.sync.SyncJob.Priority
 import com.waz.model.sync._
 import com.waz.model.{AccentColor, Availability, _}
 import com.waz.service._
+import com.waz.service.assets2.UploadAssetStatus
 import com.waz.sync.SyncResult.Failure
 import com.waz.threading.Threading
 import org.threeten.bp.Instant
+
+import com.waz.log.LogSE._
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
@@ -57,7 +61,7 @@ trait SyncServiceHandle {
   def postMessage(id: MessageId, conv: ConvId, editTime: RemoteInstant): Future[SyncId]
   def postDeleted(conv: ConvId, msg: MessageId): Future[SyncId]
   def postRecalled(conv: ConvId, currentMsgId: MessageId, recalledMsgId: MessageId): Future[SyncId]
-  def postAssetStatus(id: MessageId, conv: ConvId, exp: Option[FiniteDuration], status: AssetStatus.Syncable): Future[SyncId]
+  def postAssetStatus(id: MessageId, conv: ConvId, exp: Option[FiniteDuration], status: UploadAssetStatus): Future[SyncId]
   def postLiking(id: ConvId, liking: Liking): Future[SyncId]
   def postConnection(user: UserId, name: Name, message: String): Future[SyncId]
   def postConnectionStatus(user: UserId, status: ConnectionStatus): Future[SyncId]
@@ -93,7 +97,8 @@ trait SyncServiceHandle {
   def performFullSync(): Future[Unit]
 }
 
-class AndroidSyncServiceHandle(account: UserId, service: SyncRequestService, timeouts: Timeouts, userPreferences: UserPreferences) extends SyncServiceHandle {
+class AndroidSyncServiceHandle(account: UserId, service: SyncRequestService, timeouts: Timeouts, userPreferences: UserPreferences)
+  extends SyncServiceHandle with DerivedLogTag {
 
   import Threading.Implicits.Background
   import com.waz.model.sync.SyncRequest._
@@ -138,7 +143,7 @@ class AndroidSyncServiceHandle(account: UserId, service: SyncRequestService, tim
   def postMessage(id: MessageId, conv: ConvId, time: RemoteInstant) = addRequest(PostMessage(conv, id, time), forceRetry = true)
   def postDeleted(conv: ConvId, msg: MessageId) = addRequest(PostDeleted(conv, msg))
   def postRecalled(conv: ConvId, msg: MessageId, recalled: MessageId) = addRequest(PostRecalled(conv, msg, recalled))
-  def postAssetStatus(id: MessageId, conv: ConvId, exp: Option[FiniteDuration], status: AssetStatus.Syncable) = addRequest(PostAssetStatus(conv, id, exp, status))
+  def postAssetStatus(id: MessageId, conv: ConvId, exp: Option[FiniteDuration], status: UploadAssetStatus) = addRequest(PostAssetStatus(conv, id, exp, status))
   def postAddressBook(ab: AddressBook) = addRequest(PostAddressBook(ab))
   def postConnection(user: UserId, name: Name, message: String) = addRequest(PostConnection(user, name, message))
   def postConnectionStatus(user: UserId, status: ConnectionStatus) = addRequest(PostConnectionStatus(user, Some(status)))
@@ -174,16 +179,21 @@ class AndroidSyncServiceHandle(account: UserId, service: SyncRequestService, tim
 
   def postSessionReset(conv: ConvId, user: UserId, client: ClientId) = addRequest(PostSessionReset(conv, user, client))
 
-  override def performFullSync(): Future[Unit] = for {
-    id1 <- syncSelfUser()
-    id2 <- syncSelfClients()
-    id3 <- syncSelfPermissions()
-    id4 <- syncTeam()
-    id5 <- syncConversations()
-    id6 <- syncConnections()
-    id7 <- syncProperties()
-    _ <- service.await(Set(id1, id2, id3, id4, id5, id6, id7))
-  } yield ()
+  override def performFullSync(): Future[Unit] = {
+    verbose(l"SYNC performFullSync")
+    for {
+      id1 <- syncSelfUser()
+      id2 <- syncSelfClients()
+      id3 <- syncSelfPermissions()
+      id4 <- syncTeam()
+      id5 <- syncConversations()
+      id6 <- syncConnections()
+      id7 <- syncProperties()
+      _ = verbose(l"SYNC waiting for full sync to finish...")
+      _ <- service.await(Set(id1, id2, id3, id4, id5, id6, id7))
+      _ = verbose(l"SYNC ... and done")
+    } yield ()
+  }
 }
 
 trait SyncHandler {

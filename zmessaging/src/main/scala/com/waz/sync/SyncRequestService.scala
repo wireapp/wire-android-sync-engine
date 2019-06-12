@@ -18,6 +18,7 @@
 package com.waz.sync
 
 import com.waz.api.SyncState
+import com.waz.log.BasicLogging.LogTag
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model.sync.SyncJob.Priority
 import com.waz.model.sync._
@@ -30,6 +31,8 @@ import com.waz.utils.events.Signal
 
 import scala.concurrent.Future
 import scala.concurrent.duration.{Duration, FiniteDuration}
+import com.waz.log.LogSE._
+import com.waz.utils.returning
 
 trait SyncRequestService {
 
@@ -90,10 +93,14 @@ class SyncRequestServiceImpl(accountId: UserId,
   override def await(id: SyncId): Future[SyncResult] =
     scheduler.await(id)
 
-  override def syncState(account: UserId, commands: Seq[SyncCommand]) =
-    content.syncJobs
-      .map(_.values.filter(job => commands.contains(job.request.cmd)))
-      .map(jobs => if (jobs.isEmpty) SyncState.COMPLETED else jobs.minBy(_.state.ordinal()).state)
+  override def syncState(account: UserId, commands: Seq[SyncCommand]) = {
+    implicit val logTag: LogTag = LogTag("WorkManager#syncState")
+    returning {
+      content.syncJobs
+        .map(_.values.filter(job => commands.contains(job.request.cmd)))
+        .map(jobs => if (jobs.isEmpty) SyncState.COMPLETED else jobs.minBy(_.state.ordinal()).state)
+    }(s => verbose(l"commands: $commands => state: $s"))
+  }
 
   //only used in tests currently
   def listJobs =

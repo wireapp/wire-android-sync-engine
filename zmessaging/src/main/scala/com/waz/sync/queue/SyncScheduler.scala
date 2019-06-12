@@ -31,7 +31,7 @@ import com.waz.sync.{SyncHandler, SyncRequestServiceImpl, SyncResult}
 import com.waz.threading.CancellableFuture.CancelException
 import com.waz.threading.{CancellableFuture, SerialDispatchQueue}
 import com.waz.utils.events.Signal
-import com.waz.utils.returning
+import com.waz.utils.{WhereAmI, returning}
 
 import scala.collection.mutable
 import scala.concurrent.duration._
@@ -100,14 +100,15 @@ class SyncSchedulerImpl(accountId:   UserId,
   override def report(pw: PrintWriter) = reportString.map(pw.println)
 
   private def execute(job: SyncJob): Unit = {
-    verbose(l"execute($job)")
+    verbose(l"SYNC execute($job)")
+    val t = System.currentTimeMillis()
     val future = executor(job)
     executions += job.id -> future
     executionsCount.mutate(_ + 1)
     future onComplete { res =>
       executions -= job.id
       executionsCount.mutate(_ - 1)
-      verbose(l"job completed: $job, res: $res")
+      verbose(l"SYNC job completed: $job, res: $res, time: ${System.currentTimeMillis() - t}ms")
       res.failed.foreach(t => t.printStackTrace())
     }
   }
@@ -130,7 +131,8 @@ class SyncSchedulerImpl(accountId:   UserId,
   }
 
   override def awaitPreconditions[A](job: SyncJob)(f: => Future[A]) = {
-    verbose(l"awaitPreconditions($job)")
+    verbose(l"SYNC awaitPreconditions($job)")
+    val t = System.currentTimeMillis()
 
     val entry = new WaitEntry(job)
     waitEntries.put(job.id, entry)
@@ -142,9 +144,13 @@ class SyncSchedulerImpl(accountId:   UserId,
 
     jobReady.onComplete(_ => waitEntries -= job.id)
 
-    countWaiting(job.id, getStartTime(job))(jobReady) flatMap { _ =>
+    val res = countWaiting(job.id, getStartTime(job))(jobReady) flatMap { _ =>
       returning(f)(_.onComplete(_ => queue.release()))
     }
+
+    verbose(l"SYNC awaitPreconditions($job) - completed, time: ${System.currentTimeMillis() -t}ms")
+
+    res
   }
 
   private def getStartTime(job: SyncJob): Long =
@@ -158,7 +164,11 @@ class SyncSchedulerImpl(accountId:   UserId,
     private var delayFuture: CancellableFuture[Unit] = setup(job)
 
     private def setup(job: SyncJob) = {
-      val delay = CancellableFuture.delay(math.max(0, getStartTime(job) - System.currentTimeMillis()).millis)
+      val t = System.currentTimeMillis()
+      val startJob = getStartTime(job)
+      val d = math.max(0, startJob - t).millis
+      verbose(l"SYNC setup($job), delay: $d, startJob: $startJob, current time: $t, job offline: ${job.offline}, network online: ${network.isOnlineMode} ")
+      val delay = CancellableFuture.delay(d)
       for {
         _ <- delay.recover { case _: CancelException => () } .future
         _ <- Future.traverse(job.dependsOn)(await)
@@ -175,7 +185,7 @@ class SyncSchedulerImpl(accountId:   UserId,
     def onOnline() = if (job.offline) delayFuture.cancel()
     def onUpdated(updated: SyncJob): Unit = {
       job = updated
-      verbose(l"job updated: $job, should update delay and/or priority")
+      verbose(l"SYNC job updated: $job, should update delay and/or priority")
       delayFuture = setup(updated)
     }
 
