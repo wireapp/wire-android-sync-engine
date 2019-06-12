@@ -140,7 +140,6 @@ class LruFileCacheSpec extends ZIntegrationSpec {
       }
     }
 
-
     scenario("Lru functionality.") {
       val puttingTimeout                        = 1.second //https://bugs.openjdk.java.net/browse/JDK-8177809
       val directoryMaxSize                      = 1024
