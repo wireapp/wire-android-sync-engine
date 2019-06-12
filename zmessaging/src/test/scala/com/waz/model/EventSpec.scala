@@ -51,24 +51,23 @@ class EventSpec extends AndroidFreeSpec with GivenWhenThen {
     }
 
     scenario("Read receipt off messages are parsed correctly") {
-      val userConectionEventData = new JSONObject(
+      val readReceiptJson = new JSONObject(
       s"""{
          |  "key": "${PropertyKey.ReadReceiptsEnabled}",
-         |  "value": "0"
+         |  "type": "user.properties-delete"
          |}""".stripMargin)
-      val res = PropertyEvent.Decoder(userConectionEventData).asInstanceOf[ReadReceiptEnabledPropertyEvent]
+      val res = PropertyEvent.Decoder(readReceiptJson)
       res.isInstanceOf[ReadReceiptEnabledPropertyEvent] shouldEqual true
       res.asInstanceOf[ReadReceiptEnabledPropertyEvent].value shouldEqual 0
     }
 
     scenario("Read receipt on messages are parsed correctly") {
-      val userConectionEventData = new JSONObject(
+      val readReceiptData = new JSONObject(
         s"""{
            |  "key": "${PropertyKey.ReadReceiptsEnabled}",
-           |  "value": "1"
+           |  "type": "user.properties-set"
            |}""".stripMargin)
-      val res = PropertyEvent.Decoder(userConectionEventData)
-        .asInstanceOf[ReadReceiptEnabledPropertyEvent]
+      val res = PropertyEvent.Decoder(readReceiptData)
       res.isInstanceOf[ReadReceiptEnabledPropertyEvent] shouldEqual true
       res.asInstanceOf[ReadReceiptEnabledPropertyEvent].value shouldEqual 1
     }
