@@ -113,7 +113,7 @@ class LruFileCacheSpec extends ZIntegrationSpec {
       }
     }
 
-    scenario("Putting file directly in cache should trigger cache cleanup if it is needed") {
+    ignore("Putting file directly in cache should trigger cache cleanup if it is needed") {
       val fileKey       = "key"
       val (key1, key2)  = ("key1", "key2")
       val content       = TestData.bytes(200)
