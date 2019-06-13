@@ -20,6 +20,7 @@ package com.waz.model
 import com.waz.model.Event.EventDecoder
 import com.waz.model.nano.Messages
 import com.waz.model.otr.ClientId
+import com.waz.service.PropertyKey
 import com.waz.specs.AndroidFreeSpec
 import com.waz.utils.JsonDecoder
 import org.json.JSONObject
@@ -47,6 +48,30 @@ class EventSpec extends AndroidFreeSpec with GivenWhenThen {
       event.asInstanceOf[UserConnectionEvent].from should be(selfUser.id)
       event.asInstanceOf[UserConnectionEvent].lastUpdated should be(RemoteInstant.ofEpochMilli(JsonDecoder.parseDate("2014-06-12T10:04:02.047Z").getTime))
       event.asInstanceOf[UserConnectionEvent].message should be(Some("Hello Test"))
+    }
+
+    scenario("Read receipt off messages are parsed correctly") {
+      val readReceiptJson = new JSONObject(
+      s"""{
+         |  "key": "${PropertyKey.ReadReceiptsEnabled}",
+         |  "type": "user.properties-delete",
+         |  "value": "0"
+         |}""".stripMargin)
+      val res = PropertyEvent.Decoder(readReceiptJson)
+      res.isInstanceOf[ReadReceiptEnabledPropertyEvent] shouldEqual true
+      res.asInstanceOf[ReadReceiptEnabledPropertyEvent].value shouldEqual 0
+    }
+
+    scenario("Read receipt on messages are parsed correctly") {
+      val readReceiptData = new JSONObject(
+        s"""{
+           |  "key": "${PropertyKey.ReadReceiptsEnabled}",
+           |  "type": "user.properties-set",
+           |  "value": "1"
+           |}""".stripMargin)
+      val res = PropertyEvent.Decoder(readReceiptData)
+      res.isInstanceOf[ReadReceiptEnabledPropertyEvent] shouldEqual true
+      res.asInstanceOf[ReadReceiptEnabledPropertyEvent].value shouldEqual 1
     }
 
     scenario("parse otr message event") {

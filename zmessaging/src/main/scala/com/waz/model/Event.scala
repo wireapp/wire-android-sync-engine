@@ -211,6 +211,7 @@ object Event {
         case "user.client-add" => OtrClientAddEvent(OtrClient.ClientsResponse.client(js.getJSONObject("client")))
         case "user.client-remove" => OtrClientRemoveEvent(decodeId[ClientId]('id)(js.getJSONObject("client"), implicitly))
         case "user.properties-set" => PropertyEvent.Decoder(js)
+        case "user.properties-delete" => PropertyEvent.Decoder(js)
         case _ =>
           error(l"unhandled event: $js")
           UnknownEvent(js)
@@ -410,7 +411,11 @@ object PropertyEvent {
     override def apply(implicit js: JSONObject): PropertyEvent = {
       import PropertyKey._
       decodePropertyKey('key) match {
-        case ReadReceiptsEnabled => ReadReceiptEnabledPropertyEvent('value)
+        case ReadReceiptsEnabled => decodeString('type) match {
+          case "user.properties-set" => ReadReceiptEnabledPropertyEvent('value)
+          case "user.properties-delete" => ReadReceiptEnabledPropertyEvent(0)
+          case e => UnknownPropertyEvent(ReadReceiptsEnabled, e)
+        }
         case key => UnknownPropertyEvent(key, 'value)
       }
     }
