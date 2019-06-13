@@ -412,7 +412,7 @@ object PropertyEvent {
       import PropertyKey._
       decodePropertyKey('key) match {
         case ReadReceiptsEnabled => decodeString('type) match {
-          case "user.properties-set" => ReadReceiptEnabledPropertyEvent(1)
+          case "user.properties-set" => ReadReceiptEnabledPropertyEvent('value)
           case "user.properties-delete" => ReadReceiptEnabledPropertyEvent(0)
           case e => UnknownPropertyEvent(ReadReceiptsEnabled, e)
         }
