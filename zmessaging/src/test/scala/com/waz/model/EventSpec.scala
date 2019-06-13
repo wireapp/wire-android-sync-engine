@@ -59,8 +59,7 @@ class EventSpec extends AndroidFreeSpec with GivenWhenThen {
       }
     }
 
-    //TODO Base64.decode doesn't work on JVM - fix..
-    ignore("encode/decode GenericMessageEvent") {
+    scenario("encode/decode GenericMessageEvent") {
       val msg = GenericMessageEvent(RConvId(), RemoteInstant(Instant.now()), UserId(), new Messages.GenericMessage)
       EventDecoder(MessageEventEncoder(msg)) match {
         case ev: GenericMessageEvent =>
@@ -68,20 +67,6 @@ class EventSpec extends AndroidFreeSpec with GivenWhenThen {
           ev.content.equals(msg.content)
           ev.from shouldEqual msg.from
           ev.time shouldEqual msg.time
-        case e => fail(s"unexpected event: $e")
-      }
-    }
-
-    //TODO Base64.decode doesn't work on JVM - fix..
-    ignore("encode/decode CallMessageEvent") {
-      val msg = CallMessageEvent(RConvId(), RemoteInstant(Instant.now()), UserId(), ClientId(), "")
-      EventDecoder(MessageEventEncoder(msg)) match {
-        case ev: CallMessageEvent =>
-          ev.convId shouldEqual msg.convId
-          ev.time shouldEqual msg.time
-          ev.from shouldEqual msg.from
-          ev.sender shouldEqual msg.sender
-          ev.content shouldEqual msg.content
         case e => fail(s"unexpected event: $e")
       }
     }
