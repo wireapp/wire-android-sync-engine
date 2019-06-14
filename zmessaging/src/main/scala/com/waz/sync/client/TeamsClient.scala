@@ -60,11 +60,17 @@ class TeamsClientImpl(implicit
   }
 
   override def getTeamData(id: TeamId): ErrorOrResponse[TeamData] = {
-
     Request.Get(relativePath = teamPath(id))
-      .withResultType[TeamData]
+      .withResultType[TeamDataResponse]
       .withErrorType[ErrorResponse]
-      .executeSafe
+      .executeSafe { response =>
+        TeamData(
+          response.id,
+          response.name,
+          response.creator,
+          Some(response.icon),
+          response.icon_key)
+      }
   }
 
   override def getPermissions(teamId: TeamId, userId: UserId): ErrorOrResponse[Option[PermissionsMasks]] = {
@@ -114,6 +120,8 @@ object TeamsClient {
           None
       }
   }
+
+  case class TeamDataResponse(id: String, name: String, creator: String, icon: String, icon_key: Option[String])
 
   case class TeamMembers(members: Seq[TeamMember])
 
