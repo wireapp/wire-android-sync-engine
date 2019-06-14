@@ -31,6 +31,9 @@ case class TeamData(override val id: TeamId,
 
 object TeamData {
 
+  def apply(id: String, name: String, creator: String, icon: Option[String], iconKey: Option[String]): TeamData =
+    TeamData(TeamId(id), Name(name), UserId(creator), icon.map(i => RAssetId(i)), iconKey.map(i => AESKey(i)))
+
   implicit lazy val Decoder: JsonDecoder[TeamData] = new JsonDecoder[TeamData] {
     override def apply(implicit js: JSONObject): TeamData = {
       import JsonDecoder._
