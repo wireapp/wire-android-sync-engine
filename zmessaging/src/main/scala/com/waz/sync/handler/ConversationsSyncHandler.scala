@@ -151,9 +151,11 @@ class ConversationsSyncHandler(selfUserId:          UserId,
     val initState = ConversationInitState(users = toCreate, name = name, team = team, access = access, accessRole = accessRole, receiptMode = receiptMode)
     conversationsClient.postConversation(initState).future.flatMap {
       case Right(response) =>
-        convService.updateConversationsWithDeviceStartMessage(Seq(response)).flatMap { _ =>
-          if (toAdd.nonEmpty) postConversationMemberJoin(convId, toAdd)
-          else Future.successful(Success)
+        convService.updateRemoteId(convId, response.id).flatMap { _ =>
+          convService.updateConversationsWithDeviceStartMessage(Seq(response)).flatMap { _ =>
+            if (toAdd.nonEmpty) postConversationMemberJoin(convId, toAdd)
+            else Future.successful(Success)
+          }
         }
       case Left(resp@ErrorResponse(403, msg, "not-connected")) =>
         warn(l"got error: $resp")

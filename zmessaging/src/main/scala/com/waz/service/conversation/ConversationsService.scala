@@ -50,6 +50,7 @@ trait ConversationsService {
   def processConversationEvent(ev: ConversationStateEvent, selfUserId: UserId, retryCount: Int = 0): Future[Any]
   def getSelfConversation: Future[Option[ConversationData]]
   def updateConversationsWithDeviceStartMessage(conversations: Seq[ConversationResponse]): Future[Unit]
+  def updateRemoteId(id: ConvId, remoteId: RConvId): Future[Unit]
   def setConversationArchived(id: ConvId, archived: Boolean): Future[Option[ConversationData]]
   def setReceiptMode(id: ConvId, receiptMode: Int): Future[Option[ConversationData]]
   def forceNameUpdate(id: ConvId): Future[Option[(ConversationData, ConversationData)]]
@@ -307,6 +308,9 @@ class ConversationsServiceImpl(teamId:          Option[TeamId],
     } yield
       (convs.toSeq, created)
   }
+
+  def updateRemoteId(id: ConvId, remoteId: RConvId): Future[Unit] =
+    convsStorage.update(id, c => c.copy(remoteId = remoteId)).map(_ => ())
 
   def setConversationArchived(id: ConvId, archived: Boolean) = content.updateConversationArchived(id, archived) flatMap {
     case Some((_, conv)) =>
