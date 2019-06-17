@@ -371,7 +371,6 @@ object ZMessagingDB {
             m
         }
       }
-      db.execSQL("ALTER TABLE Users ADD COLUMN managed_by TEXT DEFAULT null")
     }
   )
 }
