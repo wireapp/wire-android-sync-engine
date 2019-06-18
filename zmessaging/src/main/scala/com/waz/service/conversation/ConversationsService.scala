@@ -53,7 +53,7 @@ trait ConversationsService {
   def updateRemoteId(id: ConvId, remoteId: RConvId): Future[Unit]
   def setConversationArchived(id: ConvId, archived: Boolean): Future[Option[ConversationData]]
   def setReceiptMode(id: ConvId, receiptMode: Int): Future[Option[ConversationData]]
-  def forceNameUpdate(id: ConvId): Future[Option[(ConversationData, ConversationData)]]
+  def forceNameUpdate(id: ConvId, defaultName: String): Future[Option[(ConversationData, ConversationData)]]
   def onMemberAddFailed(conv: ConvId, users: Set[UserId], error: Option[ErrorType], resp: ErrorResponse): Future[Unit]
   def groupConversation(convId: ConvId): Signal[Boolean]
   def isGroupConversation(convId: ConvId): Future[Boolean]
@@ -332,9 +332,9 @@ class ConversationsServiceImpl(teamId:          Option[TeamId],
     _ <- msgContent.deleteMessagesForConversation(convId: ConvId)
   } yield ()
 
-  def forceNameUpdate(id: ConvId) = {
+  def forceNameUpdate(id: ConvId, defaultName: String) = {
     warn(l"forceNameUpdate($id)")
-    nameUpdater.forceNameUpdate(id)
+    nameUpdater.forceNameUpdate(id, defaultName)
   }
 
   def onMemberAddFailed(conv: ConvId, users: Set[UserId], error: Option[ErrorType], resp: ErrorResponse) = for {
