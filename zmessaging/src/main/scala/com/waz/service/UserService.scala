@@ -327,7 +327,7 @@ class UserServiceImpl(selfUserId:        UserId,
     val contentForUpload = ContentForUpload("profile-picture", content)
     for {
       asset <- assets.createAndSaveUploadAsset(contentForUpload, NoEncryption, public = true, Retention.Eternal, None)
-      _ <- updateAndSync(_.copy(picture = Some(Picture.NotUploaded(asset.id))), _ => sync.postSelfPicture(None))
+      _     <- updateAndSync(_.copy(picture = Some(Picture.NotUploaded(asset.id))), _ => sync.postSelfPicture(asset.id))
     } yield ()
   }
 

@@ -194,6 +194,7 @@ object JsonDecoder {
   implicit def decodeClientId(s: Symbol)(implicit js: JSONObject): ClientId = ClientId(js.getString(s.name))
   implicit def decodeRConvId(s: Symbol)(implicit js: JSONObject): RConvId = RConvId(js.getString(s.name))
   implicit def decodeAssetId(s: Symbol)(implicit js: JSONObject): AssetId = AssetId(js.getString(s.name))
+  implicit def decodeUploadAssetId(s: Symbol)(implicit js: JSONObject): UploadAssetId = UploadAssetId(js.getString(s.name))
   implicit def decodeRAssetId(s: Symbol)(implicit js: JSONObject): RAssetId = RAssetId(js.getString(s.name))
   implicit def decodeMessageId(s: Symbol)(implicit js: JSONObject): MessageId = MessageId(js.getString(s.name))
   implicit def decodeHandle(s: Symbol)(implicit js: JSONObject): Handle = Handle(js.getString(s.name))

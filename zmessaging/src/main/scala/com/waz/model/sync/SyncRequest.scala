@@ -116,7 +116,7 @@ object SyncRequest {
     override val mergeKey: Any = (cmd, messageId)
   }
 
-  case class PostSelfPicture(assetId: Option[AssetId]) extends BaseRequest(Cmd.PostSelfPicture) {
+  case class PostSelfPicture(assetId: UploadAssetId) extends BaseRequest(Cmd.PostSelfPicture) {
     override def merge(req: SyncRequest) = mergeHelper[PostSelfPicture](req)(Merged(_))
   }
 
@@ -351,7 +351,7 @@ object SyncRequest {
           case Cmd.PostCleared               => PostCleared(convId, 'time)
           case Cmd.PostTypingState           => PostTypingState(convId, 'typing)
           case Cmd.PostConnectionStatus      => PostConnectionStatus(userId, opt('status, js => ConnectionStatus(js.getString("status"))))
-          case Cmd.PostSelfPicture           => PostSelfPicture(decodeOptAssetId('asset))
+          case Cmd.PostSelfPicture           => PostSelfPicture(decodeUploadAssetId('asset))
           case Cmd.PostSelfName              => PostSelfName('name)
           case Cmd.PostSelfAccentColor       => PostSelfAccentColor(AccentColor(decodeInt('color)))
           case Cmd.PostAvailability          => PostAvailability(Availability(decodeInt('availability)))
@@ -428,7 +428,7 @@ object SyncRequest {
         case DeletePushToken(token)           => putId("token", token)
         case RegisterPushToken(token)         => putId("token", token)
         case SyncRichMedia(messageId)         => putId("message", messageId)
-        case PostSelfPicture(assetId)         => assetId.foreach(putId("asset", _))
+        case PostSelfPicture(assetId)         => putId("asset", assetId)
         case PostSelfName(name)               => o.put("name", name)
         case PostSelfAccentColor(color)       => o.put("color", color.id)
         case PostAvailability(availability)   => o.put("availability", availability.id)
