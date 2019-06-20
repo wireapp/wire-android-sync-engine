@@ -54,7 +54,7 @@ trait SyncServiceHandle {
   def postRemoveBot(cId: ConvId, botId: UserId): Future[SyncId]
 
   def postSelfUser(info: UserInfo): Future[SyncId]
-  def postSelfPicture(picture: Option[AssetId]): Future[SyncId]
+  def postSelfPicture(picture: UploadAssetId): Future[SyncId]
   def postSelfName(name: Name): Future[SyncId]
   def postSelfAccentColor(color: AccentColor): Future[SyncId]
   def postAvailability(status: Availability): Future[SyncId]
@@ -136,7 +136,7 @@ class AndroidSyncServiceHandle(account: UserId, service: SyncRequestService, tim
   def syncRichMedia(id: MessageId, priority: Int = Priority.MinPriority) = addRequest(SyncRichMedia(id), priority = priority)
 
   def postSelfUser(info: UserInfo) = addRequest(PostSelf(info))
-  def postSelfPicture(picture: Option[AssetId]) = addRequest(PostSelfPicture(picture))
+  def postSelfPicture(picture: UploadAssetId) = addRequest(PostSelfPicture(picture))
   def postSelfName(name: Name) = addRequest(PostSelfName(name))
   def postSelfAccentColor(color: AccentColor) = addRequest(PostSelfAccentColor(color))
   def postAvailability(status: Availability) = addRequest(PostAvailability(status))
@@ -236,7 +236,7 @@ class AccountSyncHandler(accounts: AccountsService) extends SyncHandler {
           case SyncSelfPermissions                                 => zms.teamsSync.syncSelfPermissions()
           case DeleteAccount                                       => zms.usersSync.deleteAccount()
           case PostSelf(info)                                      => zms.usersSync.postSelfUser(info)
-          case PostSelfPicture(_)                                  => zms.usersSync.postSelfPicture()
+          case PostSelfPicture(assetId)                            => zms.usersSync.postSelfPicture(assetId)
           case PostSelfName(name)                                  => zms.usersSync.postSelfName(name)
           case PostSelfAccentColor(color)                          => zms.usersSync.postSelfAccentColor(color)
           case PostAvailability(availability)                      => zms.usersSync.postAvailability(availability)

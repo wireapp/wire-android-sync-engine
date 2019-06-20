@@ -82,21 +82,18 @@ class UsersSyncHandler(assetSync: AssetSyncHandler,
   def postSelfUser(info: UserInfo): Future[SyncResult] =
     updatedSelfToSyncResult(usersClient.updateSelf(info))
 
-  def postSelfPicture(): Future[SyncResult] =
+  def postSelfPicture(assetId: UploadAssetId): Future[SyncResult] =
     userService.getSelfUser flatMap {
-      case Some(userData) => userData.picture match {
-        case Some(assetId: UploadAssetId) =>
-          for {
-            uploadedPicId <- assets.uploadAsset(assetId).map(r => r.id).future
-            //TODO post a smaller preview?
-            updateInfo = UserInfo(userData.id, picture = Some(Seq(ProfilePicture(uploadedPicId, Tag.Medium), ProfilePicture(uploadedPicId, Tag.Preview))))
-            _ <- usersStorage.update(userData.id, _.updated(updateInfo))
-            _ <- usersClient.updateSelf(updateInfo)
-          } yield SyncResult.Success
-
-        case Some(_)       => Future.successful(SyncResult.Success)
-        case None          => updatedSelfToSyncResult(usersClient.updateSelf(UserInfo(userData.id, picture = None)))
-      }
+      case Some(userData) =>
+        verbose(l"postSelfPicture($assetId)")
+        for {
+          uploadedPicId <- assets.uploadAsset(assetId).map(r => r.id).future
+          updateInfo    =  UserInfo(userData.id,
+                                    picture = Some(Seq(ProfilePicture(uploadedPicId, Tag.Medium), ProfilePicture(uploadedPicId, Tag.Preview)))
+                                   )
+          _             <- usersStorage.update(userData.id, _.updated(updateInfo))
+          _             <- usersClient.updateSelf(updateInfo)
+        } yield SyncResult.Success
       case _ => Future.successful(SyncResult.Retry())
     }
 

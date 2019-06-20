@@ -17,7 +17,6 @@
  */
 package com.waz.model
 
-import com.waz.log.LogSE._
 import com.waz.model.AssetMetaData.Image
 import com.waz.model.AssetMetaData.Image.Tag
 import com.waz.model.AssetMetaData.Image.Tag.{Medium, Preview}
@@ -45,12 +44,7 @@ case class UserInfo(id:           UserId,
                     expiresAt:    Option[RemoteInstant]   = None,
                     ssoId:        Option[SSOId]           = None,
                     managedBy:    Option[ManagedBy]       = None,
-                    fields:       Option[Seq[UserField]]  = None
-                   ) {
-  //TODO Dean - this will actually prevent deleting profile pictures, since the empty seq will be mapped to a None,
-  //And so in UserData, the current picture will be used instead...
-  def mediumPicture: Option[ProfilePicture] = picture.flatMap(_.collectFirst { case a if a.tag == Medium => a })
-}
+                    fields:       Option[Seq[UserField]]  = None)
 
 object UserInfo {
   import JsonDecoder._
@@ -95,16 +89,6 @@ object UserInfo {
       }
     }.getOrElse(Seq())
 
-
-    //TODO: Do we still need this?
-    def getPictureV2(userId: UserId)(implicit js: JSONObject): Option[AssetData] = fromArray(js, "picture") flatMap { pic =>
-      val id = decodeOptString('correlation_id)(pic.getJSONObject(0).getJSONObject("info")).fold(AssetId())(AssetId(_))
-
-      Seq.tabulate(pic.length())(i => imageData(userId, pic.getJSONObject(i))).collectFirst {
-        case a@AssetData.IsImageWithTag(Medium) => a //discard preview
-      }.map(_.copy(id = id))
-    }
-
     private def fromArray(js: JSONObject, name: String) = Try(js.getJSONArray(name)).toOption.filter(_.length() > 0)
 
     override def apply(implicit js: JSONObject): UserInfo = {
@@ -115,8 +99,7 @@ object UserInfo {
         }
       }
       val id = UserId('id)
-      //prefer v3 ("assets") over v2 ("picture") - this will prevent unnecessary uploading of v3 if a v2 also exists.
-      val pic = getAssets //TODO: get V2 pictures too
+      val pic = getAssets
       val privateMode = decodeOptBoolean('privateMode)
       val ssoId = SSOId.decodeOptSSOId('sso_id)
       val managedBy = ManagedBy.decodeOptManagedBy('managed_by)
