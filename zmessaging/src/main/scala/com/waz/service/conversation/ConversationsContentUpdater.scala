@@ -29,7 +29,6 @@ import com.waz.service.tracking.TrackingService
 import com.waz.sync.SyncServiceHandle
 import com.waz.threading.{CancellableFuture, SerialDispatchQueue}
 import com.waz.utils._
-import org.threeten.bp.Instant
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.control.NoStackTrace
@@ -200,8 +199,7 @@ class ConversationsContentUpdaterImpl(val storage:     ConversationStorage,
           team          = teamId,
           access        = access,
           accessRole    = Some(accessRole),
-          receiptMode   = Some(receiptMode),
-          lastEventTime = RemoteInstant(Instant.now())
+          receiptMode   = Some(receiptMode)
         ))
       _ <- membersStorage.add(convId, members + creator)
     } yield conv
