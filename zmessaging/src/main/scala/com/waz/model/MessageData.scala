@@ -44,7 +44,6 @@ import org.threeten.bp.Instant.now
 
 import scala.collection.breakOut
 import scala.concurrent.duration._
-import scala.util.matching.Regex
 
 case class MessageData(override val id: MessageId              = MessageId(),
                        convId:          ConvId                 = ConvId(),
@@ -479,8 +478,13 @@ object MessageData extends
   def messageContent(message: String, mentions: Seq[Mention], links: Seq[LinkPreview] = Nil, weblinkEnabled: Boolean = false): (Message.Type, Seq[MessageContent]) =
     if (message.trim.isEmpty) (Message.Type.TEXT, textContent(message))
     else {
+      val markdownLinks =
+        markdownLinkPattern.findAllMatchIn(message).map(_.group(1)).toSet ++
+        markdownReferencePattern.findAllMatchIn(message).map(_.group(1)).toSet
+
       if (links.isEmpty) {
         val ct = RichMediaContentParser.splitContent(message, mentions, 0, weblinkEnabled)
+            .filterNot(c => c.tpe == Message.Part.Type.WEB_LINK && markdownLinks.contains(c.content))
 
         (ct.size, ct.head.tpe) match {
           case (1, Message.Part.Type.TEXT) => (Message.Type.TEXT, ct)
@@ -496,10 +500,6 @@ object MessageData extends
         }
 
         val res = new MessageContentBuilder
-
-        val markdownLinks = markdownLinkPattern.findAllMatchIn(message).map(_.group(1)).toSet ++ markdownReferencePattern.findAllMatchIn(message).map(_.group(1)).toSet
-        verbose(l"ignored markdown links: $markdownLinks")
-
         val end = links.filterNot(l => markdownLinks.contains(l.url)).sortBy(_.urlOffset).foldLeft(0) {
           case (prevEnd, link) =>
             if (link.urlOffset > prevEnd) res ++= RichMediaContentParser.splitContent(message.substring(prevEnd, link.urlOffset), mentions, prevEnd)
