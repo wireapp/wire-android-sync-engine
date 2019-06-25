@@ -375,8 +375,7 @@ class ConversationsUiServiceImpl(selfUserId:      UserId,
     for {
       conv <- convsContent.createConversationWithMembers(id, generateTempConversationId(members + selfUserId), ConversationType.Group, selfUserId, members, name, access = ac, accessRole = ar, receiptMode = receiptMode)
       _    = verbose(l"created: $conv")
-      time = LocalInstant.Now.toRemote(ZMessaging.currentBeDrift)
-      _    <- messages.addConversationStartMessage(conv.id, selfUserId, members, name, conv.readReceiptsAllowed, time = Some(time))
+      _    <- messages.addConversationStartMessage(conv.id, selfUserId, members, name, conv.readReceiptsAllowed)
       syncId <- sync.postConversation(id, members, conv.name, teamId, ac, ar, Some(receiptMode))
     } yield (conv, syncId)
   }

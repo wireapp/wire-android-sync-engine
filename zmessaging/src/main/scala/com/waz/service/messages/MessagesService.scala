@@ -329,15 +329,14 @@ class MessagesServiceImpl(selfUserId:   UserId,
   }
 
   def addConversationStartMessage(convId: ConvId, creator: UserId, users: Set[UserId], name: Option[Name], readReceiptsAllowed: Boolean, time: Option[RemoteInstant]) = {
-    time.foreach { t =>
-      convs.updateLastEvent(convId, t)
-    }
+    val eventTime = time.getOrElse(LocalInstant.Now.toRemote(ZMessaging.currentBeDrift))
+    convs.updateLastEvent(convId, eventTime)
 
     updater
-      .addLocalSentMessage(MessageData(MessageId(), convId, Message.Type.MEMBER_JOIN, creator, name = name, members = users, firstMessage = true), time)
+      .addLocalSentMessage(MessageData(MessageId(), convId, Message.Type.MEMBER_JOIN, creator, name = name, members = users, firstMessage = true), Some(eventTime))
       .flatMap(_ =>
         if (readReceiptsAllowed)
-          updater.addLocalSentMessage(MessageData(MessageId(), convId, Message.Type.READ_RECEIPTS_ON, creator, firstMessage = true), time.map(_ + 1.millis)).map(_ => ())
+          updater.addLocalSentMessage(MessageData(MessageId(), convId, Message.Type.READ_RECEIPTS_ON, creator, firstMessage = true), Some(eventTime + 1.millis)).map(_ => ())
         else
           Future.successful({})
       )
