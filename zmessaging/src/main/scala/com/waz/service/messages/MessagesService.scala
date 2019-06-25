@@ -329,6 +329,10 @@ class MessagesServiceImpl(selfUserId:   UserId,
   }
 
   def addConversationStartMessage(convId: ConvId, creator: UserId, users: Set[UserId], name: Option[Name], readReceiptsAllowed: Boolean, time: Option[RemoteInstant]) = {
+    time.foreach { t =>
+      convs.updateLastEvent(convId, t)
+    }
+
     updater
       .addLocalSentMessage(MessageData(MessageId(), convId, Message.Type.MEMBER_JOIN, creator, name = name, members = users, firstMessage = true), time)
       .flatMap(_ =>
