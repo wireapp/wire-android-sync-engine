@@ -57,11 +57,11 @@ class MessageEventProcessorSpec extends AndroidFreeSpec with Inside with Derived
   val prefs             = new TestGlobalPreferences()
 
   val messagesInStorage = Signal[Seq[MessageData]](Seq.empty)
-  (storage.getMessages _).expects(*).anyNumberOfTimes.onCall { ids: Traversable[MessageId] =>
+  (storage.getMessages _).expects(*).atLeastOnce.onCall { ids: Traversable[MessageId] =>
     messagesInStorage.head.map(msgs => ids.map(id => msgs.find(_.id == id)).toSeq)(Threading.Background)
   }
 
-  (replyHashing.hashMessages _).expects(*).anyNumberOfTimes.onCall { msgs: Seq[MessageData] =>
+  (replyHashing.hashMessages _).expects(*).atLeastOnce.onCall { msgs: Seq[MessageData] =>
     Future.successful(msgs.filter(m => m.quote.isDefined && m.quote.flatMap(_.hash).isDefined).map(m => m.id -> m.quote.flatMap(_.hash).get).toMap)
   }
 
