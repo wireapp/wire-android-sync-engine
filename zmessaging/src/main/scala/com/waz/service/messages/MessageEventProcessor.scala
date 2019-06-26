@@ -17,17 +17,12 @@
  */
 package com.waz.service.messages
 
-
 import com.waz.api.{Message, Verification}
 import com.waz.content.MessagesStorage
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.log.LogSE._
-import com.waz.model.AssetMetaData.Image.Tag.{Medium, Preview}
-import com.waz.model.AssetStatus.{UploadCancelled, UploadFailed}
-import com.waz.model.GenericContent.{Asset, Calling, Cleared, DeliveryReceipt, Ephemeral, ImageAsset, Knock, LastRead, LinkPreview, Location, MsgDeleted, MsgEdit, MsgRecall, Reaction, Text}
-import com.waz.model.{GenericContent, _}
 import com.waz.model.GenericContent.{Asset, Calling, Cleared, DeliveryReceipt, Ephemeral, Knock, LastRead, Location, MsgDeleted, MsgEdit, MsgRecall, Reaction, Text}
-import com.waz.model._
+import com.waz.model.{GenericContent, _}
 import com.waz.service.EventScheduler
 import com.waz.service.assets2.{AssetService, AssetStatus, DownloadAsset, DownloadAssetStatus, DownloadAssetStorage, GeneralAsset, Asset => Asset2}
 import com.waz.service.conversation.{ConversationsContentUpdater, ConversationsService}
@@ -40,15 +35,15 @@ import com.waz.utils.{RichFuture, _}
 
 import scala.concurrent.Future
 
-class MessageEventProcessor(selfUserId:          UserId,
-                            storage:             MessagesStorage,
-                            content:             MessagesContentUpdater,
-                            assets:              AssetService,
-                            replyHashing:        ReplyHashing,
-                            msgsService:         MessagesService,
-                            convsService:        ConversationsService,
-                            convs:               ConversationsContentUpdater,
-                            otr:                 OtrService,
+class MessageEventProcessor(selfUserId:           UserId,
+                            storage:              MessagesStorage,
+                            content:              MessagesContentUpdater,
+                            assets:               AssetService,
+                            replyHashing:         ReplyHashing,
+                            msgsService:          MessagesService,
+                            convsService:         ConversationsService,
+                            convs:                ConversationsContentUpdater,
+                            otr:                  OtrService,
                             downloadAssetStorage: DownloadAssetStorage) extends DerivedLogTag {
 
   import MessageEventProcessor._
@@ -65,40 +60,6 @@ class MessageEventProcessor(selfUserId:          UserId,
     }
   }
 
-  def checkReplyHashes(msgs: Seq[MessageData]): Future[Seq[MessageData]] = {
-    val (standard, quotes) = msgs.partition(_.quote.isEmpty)
-
-    for {
-      originals     <- storage.getMessages(quotes.flatMap(_.quote.map(_.message)): _*)
-      hashes        <- replyHashing.hashMessages(originals.flatten)
-      updatedQuotes =  quotes.map(q => q.quote match {
-                         case Some(QuoteContent(message, validity, hash)) if hashes.contains(message) =>
-                           val newValidity = hash.contains(hashes(message))
-                           if (validity != newValidity) q.copy(quote = Some(QuoteContent(message, newValidity, hash) )) else q
-                         case _ => q
-                       })
-    } yield standard ++ updatedQuotes
-  }
-
-  case class EventAndLocalData(event: MessageEvent, message: Option[MessageData], asset: Option[DownloadAsset])
-
-  def localDataForEvent(event: MessageEvent): Future[EventAndLocalData] =
-    for {
-      message <- event match {
-        case GenericMessageEvent(_, _, _, c) => storage.get(MessageId(c.messageId))
-        case _                               => Future.successful(None)
-      }
-
-      asset <- message.flatMap(_.assetId) match {
-        case Some(dId: DownloadAssetId) => downloadAssetStorage.find(dId)
-        case _                          => Future.successful(None)
-      }
-
-    } yield EventAndLocalData(event, message, asset)
-
-  def localDataForEvents(events: Seq[MessageEvent]): Future[Seq[EventAndLocalData]] =
-    Future.traverse(events)(localDataForEvent)
-
   private[service] def processEvents(conv: ConversationData, isGroup: Boolean, events: Seq[MessageEvent]): Future[Set[MessageData]] = {
     verbose(l"processEvents: ${conv.id} isGroup:$isGroup ${events.map(_.from)}")
 
@@ -107,31 +68,81 @@ class MessageEventProcessor(selfUserId:          UserId,
       case e => conv.cleared.forall(_.isBefore(e.time))
     }
 
-    val recalls = toProcess collect { case GenericMessageEvent(_, time, from, msg @ GenericMessage(_, MsgRecall(_))) => (msg, from, time) }
+    verbose(l"SYNC process events")
 
-    val edits = toProcess collect { case GenericMessageEvent(_, time, from, msg @ GenericMessage(_, MsgEdit(_, _))) => (msg, from, time) }
+    for {
+      eventData     <- Future.traverse(toProcess)(localDataForEvent)
+      modifications =  eventData.map(eald => createModifications(conv, isGroup, eald))
+      msgs          <- getModifiedMessages(modifications)
+      _             =  verbose(l"SYNC messages from events: ${msgs.map(m => m.id -> m.msgType)}")
+      _             <- addUnexpectedMembers(conv.id, events)
+      res           <- content.addMessages(conv.id, msgs)
+      _             <- Future.traverse(modifications.flatMap(_.assets))(assets.save)
+      _             <- updateLastReadFromOwnMessages(conv.id, msgs)
+      _             <- deleteCancelled(modifications)
+      _             <- applyRecalls(conv.id, toProcess)
+      _             <- applyEdits(conv.id, toProcess)
+      _             =  verbose(l"SYNC processing events finished")
+    } yield res
+  }
 
+  private def checkReplyHashes(msgs: Seq[MessageData]) = {
+    val (standard, quotes) = msgs.partition(_.quote.isEmpty)
+
+    for {
+      originals     <- storage.getMessages(quotes.flatMap(_.quote.map(_.message)): _*)
+      hashes        <- replyHashing.hashMessages(originals.flatten)
+      updatedQuotes =  quotes.map(q => q.quote match {
+        case Some(QuoteContent(message, validity, hash)) if hashes.contains(message) =>
+          val newValidity = hash.contains(hashes(message))
+          if (validity != newValidity) q.copy(quote = Some(QuoteContent(message, newValidity, hash) )) else q
+        case _ => q
+      })
+    } yield standard ++ updatedQuotes
+  }
+
+  private def localDataForEvent(event: MessageEvent) =
+    for {
+      message <- event match {
+        case GenericMessageEvent(_, _, _, c) => storage.get(MessageId(c.messageId))
+        case _                               => Future.successful(None)
+      }
+      asset <- message.flatMap(_.assetId) match {
+        case Some(dId: DownloadAssetId) => downloadAssetStorage.find(dId)
+        case _                          => Future.successful(None)
+      }
+    } yield EventAndLocalData(event, message, asset)
+
+  private def getModifiedMessages(modifications: Seq[EventModifications]) =
+    checkReplyHashes(modifications.collect { case m if m.message != MessageData.Empty => m.message })
+
+  private def addUnexpectedMembers(convId: ConvId, events: Seq[MessageEvent]) = {
     val potentiallyUnexpectedMembers = events.filter {
       case e: MemberLeaveEvent if e.userIds.contains(e.from) => false
       case _ => true
     }.map(_.from).toSet
+    convsService.addUnexpectedMembersToConv(convId, potentiallyUnexpectedMembers)
+  }
 
-    verbose(l"SYNC process events")
+  private def applyRecalls(convId: ConvId, toProcess: Seq[MessageEvent]) = {
+    val recalls = toProcess collect {
+      case GenericMessageEvent(_, time, from, msg @ GenericMessage(_, MsgRecall(_))) => (msg, from, time)
+    }
+    Future.traverse(recalls) {
+      case (GenericMessage(id, MsgRecall(ref)), user, time) =>
+        msgsService.recallMessage(convId, ref, user, MessageId(id.str), time, Message.Status.SENT)
+    }
+  }
 
-    for {
-      eventData <- localDataForEvents(toProcess)
-      modifications = eventData.map(eald => createModifications(conv, isGroup, eald))
-      msgs = modifications.collect { case m if m.message != MessageData.Empty => m.message }
-      _     = verbose(l"SYNC messages from events: ${msgs.map(m => m.id -> m.msgType)}")
-      _     <- convsService.addUnexpectedMembersToConv(conv.id, potentiallyUnexpectedMembers)
-      res   <- content.addMessages(conv.id, msgs)
-      _     <- Future.traverse(modifications.flatMap(_.assets))(assets.save)
-      _     <- updateLastReadFromOwnMessages(conv.id, msgs)
-      _     <- deleteCancelled(modifications)
-      _     <- Future.traverse(recalls) { case (GenericMessage(id, MsgRecall(ref)), user, time) => msgsService.recallMessage(conv.id, ref, user, MessageId(id.str), time, Message.Status.SENT) }
-      _     <- RichFuture.traverseSequential(edits) { case (gm @ GenericMessage(_, MsgEdit(_, Text(_, _, _, _))), user, time) => msgsService.applyMessageEdit(conv.id, user, time, gm) } // TODO: handle mentions in case of MsgEdit
-      _ = verbose(l"SYNC processing events finished")
-    } yield res
+  // TODO: handle mentions in case of MsgEdit
+  private def applyEdits(convId: ConvId, toProcess: Seq[MessageEvent]) = {
+    val edits = toProcess collect {
+      case GenericMessageEvent(_, time, from, msg @ GenericMessage(_, MsgEdit(_, _))) => (msg, from, time)
+    }
+    RichFuture.traverseSequential(edits) {
+      case (gm @ GenericMessage(_, MsgEdit(_, Text(_, _, _, _))), user, time) =>
+        msgsService.applyMessageEdit(convId, user, time, gm)
+    }
   }
 
   private def updatedAssets(id: Uid, content: Any, downloadAsset: Option[DownloadAsset]): Seq[(GeneralAsset, Option[GeneralAsset])] = {
@@ -325,4 +336,6 @@ object MessageEventProcessor {
       case (asset, None) => List(asset)
     }
   }
+
+  case class EventAndLocalData(event: MessageEvent, message: Option[MessageData], asset: Option[DownloadAsset])
 }
