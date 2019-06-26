@@ -20,6 +20,7 @@ package com.waz.service.conversation
 import com.waz.log.LogSE._
 import com.waz.api.IConversation.{Access, AccessRole}
 import com.waz.content._
+import com.waz.log.BasicLogging
 import com.waz.log.BasicLogging.LogTag
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model.ConversationData.ConversationType
@@ -222,7 +223,9 @@ class ConversationsContentUpdaterImpl(val storage:     ConversationStorage,
       processConvWithRemoteId(remoteId, retryAsync = false, retryCount + 1)(processor)(tag, ec)
     } (ec)
 
-    convByRemoteId(remoteId) .flatMap {
+    verbose(l"SYNC processConvWithRemoteId: $remoteId")(tag)
+
+    convByRemoteId(remoteId).flatMap {
       case Some(conv) => processor(conv)
       case None if retryCount > 3 =>
         val ex = new NoSuchElementException("No conversation data found") with NoStackTrace

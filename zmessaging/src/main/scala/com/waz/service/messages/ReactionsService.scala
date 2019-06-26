@@ -41,7 +41,7 @@ class ReactionsService(storage: ReactionsStorage,
   def unlike(conv: ConvId, msg: MessageId): Future[Likes] = addReaction(conv, msg, Liking.Action.Unlike)
 
   private def addReaction(conv: ConvId, msg: MessageId, action: Liking.Action): Future[Likes] = {
-    verbose(l"addLiking: $conv $msg, $action")
+    verbose(l"SYNC addLiking: $conv $msg, $action")
     val reaction = Liking(msg, selfUserId, RemoteInstant.Epoch, action) // EPOCH is used to signal "local" in-band
     for {
       likes  <- storage.addOrUpdate(reaction)
