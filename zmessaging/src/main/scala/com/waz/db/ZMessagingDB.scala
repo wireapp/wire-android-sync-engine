@@ -318,7 +318,7 @@ object ZMessagingDB {
 
       //Remove old assetId from user's profile pictures and sync to get the remote id instead
       db.execSQL("UPDATE Users SET picture = null")
-      db.execSQL("UPDATE KeyValues SET value = 'true' WHERE key = 'should_sync_users'")
+      db.execSQL("UPDATE KeyValues SET value = 'true' WHERE key = 'should_sync_users_1'")
 
       //Convert old assets to new assets (public assets won't be converted)
       def convertAsset(old: AssetData): Try[Asset] = Try {
