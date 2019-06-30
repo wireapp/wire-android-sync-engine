@@ -111,7 +111,9 @@ object AccountId extends (String => AccountId) {
   }
 }
 
-sealed trait GeneralAssetId
+sealed trait GeneralAssetId {
+  val str: String
+}
 
 case class DownloadAssetId(str: String) extends GeneralAssetId
 

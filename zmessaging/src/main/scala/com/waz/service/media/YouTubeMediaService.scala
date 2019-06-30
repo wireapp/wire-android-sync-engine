@@ -23,7 +23,8 @@ import com.waz.log.LogSE._
 import com.waz.model._
 import com.waz.model.messages.media.MediaAssetData
 import com.waz.model.messages.media.MediaAssetData.MediaWithImages
-import com.waz.service.assets.AssetService
+import com.waz.service.assets2._
+import com.waz.service.messages.MessagesService
 import com.waz.sync.client.YouTubeClient
 import com.waz.threading.Threading
 import com.waz.utils.wrappers.URI
@@ -31,19 +32,35 @@ import com.waz.sync.client.ErrorOr
 
 import scala.concurrent.Future
 
-class YouTubeMediaService(client: YouTubeClient, assets: AssetService) extends DerivedLogTag {
+class YouTubeMediaService(client: YouTubeClient, assetService: AssetService,
+                          messages: MessagesService) extends DerivedLogTag {
   import Threading.Implicits.Background
 
   def updateMedia(msg: MessageData, content: MessageContent): ErrorOr[MessageContent] = {
     RichMediaContentParser.youtubeVideoId(content.content) match {
       case Some(vId) =>
-        client.loadVideo(vId) flatMap {
+        client.loadVideo(vId).flatMap {
           case Right(MediaWithImages(media, images)) =>
             verbose(l"got youtube track: $media, images: $images")
-            assets.updateAssets(images.to[Vector]) map { _ =>
-              Right(content.copy(tpe = Message.Part.Type.YOUTUBE, richMedia = Some(media)))
+            client.loadPreview(images.head.source.get).flatMap {
+              case Right(imgBytes) =>
+                val previewContent = ContentForUpload(media.title, Content.Bytes(images.head.mime, imgBytes))
+                for {
+                  retention <- messages.retentionPolicy2(msg.convId)
+                  previewAsset <- assetService.createAndSaveUploadAsset(previewContent, AES_CBC_Encryption.random, public = false, retention, None)
+                } yield {
+                  verbose(l"Created preview asset: ${previewAsset.id}")
+                  val newMedia = media.copy(artwork = Some(previewAsset.id))
+                  val newContent = content.copy(tpe = Message.Part.Type.YOUTUBE, richMedia = Some(newMedia))
+                  Right(newContent)
+                }
+              case Left(error) if error.isFatal =>
+                warn(l"preview loading for ${redactedString(content.content)} failed fatally: $error, switching back to text")
+                Future successful Right(content.copy(tpe = Message.Part.Type.TEXT, richMedia = None))
+              case Left(error) =>
+                warn(l"preview loading failed: $error")
+                Future successful Left(error)
             }
-
           case Left(error) if error.isFatal =>
             warn(l"snippet loading for ${redactedString(content.content)} failed fatally: $error, switching back to text")
             Future successful Right(content.copy(tpe = Message.Part.Type.TEXT, richMedia = None))

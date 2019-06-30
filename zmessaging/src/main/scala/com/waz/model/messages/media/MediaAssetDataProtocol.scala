@@ -84,7 +84,7 @@ object MediaAssetDataProtocol {
                 title = 'title,
                 artist = opt[ArtistData]('artist),
                 linkUrl = 'linkUrl,
-                artwork = decodeOptAssetId('artwork),
+                artwork = decodeOptUploadAssetId('artwork),
                 duration = decodeOptDuration('durationMillis),
                 streamable = 'streamable,
                 streamUrl = 'streamUrl,
@@ -98,7 +98,7 @@ object MediaAssetDataProtocol {
                    title = 'title,
                    artist = opt[ArtistData]('artist),
                    linkUrl = 'linkUrl,
-                   artwork = decodeOptAssetId('artwork),
+                   artwork = decodeOptUploadAssetId('artwork),
                    duration = decodeOptDuration('durationMillis),
                    tracks = decodeSeq[TrackData]('tracks),
                    expires = decodeExpires)
