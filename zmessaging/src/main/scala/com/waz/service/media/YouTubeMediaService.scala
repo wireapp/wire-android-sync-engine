@@ -32,7 +32,7 @@ import com.waz.sync.client.ErrorOr
 
 import scala.concurrent.Future
 
-class YouTubeMediaService(client: YouTubeClient, assetService: AssetService,
+class YouTubeMediaService(client: YouTubeClient, assets: AssetService,
                           messages: MessagesService) extends DerivedLogTag {
   import Threading.Implicits.Background
 
@@ -46,8 +46,8 @@ class YouTubeMediaService(client: YouTubeClient, assetService: AssetService,
               case Right(imgBytes) =>
                 val previewContent = ContentForUpload(media.title, Content.Bytes(images.head.mime, imgBytes))
                 for {
-                  retention <- messages.retentionPolicy2(msg.convId)
-                  previewAsset <- assetService.createAndSaveUploadAsset(previewContent, AES_CBC_Encryption.random, public = false, retention, None)
+                  retention <- messages.retentionPolicy2ById(msg.convId)
+                  previewAsset <- assets.createAndSaveUploadAsset(previewContent, AES_CBC_Encryption.random, public = false, retention, None)
                 } yield {
                   verbose(l"Created preview asset: ${previewAsset.id}")
                   val newMedia = media.copy(artwork = Some(previewAsset.id))
@@ -57,8 +57,9 @@ class YouTubeMediaService(client: YouTubeClient, assetService: AssetService,
               case Left(error) if error.isFatal =>
                 warn(l"preview loading for ${redactedString(content.content)} failed fatally: $error, switching back to text")
                 Future successful Right(content.copy(tpe = Message.Part.Type.TEXT, richMedia = None))
+
               case Left(error) =>
-                warn(l"preview loading failed: $error")
+                warn(l"snippet loading failed: $error")
                 Future successful Left(error)
             }
           case Left(error) if error.isFatal =>

@@ -51,7 +51,7 @@ class MessagesServiceSpec extends AndroidFreeSpec {
 
   def getService = {
     val updater = new MessagesContentUpdater(storage, convsStorage, deletions, prefs)
-    new MessagesServiceImpl(selfUserId, None, replyHashing, storage, updater, edits, convs, convsStorage, network, members, users, sync)
+    new MessagesServiceImpl(selfUserId, None, replyHashing, storage, updater, edits, convs, network, members, users, sync)
   }
 
   scenario("Add local memberJoinEvent with no previous member change events") {
