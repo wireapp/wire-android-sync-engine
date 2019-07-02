@@ -20,7 +20,6 @@ package com.waz.service
 import com.waz.api.User.ConnectionStatus
 import com.waz.content._
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
-import com.waz.model.SearchQuery.Recommended
 import com.waz.model._
 import com.waz.service.conversation.{ConversationsService, ConversationsUiService}
 import com.waz.service.teams.TeamsService
@@ -30,7 +29,6 @@ import com.waz.testutils.TestUserPreferences
 import com.waz.utils.Managed
 import com.waz.utils.events.{Signal, SourceSignal}
 import com.waz.utils.wrappers.DB
-import org.threeten.bp.Instant
 
 import scala.collection.breakOut
 import scala.collection.generic.CanBuild
@@ -44,7 +42,6 @@ class UserSearchServiceSpec extends AndroidFreeSpec with DerivedLogTag {
   val memberPermissions: Long = 1587
   val adminPermissions: Long = 5951
 
-  val queryCacheStorage = mock[SearchQueryCacheStorage]
   val userService       = mock[UserService]
   val usersStorage      = mock[UsersStorage]
   val membersStorage    = mock[MembersStorage]
@@ -129,20 +126,18 @@ class UserSearchServiceSpec extends AndroidFreeSpec with DerivedLogTag {
   )
 
   // Mock search in team
-  (teamsService.searchTeamMembers _).expects(*, *).anyNumberOfTimes().onCall { (query, handleOnly) =>
+  (teamsService.searchTeamMembers _).expects(*).anyNumberOfTimes().onCall { query: SearchQuery =>
     Signal.const(
       users
         .filter(u => u._2.teamId == teamId)
-        .filter(_._2.matchesQuery(query, handleOnly))
-        .map(_._2).toSet
+        .filter(_._2.matchesQuery(query))
+        .values.toSet
     )
   }
 
   scenario("search conversation with token starting with query") {
-
     val convMembers = Set(id('l), id('b))
 
-    (queryCacheStorage.deleteBefore _).expects(*).anyNumberOfTimes().returning(Future.successful[Unit]({}))
     (membersStorage.activeMembers _).expects(*).anyNumberOfTimes().returning(Signal.const(convMembers))
     (usersStorage.listSignal _).expects(*).once().returning(Signal.const(convMembers.map(users).toVector))
 
@@ -151,10 +146,8 @@ class UserSearchServiceSpec extends AndroidFreeSpec with DerivedLogTag {
   }
 
   scenario("search conversation with name starting with query") {
-
     val convMembers = Set(id('l), id('b))
 
-    (queryCacheStorage.deleteBefore _).expects(*).anyNumberOfTimes().returning(Future.successful[Unit]({}))
     (membersStorage.activeMembers _).expects(*).anyNumberOfTimes().returning(Signal.const(convMembers))
     (usersStorage.listSignal _).expects(*).once().returning(Signal.const(convMembers.map(users).toVector))
 
@@ -163,10 +156,8 @@ class UserSearchServiceSpec extends AndroidFreeSpec with DerivedLogTag {
   }
 
   scenario("search conversation with name containing query") {
-
     val convMembers = Set(id('l), id('m))
 
-    (queryCacheStorage.deleteBefore _).expects(*).anyNumberOfTimes().returning(Future.successful[Unit]({}))
     (membersStorage.activeMembers _).expects(*).anyNumberOfTimes().returning(Signal.const(convMembers))
     (usersStorage.listSignal _).expects(*).once().returning(Signal.const(convMembers.map(users).toVector))
 
@@ -175,10 +166,8 @@ class UserSearchServiceSpec extends AndroidFreeSpec with DerivedLogTag {
   }
 
   scenario("search conversation with handle containing query") {
-
     val convMembers = Set(id('s), id('t))
 
-    (queryCacheStorage.deleteBefore _).expects(*).anyNumberOfTimes().returning(Future.successful[Unit]({}))
     (membersStorage.activeMembers _).expects(*).anyNumberOfTimes().returning(Signal.const(convMembers))
     (usersStorage.listSignal _).expects(*).once().returning(Signal.const(convMembers.map(users).toVector))
 
@@ -187,10 +176,8 @@ class UserSearchServiceSpec extends AndroidFreeSpec with DerivedLogTag {
   }
 
   scenario("search conversation handle beginning with query") {
-
     val convMembers = Set(id('s), id('t))
 
-    (queryCacheStorage.deleteBefore _).expects(*).anyNumberOfTimes().returning(Future.successful[Unit]({}))
     (membersStorage.activeMembers _).expects(*).anyNumberOfTimes().returning(Signal.const(convMembers))
     (usersStorage.listSignal _).expects(*).once().returning(Signal.const(convMembers.map(users).toVector))
 
@@ -199,11 +186,9 @@ class UserSearchServiceSpec extends AndroidFreeSpec with DerivedLogTag {
   }
 
   scenario("search conversation people ordering") {
-
     val convMembers = Set(id('q), id('r),id('p), id('n), id('m), id('o))
     val correctOrder = IndexedSeq(ud('m), ud('n), ud('o), ud('p), ud('q), ud('r))
 
-    (queryCacheStorage.deleteBefore _).expects(*).anyNumberOfTimes().returning(Future.successful[Unit]({}))
     (membersStorage.activeMembers _).expects(*).anyNumberOfTimes().returning(Signal.const(convMembers))
     (usersStorage.listSignal _).expects(*).once().returning(Signal.const(convMembers.map(users).toVector))
 
@@ -217,42 +202,13 @@ class UserSearchServiceSpec extends AndroidFreeSpec with DerivedLogTag {
   def ud(s: Symbol) = users(id(s))
 
   def verifySearch(prefix: String, matches: Set[UserId]) = {
-    val query = Recommended(prefix)
+    val query = SearchQuery(prefix)
     val expected = users.filterKeys(matches.contains).values.toVector
-    val querySignal = Signal[Option[SearchQueryCache]]()
-    val firstQueryCache = SearchQueryCache(query, Instant.now, None)
-    val secondQueryCache = SearchQueryCache(query, Instant.now, Some(matches.toVector))
 
-    (queryCacheStorage.deleteBefore _).expects(*).anyNumberOfTimes().returning(Future.successful({}))
-
-    (queryCacheStorage.optSignal _).expects(query).once().returning(querySignal)
-    (usersStorage.find(_: UserData => Boolean, _: DB => Managed[TraversableOnce[UserData]], _: UserData => UserData)(_: CanBuild[UserData, Vector[UserData]]))
-      .expects(*, *, *, *).once().returning(Future.successful(expected))
-
-    (queryCacheStorage.updateOrCreate _).expects(query, *, *).once().returning {
-      Future.successful(secondQueryCache)
-    }
-
-    (sync.syncSearchQuery _).expects(query).once().onCall { _: SearchQuery =>
-      Future.successful {
-        querySignal ! Some(secondQueryCache)
-        result(querySignal.filter(_.contains(secondQueryCache)).head)
-        SyncId()
-      }
-    }
-
-    if (matches.nonEmpty)
-      (usersStorage.listSignal _).expects(*).once().returning(Signal.const(expected))
-    else
-      (usersStorage.listSignal _).expects(*).never()
-
-    querySignal ! Some(firstQueryCache)
-    result(querySignal.filter(_.contains(firstQueryCache)).head)
-    
-    val resSignal = getService(false, id('me)).searchUserData(Recommended(prefix)).map(_.map(_.id)).disableAutowiring()
-
-    result(querySignal.filter(_.contains(secondQueryCache)).head)
-
+    (usersStorage.find[UserData, Vector[UserData]](_: UserData => Boolean, _: DB => Managed[TraversableOnce[UserData]], _: UserData => UserData)(_: CanBuild[UserData, Vector[UserData]])).expects(*, *, *, *).once().returning(Future.successful(expected))
+    (usersStorage.listSignal _).expects(expected.map(_.id)).once().returning(Signal.const(expected))
+    (sync.syncSearchQuery _).expects(*).once().returning(Future.successful(SyncId()))
+    val resSignal = getService(false, id('me)).searchUserData(query).map(_.map(_.id)).disableAutowiring()
     result(resSignal.map(_.toSet).filter(_ == matches).head)
   }
 
@@ -279,7 +235,6 @@ class UserSearchServiceSpec extends AndroidFreeSpec with DerivedLogTag {
     scenario("search for top people"){
       val expected = ids('g, 'h, 'i)
 
-      (queryCacheStorage.deleteBefore _).expects(*).anyNumberOfTimes().returning(Future.successful[Unit]({}))
       (usersStorage.find(_: UserData => Boolean, _: DB => Managed[TraversableOnce[UserData]], _: UserData => UserData)(_: CanBuild[UserData, Vector[UserData]]))
         .expects(*, *, *, *).once().returning(Future.successful(expected.map(users).toVector))
 
@@ -290,28 +245,24 @@ class UserSearchServiceSpec extends AndroidFreeSpec with DerivedLogTag {
 
       result(res.filter(_ == expected).head)
     }
-
+/*
     scenario("search for local results"){
       val expected = ids('g, 'h)
-      val query = Recommended("fr")
+      val query = SearchQuery("fr")
 
-      val querySignal = new SourceSignal[Option[SearchQueryCache]]()
-      val queryCache = SearchQueryCache(query, Instant.now, Some(Vector.empty[UserId]))
-
-      (queryCacheStorage.deleteBefore _).expects(*).anyNumberOfTimes().returning(Future.successful[Unit]({}))
-      (queryCacheStorage.optSignal _).expects(query).once().returning(querySignal)
+      val querySignal = new SourceSignal[Option[Vector[UserId]]]()
+      val queryResults = Some(Vector.empty[UserId])
 
       (usersStorage.find(_: UserData => Boolean, _: DB => Managed[TraversableOnce[UserData]], _: UserData => UserData)(_: CanBuild[UserData, Vector[UserData]]))
         .expects(*, *, *, *).once().returning(Future.successful(Vector.empty[UserData]))
       (userService.acceptedOrBlockedUsers _).expects().once().returning(Signal.const(expected.map(key => (key -> users(key))).toMap))
 
       (convsStorage.findGroupConversations _).expects(*, *, *, *).returns(Future.successful(IndexedSeq.empty[ConversationData]))
-      (queryCacheStorage.updateOrCreate _).expects(*, *, *).once().returning(Future.successful(queryCache))
 
       (sync.syncSearchQuery _).expects(query).once().onCall { _: SearchQuery =>
         Future.successful[SyncId] {
-          querySignal ! Some(queryCache)
-          result(querySignal.filter(_.contains(queryCache)).head)
+          querySignal ! queryResults
+          result(querySignal.filter(_.contains(queryResults)).head)
           SyncId()
         }
       }
@@ -690,13 +641,12 @@ class UserSearchServiceSpec extends AndroidFreeSpec with DerivedLogTag {
 
       // THEN
       res shouldBe ids('v) // the user 'u also has the username starting with Wire, but is wireless
-    }
+    }*/
   }
 
-  def getService(inTeam: Boolean, selfId: UserId) = {
+  def getService(inTeam: Boolean, selfId: UserId) =
     new UserSearchService(
       selfId,
-      queryCacheStorage,
       if (inTeam) teamId else emptyTeamId,
       userService,
       usersStorage,
@@ -710,6 +660,4 @@ class UserSearchServiceSpec extends AndroidFreeSpec with DerivedLogTag {
       convs,
       userPrefs
     )
-  }
-
 }

@@ -29,7 +29,6 @@ import com.waz.model.AssetMetaData.Image.Tag.Medium
 import com.waz.model.ConversationData.ConversationDataDao
 import com.waz.model.MessageData.MessageDataDao
 import com.waz.model.MsgDeletion.MsgDeletionDao
-import com.waz.model.SearchQueryCache.SearchQueryCacheDao
 import com.waz.model.UserData.UserDataDao
 import com.waz.model._
 import com.waz.model.sync.SyncJob.SyncJobDao

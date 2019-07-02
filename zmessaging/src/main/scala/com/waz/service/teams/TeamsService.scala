@@ -93,7 +93,7 @@ class TeamsServiceImpl(selfUser:           UserId,
     } yield {}
   }
 
-  override def searchTeamMembers(query: SearchQuery) = teamId match {
+  override def searchTeamMembers(query: SearchQuery): Signal[Set[UserData]] = teamId match {
     case None => Signal.empty
     case Some(tId) =>
 
@@ -130,7 +130,7 @@ class TeamsServiceImpl(selfUser:           UserId,
     case Some(id) => new RefreshingSignal(CancellableFuture.lift(teamStorage.get(id)), teamStorage.onChanged.map(_.map(_.id)))
   }
 
-  override lazy val guests = {
+  override lazy val guests: Signal[Set[UserId]] = {
     def load(id: TeamId): Future[Set[UserId]] = for {
       convs       <- getTeamConversations.map(_.map(_.id))
       allUsers    <- convMemberStorage.getByConvs(convs).map(_.map(_.userId).toSet)
@@ -149,7 +149,7 @@ class TeamsServiceImpl(selfUser:           UserId,
     }
   }
 
-  override def onTeamSynced(team: TeamData, members: Seq[TeamMember]) = {
+  override def onTeamSynced(team: TeamData, members: Seq[TeamMember]): Future[Unit] = {
     verbose(l"onTeamSynced: team: $team \nmembers: $members")
 
     val memberIds = members.map(_.user).toSet
@@ -164,7 +164,7 @@ class TeamsServiceImpl(selfUser:           UserId,
     } yield {}
   }
 
-  override def onMemberSynced(member: TeamMember) = member match {
+  override def onMemberSynced(member: TeamMember): Future[Unit] = member match {
     case TeamMember(userId, permissions, createdBy) =>
 
       if (userId == selfUser) permissions.foreach { ps =>
