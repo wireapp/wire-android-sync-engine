@@ -18,10 +18,10 @@
 package com.waz.service
 
 import java.io.File
+import java.net.Proxy
 
-import android.content.{ComponentCallbacks2, Context}
+import android.content.Context
 import com.softwaremill.macwire._
-import com.waz.log.LogSE._
 import com.waz.api.ContentSearchQuery
 import com.waz.content.{MembersStorageImpl, UsersStorageImpl, ZmsDatabase, _}
 import com.waz.log.BasicLogging.LogTag
@@ -49,7 +49,6 @@ import com.waz.sync.otr.{OtrClientsSyncHandler, OtrClientsSyncHandlerImpl, OtrSy
 import com.waz.sync.queue.{SyncContentUpdater, SyncContentUpdaterImpl}
 import com.waz.threading.{SerialDispatchQueue, Threading}
 import com.waz.ui.UiModule
-import com.waz.utils.Locales
 import com.waz.utils.crypto.ReplyHashingImpl
 import com.waz.utils.events.EventContext
 import com.waz.utils.wrappers.{AndroidContext, DB, GoogleApi}
@@ -393,6 +392,7 @@ object ZMessaging extends DerivedLogTag { self =>
   private var prefs:           GlobalPreferences = _
   private var googleApi:       GoogleApi = _
   private var backend:         BackendConfig = _
+  private var httpProxy:       Option[Proxy] = _
   private var syncRequests:    SyncRequestService = _
   private var notificationsUi: NotificationUiController = _
   private var assets2Module:   Assets2Module = _
@@ -400,7 +400,7 @@ object ZMessaging extends DerivedLogTag { self =>
   //var for tests - and set here so that it is globally available without the need for DI
   var clock = Clock.systemUTC()
 
-  private lazy val _global: GlobalModule = new GlobalModuleImpl(context, backend, prefs, googleApi, syncRequests, notificationsUi)
+  private lazy val _global: GlobalModule = new GlobalModuleImpl(context, backend, httpProxy, prefs, googleApi, syncRequests, notificationsUi)
   private lazy val ui: UiModule = new UiModule(_global)
 
   //Try to avoid using these - map from the futures instead.
@@ -419,6 +419,7 @@ object ZMessaging extends DerivedLogTag { self =>
   //TODO - we should probably just request the entire GlobalModule from the UI here
   def onCreate(context:        Context,
                beConfig:       BackendConfig,
+               httpProxy:      Option[Proxy],
                prefs:          GlobalPreferences,
                googleApi:      GoogleApi,
                syncRequests:   SyncRequestService,
@@ -429,6 +430,7 @@ object ZMessaging extends DerivedLogTag { self =>
     if (this.currentUi == null) {
       this.context = context.getApplicationContext
       this.backend = beConfig
+      this.httpProxy = httpProxy
       this.prefs = prefs
       this.googleApi = googleApi
       this.syncRequests = syncRequests

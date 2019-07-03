@@ -20,6 +20,7 @@ package com.waz.znet2
 import java.io.{ByteArrayInputStream, InputStream}
 import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
+import java.net.Proxy
 
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.log.LogSE._
@@ -28,7 +29,7 @@ import com.waz.threading.CancellableFuture
 import com.waz.utils.crypto.AESUtils
 import com.waz.utils.{ExecutorServiceWrapper, IoUtils, RichOption}
 import com.waz.znet.ServerTrust
-import com.waz.znet2.http.HttpClient.{Progress, ProgressCallback}
+import com.waz.znet2.http.HttpClient.ProgressCallback
 import com.waz.znet2.http.Method._
 import com.waz.znet2.http.{Headers, _}
 import okhttp3.MultipartBody.{Part => OkMultipartBodyPart}
@@ -77,13 +78,17 @@ class HttpClientOkHttpImpl(client: OkHttpClient)(implicit protected val ec: Exec
 
 object HttpClientOkHttpImpl {
 
-  def apply(enableLogging: Boolean, timeout: Option[FiniteDuration] = None, pin: CertificatePin = ServerTrust.wirePin, customUserAgentInterceptor: Option[Interceptor] = None)
+  def apply(enableLogging: Boolean, timeout: Option[FiniteDuration] = None,
+            pin: CertificatePin = ServerTrust.wirePin,
+            proxy: Option[Proxy] = None,
+            customUserAgentInterceptor: Option[Interceptor] = None)
            (implicit ec: ExecutionContext): HttpClientOkHttpImpl =
     new HttpClientOkHttpImpl(
       createOkHttpClient(
         Some(createModernConnectionSpec),
         Some(createCertificatePinner(pin)),
         if (enableLogging) Some(createLoggerInterceptor) else None,
+        proxy,
         customUserAgentInterceptor,
         timeout
       )
@@ -93,6 +98,7 @@ object HttpClientOkHttpImpl {
       connectionSpec: Option[ConnectionSpec] = None,
       certificatePinner: Option[CertificatePinner] = None,
       loggerInterceptor: Option[Interceptor] = None,
+      proxy: Option[Proxy] = None,
       customUserAgentInterceptor: Option[Interceptor] = None,
       timeout: Option[FiniteDuration] = None
   )(implicit ec: ExecutionContext): OkHttpClient = {
@@ -100,6 +106,7 @@ object HttpClientOkHttpImpl {
     connectionSpec.foreach(spec => builder.connectionSpecs(List(spec, ConnectionSpec.CLEARTEXT).asJava))
     certificatePinner.foreach(builder.certificatePinner)
     customUserAgentInterceptor.foreach(builder.addInterceptor)
+    proxy.foreach(p => builder.proxy(p))
     loggerInterceptor.foreach(builder.addInterceptor)
     timeout.foreach { t =>
       builder.connectTimeout(t.toMillis, TimeUnit.MILLISECONDS)

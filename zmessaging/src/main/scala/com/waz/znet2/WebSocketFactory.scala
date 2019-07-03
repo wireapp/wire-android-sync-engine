@@ -59,7 +59,7 @@ object OkHttpWebSocketFactory extends WebSocketFactory with DerivedLogTag {
   //TODO Should be created somewhere outside
   private lazy val okHttpClient = new OkHttpClient.Builder()
                                       .pingInterval(30000,  TimeUnit.MILLISECONDS)
-                                      .build();
+                                      .build()
 
   override def openWebSocket(request: Request[Body]): EventStream[SocketEvent] = {
     new EventStream[SocketEvent] {

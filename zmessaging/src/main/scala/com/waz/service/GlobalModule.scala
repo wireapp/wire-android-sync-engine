@@ -19,6 +19,7 @@ package com.waz.service
 
 import java.io.File
 import java.util.concurrent.Executors
+import java.net.Proxy
 
 import android.content.{Context => AContext}
 import com.softwaremill.macwire._
@@ -44,7 +45,6 @@ import com.waz.ui.MemoryImageCache
 import com.waz.ui.MemoryImageCache.{Entry, Key}
 import com.waz.utils.{Cache, IoUtils}
 import com.waz.utils.wrappers.{Context, GoogleApi}
-import com.waz.zms.BuildConfig
 import com.waz.znet2.http.Request.UrlCreator
 import com.waz.znet2.http.{HttpClient, RequestInterceptor}
 import com.waz.znet2.{HttpClientOkHttpImpl, OkHttpUserAgentInterceptor}
@@ -112,6 +112,7 @@ trait GlobalModule {
 
 class GlobalModuleImpl(val context:                 AContext,
                        val backend:                 BackendConfig,
+                       val httpProxy:               Option[Proxy],
                        val prefs:                   GlobalPreferences,
                        val googleApi:               GoogleApi,
                        val syncRequests:            SyncRequestService,
