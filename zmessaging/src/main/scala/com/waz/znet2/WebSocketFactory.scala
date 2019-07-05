@@ -59,16 +59,15 @@ class OkHttpWebSocketFactory(proxy: Option[Proxy]) extends WebSocketFactory with
   import HttpClientOkHttpImpl.convertHttpRequest
 
   //TODO Should be created somewhere outside
-  private lazy val okHttpClient = if(proxy.isDefined) {
-    new OkHttpClient.Builder()
-      .pingInterval(30000,  TimeUnit.MILLISECONDS)
-      .proxy(proxy.get)
-      .build()
-  } else {
-    new OkHttpClient.Builder()
-      .pingInterval(30000,  TimeUnit.MILLISECONDS)
-      .build()
-  }
+  private lazy val builder = new OkHttpClient.Builder()
+    .pingInterval(30000, TimeUnit.MILLISECONDS)
+
+  private lazy val okHttpClient =
+    if(proxy.isDefined)
+      builder
+        .proxy(proxy.get)
+        .build()
+    else builder.build()
 
   override def openWebSocket(request: Request[Body]): EventStream[SocketEvent] = {
     new EventStream[SocketEvent] {
