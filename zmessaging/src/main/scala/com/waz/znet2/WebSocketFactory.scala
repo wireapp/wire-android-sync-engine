@@ -17,6 +17,8 @@
  */
 package com.waz.znet2
 
+import java.net.Proxy
+
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.log.LogSE._
 import com.waz.sync.client.{BinaryResponse, JsonObjectResponse, ResponseContent, StringResponse}
@@ -45,7 +47,7 @@ trait WebSocketFactory {
   def openWebSocket(request: Request[Body]): EventStream[SocketEvent]
 }
 
-object OkHttpWebSocketFactory extends WebSocketFactory with DerivedLogTag {
+class OkHttpWebSocketFactory(proxy: Option[Proxy]) extends WebSocketFactory with DerivedLogTag {
   import okhttp3.{
     OkHttpClient,
     WebSocketListener,
@@ -57,9 +59,16 @@ object OkHttpWebSocketFactory extends WebSocketFactory with DerivedLogTag {
   import HttpClientOkHttpImpl.convertHttpRequest
 
   //TODO Should be created somewhere outside
-  private lazy val okHttpClient = new OkHttpClient.Builder()
-                                      .pingInterval(30000,  TimeUnit.MILLISECONDS)
-                                      .build()
+  private lazy val okHttpClient = if(proxy.isDefined) {
+    new OkHttpClient.Builder()
+      .pingInterval(30000,  TimeUnit.MILLISECONDS)
+      .proxy(proxy.get)
+      .build()
+  } else {
+    new OkHttpClient.Builder()
+      .pingInterval(30000,  TimeUnit.MILLISECONDS)
+      .build()
+  }
 
   override def openWebSocket(request: Request[Body]): EventStream[SocketEvent] = {
     new EventStream[SocketEvent] {

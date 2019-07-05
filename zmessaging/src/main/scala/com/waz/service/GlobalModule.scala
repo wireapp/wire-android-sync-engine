@@ -108,6 +108,7 @@ trait GlobalModule {
 
   def logsService:              LogsService
   def customBackendClient:      CustomBackendClient
+  def httpProxy:                Option[Proxy]
 }
 
 class GlobalModuleImpl(val context:                 AContext,
@@ -153,8 +154,8 @@ class GlobalModuleImpl(val context:                 AContext,
 
   lazy val urlCreator:          UrlCreator                       = UrlCreator.simpleAppender(() => backend.baseUrl.toString)
   private val customUserAgentHttpInterceptor: Interceptor        = new OkHttpUserAgentInterceptor(metadata)
-  implicit lazy val httpClient: HttpClient                       = HttpClientOkHttpImpl(enableLogging = ZmsVersion.DEBUG, pin = backend.pin, customUserAgentInterceptor = Some(customUserAgentHttpInterceptor))(Threading.BlockingIO)
-  lazy val httpClientForLongRunning: HttpClient                  = HttpClientOkHttpImpl(enableLogging = ZmsVersion.DEBUG, timeout = Some(30.seconds), pin = backend.pin, customUserAgentInterceptor = Some(customUserAgentHttpInterceptor))(ExecutionContext.fromExecutor(Executors.newFixedThreadPool(4)))
+  implicit lazy val httpClient: HttpClient                       = HttpClientOkHttpImpl(enableLogging = ZmsVersion.DEBUG, pin = backend.pin, customUserAgentInterceptor = Some(customUserAgentHttpInterceptor), proxy = httpProxy)(Threading.BlockingIO)
+  lazy val httpClientForLongRunning: HttpClient                  = HttpClientOkHttpImpl(enableLogging = ZmsVersion.DEBUG, timeout = Some(30.seconds), pin = backend.pin, customUserAgentInterceptor = Some(customUserAgentHttpInterceptor), proxy = httpProxy)(ExecutionContext.fromExecutor(Executors.newFixedThreadPool(4)))
 
   implicit lazy val requestInterceptor: RequestInterceptor       = RequestInterceptor.identity
 
@@ -193,6 +194,7 @@ class GlobalModuleImpl(val context:                 AContext,
 
   lazy val logsService:         LogsService                      = new LogsServiceImpl(prefs)
   lazy val customBackendClient: CustomBackendClient              = new CustomBackendClientImpl()
+  lazy val proxy:               Option[Proxy]                    = httpProxy
 }
 
 class EmptyGlobalModule extends GlobalModule {
@@ -245,5 +247,6 @@ class EmptyGlobalModule extends GlobalModule {
   override def syncHandler:              SyncHandler                                         = ???
   override def logsService:              LogsService                                         = ???
   override def customBackendClient:      CustomBackendClient                                 = ???
+  override def httpProxy:                Option[Proxy]                                       = ???
 }
 
