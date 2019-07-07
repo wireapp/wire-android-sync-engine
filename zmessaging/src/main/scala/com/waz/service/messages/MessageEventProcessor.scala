@@ -17,17 +17,14 @@
  */
 package com.waz.service.messages
 
-
 import com.waz.api.{Message, Verification}
 import com.waz.content.MessagesStorage
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.log.LogSE._
-import com.waz.model.AssetMetaData.Image.Tag.{Medium, Preview}
-import com.waz.model.AssetStatus.{UploadCancelled, UploadFailed}
-import com.waz.model.GenericContent.{Asset, Calling, Cleared, DeliveryReceipt, Ephemeral, ImageAsset, Knock, LastRead, LinkPreview, Location, MsgDeleted, MsgEdit, MsgRecall, Reaction, Text}
+import com.waz.model.GenericContent.{Asset, Calling, Cleared, DeliveryReceipt, Ephemeral, Knock, LastRead, Location, MsgDeleted, MsgEdit, MsgRecall, Reaction, Text}
 import com.waz.model.{GenericContent, _}
 import com.waz.service.EventScheduler
-import com.waz.service.assets.AssetService
+import com.waz.service.assets2.{AssetService, AssetStatus, DownloadAsset, DownloadAssetStatus, DownloadAssetStorage, GeneralAsset, Asset => Asset2}
 import com.waz.service.conversation.{ConversationsContentUpdater, ConversationsService}
 import com.waz.service.otr.OtrService
 import com.waz.service.otr.VerificationStateUpdater.{ClientAdded, ClientUnverified, MemberAdded, VerificationChange}
@@ -38,148 +35,165 @@ import com.waz.utils.{RichFuture, _}
 
 import scala.concurrent.Future
 
-class MessageEventProcessor(selfUserId:          UserId,
-                            storage:             MessagesStorage,
-                            content:             MessagesContentUpdater,
-                            assets:              AssetService,
-                            replyHashing:        ReplyHashing,
-                            msgsService:         MessagesService,
-                            convsService:        ConversationsService,
-                            convs:               ConversationsContentUpdater,
-                            otr:                 OtrService) extends DerivedLogTag {
+class MessageEventProcessor(selfUserId:           UserId,
+                            storage:              MessagesStorage,
+                            content:              MessagesContentUpdater,
+                            assets:               AssetService,
+                            replyHashing:         ReplyHashing,
+                            msgsService:          MessagesService,
+                            convsService:         ConversationsService,
+                            convs:                ConversationsContentUpdater,
+                            otr:                  OtrService,
+                            downloadAssetStorage: DownloadAssetStorage) extends DerivedLogTag {
 
   import MessageEventProcessor._
   import Threading.Implicits.Background
   private implicit val ec = EventContext.Global
 
   val messageEventProcessingStage = EventScheduler.Stage[MessageEvent] { (convId, events) =>
-    verbose(l"got events to process: $events")
     convs.processConvWithRemoteId(convId, retryAsync = true) { conv =>
       verbose(l"processing events for conv: $conv, events: $events")
       convsService.isGroupConversation(conv.id).flatMap { isGroup =>
-        processEvents(conv, isGroup, events)
+        storage.blockStreams(true)
+        returning(processEvents(conv, isGroup, events)){ _ => storage.blockStreams(false) }
       }
     }
   }
 
-  def checkReplyHashes(msgs: Seq[MessageData]): Future[Seq[MessageData]] = {
+  private[service] def processEvents(conv: ConversationData, isGroup: Boolean, events: Seq[MessageEvent]): Future[Set[MessageData]] = {
+    verbose(l"processEvents: ${conv.id} isGroup:$isGroup ${events.map(_.from)}")
+
+    val toProcess = events.filter {
+      case GenericMessageEvent(_, _, _, msg) if GenericMessage.isBroadcastMessage(msg) => false
+      case e => conv.cleared.forall(_.isBefore(e.time))
+    }
+
+    verbose(l"SYNC process events")
+
+    for {
+      eventData     <- Future.traverse(toProcess)(localDataForEvent)
+      modifications =  eventData.map(eald => createModifications(conv, isGroup, eald))
+      msgs          <- getModifiedMessages(modifications)
+      _             =  verbose(l"SYNC messages from events: ${msgs.map(m => m.id -> m.msgType)}")
+      _             <- addUnexpectedMembers(conv.id, events)
+      res           <- content.addMessages(conv.id, msgs)
+      _             <- Future.traverse(modifications.flatMap(_.assets))(assets.save)
+      _             <- updateLastReadFromOwnMessages(conv.id, msgs)
+      _             <- deleteCancelled(modifications)
+      _             <- applyRecalls(conv.id, toProcess)
+      _             <- applyEdits(conv.id, toProcess)
+      _             =  verbose(l"SYNC processing events finished")
+    } yield res
+  }
+
+  private def checkReplyHashes(msgs: Seq[MessageData]) = {
     val (standard, quotes) = msgs.partition(_.quote.isEmpty)
 
     for {
       originals     <- storage.getMessages(quotes.flatMap(_.quote.map(_.message)): _*)
       hashes        <- replyHashing.hashMessages(originals.flatten)
       updatedQuotes =  quotes.map(q => q.quote match {
-                         case Some(QuoteContent(message, validity, hash)) if hashes.contains(message) =>
-                           val newValidity = hash.contains(hashes(message))
-                           if (validity != newValidity) q.copy(quote = Some(QuoteContent(message, newValidity, hash) )) else q
-                         case _ => q
-                       })
+        case Some(QuoteContent(message, validity, hash)) if hashes.contains(message) =>
+          val newValidity = hash.contains(hashes(message))
+          if (validity != newValidity) q.copy(quote = Some(QuoteContent(message, newValidity, hash) )) else q
+        case _ => q
+      })
     } yield standard ++ updatedQuotes
   }
 
-  private[service] def processEvents(conv: ConversationData, isGroup: Boolean, events: Seq[MessageEvent]): Future[Set[MessageData]] = {
-    val toProcess = events.filter {
-      case GenericMessageEvent(_, _, _, msg) if GenericMessage.isBroadcastMessage(msg) => false
-      case e => conv.cleared.forall(_.isBefore(e.time))
-    }
+  private def localDataForEvent(event: MessageEvent) =
+    for {
+      message <- event match {
+        case GenericMessageEvent(_, _, _, c) => storage.get(MessageId(c.messageId))
+        case _                               => Future.successful(None)
+      }
+      asset <- message.flatMap(_.assetId) match {
+        case Some(dId: DownloadAssetId) => downloadAssetStorage.find(dId)
+        case _                          => Future.successful(None)
+      }
+    } yield EventAndLocalData(event, message, asset)
 
-    val recalls = toProcess collect { case GenericMessageEvent(_, time, from, msg @ GenericMessage(_, MsgRecall(_))) => (msg, from, time) }
+  private def getModifiedMessages(modifications: Seq[EventModifications]) =
+    checkReplyHashes(modifications.collect { case m if m.message != MessageData.Empty => m.message })
 
-    val edits = toProcess collect { case GenericMessageEvent(_, time, from, msg @ GenericMessage(_, MsgEdit(_, _))) => (msg, from, time) }
-
+  private def addUnexpectedMembers(convId: ConvId, events: Seq[MessageEvent]) = {
     val potentiallyUnexpectedMembers = events.filter {
       case e: MemberLeaveEvent if e.userIds.contains(e.from) => false
       case _ => true
     }.map(_.from).toSet
-
-    for {
-      as    <- updateAssets(toProcess)
-      msgs  = toProcess map { createMessage(conv, isGroup, _) } filter (_ != MessageData.Empty)
-      msgs  <- checkReplyHashes(msgs)
-      _     = verbose(l"messages from events: ${msgs.map(m => m.id -> m.msgType)}")
-      _     <- convsService.addUnexpectedMembersToConv(conv.id, potentiallyUnexpectedMembers)
-      res   <- content.addMessages(conv.id, msgs)
-      _     <- updateLastReadFromOwnMessages(conv.id, msgs)
-      _     <- deleteCancelled(as)
-      _     <- Future.traverse(recalls) { case (GenericMessage(id, MsgRecall(ref)), user, time) => msgsService.recallMessage(conv.id, ref, user, MessageId(id.str), time, Message.Status.SENT) }
-      _     <- RichFuture.traverseSequential(edits) { case (gm @ GenericMessage(_, MsgEdit(_, Text(_, _, _, _))), user, time) => msgsService.applyMessageEdit(conv.id, user, time, gm) } // TODO: handle mentions in case of MsgEdit
-    } yield res
+    convsService.addUnexpectedMembersToConv(convId, potentiallyUnexpectedMembers)
   }
 
-  private def updateAssets(events: Seq[MessageEvent]) = {
-
-    def decryptAssetData(assetData: AssetData, data: Option[Array[Byte]]): Option[Array[Byte]] =
-      otr.decryptAssetData(assetData.id, assetData.otrKey, assetData.sha, data, assetData.encryption)
-
-    //ensure we always save the preview to the same id (GenericContent.Asset.unapply always creates new assets and previews))
-    def saveAssetAndPreview(asset: AssetData, preview: Option[AssetData]) =
-      assets.mergeOrCreateAsset(asset).flatMap {
-        case Some(asset) => preview.fold(Future.successful(Seq.empty[AssetData]))(p =>
-          assets.mergeOrCreateAsset(p.copy(id = asset.previewId.getOrElse(p.id))).map(_.fold(Seq.empty[AssetData])(Seq(_)))
-        )
-        case _ => Future.successful(Seq.empty[AssetData])
-      }
-
-    //For assets v3, the RAssetId will be contained in the proto content. For v2, it will be passed along with in the GenericAssetEvent
-    //A defined convId marks that the asset is a v2 asset.
-    def update(id: Uid, convId: Option[RConvId], ct: Any, v2RId: Option[RAssetId], data: Option[Array[Byte]]): Future[Seq[AssetData]] = {
-      verbose(l"update asset for event: $id, convId: $convId")
-
-      (ct, v2RId) match {
-        case (Asset(a@AssetData.WithRemoteId(_), preview), _) =>
-          val asset = a.copy(id = AssetId(id.str))
-          verbose(l"Received asset v3: $asset with preview: $preview")
-          saveAssetAndPreview(asset, preview)
-        case (Text(_, _, linkPreviews, _), _) =>
-          Future.sequence(linkPreviews.zipWithIndex.map {
-            case (LinkPreview.WithAsset(a@AssetData.WithRemoteId(_)), index) =>
-              val asset = a.copy(id = if (index == 0) AssetId(id.str) else AssetId())
-              verbose(l"Received link preview asset: $asset")
-              saveAssetAndPreview(asset, None)
-            case _ => Future successful Seq.empty[AssetData]
-          }).map(_.flatten)
-        case (Asset(a, p), Some(rId)) =>
-          val forPreview = a.otrKey.isEmpty //For assets containing previews, the second GenericMessage contains remote information about the preview, not the asset
-          val asset = a.copy(id = AssetId(id.str), remoteId = if (forPreview) None else Some(rId), convId = convId, data = if (forPreview) None else decryptAssetData(a, data))
-          val preview = p.map(_.copy(remoteId = if (forPreview) Some(rId) else None, convId = convId, data = if (forPreview) decryptAssetData(a, data) else None))
-          verbose(l"Received asset v2 non-image (forPreview?: $forPreview): $asset with preview: $preview")
-          saveAssetAndPreview(asset, preview)
-        case (ImageAsset(a@AssetData.IsImageWithTag(Preview)), _) =>
-          verbose(l"Received image preview for msg: $id. Dropping")
-          Future successful Seq.empty[AssetData]
-        case (ImageAsset(a@AssetData.IsImageWithTag(Medium)), Some(rId)) =>
-          val asset = a.copy(id = AssetId(id.str), remoteId = Some(rId), convId = convId, data = decryptAssetData(a, data))
-          verbose(l"Received asset v2 image: $asset")
-          assets.mergeOrCreateAsset(asset).map( _.fold(Seq.empty[AssetData])( Seq(_) ))
-        case (Asset(a, _), _) if a.status == UploadFailed && a.isImage =>
-          verbose(l"Received a message about a failed image upload: $id. Dropping")
-          Future successful Seq.empty[AssetData]
-        case (Asset(a, _), _) if a.status == UploadCancelled =>
-          verbose(l"Uploader cancelled asset: $id")
-          assets.updateAsset(AssetId(id.str), _.copy(status = UploadCancelled)).map( _.fold(Seq.empty[AssetData])( Seq(_) ))
-        case (Asset(a, preview), _ ) =>
-          val asset = a.copy(id = AssetId(id.str))
-          verbose(l"Received asset without remote data - we will expect another update: $asset")
-          saveAssetAndPreview(asset, preview)
-        case (Ephemeral(_, content), _)=>
-          update(id, convId, content, v2RId, data)
-        case res =>
-          Future successful Seq.empty[AssetData]
-      }
+  private def applyRecalls(convId: ConvId, toProcess: Seq[MessageEvent]) = {
+    val recalls = toProcess collect {
+      case GenericMessageEvent(_, time, from, msg @ GenericMessage(_, MsgRecall(_))) => (msg, from, time)
     }
-
-    Future.sequence(events.collect {
-      case GenericMessageEvent(_, time, from, GenericMessage(id, ct)) =>
-        update(id, None, ct, None, None)
-
-      case GenericAssetEvent(convId, time, from, msg @ GenericMessage(id, ct), dataId, data) =>
-        update(id, Some(convId), ct, Some(dataId), data)
-    }) map { _.flatten }
+    Future.traverse(recalls) {
+      case (GenericMessage(id, MsgRecall(ref)), user, time) =>
+        msgsService.recallMessage(convId, ref, user, MessageId(id.str), time, Message.Status.SENT)
+    }
   }
 
-  private def createMessage(conv: ConversationData, isGroup: Boolean, event: MessageEvent) = {
-    val id = MessageId()
+  // TODO: handle mentions in case of MsgEdit
+  private def applyEdits(convId: ConvId, toProcess: Seq[MessageEvent]) = {
+    val edits = toProcess collect {
+      case GenericMessageEvent(_, time, from, msg @ GenericMessage(_, MsgEdit(_, _))) => (msg, from, time)
+    }
+    RichFuture.traverseSequential(edits) {
+      case (gm @ GenericMessage(_, MsgEdit(_, Text(_, _, _, _))), user, time) =>
+        msgsService.applyMessageEdit(convId, user, time, gm)
+    }
+  }
+
+  private def updatedAssets(id: Uid, content: Any, downloadAsset: Option[DownloadAsset]): Seq[(GeneralAsset, Option[GeneralAsset])] = {
+    verbose(l"update asset for event: $id")
+
+    content match {
+
+      case asset: Asset if asset.hasUploaded =>
+        val preview = Option(asset.preview).map(Asset2.create)
+        val updatedDownloadAsset = downloadAsset.map(da => da.copy(preview = preview.map(_.id).orElse(da.preview), status = AssetStatus.Done))
+        val asset2 = Asset2.create(updatedDownloadAsset.getOrElse(DownloadAsset.create(asset)), asset.getUploaded)
+
+        verbose(l"Received asset v3 with preview")
+        List((asset2, preview))
+
+      case Text(_, _, linkPreviews, _) =>
+        linkPreviews
+          .collect { case lp if lp.image != null && lp.image.hasUploaded => lp }
+          .map { lp =>
+            val asset = Asset2.create(DownloadAsset.create(lp.image), lp.image.getUploaded)
+            verbose(l"Received link preview asset: ${asset.id}")
+            (asset, Option.empty[GeneralAsset])
+          }
+
+      case asset: Asset if DownloadAsset.getStatus(asset) == DownloadAssetStatus.Failed && asset.original.hasImage =>
+        verbose(l"Received a message about a failed image upload: $id. Dropping")
+        List.empty
+
+      case asset: Asset if DownloadAsset.getStatus(asset) == DownloadAssetStatus.Cancelled =>
+        verbose(l"Uploader cancelled asset: $id")
+        val asset2 = downloadAsset.map(_.copy(status = DownloadAssetStatus.Cancelled)).getOrElse(DownloadAsset.create(asset))
+        List((asset2, None))
+
+      case asset: Asset =>
+        val preview = Option(asset.preview).map(Asset2.create)
+        val updatedDownloadAsset = downloadAsset.map(da => da.copy(preview = preview.map(_.id).orElse(da.preview), status = DownloadAsset.getStatus(asset)))
+        val asset2 = updatedDownloadAsset.getOrElse(DownloadAsset.create(asset))
+        verbose(l"Received asset without remote data - we will expect another update")
+        List((asset2, preview))
+
+      case Ephemeral(_, content) =>
+        updatedAssets(id, content, downloadAsset)
+
+      case _ =>
+        List.empty
+    }
+  }
+
+  private def createModifications(conv: ConversationData, isGroup: Boolean, eventAndLocalData: EventAndLocalData): EventModifications = {
     val convId = conv.id
+    val event = eventAndLocalData.event
 
     def forceReceiptMode: Option[Int] = conv.receiptMode.filter(_ => isGroup)
 
@@ -194,16 +208,17 @@ class MessageEventProcessor(selfUserId:          UserId,
       case Knock() =>
         MessageData(id, conv.id, Message.Type.KNOCK, from, time = time, localTime = event.localTime, protos = Seq(proto), forceReadReceipts = forceReceiptMode)
       case Reaction(_, _) => MessageData.Empty
-      case Asset(AssetData.WithStatus(UploadCancelled), _) => MessageData.Empty
-      case Asset(AssetData.IsVideo(), _) =>
+      case asset: Asset if asset.original == null =>
+        MessageData(id, convId, Message.Type.UNKNOWN, from, time = time, localTime = event.localTime, protos = Seq(proto), forceReadReceipts = forceReceiptMode)
+      case asset: Asset if DownloadAsset.getStatus(asset) == DownloadAssetStatus.Cancelled =>
+        MessageData.Empty
+      case asset: Asset if asset.original.hasVideo =>
         MessageData(id, convId, Message.Type.VIDEO_ASSET, from, time = time, localTime = event.localTime, protos = Seq(proto), forceReadReceipts = forceReceiptMode)
-      case Asset(AssetData.IsAudio(), _) =>
+      case asset: Asset if asset.original.hasAudio =>
         MessageData(id, convId, Message.Type.AUDIO_ASSET, from, time = time, localTime = event.localTime, protos = Seq(proto), forceReadReceipts = forceReceiptMode)
-      case Asset(AssetData.IsImage(), _) | ImageAsset(AssetData.IsImage()) =>
+      case asset: Asset if asset.original.hasImage =>
         MessageData(id, convId, Message.Type.ASSET, from, time = time, localTime = event.localTime, protos = Seq(proto), forceReadReceipts = forceReceiptMode)
-      case a@Asset(_, _) if a.original == null =>
-        MessageData(id, convId, Message.Type.UNKNOWN, from, time = time, localTime = event.localTime, protos = Seq(proto))
-      case Asset(_, _) =>
+      case _: Asset =>
         MessageData(id, convId, Message.Type.ANY_ASSET, from, time = time, localTime = event.localTime, protos = Seq(proto), forceReadReceipts = forceReceiptMode)
       case Location(_, _, _, _) =>
         MessageData(id, convId, Message.Type.LOCATION, from, time = time, localTime = event.localTime, protos = Seq(proto), forceReadReceipts = forceReceiptMode)
@@ -223,27 +238,6 @@ class MessageEventProcessor(selfUserId:          UserId,
         MessageData(id, conv.id, Message.Type.UNKNOWN, from, time = time, localTime = event.localTime, protos = Seq(proto))
     }
 
-    //v2 assets go here
-    def assetContent(id: MessageId, ct: Any, from: UserId, time: RemoteInstant, msg: GenericMessage): MessageData = ct match {
-      case Asset(AssetData.IsVideo(), _) =>
-        MessageData(id, convId, Message.Type.VIDEO_ASSET, from, time = time, localTime = event.localTime, protos = Seq(msg))
-      case Asset(AssetData.IsAudio(), _) =>
-        MessageData(id, convId, Message.Type.AUDIO_ASSET, from, time = time, localTime = event.localTime, protos = Seq(msg))
-      case ImageAsset(AssetData.IsImageWithTag(Preview)) => //ignore previews
-        MessageData.Empty
-      case Asset(AssetData.IsImage(), _) | ImageAsset(AssetData.IsImage()) =>
-        MessageData(id, convId, Message.Type.ASSET, from, time = time, localTime = event.localTime, protos = Seq(msg))
-      case a@Asset(_, _) if a.original == null =>
-        MessageData(id, convId, Message.Type.UNKNOWN, from, time = time, localTime = event.localTime, protos = Seq(msg))
-      case Asset(_, _) =>
-        MessageData(id, convId, Message.Type.ANY_ASSET, from, time = time, localTime = event.localTime, protos = Seq(msg))
-      case Ephemeral(expiry, ect) =>
-        assetContent(id, ect, from, time, msg).copy(ephemeral = expiry)
-      case _ =>
-        // TODO: this message should be processed again after app update, maybe future app version will understand it
-        MessageData(id, conv.id, Message.Type.UNKNOWN, from, time = time, localTime = event.localTime, protos = Seq(msg))
-    }
-
     /**
       * Creates safe version of incoming message.
       * Messages sent by malicious contacts might contain content intended to break the app. One example of that
@@ -259,45 +253,50 @@ class MessageEventProcessor(selfUserId:          UserId,
         msg
     }
 
+    val id = MessageId()
     event match {
       case ConnectRequestEvent(_, time, from, text, recipient, name, email) =>
-        MessageData(id, convId, Message.Type.CONNECT_REQUEST, from, MessageData.textContent(text), recipient = Some(recipient), email = email, name = Some(name), time = time, localTime = event.localTime)
+        EventModifications(MessageData(id, convId, Message.Type.CONNECT_REQUEST, from, MessageData.textContent(text), recipient = Some(recipient), email = email, name = Some(name), time = time, localTime = event.localTime))
       case RenameConversationEvent(_, time, from, name) =>
-        MessageData(id, convId, Message.Type.RENAME, from, name = Some(name), time = time, localTime = event.localTime)
+        EventModifications(MessageData(id, convId, Message.Type.RENAME, from, name = Some(name), time = time, localTime = event.localTime))
       case MessageTimerEvent(_, time, from, duration) =>
-        MessageData(id, convId, Message.Type.MESSAGE_TIMER, from, time = time, duration = duration, localTime = event.localTime)
+        EventModifications(MessageData(id, convId, Message.Type.MESSAGE_TIMER, from, time = time, duration = duration, localTime = event.localTime))
       case MemberJoinEvent(_, time, from, userIds, firstEvent) =>
-        MessageData(id, convId, Message.Type.MEMBER_JOIN, from, members = userIds.toSet, time = time, localTime = event.localTime, firstMessage = firstEvent)
+        EventModifications(MessageData(id, convId, Message.Type.MEMBER_JOIN, from, members = userIds.toSet, time = time, localTime = event.localTime, firstMessage = firstEvent))
       case ConversationReceiptModeEvent(_, time, from, 0) =>
-        MessageData(id, convId, Message.Type.READ_RECEIPTS_OFF, from, time = time, localTime = event.localTime)
+        EventModifications(MessageData(id, convId, Message.Type.READ_RECEIPTS_OFF, from, time = time, localTime = event.localTime))
       case ConversationReceiptModeEvent(_, time, from, receiptMode) if receiptMode > 0 =>
-        MessageData(id, convId, Message.Type.READ_RECEIPTS_ON, from, time = time, localTime = event.localTime)
+        EventModifications(MessageData(id, convId, Message.Type.READ_RECEIPTS_ON, from, time = time, localTime = event.localTime))
       case MemberLeaveEvent(_, time, from, userIds) =>
-        MessageData(id, convId, Message.Type.MEMBER_LEAVE, from, members = userIds.toSet, time = time, localTime = event.localTime)
+        EventModifications(MessageData(id, convId, Message.Type.MEMBER_LEAVE, from, members = userIds.toSet, time = time, localTime = event.localTime))
       case OtrErrorEvent(_, time, from, IdentityChangedError(_, _)) =>
-        MessageData (id, conv.id, Message.Type.OTR_IDENTITY_CHANGED, from, time = time, localTime = event.localTime)
+        EventModifications(MessageData(id, conv.id, Message.Type.OTR_IDENTITY_CHANGED, from, time = time, localTime = event.localTime))
       case OtrErrorEvent(_, time, from, otrError) =>
-        MessageData (id, conv.id, Message.Type.OTR_ERROR, from, time = time, localTime = event.localTime)
+        EventModifications(MessageData(id, conv.id, Message.Type.OTR_ERROR, from, time = time, localTime = event.localTime))
       case GenericMessageEvent(_, time, from, proto) =>
         val sanitized @ GenericMessage(uid, msgContent) = sanitize(proto)
-        content(MessageId(uid.str), msgContent, from, time, sanitized)
-      case GenericAssetEvent(_, time, from, proto @ GenericMessage(uid, msgContent), dataId, data) =>
-        assetContent(MessageId(uid.str), msgContent, from, time, proto)
-      case _:CallMessageEvent =>
-        MessageData.Empty
+        val id = MessageId(uid.str)
+        val assets = updatedAssets(uid, sanitized.getAsset, eventAndLocalData.asset)
+        val message = content(id, msgContent, from, time, sanitized).copy(assetId = assets.headOption.map(_._1.id))
+        EventModifications(message, assets)
+      case _: CallMessageEvent =>
+        EventModifications(MessageData.Empty)
       case _ =>
-        MessageData.Empty
-    }
+        warn(l"Unexpected event for addMessage: $event")
+        EventModifications(MessageData.Empty)}
   }
 
-  private def deleteCancelled(as: Seq[AssetData]) = {
-    val toRemove = as collect {
-      case a@AssetData.WithStatus(UploadCancelled) => a.id
+  private def deleteCancelled(modifications: Seq[EventModifications]): Future[Unit] = {
+    val toRemove = modifications.filter { m =>
+      m.assetWithPreview.headOption match {
+        case Some((asset: DownloadAsset, _)) => asset.status == DownloadAssetStatus.Cancelled
+        case _ => false
+      }
     }
-    if (toRemove.isEmpty) Future.successful(())
-    else for {
-      _ <- Future.traverse(toRemove)(id => storage.remove(MessageId(id.str)))
-      _ <- assets.removeAssets(toRemove)
+
+    for {
+      _ <- Future.traverse(toRemove.map(_.message))(msg => storage.remove(msg.id))
+      _ <- Future.traverse(toRemove.flatMap(_.assets))(asset => assets.delete(asset.id))
     } yield ()
   }
 
@@ -329,4 +328,14 @@ class MessageEventProcessor(selfUserId:          UserId,
 
 object MessageEventProcessor {
   val MaxTextContentLength = 8192
+
+  case class EventModifications(message: MessageData,
+                                assetWithPreview: Seq[(GeneralAsset, Option[GeneralAsset])] = List.empty) {
+    val assets: Seq[GeneralAsset] = assetWithPreview.flatMap {
+      case (asset, Some(preview)) => List(asset, preview)
+      case (asset, None) => List(asset)
+    }
+  }
+
+  case class EventAndLocalData(event: MessageEvent, message: Option[MessageData], asset: Option[DownloadAsset])
 }

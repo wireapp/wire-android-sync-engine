@@ -221,7 +221,7 @@ object HttpClientOkHttpImpl {
       data,
       new ProgressInputStream.Listener {
         override def progressUpdated(bytesRead: Long, totalBytesRead: Long): Unit =
-          callback(Progress(totalBytesRead, dataLength))
+          callback.updated(totalBytesRead, dataLength)
       }
     )
 
@@ -254,10 +254,11 @@ object HttpClientOkHttpImpl {
 
     val totalProgressListener = callback.map { c =>
       new ProgressInputStream.Listener {
-        var lastProgress: Progress = Progress(0, RichOption.traverse(parts)(getRawBody(_).dataLength).map(_.sum))
+        var total: Option[Long] = RichOption.traverse(parts)(getRawBody(_).dataLength).map(_.sum)
+        var lastProgress: Long = 0
         override def progressUpdated(bytesRead: Long, totalBytesRead: Long): Unit = {
-          lastProgress = lastProgress.copy(progress = lastProgress.progress + bytesRead)
-          c(lastProgress)
+          lastProgress = lastProgress + bytesRead
+          c.updated(lastProgress, total)
         }
       }
     }

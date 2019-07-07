@@ -23,6 +23,7 @@ import com.waz.model.UserData.ConnectionStatus
 import com.waz.model.otr.ClientId
 import com.waz.model.{AccentColor, Availability, SearchQuery, _}
 import com.waz.service.PropertyKey
+import com.waz.service.assets2.{Codec, StorageCodecs, UploadAssetStatus}
 import com.waz.sync.client.{ConversationsClient, UsersClient}
 import com.waz.sync.queue.SyncJobMerger._
 import com.waz.utils._
@@ -115,7 +116,7 @@ object SyncRequest {
     override val mergeKey: Any = (cmd, messageId)
   }
 
-  case class PostSelfPicture(assetId: Option[AssetId]) extends BaseRequest(Cmd.PostSelfPicture) {
+  case class PostSelfPicture(assetId: UploadAssetId) extends BaseRequest(Cmd.PostSelfPicture) {
     override def merge(req: SyncRequest) = mergeHelper[PostSelfPicture](req)(Merged(_))
   }
 
@@ -207,7 +208,7 @@ object SyncRequest {
     override val mergeKey = (cmd, convId, msg, recalledId)
   }
 
-  case class PostAssetStatus(convId: ConvId, messageId: MessageId, exp: Option[FiniteDuration], status: AssetStatus.Syncable) extends RequestForConversation(Cmd.PostAssetStatus) with Serialized {
+  case class PostAssetStatus(convId: ConvId, messageId: MessageId, exp: Option[FiniteDuration], status: UploadAssetStatus) extends RequestForConversation(Cmd.PostAssetStatus) with Serialized {
     override val mergeKey = (cmd, convId, messageId)
     override def merge(req: SyncRequest) = mergeHelper[PostAssetStatus](req)(Merged(_))
   }
@@ -325,7 +326,7 @@ object SyncRequest {
     case _ => Unchanged
   }
 
-  implicit lazy val Decoder: JsonDecoder[SyncRequest] = new JsonDecoder[SyncRequest] {
+  implicit lazy val Decoder: JsonDecoder[SyncRequest] = new JsonDecoder[SyncRequest] with StorageCodecs {
     import JsonDecoder._
 
     override def apply(implicit js: JSONObject): SyncRequest = {
@@ -350,14 +351,14 @@ object SyncRequest {
           case Cmd.PostCleared               => PostCleared(convId, 'time)
           case Cmd.PostTypingState           => PostTypingState(convId, 'typing)
           case Cmd.PostConnectionStatus      => PostConnectionStatus(userId, opt('status, js => ConnectionStatus(js.getString("status"))))
-          case Cmd.PostSelfPicture           => PostSelfPicture(decodeOptAssetId('asset))
+          case Cmd.PostSelfPicture           => PostSelfPicture(decodeUploadAssetId('asset))
           case Cmd.PostSelfName              => PostSelfName('name)
           case Cmd.PostSelfAccentColor       => PostSelfAccentColor(AccentColor(decodeInt('color)))
           case Cmd.PostAvailability          => PostAvailability(Availability(decodeInt('availability)))
           case Cmd.PostMessage               => PostMessage(convId, messageId, 'time)
           case Cmd.PostDeleted               => PostDeleted(convId, messageId)
           case Cmd.PostRecalled              => PostRecalled(convId, messageId, decodeId[MessageId]('recalled))
-          case Cmd.PostAssetStatus           => PostAssetStatus(convId, messageId, decodeOptLong('ephemeral).map(_.millis), JsonDecoder[AssetStatus.Syncable]('status))
+          case Cmd.PostAssetStatus           => PostAssetStatus(convId, messageId, decodeOptLong('ephemeral).map(_.millis), Codec[UploadAssetStatus, Int].deserialize(decodeInt('status)))
           case Cmd.PostConvJoin              => PostConvJoin(convId, users)
           case Cmd.PostConvLeave             => PostConvLeave(convId, userId)
           case Cmd.PostConnection            => PostConnection(userId, 'name, 'message)
@@ -396,7 +397,7 @@ object SyncRequest {
     }
   }
 
-  implicit lazy val Encoder: JsonEncoder[SyncRequest] = new JsonEncoder[SyncRequest] {
+  implicit lazy val Encoder: JsonEncoder[SyncRequest] = new JsonEncoder[SyncRequest] with StorageCodecs {
     import JsonEncoder._
 
     override def apply(req: SyncRequest): JSONObject = JsonEncoder { o =>
@@ -427,7 +428,7 @@ object SyncRequest {
         case DeletePushToken(token)           => putId("token", token)
         case RegisterPushToken(token)         => putId("token", token)
         case SyncRichMedia(messageId)         => putId("message", messageId)
-        case PostSelfPicture(assetId)         => assetId.foreach(putId("asset", _))
+        case PostSelfPicture(assetId)         => putId("asset", assetId)
         case PostSelfName(name)               => o.put("name", name)
         case PostSelfAccentColor(color)       => o.put("color", color.id)
         case PostAvailability(availability)   => o.put("availability", availability.id)
@@ -465,7 +466,7 @@ object SyncRequest {
         case PostAssetStatus(_, mid, exp, status) =>
           putId("message", mid)
           exp.foreach(v => o.put("ephemeral", v.toMillis))
-          o.put("status", JsonEncoder.encode(status))
+          o.put("status", Codec[UploadAssetStatus, Int].serialize(status))
 
         case PostSelf(info) => o.put("user", JsonEncoder.encode(info))
         case PostTypingState(_, typing) => o.put("typing", typing)

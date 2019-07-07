@@ -112,8 +112,6 @@ case class UnknownOtrErrorEvent(json: JSONObject) extends OtrError
 
 case class OtrErrorEvent(convId: RConvId, time: RemoteInstant, from: UserId, error: OtrError) extends MessageEvent
 
-case class GenericAssetEvent(convId: RConvId, time: RemoteInstant, from: UserId, content: GenericMessage, dataId: RAssetId, data: Option[Array[Byte]]) extends MessageEvent
-
 case class TypingEvent(convId: RConvId, time: RemoteInstant, from: UserId, isTyping: Boolean) extends ConversationEvent
 
 case class MemberJoinEvent(convId: RConvId, time: RemoteInstant, from: UserId, userIds: Seq[UserId], firstEvent: Boolean = false) extends MessageEvent with ConversationStateEvent with ConversationEvent
@@ -147,13 +145,13 @@ case class ConversationState(archived:    Option[Boolean] = None,
                              mutedStatus: Option[Int] = None) extends SafeToLog
 
 object ConversationState {
-
   private def encode(state: ConversationState, o: JSONObject) = {
     state.archived foreach { o.put("otr_archived", _) }
     state.archiveTime foreach { time =>
       o.put("otr_archived_ref", JsonEncoder.encodeISOInstant(time.instant))
     }
     state.muted.foreach(o.put("otr_muted", _))
+
     state.muteTime foreach { time =>
       o.put("otr_muted_ref", JsonEncoder.encodeISOInstant(time.instant))
     }
@@ -213,6 +211,7 @@ object Event {
         case "user.client-add" => OtrClientAddEvent(OtrClient.ClientsResponse.client(js.getJSONObject("client")))
         case "user.client-remove" => OtrClientRemoveEvent(decodeId[ClientId]('id)(js.getJSONObject("client"), implicitly))
         case "user.properties-set" => PropertyEvent.Decoder(js)
+        case "user.properties-delete" => PropertyEvent.Decoder(js)
         case _ =>
           error(l"unhandled event: $js")
           UnknownEvent(js)
@@ -258,7 +257,6 @@ object ConversationEvent extends DerivedLogTag {
 
           //Note, the following events are not from the backend, but are the result of decrypting and re-encoding conversation.otr-message-add events - hence the different name for `convId
         case "conversation.generic-message"      => GenericMessageEvent('convId, time, 'from, 'content)
-        case "conversation.generic-asset"        => GenericAssetEvent('convId, time, 'from, 'content, 'dataId, decodeOptByteString('data))
         case "conversation.otr-error"            => OtrErrorEvent('convId, time, 'from, decodeOtrError('error))
         case _ =>
           error(l"unhandled event: $js")
@@ -310,14 +308,6 @@ object MessageEvent {
       event match {
         case GenericMessageEvent(convId, time, from, content) =>
           setFields(json, convId, time, from, "conversation.generic-message")
-            .put("content", AESUtils.base64(GenericMessage.toByteArray(content)))
-        case GenericAssetEvent(convId, time, from, content, dataId, data) =>
-          setFields(json, convId, time, from, "conversation.generic-asset")
-            .put("dataId", dataId.str)
-            .put("data", data match {
-              case None => null
-              case Some(d) => AESUtils.base64(d)
-            })
             .put("content", AESUtils.base64(GenericMessage.toByteArray(content)))
         case OtrErrorEvent(convId, time, from, error) =>
           setFields(json, convId, time, from, "conversation.otr-error")
@@ -421,7 +411,11 @@ object PropertyEvent {
     override def apply(implicit js: JSONObject): PropertyEvent = {
       import PropertyKey._
       decodePropertyKey('key) match {
-        case ReadReceiptsEnabled => ReadReceiptEnabledPropertyEvent('value)
+        case ReadReceiptsEnabled => decodeString('type) match {
+          case "user.properties-set" => ReadReceiptEnabledPropertyEvent('value)
+          case "user.properties-delete" => ReadReceiptEnabledPropertyEvent(0)
+          case e => UnknownPropertyEvent(ReadReceiptsEnabled, e)
+        }
         case key => UnknownPropertyEvent(key, 'value)
       }
     }

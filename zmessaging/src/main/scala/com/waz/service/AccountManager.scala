@@ -31,7 +31,7 @@ import com.waz.model._
 import com.waz.model.otr.{Client, ClientId}
 import com.waz.service.AccountManager.ClientRegistrationState.{LimitReached, PasswordMissing, Registered, Unregistered}
 import com.waz.service.UserService.UnsplashUrl
-import com.waz.service.assets.AssetService.RawAssetInput.UriInput
+import com.waz.service.assets2.Content
 import com.waz.service.otr.OtrService.SessionId
 import com.waz.service.tracking.LoggedOutEvent
 import com.waz.sync.client.InvitationClient.ConfirmedTeamInvitation
@@ -39,11 +39,11 @@ import com.waz.sync.client.{InvitationClientImpl, OtrClientImpl}
 import com.waz.threading.{CancellableFuture, SerialDispatchQueue}
 import com.waz.utils._
 import com.waz.utils.events.Signal
-import com.waz.utils.wrappers.Context
+import com.waz.utils.wrappers.{Context, URI}
 import com.waz.znet2.http.ResponseCode
 import com.waz.sync.client.ErrorOr
 import com.waz.sync.client.ErrorOrResponse
-import com.waz.znet2.AuthRequestInterceptor
+import com.waz.znet2.{AuthRequestInterceptor, AuthRequestInterceptorOld}
 
 import scala.collection.immutable.ListMap
 import scala.concurrent.Future
@@ -90,7 +90,7 @@ class AccountManager(val userId:   UserId,
 
   val cryptoBox         = global.factory.cryptobox(userId, storage)
   val auth              = global.factory.auth(userId)
-  val authRequestInterceptor: AuthRequestInterceptor = new AuthRequestInterceptor(auth, global.httpClient)
+  val authRequestInterceptor: AuthRequestInterceptor = new AuthRequestInterceptorOld(auth, global.httpClient)
   val otrClient         = new OtrClientImpl()(global.urlCreator, global.httpClient, authRequestInterceptor)
   val credentialsClient = global.factory.credentialsClient(global.urlCreator, global.httpClient, authRequestInterceptor)
 
@@ -109,7 +109,7 @@ class AccountManager(val userId:   UserId,
       for {
         _ <- storage.userPrefs(CrashesAndAnalyticsRequestShown) := false //new login/registration, we need to ask for permission to send analytics
         _ <- storage.usersStorage.updateOrCreate(u.id, _.updated(u, withSearchKey = false), UserData(u, withSearchKey = false)) //no search key to avoid transliteration loading
-        _ <- storage.assetsStorage.insertAll(u.picture.getOrElse(Seq.empty)) //TODO https://github.com/wireapp/android-project/issues/58
+        //_ <- storage.assetsStorage.saveAll(u.picture.getOrElse(Seq.empty)) //TODO https://github.com/wireapp/android-project/issues/58
       } yield {})
     _ <- isLogin.fold2(Future.successful({}), storage.userPrefs(IsLogin) := _)
   } yield {}
@@ -151,7 +151,7 @@ class AccountManager(val userId:   UserId,
     hasClient = exists
   }
 
-  def addUnsplashPicture(): Future[Unit] = zmessaging.flatMap(_.users.updateSelfPicture(UriInput(UnsplashUrl)))
+  def addUnsplashPicture(): Future[Unit] = zmessaging.flatMap(_.users.updateSelfPicture(Content.Uri(URI.toJava(UnsplashUrl))))
 
   def fingerprintSignal(uId: UserId, cId: ClientId): Signal[Option[Array[Byte]]] =
     for {

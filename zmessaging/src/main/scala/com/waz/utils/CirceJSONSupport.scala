@@ -16,22 +16,33 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 package com.waz.utils
-import java.net.URL
+import java.net.{URI, URL}
 
-import com.waz.model.{RAssetId, UserId}
+import com.waz.model.UserId
+import com.waz.model.{AssetId, AssetToken, RAssetId, Sha256}
 import io.circe.generic.AutoDerivation
 import io.circe.{Decoder, Encoder}
-import org.threeten.bp.Duration
+import org.threeten.bp.{Duration, Instant}
 
 trait CirceJSONSupport extends AutoDerivation {
 
   implicit def UrlDecoder: Decoder[URL] = Decoder[String].map(new URL(_))
   implicit def UrlEncoder: Encoder[URL] = Encoder[String].contramap(_.toString)
 
+  implicit def UriDecoder: Decoder[URI] = Decoder[String].map(URI.create)
+  implicit def UriEncoder: Encoder[URI] = Encoder[String].contramap(_.toString)
+
+  implicit def Sha256Decoder: Decoder[Sha256] = Decoder[String].map(Sha256.apply)
+  implicit def Sha256Encoder: Encoder[Sha256] = Encoder[String].contramap(_.str)
+
   implicit def DurationDecoder: Decoder[Duration] = Decoder[Long].map(Duration.ofMillis)
   implicit def DurationEncoder: Encoder[Duration] = Encoder[Long].contramap(_.toMillis)
 
+  implicit def InstantDecoder: Decoder[Instant] = Decoder[String].map(Instant.parse)
+
   implicit def RAssetIdDecoder: Decoder[RAssetId] = Decoder[String].map(RAssetId.apply)
   implicit def UserIdDecoder: Decoder[UserId] = Decoder[String].map(UserId.apply)
+  implicit def AssetIdDecoder: Decoder[AssetId] = Decoder[String].map(AssetId.apply)
+  implicit def AssetTokenDecoder: Decoder[AssetToken] = Decoder[String].map(AssetToken.apply)
 
 }

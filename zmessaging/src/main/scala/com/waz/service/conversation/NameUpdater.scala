@@ -36,7 +36,7 @@ import scala.concurrent.duration._
 class NameUpdater(selfUserId:     UserId,
                   usersStorage:   UsersStorage,
                   convs:          ConversationStorage,
-                  membersStorage: MembersStorage) extends DerivedLogTag {
+                  membersStorage: MembersStorage) {
 
   private implicit val ev = EventContext.Global
   private implicit val dispatcher = new SerialDispatchQueue(name = "NameUpdaterQueue")
@@ -117,7 +117,7 @@ class NameUpdater(selfUserId:     UserId,
     }
   }
 
-  def forceNameUpdate(id: ConvId) = convs.get(id) flatMap {
+  def forceNameUpdate(id: ConvId, defaultName: String) = convs.get(id) flatMap {
     case Some(conv) if conv.convType == ConversationType.Group =>
       for {
         members <- membersStorage.getByConv(conv.id)
@@ -126,7 +126,8 @@ class NameUpdater(selfUserId:     UserId,
           case Some(u) if !u.deleted => Some(u.getDisplayName)
           case _                     => None
         })
-        res <- convs.update(conv.id,  _.copy(generatedName = name))
+        newName = if(name.isEmpty) Name(defaultName) else name
+        res <- convs.update(conv.id,  _.copy(generatedName = newName))
       } yield res
     case Some(conv) => // one to one conv should use full user name
       usersStorage.get(UserId(conv.id.str)) flatMap {

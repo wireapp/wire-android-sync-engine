@@ -22,35 +22,31 @@ import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.log.LogSE._
 import com.waz.model.SearchQuery.{Recommended, RecommendedHandle, TopPeople}
 import com.waz.model._
-import com.waz.sync.client.UserSearchClient.{DefaultLimit, UserSearchEntry}
+import com.waz.sync.client.UserSearchClient.{DefaultLimit, UserSearchResponse}
 import com.waz.threading.{CancellableFuture, Threading}
-import com.waz.utils.JsonDecoder
+import com.waz.utils.CirceJSONSupport
 import com.waz.znet2.AuthRequestInterceptor
 import com.waz.znet2.http.Request.UrlCreator
 import com.waz.znet2.http._
-import org.json.JSONObject
-
-import scala.util.control.NonFatal
 
 trait UserSearchClient {
-  def getContacts(query: SearchQuery, limit: Int = DefaultLimit): ErrorOrResponse[Seq[UserSearchEntry]]
+  def getContacts(query: SearchQuery, limit: Int = DefaultLimit): ErrorOrResponse[UserSearchResponse]
   def exactMatchHandle(handle: Handle): ErrorOrResponse[Option[UserId]]
 }
 
 class UserSearchClientImpl(implicit
                            urlCreator: UrlCreator,
                            httpClient: HttpClient,
-                           authRequestInterceptor: AuthRequestInterceptor) extends UserSearchClient with DerivedLogTag {
-
-  import HttpClient.dsl._
+                           authRequestInterceptor: AuthRequestInterceptor) extends UserSearchClient with CirceJSONSupport {
   import HttpClient.AutoDerivation._
+  import HttpClient.dsl._
   import Threading.Implicits.Background
   import UserSearchClient._
 
-  private implicit val UsersSearchDeserializer: RawBodyDeserializer[Seq[UserSearchEntry]] =
-    RawBodyDeserializer[JSONObject].map(json => UserSearchResponse.unapply(JsonObjectResponse(json)).get)
+  private implicit val errorResponseDeserializer: RawBodyDeserializer[ErrorResponse] =
+    objectFromCirceJsonRawBodyDeserializer[ErrorResponse]
 
-  override def getContacts(query: SearchQuery, limit: Int = DefaultLimit): ErrorOrResponse[Seq[UserSearchEntry]] = {
+  override def getContacts(query: SearchQuery, limit: Int = DefaultLimit): ErrorOrResponse[UserSearchResponse] = {
     debug(l"graphSearch('$query', $limit)")
 
     //TODO Get rid of this
@@ -69,21 +65,19 @@ class UserSearchClientImpl(implicit
         relativePath = ContactsPath,
         queryParameters = queryParameters("q" -> prefix, "size" -> limit, "l" -> Relation.Third.id, "d" -> 1)
       )
-      .withResultType[Seq[UserSearchEntry]]
+      .withResultType[UserSearchResponse]
       .withErrorType[ErrorResponse]
       .executeSafe
   }
 
-  private implicit val UserIdDeserializer: RawBodyDeserializer[UserId] =
-    RawBodyDeserializer[JSONObject].map(json => UserId(json.getString("user")))
 
   override def exactMatchHandle(handle: Handle): ErrorOrResponse[Option[UserId]] = {
     Request.Get(relativePath = handlesQuery(handle))
-      .withResultType[UserId]
+      .withResultType[ExactHandleResponse]
       .withErrorType[ErrorResponse]
       .executeSafe
       .map {
-        case Right(userId) => Right(Some(userId))
+        case Right(response) => Right(Some(UserId(response.user)))
         case Left(response) if response.code == ResponseCode.NotFound => Right(None)
         case Left(response) => Left(response)
       }
@@ -99,37 +93,12 @@ object UserSearchClient extends DerivedLogTag {
   def handlesQuery(handle: Handle): String =
     UserSearchClient.HandlesPath + "/" + Handle.stripSymbol(handle.string)
 
-  case class UserSearchEntry(id: UserId, name: Name, colorId: Option[Int], handle: Handle)
+  // Response types
 
-  object UserSearchEntry {
-    import JsonDecoder._
-
-    implicit lazy val Decoder: JsonDecoder[Option[UserSearchEntry]] = new JsonDecoder[Option[UserSearchEntry]] {
-      override def apply(implicit js: JSONObject): Option[UserSearchEntry] =
-        if (js.has("handle")) Some(UserSearchEntry('id, 'name, 'accent_id, 'handle)) else None
-    }
-  }
+  case class ExactHandleResponse(user: String)
+  case class UserSearchResponse(documents: Seq[UserSearchResponse.User])
 
   object UserSearchResponse {
-
-    def unapply(resp: ResponseContent): Option[Seq[UserSearchEntry]] = resp match {
-      case JsonObjectResponse(js) if js.has("documents") =>
-        try {
-          Some(JsonDecoder.array[Option[UserSearchEntry]](js.getJSONArray("documents")).flatten)
-        } catch {
-          case NonFatal(ex) => warn(l"parsing failed", ex)
-            None
-        }
-      case _ => None
-    }
-
+    case class User(id: String, name: String, handle: String, accent_id: Option[Int])
   }
-
-  object ExactMatchHandleResponseContent {
-    def unapply(response: ResponseContent): Option[UserId] = response match {
-      case JsonObjectResponse(js) if js.has("user") => Some(UserId(js.getString("user")))
-      case _ => None
-    }
-  }
-
 }

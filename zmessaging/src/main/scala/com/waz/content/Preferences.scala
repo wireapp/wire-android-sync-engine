@@ -19,6 +19,7 @@ package com.waz.content
 
 import android.content.SharedPreferences.OnSharedPreferenceChangeListener
 import android.content.{Context, SharedPreferences}
+import com.waz.api.ZmsVersion
 import com.waz.content.Preferences.Preference.PrefCodec
 import com.waz.content.Preferences.{PrefKey, Preference}
 import com.waz.log.BasicLogging.LogTag
@@ -34,7 +35,6 @@ import com.waz.threading.{DispatchQueue, SerialDispatchQueue, Threading}
 import com.waz.utils.TrimmingLruCache.Fixed
 import com.waz.utils.events.{Signal, SourceSignal}
 import com.waz.utils.{CachedStorageImpl, JsonDecoder, JsonEncoder, Serialized, TrimmingLruCache, returning}
-import com.waz.zms.BuildConfig
 import org.json.JSONObject
 import org.threeten.bp.{Duration, Instant}
 
@@ -358,7 +358,8 @@ object GlobalPreferences {
   //TODO think of a nicer way of ensuring that these key values are used in UI - right now, we need to manually check they're correct
   lazy val AutoAnswerCallPrefKey   = PrefKey[Boolean]("PREF_KEY_AUTO_ANSWER_ENABLED")
   lazy val V31AssetsEnabledKey     = PrefKey[Boolean]("PREF_V31_ASSETS_ENABLED")
-  lazy val WsForegroundKey         = PrefKey[Boolean]("websocket_foreground_service_enabled", customDefault = true)
+  lazy val WsForegroundKey         = PrefKey[Boolean]("websocket_foreground_service_enabled_1", customDefault = false)
+  lazy val CheckedForPlayServices  = PrefKey[Boolean]("checked_for_google_play_services", customDefault = false)
   lazy val SkipTerminatingState    = PrefKey[Boolean]("skip_terminating_state") //for calling
 
   lazy val PushEnabledKey          = PrefKey[Boolean]("PUSH_ENABLED", customDefault = true)
@@ -379,7 +380,7 @@ object GlobalPreferences {
 
   lazy val ShouldCreateFullConversation = PrefKey[Boolean]("should_create_full_conv", customDefault = false)
 
-  lazy val LogsEnabled: PrefKey[Boolean] = PrefKey[Boolean]("logs_enabled", customDefault = BuildConfig.DEBUG)
+  lazy val LogsEnabled: PrefKey[Boolean] = PrefKey[Boolean]("save_local_logs", customDefault = ZmsVersion.DEBUG)
 
 
   //DEPRECATED!!! Use the UserPreferences instead!!
@@ -457,5 +458,8 @@ object UserPreferences {
   lazy val CheckMutedStatus                 = PrefKey[Boolean]("check_muted_status", customDefault = true)
 
   lazy val ReadReceiptsRemotelyChanged      = PrefKey[Boolean]("read_receipts_remotely_changed", customDefault = false)
+
+  lazy val StatusNotificationsBitmask       = PrefKey[Int]("status_notifications_bitmask", customDefault = 0)
+  lazy val ShouldWarnStatusNotifications    = PrefKey[Boolean]( "should_warn_status_notifications", customDefault = true)
 
 }

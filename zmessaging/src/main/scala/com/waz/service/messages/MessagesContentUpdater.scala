@@ -132,16 +132,16 @@ class MessagesContentUpdater(messagesStorage: MessagesStorage,
       }
     }
 
-  private[service] def addMessages(convId: ConvId, msgs: Seq[MessageData]): Future[Set[MessageData]] = {
-    verbose(l"addMessages: ${msgs.map(_.id)}")
-
+  private[service] def addMessages(convId: ConvId, msgs: Seq[MessageData]): Future[Set[MessageData]] =
     for {
       toAdd <- skipPreviouslyDeleted(msgs)
       (systemMsgs, contentMsgs) = toAdd.partition(_.isSystemMessage)
       sm <- addSystemMessages(convId, systemMsgs)
+      _  =  verbose(l"SYNC system messages added (${sm.size})")
       cm <- addContentMessages(convId, contentMsgs)
+      _  =  verbose(l"SYNC content messages added (${cm.size})")
     } yield sm.toSet ++ cm
-  }
+
 
   private def skipPreviouslyDeleted(msgs: Seq[MessageData]) =
     deletions.getAll(msgs.map(_.id)) map { deletions =>
@@ -182,6 +182,7 @@ class MessagesContentUpdater(messagesStorage: MessagesStorage,
 
   private def addContentMessages(convId: ConvId, msgs: Seq[MessageData]): Future[Set[MessageData]] = {
     // merge data from multiple events in single message
+    verbose(l"SYNC addContentMessages($convId, ${msgs.map(_.id)})")
     def merge(msgs: Seq[MessageData]): MessageData = {
 
       def mergeLocal(m: MessageData, msg: MessageData) =
@@ -193,7 +194,8 @@ class MessagesContentUpdater(messagesStorage: MessagesStorage,
           time          = if (msg.time.isBefore(prev.time) || prev.isLocal) msg.time else prev.time,
           protos        = prev.protos ++ msg.protos,
           content       = msg.content,
-          quote         = msg.quote
+          quote         = msg.quote,
+          assetId       = msg.assetId.orElse(prev.assetId)
         )
         prev.msgType match {
           case Message.Type.RECALLED => prev // ignore updates to already recalled message
@@ -203,6 +205,7 @@ class MessagesContentUpdater(messagesStorage: MessagesStorage,
 
       if (msgs.size == 1) msgs.head
       else msgs.reduce { (prev, msg) =>
+        verbose(l"msgs reduce from $prev to $msg")
         if (prev.isLocal && prev.userId == msg.userId) mergeLocal(prev, msg)
         else if (prev.userId == msg.userId) mergeMatching(prev, msg)
         else {
@@ -214,12 +217,15 @@ class MessagesContentUpdater(messagesStorage: MessagesStorage,
     }
 
     if (msgs.isEmpty) Future.successful(Set.empty)
-    else
-      messagesStorage.updateOrCreateAll (
-        msgs.groupBy(_.id).mapValues { data =>
-          { (prev: Option[MessageData]) => merge(prev.toSeq ++ data) }
-        }
-      )
+    else {
+      val grouped = msgs.groupBy(_.id).map {
+        case (id, data) => id -> { prev: Option[MessageData] => merge(prev.toSeq ++ data) }
+      }
+      verbose(l"SYNC before update or create all for ${msgs.size}")
+      returning(messagesStorage.updateOrCreateAll(grouped)) {
+        _.foreach(_ => verbose(l"SYNC after update or create all for ${msgs.size}"))
+      }
+    }
   }
 
   private[service] def addMessage(msg: MessageData): Future[Option[MessageData]] = addMessages(msg.convId, Seq(msg)).map(_.headOption)

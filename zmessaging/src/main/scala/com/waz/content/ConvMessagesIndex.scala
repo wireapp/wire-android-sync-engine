@@ -70,8 +70,8 @@ class ConvMessagesIndex(convId: ConvId, messages: MessagesStorageImpl, selfUserI
     val lastMessageFromOther: Signal[Option[MessageData]] = returning(sources.lastMessageFromOther)(_.disableAutowiring())
 
     val unreadCount = for {
-      time <- sources.lastReadTime
-      _ <- Signal.wrap(LocalInstant.Epoch, indexChanged.map(_.time)).throttle(500.millis)
+      time   <- sources.lastReadTime
+      _      <- Signal.wrap(LocalInstant.Epoch, indexChanged.map(_.time)).throttle(500.millis)
       unread <- Signal.future(messages.countUnread(convId, time))
     } yield unread
 

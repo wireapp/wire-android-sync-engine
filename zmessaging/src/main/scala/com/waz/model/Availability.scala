@@ -19,13 +19,29 @@ package com.waz.model
 
 import com.waz.log.LogShow.SafeToLog
 
-sealed trait Availability extends SafeToLog { val id: Int }
+sealed trait Availability extends SafeToLog {
+  val id: Int
+  val bitmask: Int // used to enable/disable warnings about the status change, see User Preferences
+}
 
 object Availability {
-  case object None      extends Availability { override val id = 0 }
-  case object Available extends Availability { override val id = 1 }
-  case object Away      extends Availability { override val id = 2 }
-  case object Busy      extends Availability { override val id = 3 }
+  case object None extends Availability {
+    override val id: Int = 0
+    override val bitmask: Int = 1 << 0
+  }
+
+  case object Available extends Availability {
+    override val id: Int = 1
+    override val bitmask: Int = 1 << 1
+  }
+  case object Away extends Availability {
+    override val id: Int = 2
+    override val bitmask: Int = 1 << 2
+  }
+  case object Busy extends Availability {
+    override val id: Int = 3
+    override val bitmask: Int = 1 << 3
+  }
 
   val all = List(None, Available, Away, Busy)
 

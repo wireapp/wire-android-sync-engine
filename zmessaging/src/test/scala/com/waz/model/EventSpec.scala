@@ -20,6 +20,7 @@ package com.waz.model
 import com.waz.model.Event.EventDecoder
 import com.waz.model.nano.Messages
 import com.waz.model.otr.ClientId
+import com.waz.service.PropertyKey
 import com.waz.specs.AndroidFreeSpec
 import com.waz.utils.JsonDecoder
 import org.json.JSONObject
@@ -49,6 +50,30 @@ class EventSpec extends AndroidFreeSpec with GivenWhenThen {
       event.asInstanceOf[UserConnectionEvent].message should be(Some("Hello Test"))
     }
 
+    scenario("Read receipt off messages are parsed correctly") {
+      val readReceiptJson = new JSONObject(
+      s"""{
+         |  "key": "${PropertyKey.ReadReceiptsEnabled}",
+         |  "type": "user.properties-delete",
+         |  "value": "0"
+         |}""".stripMargin)
+      val res = PropertyEvent.Decoder(readReceiptJson)
+      res.isInstanceOf[ReadReceiptEnabledPropertyEvent] shouldEqual true
+      res.asInstanceOf[ReadReceiptEnabledPropertyEvent].value shouldEqual 0
+    }
+
+    scenario("Read receipt on messages are parsed correctly") {
+      val readReceiptData = new JSONObject(
+        s"""{
+           |  "key": "${PropertyKey.ReadReceiptsEnabled}",
+           |  "type": "user.properties-set",
+           |  "value": "1"
+           |}""".stripMargin)
+      val res = PropertyEvent.Decoder(readReceiptData)
+      res.isInstanceOf[ReadReceiptEnabledPropertyEvent] shouldEqual true
+      res.asInstanceOf[ReadReceiptEnabledPropertyEvent].value shouldEqual 1
+    }
+
     scenario("parse otr message event") {
       EventDecoder(new JSONObject(OtrMessageEvent)) match {
         case ev: OtrMessageEvent =>
@@ -59,8 +84,7 @@ class EventSpec extends AndroidFreeSpec with GivenWhenThen {
       }
     }
 
-    //TODO Base64.decode doesn't work on JVM - fix..
-    ignore("encode/decode GenericMessageEvent") {
+    scenario("encode/decode GenericMessageEvent") {
       val msg = GenericMessageEvent(RConvId(), RemoteInstant(Instant.now()), UserId(), new Messages.GenericMessage)
       EventDecoder(MessageEventEncoder(msg)) match {
         case ev: GenericMessageEvent =>
@@ -68,20 +92,6 @@ class EventSpec extends AndroidFreeSpec with GivenWhenThen {
           ev.content.equals(msg.content)
           ev.from shouldEqual msg.from
           ev.time shouldEqual msg.time
-        case e => fail(s"unexpected event: $e")
-      }
-    }
-
-    //TODO Base64.decode doesn't work on JVM - fix..
-    ignore("encode/decode CallMessageEvent") {
-      val msg = CallMessageEvent(RConvId(), RemoteInstant(Instant.now()), UserId(), ClientId(), "")
-      EventDecoder(MessageEventEncoder(msg)) match {
-        case ev: CallMessageEvent =>
-          ev.convId shouldEqual msg.convId
-          ev.time shouldEqual msg.time
-          ev.from shouldEqual msg.from
-          ev.sender shouldEqual msg.sender
-          ev.content shouldEqual msg.content
         case e => fail(s"unexpected event: $e")
       }
     }

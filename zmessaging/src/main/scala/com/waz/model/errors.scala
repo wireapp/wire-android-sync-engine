@@ -19,8 +19,9 @@ package com.waz.model
 
 import com.waz.api.impl.ErrorResponse
 import com.waz.threading.CancellableFuture
+import com.waz.log.LogSE.asSize
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.{ ExecutionContext, Future }
 
 object errors {
 
@@ -45,28 +46,37 @@ object errors {
       }
   }
 
-  sealed trait ZError extends Throwable {
-    val description: String
-    val cause: Option[Throwable]
-  }
+  abstract class ZError(val description: String, val cause: Option[Throwable])
+      extends Throwable(description, cause.orNull)
 
-  case class UnexpectedError(causeError: Throwable) extends ZError {
-    override val description: String = causeError.getMessage
-    override val cause: Option[Throwable] = Some(causeError)
-  }
+  case class UnexpectedError(causeError: Throwable) extends ZError(causeError.getMessage, Some(causeError))
 
-  sealed trait NotFound extends ZError
-  case class NotFoundRemote(description: String, cause: Option[Throwable] = None) extends NotFound
-  case class NotFoundLocal(description: String, cause: Option[Throwable] = None) extends NotFound
+  abstract class NotFound(override val description: String, override val cause: Option[Throwable])
+      extends ZError(description, cause)
+  case class NotFoundRemote(override val description: String, override val cause: Option[Throwable] = None)
+      extends NotFound(description, cause)
+  case class NotFoundLocal(override val description: String, override val cause: Option[Throwable] = None)
+      extends NotFound(description, cause)
 
-  case class NetworkError(errorResponse: ErrorResponse) extends ZError {
-    override val description: String = errorResponse.toString
-    override val cause: Option[Throwable] = None
-  }
+  case class NetworkError(errorResponse: ErrorResponse) extends ZError(errorResponse.toString, None)
 
-  sealed trait LogicError extends ZError
-  case class ValidationError(description: String, cause: Option[Throwable] = None) extends LogicError
+  abstract class LogicError(override val description: String, override val cause: Option[Throwable])
+      extends ZError(description, cause)
+  case class FailedExpectationsError(override val description: String, override val cause: Option[Throwable] = None)
+    extends LogicError(description, cause)
+  case class NotSupportedError(override val description: String, override val cause: Option[Throwable] = None)
+    extends LogicError(description, cause)
 
+  class ValidationError(override val description: String, override val cause: Option[Throwable] = None)
+    extends LogicError(description, cause)
 
+  case class AssetContentTooLargeError(contentSize: Long, allowedSize: Long)
+    extends ValidationError(s"Asset content too large. Max allowed size: ${asSize(allowedSize)}. Actual size: ${asSize(contentSize)}", None)
+
+  case class FileSystemError(override val description: String, override val cause: Option[Throwable] = None)
+    extends ZError(description, cause)
+
+  case class PermissionDeniedError(permissions: Seq[String]) extends
+    ZError(s"Permissions list: ${permissions.mkString}", None)
 
 }

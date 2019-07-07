@@ -50,9 +50,10 @@ trait ConversationsService {
   def processConversationEvent(ev: ConversationStateEvent, selfUserId: UserId, retryCount: Int = 0): Future[Any]
   def getSelfConversation: Future[Option[ConversationData]]
   def updateConversationsWithDeviceStartMessage(conversations: Seq[ConversationResponse]): Future[Unit]
+  def updateRemoteId(id: ConvId, remoteId: RConvId): Future[Unit]
   def setConversationArchived(id: ConvId, archived: Boolean): Future[Option[ConversationData]]
   def setReceiptMode(id: ConvId, receiptMode: Int): Future[Option[ConversationData]]
-  def forceNameUpdate(id: ConvId): Future[Option[(ConversationData, ConversationData)]]
+  def forceNameUpdate(id: ConvId, defaultName: String): Future[Option[(ConversationData, ConversationData)]]
   def onMemberAddFailed(conv: ConvId, users: Set[UserId], error: Option[ErrorType], resp: ErrorResponse): Future[Unit]
   def groupConversation(convId: ConvId): Signal[Boolean]
   def isGroupConversation(convId: ConvId): Future[Boolean]
@@ -114,7 +115,7 @@ class ConversationsServiceImpl(teamId:          Option[TeamId],
   }
 
   push.onHistoryLost { req =>
-    verbose(l"onSlowSyncNeeded($req)")
+    verbose(l"SYNC onSlowSyncNeeded($req)")
     // TODO: this is just very basic implementation creating empty message
     // This should be updated to include information about possibly missed changes
     // this message will be shown rarely (when notifications stream skips data)
@@ -241,8 +242,8 @@ class ConversationsServiceImpl(teamId:          Option[TeamId],
 
   private def updateConversations(responses: Seq[ConversationResponse]): Future[(Seq[ConversationData], Seq[ConversationData])] = {
 
-    def updateConversationData() = {
-      def findExistingId = convsStorage { convsById =>
+    def updateConversationData(): Future[(Set[ConversationData], Seq[ConversationData])] = {
+      def findExistingId: Future[Seq[(ConvId, ConversationResponse)]] = convsStorage { convsById =>
         def byRemoteId(id: RConvId) = convsById.values.find(_.remoteId == id)
 
         responses.map { resp =>
@@ -255,7 +256,9 @@ class ConversationsServiceImpl(teamId:          Option[TeamId],
             }
           }
 
-          (matching.fold(newId)(_.id), resp)
+          val r = (matching.fold(newId)(_.id), resp)
+          verbose(l"Returning conv id pair $r, isOneToOne: ${isOneToOne(resp.convType)}")
+          r
         }
       }
 
@@ -306,6 +309,9 @@ class ConversationsServiceImpl(teamId:          Option[TeamId],
       (convs.toSeq, created)
   }
 
+  def updateRemoteId(id: ConvId, remoteId: RConvId): Future[Unit] =
+    convsStorage.update(id, c => c.copy(remoteId = remoteId)).map(_ => ())
+
   def setConversationArchived(id: ConvId, archived: Boolean) = content.updateConversationArchived(id, archived) flatMap {
     case Some((_, conv)) =>
       sync.postConversationState(id, ConversationState(archived = Some(conv.archived), archiveTime = Some(conv.archiveTime))) map { _ => Some(conv) }
@@ -326,9 +332,9 @@ class ConversationsServiceImpl(teamId:          Option[TeamId],
     _ <- msgContent.deleteMessagesForConversation(convId: ConvId)
   } yield ()
 
-  def forceNameUpdate(id: ConvId) = {
+  def forceNameUpdate(id: ConvId, defaultName: String) = {
     warn(l"forceNameUpdate($id)")
-    nameUpdater.forceNameUpdate(id)
+    nameUpdater.forceNameUpdate(id, defaultName)
   }
 
   def onMemberAddFailed(conv: ConvId, users: Set[UserId], error: Option[ErrorType], resp: ErrorResponse) = for {

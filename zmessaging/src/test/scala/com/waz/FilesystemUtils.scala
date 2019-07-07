@@ -23,10 +23,19 @@ object FilesystemUtils {
 
   lazy val globalDirectoryForTests = new File(System.getProperty("java.io.tmpdir"))
 
-  def createDirectoryForTest(directoryName: String = s"directory_for_test_${System.currentTimeMillis()}"): File = {
+  private var counter = 0
+  private val lock = new Object
+
+  def createDirectoryForTest(directoryName: String = calculateSuffix()): File = {
     val directory = new File(globalDirectoryForTests, directoryName)
     directory.mkdir()
     directory
   }
+
+  private def calculateSuffix(): String =
+    lock.synchronized {
+      counter += 1
+      s"directory_for_test_${System.currentTimeMillis()}_$counter"
+    }
 
 }

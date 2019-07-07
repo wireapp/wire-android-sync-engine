@@ -37,7 +37,7 @@ class AddressBookClientImpl(implicit
                             httpClient: HttpClient,
                             authRequestInterceptor: AuthRequestInterceptor) extends AddressBookClient {
 
-  import HttpClient.AutoDerivation._
+  import HttpClient.AutoDerivationOld._
   import HttpClient.dsl._
   import com.waz.sync.client.AddressBookClient._
 

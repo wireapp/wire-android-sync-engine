@@ -21,11 +21,13 @@ import com.waz.api.Verification
 import com.waz.db.Col._
 import com.waz.db.Dao
 import com.waz.model
+import com.waz.model.AssetMetaData.Image.Tag.Medium
 import com.waz.model.ManagedBy.ManagedBy
-import com.waz.model.UserData.ConnectionStatus
+import com.waz.model.UserData.{ConnectionStatus, Picture}
 import com.waz.model.UserPermissions._
 import com.waz.service.SearchKey
-import com.waz.sync.client.UserSearchClient.UserSearchEntry
+import com.waz.service.UserSearchService.UserSearchEntry
+import com.waz.service.assets2.StorageCodecs
 import com.waz.utils._
 import com.waz.utils.wrappers.{DB, DBCursor}
 
@@ -34,11 +36,11 @@ import scala.concurrent.duration._
 case class UserData(override val id:       UserId,
                     teamId:                Option[TeamId]         = None,
                     name:                  Name,
-                    email:                 Option[EmailAddress]   = None,
-                    phone:                 Option[PhoneNumber]    = None,
-                    trackingId:            Option[TrackingId]     = None,
-                    picture:               Option[AssetId]        = None,
-                    accent:                Int                    = 0, // accent color id
+                    email:                 Option[EmailAddress]  = None,
+                    phone:                 Option[PhoneNumber]   = None,
+                    trackingId:            Option[TrackingId]    = None,
+                    picture:               Option[UserData.Picture] = None,
+                    accent:                Int                   = 0, // accent color id
                     searchKey:             SearchKey,
                     connection:            ConnectionStatus       = ConnectionStatus.Unconnected,
                     connectionLastUpdated: RemoteInstant          = RemoteInstant.Epoch, // server side timestamp of last connection update
@@ -72,31 +74,31 @@ case class UserData(override val id:       UserId,
 
   def updated(user: UserInfo): UserData = updated(user, withSearchKey = true)
   def updated(user: UserInfo, withSearchKey: Boolean): UserData = copy(
-    name = user.name.getOrElse(name),
-    email = user.email.orElse(email),
-    phone = user.phone.orElse(phone),
-    accent = user.accentId.getOrElse(accent),
-    trackingId = user.trackingId.orElse(trackingId),
-    searchKey = SearchKey(if (withSearchKey) user.name.getOrElse(name).str else ""),
-    picture = user.mediumPicture.map(_.id).orElse(picture),
-    deleted = user.deleted,
-    handle = user.handle match {
+    name          = user.name.getOrElse(name),
+    email         = user.email.orElse(email),
+    phone         = user.phone.orElse(phone),
+    accent        = user.accentId.getOrElse(accent),
+    trackingId    = user.trackingId.orElse(trackingId),
+    searchKey     = SearchKey(if (withSearchKey) user.name.getOrElse(name).str else ""),
+    picture       = user.picture.flatMap(_.collectFirst { case p if p.tag == Medium => Picture.Uploaded(p.id) }).orElse(picture),
+    deleted       = user.deleted,
+    providerId    = user.service.map(_.provider).orElse(providerId),
+    integrationId = user.service.map(_.id).orElse(integrationId),
+    expiresAt     = user.expiresAt.orElse(expiresAt),
+    teamId        = user.teamId.orElse(teamId),
+    managedBy     = user.managedBy.orElse(managedBy),
+    fields        = user.fields.getOrElse(fields),
+    handle        = user.handle match {
       case Some(h) if !h.toString.isEmpty => Some(h)
       case _ => handle
-    },
-    providerId = user.service.map(_.provider).orElse(providerId),
-    integrationId = user.service.map(_.id).orElse(integrationId),
-    expiresAt = user.expiresAt.orElse(expiresAt),
-    teamId = user.teamId.orElse(teamId),
-    managedBy = user.managedBy.orElse(managedBy),
-    fields = user.fields.getOrElse(fields)
+    }
   )
 
   def updated(user: UserSearchEntry): UserData = copy(
-    name = user.name,
+    name      = user.name,
     searchKey = SearchKey(user.name),
-    accent = user.colorId.getOrElse(accent),
-    handle = Some(user.handle)
+    accent    = user.colorId.getOrElse(accent),
+    handle    = Some(user.handle)
   )
 
   def updateConnectionStatus(status: UserData.ConnectionStatus, time: Option[RemoteInstant] = None, message: Option[String] = None): UserData = {
@@ -146,6 +148,12 @@ object UserData {
 
   lazy val Empty = UserData(UserId("EMPTY"), "")
 
+  trait Picture
+  object Picture {
+    case class NotUploaded(id: UploadAssetId) extends Picture
+    case class Uploaded(id: AssetId)          extends Picture
+  }
+
   type ConnectionStatus = com.waz.api.User.ConnectionStatus
   object ConnectionStatus {
     import com.waz.api.User.ConnectionStatus._
@@ -185,14 +193,14 @@ object UserData {
 
   def apply(user: UserInfo, withSearchKey: Boolean): UserData = UserData(user.id, user.name.getOrElse(Name.Empty)).updated(user, withSearchKey)
 
-  implicit object UserDataDao extends Dao[UserData, UserId] {
+  implicit object UserDataDao extends Dao[UserData, UserId] with StorageCodecs {
     val Id = id[UserId]('_id, "PRIMARY KEY").apply(_.id)
     val TeamId = opt(id[TeamId]('teamId))(_.teamId)
     val Name = text[model.Name]('name, _.str, model.Name(_))(_.name)
     val Email = opt(emailAddress('email))(_.email)
     val Phone = opt(phoneNumber('phone))(_.phone)
     val TrackingId = opt(id[TrackingId]('tracking_id))(_.trackingId)
-    val Picture = opt(id[AssetId]('picture))(_.picture)
+    val Picture = opt(text[UserData.Picture]('picture, UserPictureCodec.serialize, UserPictureCodec.deserialize))(_.picture)
     val Accent = int('accent)(_.accent)
     val SKey = text[SearchKey]('skey, _.asciiRepresentation, SearchKey.unsafeRestore)(_.searchKey)
     val Conn = text[ConnectionStatus]('connection, _.code, ConnectionStatus(_))(_.connection)

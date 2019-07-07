@@ -17,24 +17,30 @@
  */
 package com.waz.service
 
+import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model.Event
 import com.waz.threading.Threading.Implicits.Background
 
 import scala.concurrent.Future
 import scala.concurrent.Future._
+import com.waz.log.LogSE._
 
 trait EventPipeline extends (Traversable[Event] => Future[Unit]) {
   def apply(input: Traversable[Event]): Future[Unit]
 }
 
 class EventPipelineImpl(transformersByName: => Vector[Vector[Event] => Future[Vector[Event]]],
-                        schedulerByName: => Traversable[Event] => Future[Unit]) extends EventPipeline {
-
+                        schedulerByName: => Traversable[Event] => Future[Unit]) extends EventPipeline with DerivedLogTag {
   private lazy val (transformers, scheduler) = (transformersByName, schedulerByName)
 
-  override def apply(input: Traversable[Event]): Future[Unit] =
+  override def apply(input: Traversable[Event]): Future[Unit] = {
+    val inputEvents = input.toVector
+    verbose(l"SYNC pipeline apply for events (${inputEvents.size}): ${inputEvents.map(_.hashCode()).mkString(",")}")
+    val t = System.currentTimeMillis()
     for {
-      events <- transformers.foldLeft(successful(input.toVector))((l, r) => l.flatMap(r))
+      events <- transformers.foldLeft(successful(inputEvents))((l, r) => l.flatMap(r))
       _      <- scheduler(events)
+      _      =  verbose(l"SYNC pipeline apply, events scheduled, time: ${System.currentTimeMillis() - t}ms")
     } yield ()
+  }
 }

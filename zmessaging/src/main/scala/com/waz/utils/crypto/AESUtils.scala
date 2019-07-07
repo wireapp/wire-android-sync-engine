@@ -43,6 +43,9 @@ object AESUtils {
   def cipher(key: AESKey, iv: Array[Byte], mode: Int) =
     returning(Cipher.getInstance("AES/CBC/PKCS5Padding")) { _.init(mode, new SecretKeySpec(key.bytes, "AES"), new IvParameterSpec(iv)) }
 
+  def cipher(key: Array[Byte], iv: Array[Byte], mode: Int) =
+    returning(Cipher.getInstance("AES/CBC/PKCS5Padding")) { _.init(mode, new SecretKeySpec(key, "AES"), new IvParameterSpec(iv)) }
+
   def decrypt(key: AESKey, input: Array[Byte]): Array[Byte] =
     cipher(key, input.take(16), Cipher.DECRYPT_MODE).doFinal(input.drop(16))
 
@@ -70,7 +73,7 @@ object AESUtils {
     new CipherOutputStream(os, cipher(key, iv, Cipher.ENCRYPT_MODE))
   }
 
-  def inputStream(key: AESKey, is: InputStream) = {
+  def inputStream(key: AESKey, is: InputStream): CipherInputStream = {
     val iv = returning(new Array[Byte](16))(IoUtils.readFully(is, _, 0, 16))
 
     new CipherInputStream(is, cipher(key, iv, Cipher.DECRYPT_MODE)) {
@@ -94,4 +97,54 @@ object AESUtils {
         read(skipBuffer, 0, math.min(skipBuffer.length, n.toInt))
     }
   }
+
+
+  private val InitializingVectorLength = 16
+
+  def generateIV: Array[Byte] = randomBytes(InitializingVectorLength)
+
+  //This solution will not work for files larger then 2147 mb
+  def sizeAfterEncryption(key: Array[Byte], iv: Array[Byte], sizeBeforeEncryption: Long): Long = {
+    iv.length + cipher(key, iv, Cipher.ENCRYPT_MODE).getOutputSize(sizeBeforeEncryption.toInt)
+  }
+
+  def encryptInputStream(key: Array[Byte], iv: Array[Byte], is: InputStream): InputStream =
+    inputStream(key, Some(iv), is, Cipher.ENCRYPT_MODE)
+
+  def decryptInputStream(key: Array[Byte], is: InputStream): InputStream =
+    inputStream(key, None, is, Cipher.DECRYPT_MODE)
+
+  private def inputStream(key: Array[Byte], initVect: Option[Array[Byte]], is: InputStream, mode: Int): InputStream = {
+
+
+    val iv = mode match {
+      case Cipher.ENCRYPT_MODE => initVect.get
+      case Cipher.DECRYPT_MODE => returning(new Array[Byte](InitializingVectorLength))(IoUtils.readFully(is, _, 0, InitializingVectorLength))
+    }
+
+    val cipherInputStream: CipherInputStream = new CipherInputStream(is, cipher(key, iv, mode)) {
+      // close behaviour was changed in Java8, it now throws exception if stream wasn't properly decrypted,
+      // this exception will also happen if stream wasn't fully read, we don't want that.
+      // In some cases we want to only read part of a stream and be able to stop reading without unexpected errors.
+      override def close(): Unit = try {
+        super.close()
+      } catch {
+        case io: IOException =>
+          io.getCause match {
+            case _: BadPaddingException => //ignore
+            case e => throw e
+          }
+      }
+
+      private val skipBuffer = Array.ofDim[Byte](4096)
+
+      // skip is not supported in some android versions (as well as on some JVMs), so we just read required number of bytes instead
+      override def skip(n: Long): Long =
+        read(skipBuffer, 0, math.min(skipBuffer.length, n.toInt))
+    }
+
+    if (mode == Cipher.ENCRYPT_MODE) new SequenceInputStream(new ByteArrayInputStream(iv), cipherInputStream)
+    else cipherInputStream
+  }
+
 }

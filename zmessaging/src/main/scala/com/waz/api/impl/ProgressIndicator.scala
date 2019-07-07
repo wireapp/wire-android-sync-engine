@@ -26,6 +26,17 @@ object ProgressIndicator {
   object ProgressData {
     val Indefinite = ProgressData(0, -1, State.RUNNING)
     val Unknown = ProgressData(0, 0, State.UNKNOWN)
+
+    def apply(current: Long, total: Option[Long]): ProgressData = {
+      (current, total) match {
+        case (progress, Some(total)) if progress == total =>
+          ProgressData(progress, total, com.waz.api.ProgressIndicator.State.COMPLETED)
+        case (progress, Some(total)) =>
+          ProgressData(progress, total, com.waz.api.ProgressIndicator.State.RUNNING)
+        case (_, None) =>
+          ProgressData.Indefinite
+      }
+    }
   }
 
   class ProgressReporter(callback: ProgressData => Unit, total: Long) {

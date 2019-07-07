@@ -17,7 +17,9 @@
  */
 package com.waz.service
 
-import android.content.Context
+import java.io.File
+
+import android.content.{ComponentCallbacks2, Context}
 import com.softwaremill.macwire._
 import com.waz.log.LogSE._
 import com.waz.api.ContentSearchQuery
@@ -29,6 +31,7 @@ import com.waz.model.otr.ClientId
 import com.waz.repository.{FCMNotificationStatsRepositoryImpl, FCMNotificationsRepositoryImpl}
 import com.waz.service.EventScheduler.{Sequential, Stage}
 import com.waz.service.assets._
+import com.waz.service.assets2.{AssetService => _, AssetServiceImpl => _, _}
 import com.waz.service.call._
 import com.waz.service.conversation._
 import com.waz.service.downloads.{AssetLoader, AssetLoaderImpl}
@@ -48,12 +51,15 @@ import com.waz.threading.{SerialDispatchQueue, Threading}
 import com.waz.ui.UiModule
 import com.waz.utils.Locales
 import com.waz.utils.crypto.ReplyHashingImpl
+import com.waz.utils.events.EventContext
 import com.waz.utils.wrappers.{AndroidContext, DB, GoogleApi}
+import com.waz.utils.{IoUtils, Locales}
 import com.waz.znet2.http.HttpClient
 import com.waz.znet2.http.Request.UrlCreator
 import com.waz.znet2.{AuthRequestInterceptor, OkHttpWebSocketFactory}
 import org.threeten.bp.{Clock, Duration, Instant}
 
+import scala.concurrent.duration._
 import scala.concurrent.{Future, Promise}
 import scala.util.Try
 
@@ -73,23 +79,36 @@ class ZMessagingFactory(global: GlobalModule) {
   def zmessaging(teamId: Option[TeamId], clientId: ClientId, accountManager: AccountManager, storage: StorageModule, cryptoBox: CryptoBoxService) = wire[ZMessaging]
 }
 
-class StorageModule(context: Context, val userId: UserId, globalPreferences: GlobalPreferences, tracking: TrackingService) {
-  lazy val db                                         = new ZmsDatabase(userId, context, tracking)
-  lazy val db2: DB = DB(db.dbHelper.getWritableDatabase)
+trait Assets2Module {
+  import assets2._
 
-  lazy val userPrefs                                    = UserPreferences.apply(context, db, globalPreferences)
-  lazy val usersStorage:        UsersStorage            = wire[UsersStorageImpl]
-  lazy val otrClientsStorage:   OtrClientsStorage       = wire[OtrClientsStorageImpl]
-  lazy val membersStorage                               = wire[MembersStorageImpl]
-  lazy val assetsStorage :      AssetsStorage           = wire[AssetsStorageImpl]
-  lazy val notifStorage:        NotificationStorage     = wire[NotificationStorageImpl]
-  lazy val convsStorage:        ConversationStorage     = wire[ConversationStorageImpl]
-  lazy val msgDeletions:        MsgDeletionStorage      = wire[MsgDeletionStorageImpl]
-  lazy val searchQueryCache:    SearchQueryCacheStorage = wire[SearchQueryCacheStorageImpl]
-  lazy val msgEdits:            EditHistoryStorage      = wire[EditHistoryStorageImpl]
-  lazy val propertiesStorage:   PropertiesStorage       = new PropertiesStorageImpl()(context, db2, Threading.IO)
+  def uriHelper: UriHelper
+  def assetDetailsService: AssetDetailsService
+  def assetPreviewService: AssetPreviewService
+  def assetsTransformationsService: AssetTransformationsService
 }
 
+class StorageModule(context: Context, val userId: UserId, globalPreferences: GlobalPreferences, tracking: TrackingService) {
+  lazy val db                                         = new ZmsDatabase(userId, context, tracking)
+  lazy val userPrefs                                  = UserPreferences.apply(context, db, globalPreferences)
+  lazy val usersStorage:      UsersStorage            = wire[UsersStorageImpl]
+  lazy val otrClientsStorage: OtrClientsStorage       = wire[OtrClientsStorageImpl]
+  lazy val membersStorage                             = wire[MembersStorageImpl]
+  lazy val oldAssetStorage:      AssetsStorage        = wire[AssetsStorageImpl]
+  lazy val reactionsStorage                           = wire[ReactionsStorageImpl]
+  lazy val notifStorage:      NotificationStorage     = wire[NotificationStorageImpl]
+  lazy val convsStorage:      ConversationStorage     = wire[ConversationStorageImpl]
+  lazy val msgDeletions:      MsgDeletionStorage      = wire[MsgDeletionStorageImpl]
+  lazy val searchQueryCache:  SearchQueryCacheStorage = wire[SearchQueryCacheStorageImpl]
+  lazy val msgEdits:          EditHistoryStorage      = wire[EditHistoryStorageImpl]
+  lazy val propertiesStorage:   PropertiesStorage       = new PropertiesStorageImpl()(context, db2, Threading.IO)
+
+  lazy val db2: DB = DB(db.dbHelper.getWritableDatabase)
+  lazy val inProgressAssetStorage: assets2.DownloadAssetStorage = new assets2.DownloadAssetStorageImpl(context, db2)(Threading.BlockingIO)
+  lazy val rawAssetStorage: assets2.UploadAssetStorage   = new assets2.UploadAssetStorageImpl(context, db2)(Threading.BlockingIO)
+  lazy val assetsStorage: assets2.AssetStorage         = new assets2.AssetStorageImpl(context, db2, Threading.BlockingIO)
+
+}
 
 class ZMessaging(val teamId: Option[TeamId], val clientId: ClientId, account: AccountManager, val storage: StorageModule, val cryptoBox: CryptoBoxService) extends DerivedLogTag {
 
@@ -155,6 +174,10 @@ class ZMessaging(val teamId: Option[TeamId], val clientId: ClientId, account: Ac
   def otrClientsStorage = storage.otrClientsStorage
   def membersStorage    = storage.membersStorage
   def assetsStorage     = storage.assetsStorage
+  def oldAssetStorage                    = storage.oldAssetStorage
+  def rawAssetStorage               = storage.rawAssetStorage
+  def downloadAssetStorage               = storage.inProgressAssetStorage
+  def reactionsStorage  = storage.reactionsStorage
   def notifStorage      = storage.notifStorage
   def convsStorage      = storage.convsStorage
   def msgDeletions      = storage.msgDeletions
@@ -167,11 +190,11 @@ class ZMessaging(val teamId: Option[TeamId], val clientId: ClientId, account: Ac
   lazy val messagesIndexStorage: MessageIndexStorage   = wire[MessageIndexStorage]
   lazy val eventStorage: PushNotificationEventsStorage = wire[PushNotificationEventsStorageImpl]
   lazy val readReceiptsStorage: ReadReceiptsStorage    = wire[ReadReceiptsStorageImpl]
-  lazy val reactionsStorage: ReactionsStorage          = wire[ReactionsStorageImpl]
 
   lazy val youtubeClient      = new YouTubeClientImpl()(urlCreator, httpClient, authRequestInterceptor)
   lazy val soundCloudClient   = new SoundCloudClientImpl()(urlCreator, httpClient, authRequestInterceptor)
   lazy val assetClient        = new AssetClientImpl(cache)(urlCreator, httpClientForLongRunning, authRequestInterceptor)
+  lazy val asset2Client       = new AssetClient2Impl()(urlCreator, httpClientForLongRunning, authRequestInterceptor)
   lazy val usersClient        = new UsersClientImpl()(urlCreator, httpClient, authRequestInterceptor)
   lazy val convClient         = new ConversationsClientImpl()(urlCreator, httpClient, authRequestInterceptor)
   lazy val teamClient         = new TeamsClientImpl()(urlCreator, httpClient, authRequestInterceptor)
@@ -180,7 +203,7 @@ class ZMessaging(val teamId: Option[TeamId], val clientId: ClientId, account: Ac
   lazy val gcmClient          = new PushTokenClientImpl()(urlCreator, httpClient, authRequestInterceptor)
   lazy val typingClient       = new TypingClientImpl()(urlCreator, httpClient, authRequestInterceptor)
   lazy val invitationClient   = account.invitationClient
-  lazy val giphyClient        = new GiphyClientImpl()(urlCreator, httpClient, authRequestInterceptor)
+  lazy val giphyClient: GiphyClient = new GiphyClientImpl()(urlCreator, httpClient, authRequestInterceptor)
   lazy val userSearchClient   = new UserSearchClientImpl()(urlCreator, httpClient, authRequestInterceptor)
   lazy val connectionsClient  = new ConnectionsClientImpl()(urlCreator, httpClient, authRequestInterceptor)
   lazy val messagesClient     = new MessagesClientImpl()(urlCreator, httpClient, authRequestInterceptor)
@@ -195,7 +218,7 @@ class ZMessaging(val teamId: Option[TeamId], val clientId: ClientId, account: Ac
   lazy val convsContent: ConversationsContentUpdaterImpl = wire[ConversationsContentUpdaterImpl]
   lazy val messagesContent: MessagesContentUpdater = wire[MessagesContentUpdater]
 
-  lazy val assetLoader: AssetLoader                   = new AssetLoaderImpl(context, Some(assetsStorage), network, assetClient, audioTranscader, videoTranscoder, cache, imageCache, bitmapDecoder, tracking)(urlCreator, authRequestInterceptor)
+  lazy val assetLoader: AssetLoader                   = new AssetLoaderImpl(context, Some(oldAssetStorage), network, assetClient, audioTranscader, videoTranscoder, cache, imageCache, bitmapDecoder, tracking)(urlCreator, authRequestInterceptor)
   lazy val imageLoader: ImageLoader                   = wire[ImageLoaderImpl]
 
   lazy val push: PushService                          = wire[PushServiceImpl]
@@ -207,7 +230,7 @@ class ZMessaging(val teamId: Option[TeamId], val clientId: ClientId, account: Ac
   lazy val userSearch                                 = wire[UserSearchService]
   lazy val assetGenerator                             = wire[ImageAssetGenerator]
   lazy val assetMetaData                              = wire[com.waz.service.assets.MetaDataService]
-  lazy val assets: AssetService                       = wire[AssetServiceImpl]
+  lazy val oldAssets: AssetService                    = wire[AssetServiceImpl]
   lazy val users: UserService                         = wire[UserServiceImpl]
   lazy val conversations: ConversationsService        = wire[ConversationsServiceImpl]
   lazy val convOrder: ConversationOrderEventsService  = wire[ConversationOrderEventsService]
@@ -224,7 +247,7 @@ class ZMessaging(val teamId: Option[TeamId], val clientId: ClientId, account: Ac
   lazy val contacts: ContactsServiceImpl              = wire[ContactsServiceImpl]
   lazy val typing: TypingService                      = wire[TypingService]
   lazy val richmedia                                  = wire[RichMediaService]
-  lazy val giphy                                      = wire[GiphyService]
+  lazy val giphy: GiphyService                        = new GiphyServiceImpl(giphyClient)(Threading.Background)
   lazy val youtubeMedia                               = wire[YouTubeMediaService]
   lazy val soundCloudMedia                            = wire[SoundCloudMediaService]
   lazy val otrService: OtrServiceImpl                 = wire[OtrServiceImpl]
@@ -258,7 +281,42 @@ class ZMessaging(val teamId: Option[TeamId], val clientId: ClientId, account: Ac
   lazy val propertiesService: PropertiesService       = wire[PropertiesServiceImpl]
   lazy val fcmNotStatsService                         = wire[FCMNotificationStatsServiceImpl]
 
+//  lazy val contentCache: AssetContentCache = new AssetContentCacheImpl(
+//    cacheDirectory = new File(context.getExternalCacheDir, s"assets_${selfUserId.str}"),
+//    directorySizeThreshold = 1024 * 1024 * 200,
+//    sizeCheckingInterval = 30.seconds
+//  )(Threading.BlockingIO, EventContext.Global)
+
   lazy val eventPipeline: EventPipeline = new EventPipelineImpl(Vector(), eventScheduler.enqueue)
+
+  lazy val assets2Module = ZMessaging.assets2Module
+
+  lazy val assetService = {
+    val lruCacheDirectory = new File(context.getCacheDir, s"assets_${selfUserId.str}")
+    val rawCacheDirectory = new File(context.getCacheDir, s"raw_assets_${selfUserId.str}")
+
+    IoUtils.createDirectory(lruCacheDirectory)
+    IoUtils.createDirectory(rawCacheDirectory)
+
+    new assets2.AssetServiceImpl(
+      storage.assetsStorage,
+      storage.rawAssetStorage,
+      storage.inProgressAssetStorage,
+      assets2Module.assetDetailsService,
+      assets2Module.assetPreviewService,
+      assets2Module.assetsTransformationsService,
+      new AssetRestrictionsServiceImpl(assets2Module.uriHelper, teamId),
+      assets2Module.uriHelper,
+      new AssetContentCacheImpl(
+        cacheDirectory = lruCacheDirectory,
+        directorySizeThreshold = 1024 * 1024 * 200L,
+        sizeCheckingInterval = 30.seconds
+      )(Threading.BlockingIO, EventContext.Global),
+      new UploadAssetContentCacheImpl(rawCacheDirectory)(Threading.BlockingIO),
+      asset2Client,
+      sync
+    )
+  }
 
   lazy val eventScheduler = {
 
@@ -337,6 +395,7 @@ object ZMessaging extends DerivedLogTag { self =>
   private var backend:         BackendConfig = _
   private var syncRequests:    SyncRequestService = _
   private var notificationsUi: NotificationUiController = _
+  private var assets2Module:   Assets2Module = _
 
   //var for tests - and set here so that it is globally available without the need for DI
   var clock = Clock.systemUTC()
@@ -363,7 +422,8 @@ object ZMessaging extends DerivedLogTag { self =>
                prefs:          GlobalPreferences,
                googleApi:      GoogleApi,
                syncRequests:   SyncRequestService,
-               notificationUi: NotificationUiController) = {
+               notificationUi: NotificationUiController,
+               assets2:        Assets2Module) = {
     Threading.assertUiThread()
 
     if (this.currentUi == null) {
@@ -373,6 +433,7 @@ object ZMessaging extends DerivedLogTag { self =>
       this.googleApi = googleApi
       this.syncRequests = syncRequests
       this.notificationsUi = notificationUi
+      this.assets2Module = assets2
       currentUi = ui
       currentGlobal = _global
       currentAccounts = currentGlobal.accountsService

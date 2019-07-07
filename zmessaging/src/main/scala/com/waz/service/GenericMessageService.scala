@@ -38,7 +38,6 @@ class GenericMessageService(selfUserId: UserId,
   import com.waz.threading.Threading.Implicits.Background
 
   val eventProcessingStage = EventScheduler.Stage[GenericMessageEvent] { (_, events) =>
-    verbose(l"got events: ${events.map(_.from)}")
 
     def lastForConv(items: Seq[(RConvId, RemoteInstant)]) = items.groupBy(_._1).map { case (conv, times) => times.maxBy(_._2.toEpochMilli) }
 

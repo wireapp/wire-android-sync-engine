@@ -33,7 +33,7 @@ class CallingClientImpl(implicit
 
   import CallingClientImpl._
   import HttpClient.dsl._
-  import HttpClient.AutoDerivation._
+  import HttpClient.AutoDerivationOld._
 
   override def getConfig: ErrorOrResponse[String] = {
     Request.Get(relativePath = CallConfigPath)
