@@ -369,8 +369,8 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
       case Content.AsBlob(blob)       => prepareContent(blob)
     }
 
-    def extractDetails(content: PreparedContent): Future[(AssetDetails, Mime)] = contentForUpload.content match {
-      case _: Content.AsBlob => Future.successful((BlobDetails, Mime.Default))
+    def extractDetails(content: PreparedContent): (AssetDetails, Mime) = contentForUpload.content match {
+      case _: Content.AsBlob => (BlobDetails, Mime.Default)
       case _                 => assetDetailsService.extract(content)
     }
 
@@ -399,7 +399,7 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
 
     for {
       initialContent                                            <- prepareContent(contentForUpload.content)
-      (initialDetails, initialMime)                             <- extractDetails(initialContent)
+      (initialDetails, initialMime)                             =  extractDetails(initialContent)
       ts                                                        =  transformations.getTransformations(initialMime, initialDetails)
       (transformedContent, transformedMime, transformedDetails) <- ts.headOption match { //TODO Handle not only the first transformation
         case Some(transformation) =>
@@ -407,7 +407,7 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
             cacheFile    <- uploadContentCache.getOrCreateEmpty(assetId)
             mime         <- Future { transformation(() => initialContent.openInputStream(uriHelper).get, () => new FileOutputStream(cacheFile)) }
             content      =  Content.File(mime, cacheFile)
-            (details, _) <- extractDetails(content)
+            (details, _) =  extractDetails(content) // mime should not change anymore
           } yield (content, mime, details)
         case _ =>
           Future.successful((initialContent, initialMime, initialDetails))

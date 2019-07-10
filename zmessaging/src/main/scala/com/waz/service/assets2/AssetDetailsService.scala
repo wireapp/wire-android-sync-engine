@@ -22,5 +22,5 @@ import com.waz.model.Mime
 import scala.concurrent.Future
 
 trait AssetDetailsService {
-  def extract(content: PreparedContent): Future[(AssetDetails, Mime)]
+  def extract(content: PreparedContent): (AssetDetails, Mime)
 }
