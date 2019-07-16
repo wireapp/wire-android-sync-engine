@@ -158,7 +158,7 @@ class AssetServiceSpec extends ZIntegrationMockSpec with AuthenticationConfig wi
       (assetStorage.find _).expects(*).once().returns(Future.successful(Some(asset)))
       (uriHelperMock.openInputStream _)
         .expects(*)
-        .twice()
+        .once()
         .onCall({ _: URI =>
           Success(new ByteArrayInputStream(testAssetContent))
         })
