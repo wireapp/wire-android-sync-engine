@@ -18,10 +18,10 @@
 package com.waz.service.media
 
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
-import com.waz.model.AssetMetaData.Image.Tag.Medium
 import com.waz.model._
 import com.waz.service.media.RichMediaContentParser.GoogleMapsLocation
 import com.waz.sync.client.GoogleMapsClient
+import com.waz.utils.wrappers.URI
 
 object GoogleMapsMediaService extends DerivedLogTag {
 
@@ -29,17 +29,12 @@ object GoogleMapsMediaService extends DerivedLogTag {
   val ImageDimensions = Dim2(MaxImageWidth, MaxImageWidth * 3 / 4)
   val PreviewWidth = 64
 
-  def mapImageAsset(id: AssetId, loc: com.waz.api.MessageContent.Location, dimensions: Dim2 = ImageDimensions): AssetData =
-    mapImageAsset(id, GoogleMapsLocation(loc.getLatitude.toString, loc.getLongitude.toString, loc.getZoom.toString), dimensions)
+  def getImagePath(loc: com.waz.api.MessageContent.Location, dimensions: Dim2 = ImageDimensions): URI =
+    getImagePath(GoogleMapsLocation(loc.getLatitude.toString, loc.getLongitude.toString, loc.getZoom.toString), dimensions)
 
-  def mapImageAsset(id: AssetId, location: GoogleMapsLocation, dimensions: Dim2): AssetData = {
-
+  def getImagePath(location: GoogleMapsLocation, dimensions: Dim2): URI = {
     val mapWidth = math.min(MaxImageWidth, dimensions.width)
     val mapHeight = mapWidth * dimensions.height / dimensions.width
-
-    val mediumPath = GoogleMapsClient.getStaticMapPath(location, mapWidth, mapHeight)
-
-    //TODO Dean see if preview is still needed?
-    AssetData(mime = Mime.Image.Png, metaData = Some(AssetMetaData.Image(Dim2(mapWidth, mapHeight), Medium)), proxyPath = Some(mediumPath))
+    GoogleMapsClient.getStaticMapPath(location, mapWidth, mapHeight)
   }
 }
