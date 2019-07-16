@@ -20,13 +20,14 @@ package com.waz.sync.client
 import java.net.URLEncoder
 
 import com.waz.service.media.RichMediaContentParser.GoogleMapsLocation
+import com.waz.utils.wrappers.URI
 
 object GoogleMapsClient {
-  val StaticMapsPathBase = "/proxy/googlemaps/api/staticmap"
+  val StaticMapsPathBase = "https://maps.googleapis.com/maps/api/staticmap"
 
-  def getStaticMapPath(location: GoogleMapsLocation, width: Int, height: Int): String = {
+  def getStaticMapPath(location: GoogleMapsLocation, width: Int, height: Int): URI = {
     val center = URLEncoder.encode(s"${location.x},${location.y}", "utf8")
     val zoom = URLEncoder.encode(location.zoom, "utf8")
-    s"$StaticMapsPathBase?center=$center&zoom=$zoom&size=${width}x$height"
+    URI.parse(s"$StaticMapsPathBase?center=$center&zoom=$zoom&size=${width}x$height")
   }
 }
