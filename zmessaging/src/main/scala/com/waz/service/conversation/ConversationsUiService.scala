@@ -45,6 +45,7 @@ import com.waz.utils.RichFuture.traverseSequential
 import com.waz.utils.Locales.currentLocaleOrdering
 import com.waz.utils._
 import com.waz.utils.events.EventStream
+import org.threeten.bp.Instant
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
@@ -128,6 +129,12 @@ class ConversationsUiServiceImpl(selfUserId:        UserId,
 
   override val assetUploadCancelled = EventStream[Mime]() //size, mime
   override val assetUploadFailed    = EventStream[ErrorResponse]()
+
+  convStorage.list().foreach { convs =>
+    convs.foreach { c =>
+      verbose(l"Conv: ${c.generatedName} cleared: ${c.cleared} lastRead: ${c.lastRead}, comp cleared: ${c.completelyCleared}")
+    }
+  }
 
   override def sendTextMessage(convId: ConvId, text: String, mentions: Seq[Mention] = Nil, exp: Option[Option[FiniteDuration]] = None) =
     for {
@@ -291,6 +298,8 @@ class ConversationsUiServiceImpl(selfUserId:        UserId,
       _ <- convsContent.updateConversationArchived(conv, archived = true)
     } yield {}
   }
+
+  private def latest[T <: WireInstant](a: T, b: T): T = if(a.isAfter(b)) a else b
 
   override def clearConversation(id: ConvId): Future[Option[ConversationData]] = convsContent.convById(id) flatMap {
     case Some(conv) if conv.convType == ConversationType.Group || conv.convType == ConversationType.OneToOne =>

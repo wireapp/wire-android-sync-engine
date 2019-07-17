@@ -372,6 +372,11 @@ object MessageData extends
     override def apply(implicit cursor: DBCursor): MessageData =
       MessageData(Id, Conv, Type, User, Content, Protos, FirstMessage, Members, Recipient, Email, Name, State, Time, LocalTime, EditTime, Ephemeral, ExpiryTime, Expired, Duration, AssetId, Quote.map(QuoteContent(_, QuoteValidity, None)), ForceReadReceipts)
 
+    def listUnsentMsgs(id: ConvId)(implicit db: DB) = {
+      import Message.Status._
+      MessageDataDao.findInSet(State, Set(FAILED, FAILED_READ, PENDING))
+    }
+
     def deleteForConv(id: ConvId)(implicit db: DB) = delete(Conv, id)
 
     def deleteUpTo(id: ConvId, upTo: RemoteInstant)(implicit db: DB) = db.delete(table.name, s"${Conv.name} = '${id.str}' AND ${Time.name} <= ${Time(upTo)}", null)
