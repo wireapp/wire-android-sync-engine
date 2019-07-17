@@ -37,7 +37,7 @@ import com.waz.znet2.http.HttpClient._
 import com.waz.znet2.http.ResponseCode
 
 import scala.concurrent.{ExecutionContext, Future}
-import scala.util.{Failure, Try}
+import scala.util.{Failure, Success, Try}
 
 trait AssetService {
   def assetSignal(id: GeneralAssetId): Signal[GeneralAsset]
@@ -167,7 +167,7 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
       }
   }
 
-  private def loadFromCache(asset: Asset, callback: Option[ProgressCallback]): CancellableFuture[InputStream] = {
+  private def loadFromCache(asset: Asset): CancellableFuture[InputStream] = {
     verbose(l"Load asset content from cache. $asset")
     contentCache.getStream(asset.id).map(asset.encryption.decrypt(_))
       .recoverWith { case err =>
@@ -177,25 +177,17 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
       .toCancellable
   }
 
-  private def loadFromFileSystem(asset: Asset,
-                                 localSource: LocalSource,
-                                 callback: Option[ProgressCallback]): CancellableFuture[InputStream] = {
-    verbose(l"Load asset content from file system. $asset")
-    lazy val emptyUriError = new NoSuchElementException("Asset does not have local source property.")
-    val openInputStream = () => asset.localSource.map(ls => uriHelper.openInputStream(ls.uri)).getOrElse(Failure(throw emptyUriError))
-    Future.fromTry(openInputStream())
-      .flatMap(is => Future.fromTry(Sha256.calculate(is)))
-      .flatMap { sha =>
-        if (localSource.sha == sha) Future.fromTry(openInputStream())
-        else Future.failed(new ValidationError(s"SHA256 is not equal. Expected: ${localSource.sha} Actual: $sha AssetId: ${asset.id}"))
+  private def loadFromFileSystem(localSource: LocalSource): Try[InputStream] =
+    uriHelper.openInputStream(localSource.uri).flatMap { is =>
+      Sha256.calculate(is).flatMap {
+        case sha if sha != localSource.sha =>
+          is.close()
+          Failure(new ValidationError(s"SHA256 is not equal. Expected: ${localSource.sha} Actual: $sha"))
+        case _ =>
+          is.reset()
+          Success(is)
       }
-      .recoverWith { case err =>
-        debug(l"Can not load content from file system. ${showString(err.getMessage)}")
-        verbose(l"Clearing local source asset property. $asset")
-        assetsStorage.save(asset.copy(localSource = None)).flatMap(_ => Future.failed(err))
-      }
-      .toCancellable
-  }
+    }
 
   override def loadPublicContentById(assetId: AssetId, convId: Option[ConvId], callback: Option[ProgressCallback] = None): CancellableFuture[InputStream] =
     assetClient.loadPublicAssetContent(assetId, convId, callback).flatMap{
@@ -216,18 +208,18 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
     assetsStorage.get(assetId).flatMap(asset => loadContent(asset, callback)).toCancellable
 
   override def loadContent(asset: Asset, callback: Option[ProgressCallback] = None): CancellableFuture[InputStream] =
-    assetsStorage.find(asset.id)
-      .flatMap { fromStorage =>
-        if (fromStorage.isEmpty)
-          assetsStorage.save(asset).flatMap(_ => loadFromBackend(asset, callback))
-        else asset.localSource match {
-          case Some(source) =>
-            loadFromFileSystem(asset, source, callback).recoverWith { case _ => loadFromBackend(asset, callback) }
-          case None =>
-            loadFromCache(asset, callback).recoverWith { case _ => loadFromBackend(asset, callback) }
+    assetsStorage.find(asset.id).flatMap {
+      case None              => assetsStorage.save(asset).flatMap(_ => loadFromBackend(asset, callback))
+      case Some(fromStorage) => fromStorage.localSource match {
+        case None         => loadFromCache(fromStorage).recoverWith { case _ => loadFromBackend(fromStorage, callback) }
+        case Some(source) => loadFromFileSystem(source) match {
+          case Failure(t)  =>
+            verbose(l"Can not load content from file system for asset $fromStorage. ${showString(t.getMessage)}")
+            assetsStorage.save(fromStorage.copy(localSource = None)).flatMap(_ => loadFromBackend(fromStorage, callback))
+          case Success(is) => Future.successful(is)
         }
       }
-      .toCancellable
+    }.toCancellable
 
   override def uploadAsset(assetId: UploadAssetId): CancellableFuture[Asset] = {
     import com.waz.api.impl.ErrorResponse
@@ -433,5 +425,4 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
       assetId        = None
     )
   }
-
 }
