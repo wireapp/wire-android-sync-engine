@@ -27,25 +27,22 @@ import com.waz.content._
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.log.LogSE._
 import com.waz.model.ConversationData.{ConversationType, getAccessAndRoleForGroupConv}
-import com.waz.model.GenericContent.{Location, MsgEdit, Quote}
+import com.waz.model.GenericContent.{Location, MsgEdit}
 import com.waz.model.UserData.ConnectionStatus
 import com.waz.model._
 import com.waz.model.sync.ReceiptType
 import com.waz.service.AccountsService.InForeground
 import com.waz.service.ZMessaging.currentBeDrift
 import com.waz.service._
-import com.waz.service.assets2.Asset.{General, Video}
+import com.waz.service.assets2.Asset.Video
 import com.waz.service.conversation.ConversationsService.generateTempConversationId
 import com.waz.service.messages.{MessagesContentUpdater, MessagesService}
 import com.waz.service.tracking.TrackingService
 import com.waz.sync.SyncServiceHandle
 import com.waz.sync.client.{ConversationsClient, ErrorOr}
 import com.waz.threading.{CancellableFuture, Threading}
-import com.waz.utils.RichFuture.traverseSequential
-import com.waz.utils.Locales.currentLocaleOrdering
 import com.waz.utils._
 import com.waz.utils.events.EventStream
-import org.threeten.bp.Instant
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
@@ -129,12 +126,6 @@ class ConversationsUiServiceImpl(selfUserId:        UserId,
 
   override val assetUploadCancelled = EventStream[Mime]() //size, mime
   override val assetUploadFailed    = EventStream[ErrorResponse]()
-
-  convStorage.list().foreach { convs =>
-    convs.foreach { c =>
-      verbose(l"Conv: ${c.generatedName} cleared: ${c.cleared} lastRead: ${c.lastRead}, comp cleared: ${c.completelyCleared}")
-    }
-  }
 
   override def sendTextMessage(convId: ConvId, text: String, mentions: Seq[Mention] = Nil, exp: Option[Option[FiniteDuration]] = None) =
     for {
@@ -298,8 +289,6 @@ class ConversationsUiServiceImpl(selfUserId:        UserId,
       _ <- convsContent.updateConversationArchived(conv, archived = true)
     } yield {}
   }
-
-  private def latest[T <: WireInstant](a: T, b: T): T = if(a.isAfter(b)) a else b
 
   override def clearConversation(id: ConvId): Future[Option[ConversationData]] = convsContent.convById(id) flatMap {
     case Some(conv) if conv.convType == ConversationType.Group || conv.convType == ConversationType.OneToOne =>
