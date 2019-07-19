@@ -17,24 +17,45 @@
  */
 package com.waz.service.media
 
-import com.waz.log.BasicLogging.LogTag.DerivedLogTag
+import java.io.InputStream
+
+import com.waz.api.MessageContent.Location
 import com.waz.model._
 import com.waz.service.media.RichMediaContentParser.GoogleMapsLocation
 import com.waz.sync.client.GoogleMapsClient
-import com.waz.utils.wrappers.URI
+import com.waz.threading.CancellableFuture
 
-object GoogleMapsMediaService extends DerivedLogTag {
+import scala.concurrent.ExecutionContext
+
+trait GoogleMapsMediaService {
+  def loadMapPreview(location: Location, dimensions: Dim2): CancellableFuture[InputStream]
+}
+
+class GoogleMapsMediaServiceImpl(googleMapsClient: GoogleMapsClient)(implicit executionContext: ExecutionContext)
+  extends GoogleMapsMediaService {
+
+  import com.waz.service.media.GoogleMapsMediaService._
+
+  def loadMapPreview(location: Location, dimensions: Dim2 = ImageDimensions): CancellableFuture[InputStream] = {
+    val googleMapsLocation = GoogleMapsLocation(location.getLatitude.toString, location.getLongitude.toString, location.getZoom.toString)
+    val constrainedDimensions = constrain(dimensions)
+
+    googleMapsClient.loadMapPreview(googleMapsLocation, constrainedDimensions).flatMap {
+      case Left(error) => CancellableFuture.failed(error)
+      case Right(result) => CancellableFuture.successful(result)
+    }
+  }
+}
+
+object GoogleMapsMediaService {
 
   val MaxImageWidth = 640 // free maps api limitation
   val ImageDimensions = Dim2(MaxImageWidth, MaxImageWidth * 3 / 4)
   val PreviewWidth = 64
 
-  def getImagePath(loc: com.waz.api.MessageContent.Location, dimensions: Dim2 = ImageDimensions): URI =
-    getImagePath(GoogleMapsLocation(loc.getLatitude.toString, loc.getLongitude.toString, loc.getZoom.toString), dimensions)
-
-  def getImagePath(location: GoogleMapsLocation, dimensions: Dim2): URI = {
+  def constrain(dimensions: Dim2): Dim2 = {
     val mapWidth = math.min(MaxImageWidth, dimensions.width)
     val mapHeight = mapWidth * dimensions.height / dimensions.width
-    GoogleMapsClient.getStaticMapPath(location, mapWidth, mapHeight)
+    Dim2(mapWidth, mapHeight)
   }
 }
