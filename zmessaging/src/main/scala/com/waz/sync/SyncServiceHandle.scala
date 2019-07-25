@@ -19,7 +19,7 @@ package com.waz.sync
 
 import com.waz.api.IConversation.{Access, AccessRole}
 import com.waz.api.NetworkMode
-import com.waz.content.UserPreferences
+import com.waz.content.{UserPreferences, UsersStorage}
 import com.waz.content.UserPreferences.{ShouldSyncConversations, ShouldSyncInitial}
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model.UserData.ConnectionStatus
@@ -32,7 +32,6 @@ import com.waz.service.assets2.UploadAssetStatus
 import com.waz.sync.SyncResult.Failure
 import com.waz.threading.Threading
 import org.threeten.bp.Instant
-
 import com.waz.log.LogSE._
 
 import scala.concurrent.Future
@@ -97,9 +96,11 @@ trait SyncServiceHandle {
   def performFullSync(): Future[Unit]
 }
 
-class AndroidSyncServiceHandle(account: UserId, service: SyncRequestService, timeouts: Timeouts, userPreferences: UserPreferences)
-  extends SyncServiceHandle with DerivedLogTag {
-
+class AndroidSyncServiceHandle(account:         UserId,
+                               service:         SyncRequestService,
+                               timeouts:        Timeouts,
+                               userPreferences: UserPreferences,
+                               usersStorage:    UsersStorage) extends SyncServiceHandle with DerivedLogTag {
   import Threading.Implicits.Background
   import com.waz.model.sync.SyncRequest._
 
@@ -182,15 +183,17 @@ class AndroidSyncServiceHandle(account: UserId, service: SyncRequestService, tim
   override def performFullSync(): Future[Unit] = {
     verbose(l"SYNC performFullSync")
     for {
-      id1 <- syncSelfUser()
-      id2 <- syncSelfClients()
-      id3 <- syncSelfPermissions()
-      id4 <- syncTeam()
-      id5 <- syncConversations()
-      id6 <- syncConnections()
-      id7 <- syncProperties()
+      id1     <- syncSelfUser()
+      id2     <- syncSelfClients()
+      id3     <- syncSelfPermissions()
+      id4     <- syncTeam()
+      id5     <- syncConversations()
+      id6     <- syncConnections()
+      id7     <- syncProperties()
+      userIds <- usersStorage.list().map(_.map(_.id).toSet)
+      id8     <- syncUsers(userIds)
       _ = verbose(l"SYNC waiting for full sync to finish...")
-      _ <- service.await(Set(id1, id2, id3, id4, id5, id6, id7))
+      _ <- service.await(Set(id1, id2, id3, id4, id5, id6, id7, id8))
       _ = verbose(l"SYNC ... and done")
     } yield ()
   }
