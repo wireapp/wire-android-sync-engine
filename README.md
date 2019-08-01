@@ -21,6 +21,7 @@ This repository contains sync library used by [Wire for Android](https://github.
 
 Build aar libraries and publish them to local Maven repository:
 
+
 ```
 sbt publishM2
 ```
