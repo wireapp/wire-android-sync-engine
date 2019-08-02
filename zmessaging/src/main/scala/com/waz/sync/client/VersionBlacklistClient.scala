@@ -46,6 +46,8 @@ class VersionBlacklistClientImpl(backendConfig: BackendConfig)
   }
 
   def blacklistsUrl: URL = {
-    new URL(backendConfig.blacklistHost.buildUpon.appendPath("android").build.toString)
+    val uri = backendConfig.blacklistHost
+    new URL(if (uri.getPath.endsWith("/android")) uri.toString
+    else uri.buildUpon.appendPath("android").build.toString)
   }
 }
