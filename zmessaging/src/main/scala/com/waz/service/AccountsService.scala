@@ -101,6 +101,7 @@ trait AccountsService {
   def loginClient: LoginClient
 
   def wipeData(): Future[Unit]
+  def isWiped: Future[Boolean]
 }
 
 object AccountsService {
@@ -468,7 +469,7 @@ class AccountsServiceImpl(val global: GlobalModule) extends AccountsService with
           case Right(userInfo) =>
             for {
               _     <- addAccountEntry(userInfo, cookie, Some(loginResult.accessToken), None)
-              hadDb =  context.getDatabasePath(userId.str).exists()
+              hadDb =  context.getDatabasePath(userId.str).exists
               am    <- createAccountManager(userId, None, isLogin = Some(true), initialUser = Some(userInfo))
               r     <- am.fold2(Future.successful(Left(ErrorResponse.internalError(""))), _.otrClient.loadClients().future.mapRight(cs => (cs.nonEmpty, hadDb)))
               _     =  r.fold(_ => (), res => if (!res._1) am.foreach(_.addUnsplashPicture()))
@@ -485,21 +486,26 @@ class AccountsServiceImpl(val global: GlobalModule) extends AccountsService with
 
   override def wipeData(): Future[Unit] = {
     def delete(file: File) =
-      if (file.exists()) Try(file.delete()).isSuccess else true
+      if (file.exists) Try(file.delete()).isSuccess else true
 
     accountManagers.head.map { ams =>
-      val userIds = ams.map(_.userId)
-      userIds
-        .map(userId => new File(new File(context.getFilesDir, global.metadata.cryptoBoxDirName), userId.str))
-        .foreach(delete)
-      userIds
-        .map(userId => context.getDatabasePath(userId.str))
-        .flatMap(p => DbFileExtensions.map(ext => s"${p.getAbsolutePath}$ext").map(new File(_)))
-        .foreach(delete)
+      cryptoBoxDirs(ams).foreach(delete)
+      databaseFiles(ams).foreach(delete)
       accountManagers.mutate(_ => Set.empty)
-      storage.foreach(_.removeAll(userIds))
+      storage.foreach(_.removeAll(ams.map(_.userId)))
       activeAccountPref.mutate(_ => None)
     }
   }
+
+  override def isWiped: Future[Boolean] = accountManagers.head.map { ams =>
+    cryptoBoxDirs(ams).forall(!_.exists) && databaseFiles(ams).forall(!_.exists)
+  }
+
+  private def cryptoBoxDirs(ams: Set[AccountManager]): Set[File] =
+    ams.map(acc => new File(new File(context.getFilesDir, global.metadata.cryptoBoxDirName), acc.userId.str))
+
+  private def databaseFiles(ams: Set[AccountManager]): Set[File] =
+    ams.map(acc => context.getDatabasePath(acc.userId.str))
+       .flatMap(p => DbFileExtensions.map(ext => s"${p.getAbsolutePath}$ext").map(new File(_)))
 }
 
