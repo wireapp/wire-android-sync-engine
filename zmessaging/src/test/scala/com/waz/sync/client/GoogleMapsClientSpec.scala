@@ -15,12 +15,26 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-package com.waz.service.assets2
+package com.waz.sync.client
 
-import com.waz.model.Mime
+import com.waz.service.media.RichMediaContentParser.GoogleMapsLocation
+import com.waz.specs.AndroidFreeSpec
+import com.waz.sync.client.GoogleMapsClient.StaticMapsPathBase
 
-import scala.concurrent.Future
+class GoogleMapsClientSpec extends AndroidFreeSpec {
 
-trait AssetDetailsService {
-  def extract(content: PreparedContent): (AssetDetails, Mime)
+  feature("google map previews") {
+
+    scenario("get the map preview url") {
+      // Given
+      val location = GoogleMapsLocation("13.402276", "52.523842", "2")
+
+      // When
+      val actual = GoogleMapsClient.getStaticMapPath(location, 100, 200)
+
+      // Then
+      val expected = s"$StaticMapsPathBase?center=${location.x}%2C${location.y}&zoom=2&size=100x200"
+      actual shouldEqual expected
+    }
+  }
 }

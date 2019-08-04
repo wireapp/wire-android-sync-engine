@@ -19,29 +19,27 @@ package com.waz.service
 
 import java.io.File
 
-import com.waz.log.LogSE._
-import com.waz.api.impl.ErrorResponse
 import com.waz.api._
+import com.waz.api.impl.ErrorResponse
 import com.waz.content.GlobalPreferences._
 import com.waz.content.UserPreferences
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
+import com.waz.log.LogSE._
 import com.waz.log.LogShow.SafeToLog
 import com.waz.model.AccountData.Password
 import com.waz.model._
 import com.waz.service.tracking.LoggedOutEvent
-import com.waz.sync.client.LoginClient
+import com.waz.sync.client.AuthenticationManager.{AccessToken, Cookie}
+import com.waz.sync.client.{ErrorOr, LoginClient}
+import com.waz.sync.client.LoginClient.LoginResult
 import com.waz.threading.Threading
 import com.waz.utils.events.{EventContext, Signal}
-import com.waz.utils.{Serialized, returning}
-import com.waz.sync.client.AuthenticationManager.{AccessToken, Cookie}
-import com.waz.sync.client.LoginClient.LoginResult
-import com.waz.sync.client.ErrorOr
-import com.waz.utils._
+import com.waz.utils.{Serialized, returning, _}
 
 import scala.async.Async.{async, await}
 import scala.concurrent.Future
-import scala.util.Right
 import scala.util.control.NonFatal
+import scala.util.{Right, Try}
 
 /**
   * There are a few possible states that an account can progress through for the purposes of log in and registration.
@@ -87,7 +85,6 @@ trait AccountsService {
 
   def logout(userId: UserId): Future[Unit]
 
-
   def accountManagers: Signal[Set[AccountManager]]
   def accountsWithManagers: Signal[Set[UserId]] = accountManagers.map(_.map(_.userId))
   def zmsInstances: Signal[Set[ZMessaging]]
@@ -102,11 +99,15 @@ trait AccountsService {
   def activeZms:            Signal[Option[ZMessaging]]
 
   def loginClient: LoginClient
+
+  def wipeData(): Future[Unit]
+  def isWiped: Future[Boolean]
 }
 
 object AccountsService {
 
   val AccountManagersKey = "accounts-map"
+  val DbFileExtensions = Seq("", "-wal", "-shm", "-journal")
 
   sealed trait AccountState extends SafeToLog
 
@@ -170,18 +171,15 @@ class AccountsServiceImpl(val global: GlobalModule) extends AccountsService with
           verbose(l"Renaming database and cryptobox dir: ${acc.id} to $userId")
 
           val dbFileOld = context.getDatabasePath(acc.id.str)
+          val toMove = DbFileExtensions.map(ext => s"${dbFileOld.getAbsolutePath}$ext").map(new File(_))
 
-          val exts = Seq("", "-wal", "-shm", "-journal")
-
-          val toMove = exts.map(ext => s"${dbFileOld.getAbsolutePath}$ext").map(new File(_))
-
-          val dbRenamed = exts.zip(toMove).map { case (ext, f) =>
+          val dbRenamed = DbFileExtensions.zip(toMove).map { case (ext, f) =>
             val fileToMove = new File(dbFileOld.getParent, s"${userId.str}$ext")
             val res = f.renameTo(fileToMove)
-            if(!res && !ext.equals(exts.last)) {
+            if(!res && !ext.equals(DbFileExtensions.last)) {
               error(l"Failed to rename file $f")
               res
-            } else if (!res && ext.equals(exts.last)) {
+            } else if (!res && ext.equals(DbFileExtensions.last)) {
               //journal is not always present, so if copying it fails, and it the original file doesn't exist, then just skip it
               true
             } else {
@@ -471,7 +469,7 @@ class AccountsServiceImpl(val global: GlobalModule) extends AccountsService with
           case Right(userInfo) =>
             for {
               _     <- addAccountEntry(userInfo, cookie, Some(loginResult.accessToken), None)
-              hadDb =  context.getDatabasePath(userId.str).exists()
+              hadDb =  context.getDatabasePath(userId.str).exists
               am    <- createAccountManager(userId, None, isLogin = Some(true), initialUser = Some(userInfo))
               r     <- am.fold2(Future.successful(Left(ErrorResponse.internalError(""))), _.otrClient.loadClients().future.mapRight(cs => (cs.nonEmpty, hadDb)))
               _     =  r.fold(_ => (), res => if (!res._1) am.foreach(_.addUnsplashPicture()))
@@ -485,5 +483,29 @@ class AccountsServiceImpl(val global: GlobalModule) extends AccountsService with
         Future.successful(Left(error))
     }
   }
+
+  override def wipeData(): Future[Unit] = {
+    def delete(file: File) =
+      if (file.exists) Try(file.delete()).isSuccess else true
+
+    accountManagers.head.map { ams =>
+      cryptoBoxDirs(ams).foreach(delete)
+      databaseFiles(ams).foreach(delete)
+      accountManagers.mutate(_ => Set.empty)
+      storage.foreach(_.removeAll(ams.map(_.userId)))
+      activeAccountPref.mutate(_ => None)
+    }
+  }
+
+  override def isWiped: Future[Boolean] = accountManagers.head.map { ams =>
+    cryptoBoxDirs(ams).forall(!_.exists) && databaseFiles(ams).forall(!_.exists)
+  }
+
+  private def cryptoBoxDirs(ams: Set[AccountManager]): Set[File] =
+    ams.map(acc => new File(new File(context.getFilesDir, global.metadata.cryptoBoxDirName), acc.userId.str))
+
+  private def databaseFiles(ams: Set[AccountManager]): Set[File] =
+    ams.map(acc => context.getDatabasePath(acc.userId.str))
+       .flatMap(p => DbFileExtensions.map(ext => s"${p.getAbsolutePath}$ext").map(new File(_)))
 }
 

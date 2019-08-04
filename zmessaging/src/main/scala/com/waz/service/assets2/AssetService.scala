@@ -37,7 +37,7 @@ import com.waz.znet2.http.HttpClient._
 import com.waz.znet2.http.ResponseCode
 
 import scala.concurrent.{ExecutionContext, Future}
-import scala.util.{Failure, Try}
+import scala.util.{Failure, Success, Try}
 
 trait AssetService {
   def assetSignal(id: GeneralAssetId): Signal[GeneralAsset]
@@ -167,7 +167,7 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
       }
   }
 
-  private def loadFromCache(asset: Asset, callback: Option[ProgressCallback]): CancellableFuture[InputStream] = {
+  private def loadFromCache(asset: Asset): CancellableFuture[InputStream] = {
     verbose(l"Load asset content from cache. $asset")
     contentCache.getStream(asset.id).map(asset.encryption.decrypt(_))
       .recoverWith { case err =>
@@ -177,25 +177,17 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
       .toCancellable
   }
 
-  private def loadFromFileSystem(asset: Asset,
-                                 localSource: LocalSource,
-                                 callback: Option[ProgressCallback]): CancellableFuture[InputStream] = {
-    verbose(l"Load asset content from file system. $asset")
-    lazy val emptyUriError = new NoSuchElementException("Asset does not have local source property.")
-    val openInputStream = () => asset.localSource.map(ls => uriHelper.openInputStream(ls.uri)).getOrElse(Failure(throw emptyUriError))
-    Future.fromTry(openInputStream())
-      .flatMap(is => Future.fromTry(Sha256.calculate(is)))
-      .flatMap { sha =>
-        if (localSource.sha == sha) Future.fromTry(openInputStream())
-        else Future.failed(new ValidationError(s"SHA256 is not equal. Expected: ${localSource.sha} Actual: $sha AssetId: ${asset.id}"))
+  private def loadFromFileSystem(localSource: LocalSource): Try[InputStream] =
+    uriHelper.openInputStream(localSource.uri).flatMap { is =>
+      Sha256.calculate(is).flatMap {
+        case sha if sha != localSource.sha =>
+          is.close()
+          Failure(new ValidationError(s"SHA256 is not equal. Expected: ${localSource.sha} Actual: $sha"))
+        case _ =>
+          is.reset()
+          Success(is)
       }
-      .recoverWith { case err =>
-        debug(l"Can not load content from file system. ${showString(err.getMessage)}")
-        verbose(l"Clearing local source asset property. $asset")
-        assetsStorage.save(asset.copy(localSource = None)).flatMap(_ => Future.failed(err))
-      }
-      .toCancellable
-  }
+    }
 
   override def loadPublicContentById(assetId: AssetId, convId: Option[ConvId], callback: Option[ProgressCallback] = None): CancellableFuture[InputStream] =
     assetClient.loadPublicAssetContent(assetId, convId, callback).flatMap{
@@ -216,18 +208,18 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
     assetsStorage.get(assetId).flatMap(asset => loadContent(asset, callback)).toCancellable
 
   override def loadContent(asset: Asset, callback: Option[ProgressCallback] = None): CancellableFuture[InputStream] =
-    assetsStorage.find(asset.id)
-      .flatMap { fromStorage =>
-        if (fromStorage.isEmpty)
-          assetsStorage.save(asset).flatMap(_ => loadFromBackend(asset, callback))
-        else asset.localSource match {
-          case Some(source) =>
-            loadFromFileSystem(asset, source, callback).recoverWith { case _ => loadFromBackend(asset, callback) }
-          case None =>
-            loadFromCache(asset, callback).recoverWith { case _ => loadFromBackend(asset, callback) }
+    assetsStorage.find(asset.id).flatMap {
+      case None              => assetsStorage.save(asset).flatMap(_ => loadFromBackend(asset, callback))
+      case Some(fromStorage) => fromStorage.localSource match {
+        case None         => loadFromCache(fromStorage).recoverWith { case _ => loadFromBackend(fromStorage, callback) }
+        case Some(source) => loadFromFileSystem(source) match {
+          case Failure(t)  =>
+            verbose(l"Can not load content from file system for asset $fromStorage. ${showString(t.getMessage)}")
+            assetsStorage.save(fromStorage.copy(localSource = None)).flatMap(_ => loadFromBackend(fromStorage, callback))
+          case Success(is) => Future.successful(is)
         }
       }
-      .toCancellable
+    }.toCancellable
 
   override def uploadAsset(assetId: UploadAssetId): CancellableFuture[Asset] = {
     import com.waz.api.impl.ErrorResponse
@@ -339,10 +331,10 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
     val t0 = System.nanoTime()
     for {
       asset <- createUploadAsset(content, targetEncryption, public, retention, messageId)
-      _ = debug(l"Upload asset created: $asset")
-      _ <- uploadAssetStorage.save(asset)
-      t1 = System.nanoTime()
-      _ = println("Asset creation time: " + (t1 - t0) + " ns")
+      _     =  verbose(l"Upload asset created: $asset")
+      _     <- uploadAssetStorage.save(asset)
+      t1    =  System.nanoTime()
+      _     =  verbose(l"Asset creation time: ${t1 - t0}ns")
     } yield asset
   }
 
@@ -351,30 +343,27 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
                                 public: Boolean,
                                 retention: Retention,
                                 messageId: Option[MessageId] = None): Future[UploadAsset] = {
-
     val assetId = UploadAssetId()
     val encryptionSalt = targetEncryption.randomSalt
 
-    def prepareContent(content: Content): Future[PreparedContent] = {
-      content match {
-        case content: Content.Uri => Future.successful(content)
-        case Content.File(mime, file) =>
-          for {
-            _ <- uploadContentCache.put(assetId, file, removeOriginal = true)
-            cacheFile <- uploadContentCache.get(assetId)
-          } yield Content.File(mime, cacheFile)
-        case Content.Bytes(mime, bytes) =>
-          for {
-            _ <- uploadContentCache.putBytes(assetId, bytes)
-            file <- uploadContentCache.get(assetId)
-          } yield Content.File(mime, file)
-        case Content.AsBlob(content) => prepareContent(content)
-      }
+    def prepareContent(content: Content): Future[PreparedContent] = content match {
+      case content: Content.Uri       => Future.successful(content)
+      case Content.File(mime, file)   =>
+        for {
+          _         <- uploadContentCache.put(assetId, file, removeOriginal = true)
+          cacheFile <- uploadContentCache.get(assetId)
+        } yield Content.File(mime, cacheFile)
+      case Content.Bytes(mime, bytes) =>
+        for {
+          _    <- uploadContentCache.putBytes(assetId, bytes)
+          file <- uploadContentCache.get(assetId)
+        } yield Content.File(mime, file)
+      case Content.AsBlob(blob)       => prepareContent(blob)
     }
 
-    def extractDetails(content: PreparedContent, mime: Mime): Future[AssetDetails] = contentForUpload.content match {
-      case _: Content.AsBlob => Future.successful(BlobDetails)
-      case _                 => assetDetailsService.extract(mime, content)
+    def extractDetails(content: PreparedContent): (AssetDetails, Mime) = contentForUpload.content match {
+      case _: Content.AsBlob => (BlobDetails, Mime.Default)
+      case _                 => assetDetailsService.extract(content)
     }
 
     def extractLocalSourceAndEncryptedHashesAndSize(content: PreparedContent): Try[(Option[LocalSource], Sha256, MD5, Long)] = {
@@ -386,61 +375,54 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
       val md5EncryptedDigest = MessageDigest.getInstance("MD5")
 
       for {
-        source <- content.openInputStream(uriHelper)
-
-        stream1 = sha256DigestWithUri.fold(source) { case (digest, _) => new DigestInputStream(source, digest) }
-        stream2 = targetEncryption.encrypt(stream1, encryptionSalt)
-        stream3 = new DigestInputStream(stream2, sha256EncryptedDigest)
-        stream4 = new DigestInputStream(stream3, md5EncryptedDigest)
-        stream5 = new CountInputStream(stream4)
-
-        _ = IoUtils.readFully(stream5)
-
-        localSource = sha256DigestWithUri.map { case (digest, uri) => LocalSource(uri, Sha256(digest.digest())) }
-        encryptedSha = Sha256(sha256EncryptedDigest.digest())
-        encryptedMd5 = MD5(md5EncryptedDigest.digest())
-        encryptedSize = stream5.getBytesRead
+        source        <- content.openInputStream(uriHelper)
+        stream1       =  sha256DigestWithUri.fold(source) { case (digest, _) => new DigestInputStream(source, digest) }
+        stream2       =  targetEncryption.encrypt(stream1, encryptionSalt)
+        stream3       =  new DigestInputStream(stream2, sha256EncryptedDigest)
+        stream4       =  new DigestInputStream(stream3, md5EncryptedDigest)
+        stream5       =  new CountInputStream(stream4)
+        _             =  IoUtils.readFully(stream5)
+        localSource   =  sha256DigestWithUri.map { case (digest, uri) => LocalSource(uri, Sha256(digest.digest())) }
+        encryptedSha  =  Sha256(sha256EncryptedDigest.digest())
+        encryptedMd5  =  MD5(md5EncryptedDigest.digest())
+        encryptedSize =  stream5.getBytesRead
       } yield (localSource, encryptedSha, encryptedMd5, encryptedSize)
     }
 
     for {
-      initialContent <- prepareContent(contentForUpload.content)
-      initialMime <- Future.fromTry(initialContent.getMime(uriHelper))
-      initialDetails <- extractDetails(initialContent, initialMime)
-      ts = transformations.getTransformations(initialMime, initialDetails)
-      //TODO Handle not only the first transformation
-      (transformedContent, transformedMime, transformedDetails) <- ts.headOption match {
-        case Some(transformation) => for {
-          cacheFile <- uploadContentCache.getOrCreateEmpty(assetId)
-          mime <- Future { transformation(() =>
-            initialContent.openInputStream(uriHelper).get, () => new FileOutputStream(cacheFile))
-          }
-          content = Content.File(mime, cacheFile)
-          details <- extractDetails(content, mime)
-        } yield (content, mime, details)
+      initialContent                                            <- prepareContent(contentForUpload.content)
+      (initialDetails, initialMime)                             =  extractDetails(initialContent)
+      ts                                                        =  transformations.getTransformations(initialMime, initialDetails)
+      (transformedContent, transformedMime, transformedDetails) <- ts.headOption match { //TODO Handle not only the first transformation
+        case Some(transformation) =>
+          for {
+            cacheFile    <- uploadContentCache.getOrCreateEmpty(assetId)
+            mime         <- Future { transformation(() => initialContent.openInputStream(uriHelper).get, () => new FileOutputStream(cacheFile)) }
+            content      =  Content.File(mime, cacheFile)
+            (details, _) =  extractDetails(content) // mime should not change anymore
+          } yield (content, mime, details)
         case _ =>
           Future.successful((initialContent, initialMime, initialDetails))
       }
-      _ <- Future.fromTry(restrictions.validate(transformedContent))
-      (localSource, encryptedSha, encryptedMd5, encryptedSize) <- Future.fromTry(extractLocalSourceAndEncryptedHashesAndSize(transformedContent))
+      _                                                         <- Future.fromTry(restrictions.validate(transformedContent))
+      (localSource, encryptedSha, encryptedMd5, encryptedSize)  <- Future.fromTry(extractLocalSourceAndEncryptedHashesAndSize(transformedContent))
     } yield UploadAsset(
-      id = assetId,
-      localSource = localSource,
-      name = contentForUpload.name,
-      md5 = encryptedMd5,
-      sha = encryptedSha,
-      mime = transformedMime,
-      preview = NotReady,
-      uploaded = 0,
-      size = encryptedSize,
-      retention = retention,
-      public = public,
-      encryption = targetEncryption,
+      id             = assetId,
+      localSource    = localSource,
+      name           = contentForUpload.name,
+      md5            = encryptedMd5,
+      sha            = encryptedSha,
+      mime           = transformedMime,
+      preview        = NotReady,
+      uploaded       = 0,
+      size           = encryptedSize,
+      retention      = retention,
+      public         = public,
+      encryption     = targetEncryption,
       encryptionSalt = encryptionSalt,
-      details = transformedDetails,
-      status = UploadAssetStatus.NotStarted,
-      assetId = None
+      details        = transformedDetails,
+      status         = UploadAssetStatus.NotStarted,
+      assetId        = None
     )
   }
-
 }

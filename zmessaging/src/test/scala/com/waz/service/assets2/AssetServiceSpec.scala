@@ -158,7 +158,7 @@ class AssetServiceSpec extends ZIntegrationMockSpec with AuthenticationConfig wi
       (assetStorage.find _).expects(*).once().returns(Future.successful(Some(asset)))
       (uriHelperMock.openInputStream _)
         .expects(*)
-        .twice()
+        .once()
         .onCall({ _: URI =>
           Success(new ByteArrayInputStream(testAssetContent))
         })
@@ -244,7 +244,7 @@ class AssetServiceSpec extends ZIntegrationMockSpec with AuthenticationConfig wi
       (uriHelperMock.extractMime _).expects(*).anyNumberOfTimes().returns(Success(Mime.Default))
       (uriHelperMock.extractSize _).expects(*).anyNumberOfTimes().returns(Success(testAssetContent.length))
       (uriHelperMock.extractFileName _).expects(*).anyNumberOfTimes().returns(Success("test_file_name"))
-      (assetDetailsService.extract _).expects(*, *).anyNumberOfTimes().returns(Future.successful(BlobDetails))
+      (assetDetailsService.extract _).expects(*).anyNumberOfTimes().returns((BlobDetails, Mime.Default))
       (cache.putStream _).expects(*, *).anyNumberOfTimes().returns(Future.successful(()))
       (assetStorage.save _).expects(*).anyNumberOfTimes().returns(Future.successful(()))
       (rawCache.remove _).expects(*).anyNumberOfTimes().returns(Future.successful(()))

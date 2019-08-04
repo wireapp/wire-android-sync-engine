@@ -106,7 +106,7 @@ class OkHttpWebSocketSpec extends WordSpec with MustMatchers with Inside with Be
       wsServer.start(flowTwoMessageClose)
 
       // -- connect and assert --
-      toBlocking(znet2.OkHttpWebSocketFactory.openWebSocket(testWebSocketRequest(testPath))) { stream =>
+      toBlocking(new znet2.OkHttpWebSocketFactory(None).openWebSocket(testWebSocketRequest(testPath))) { stream =>
         val firstEvent :: secondEvent :: thirdEvent :: fourthEvent :: Nil = stream.takeEvents(4)
 
         firstEvent mustBe an[SocketEvent.Opened]
@@ -131,7 +131,7 @@ class OkHttpWebSocketSpec extends WordSpec with MustMatchers with Inside with Be
       wsServer.start(flowWait)
 
       // -- connect and assert --
-      toBlocking(znet2.OkHttpWebSocketFactory.openWebSocket(testWebSocketRequest(testPath))) { stream =>
+      toBlocking(new znet2.OkHttpWebSocketFactory(None).openWebSocket(testWebSocketRequest(testPath))) { stream =>
         val firstEvent = stream.getEvent(0)
         Try { wsServer.stop() } //we do not care about this error
         val secondEvent = stream.getEvent(1)

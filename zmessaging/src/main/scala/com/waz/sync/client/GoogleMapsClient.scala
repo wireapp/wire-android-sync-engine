@@ -17,11 +17,43 @@
  */
 package com.waz.sync.client
 
+import java.io.InputStream
 import java.net.URLEncoder
 
+import com.waz.api.impl.ErrorResponse
+import com.waz.model.Dim2
 import com.waz.service.media.RichMediaContentParser.GoogleMapsLocation
+import com.waz.utils.CirceJSONSupport
+import com.waz.znet2.AuthRequestInterceptor
+import com.waz.znet2.http.HttpClient.AutoDerivation._
+import com.waz.znet2.http.HttpClient.dsl._
+import com.waz.znet2.http.Request.UrlCreator
+import com.waz.znet2.http._
+
+trait GoogleMapsClient {
+  def loadMapPreview(location: GoogleMapsLocation, dimensions: Dim2): ErrorOrResponse[InputStream]
+}
+
+class GoogleMapsClientImpl(implicit
+                           urlCreator: UrlCreator,
+                           httpClient: HttpClient,
+                           authRequestInterceptor: AuthRequestInterceptor) extends GoogleMapsClient with CirceJSONSupport {
+
+  import GoogleMapsClient._
+
+  private implicit def inputStreamBodyDeserializer: RawBodyDeserializer[InputStream] = RawBodyDeserializer.create(_.data())
+
+  def loadMapPreview(location: GoogleMapsLocation, dimensions: Dim2): ErrorOrResponse[InputStream] =
+    Request
+      .Get(relativePath = getStaticMapPath(location, dimensions.width, dimensions.height))
+      .withResultType[InputStream]
+      .withErrorType[ErrorResponse]
+      .executeSafe
+
+}
 
 object GoogleMapsClient {
+
   val StaticMapsPathBase = "/proxy/googlemaps/api/staticmap"
 
   def getStaticMapPath(location: GoogleMapsLocation, width: Int, height: Int): String = {

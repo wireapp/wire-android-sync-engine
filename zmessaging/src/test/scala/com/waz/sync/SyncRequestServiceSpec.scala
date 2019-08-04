@@ -21,7 +21,7 @@ import java.io.PrintWriter
 
 import com.waz.api.NetworkMode
 import com.waz.api.NetworkMode.UNKNOWN
-import com.waz.content.{Database, UserPreferences}
+import com.waz.content.{Database, UserPreferences, UsersStorage}
 import com.waz.log.BasicLogging.LogTag
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.model._
@@ -41,12 +41,13 @@ class SyncRequestServiceSpec extends AndroidFreeSpec with DerivedLogTag {
 
   import com.waz.threading.Threading.Implicits.Background
 
-  val context   = mock[Context]
-  val db        = mock[Database]
-  val network   = mock[NetworkModeService]
-  val sync      = mock[SyncHandler]
-  val reporting = mock[ReportingService]
-  val prefs     = new TestUserPreferences {
+  val context         = mock[Context]
+  val db              = mock[Database]
+  val network         = mock[NetworkModeService]
+  val sync            = mock[SyncHandler]
+  val reporting       = mock[ReportingService]
+  val usersStorage    = mock[UsersStorage]
+  val prefs           = new TestUserPreferences {
     result(this.preference(UserPreferences.ShouldSyncInitial) := false)
     result(this.preference(UserPreferences.ShouldSyncConversations) := false)
   }
@@ -84,6 +85,6 @@ class SyncRequestServiceSpec extends AndroidFreeSpec with DerivedLogTag {
 
     val content = new SyncContentUpdaterImpl(db)
     val service = new SyncRequestServiceImpl(account1Id, content, network, sync, reporting, accounts, tracking)
-    (new AndroidSyncServiceHandle(account1Id, service, timeouts, prefs), service)
+    (new AndroidSyncServiceHandle(account1Id, service, timeouts, prefs, usersStorage), service)
   }
 }

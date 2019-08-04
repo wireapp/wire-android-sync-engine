@@ -105,23 +105,23 @@ object ConversationsUiService {
   val LargeAssetWarningThresholdInBytes = 3145728L // 3MiB
 }
 
-class ConversationsUiServiceImpl(selfUserId:      UserId,
-                                 teamId:          Option[TeamId],
-                                 assets:          AssetService,
-                                 usersStorage:    UsersStorage,
-                                 messages:        MessagesService,
-                                 messagesStorage: MessagesStorage,
-                                 messagesContent: MessagesContentUpdater,
-                                 members:         MembersStorage,
-                                 convsContent:    ConversationsContentUpdater,
-                                 convStorage:     ConversationStorage,
-                                 network:         NetworkModeService,
-                                 convs:           ConversationsService,
-                                 sync:            SyncServiceHandle,
-                                 client:          ConversationsClient,
-                                 accounts:        AccountsService,
-                                 tracking:        TrackingService,
-                                 errors:          ErrorsService,
+class ConversationsUiServiceImpl(selfUserId:        UserId,
+                                 teamId:            Option[TeamId],
+                                 assets:            AssetService,
+                                 usersStorage:      UsersStorage,
+                                 messages:          MessagesService,
+                                 messagesStorage:   MessagesStorage,
+                                 messagesContent:   MessagesContentUpdater,
+                                 members:           MembersStorage,
+                                 convsContent:      ConversationsContentUpdater,
+                                 convStorage:       ConversationStorage,
+                                 network:           NetworkModeService,
+                                 convs:             ConversationsService,
+                                 sync:              SyncServiceHandle,
+                                 client:            ConversationsClient,
+                                 accounts:          AccountsService,
+                                 tracking:          TrackingService,
+                                 errors:            ErrorsService,
                                  propertiesService: PropertiesService) extends ConversationsUiService with DerivedLogTag {
   import ConversationsUiService._
   import Threading.Implicits.Background
@@ -159,18 +159,18 @@ class ConversationsUiServiceImpl(selfUserId:      UserId,
                                 content: ContentForUpload,
                                 confirmation: WifiWarningConfirmation = DefaultConfirmation,
                                 exp: Option[Option[FiniteDuration]] = None): Future[Some[MessageData]] = {
+    verbose(l"sendAssetMessage($convId, $content)")
     val messageId = MessageId()
     for {
-      conversation <- convStorage.get(convId).map(_.get)//TODO Fix force unwrapping
-      retention  <- messages.retentionPolicy2(conversation)
-
-      rr <- readReceiptSettings(convId)
-      rawAsset   <- assets.createAndSaveUploadAsset(content, AES_CBC_Encryption.random, public = false, retention, Some(messageId))
-      message    <- messages.addAssetMessage(convId, messageId, rawAsset, rr, exp)
-      _          <- updateLastRead(message)
-      _          <- Future.successful(tracking.assetContribution(AssetId(rawAsset.id.str), selfUserId)) //TODO Maybe we can track raw assets contribution separately?
-      shouldSend <- checkSize(convId, rawAsset, message, confirmation)
-      _ <- if (shouldSend) sync.postMessage(message.id, convId, message.editTime) else Future.successful(())
+      conversation <- convStorage.get(convId).map(_.get) // TODO Fix force unwrapping
+      retention    <- messages.retentionPolicy2(conversation)
+      rr           <- readReceiptSettings(convId)
+      rawAsset     <- assets.createAndSaveUploadAsset(content, AES_CBC_Encryption.random, public = false, retention, Some(messageId))
+      message      <- messages.addAssetMessage(convId, messageId, rawAsset, rr, exp)
+      _            <- updateLastRead(message)
+      _            <- Future.successful(tracking.assetContribution(AssetId(rawAsset.id.str), selfUserId)) //TODO Maybe we can track raw assets contribution separately?
+      shouldSend   <- checkSize(convId, rawAsset, message, confirmation)
+      _            <- if (shouldSend) sync.postMessage(message.id, convId, message.editTime) else Future.successful(())
     } yield Some(message)
   }
 

@@ -85,7 +85,6 @@ trait MessagesService {
 
   def messageSent(convId: ConvId, msgId: MessageId, newTime: RemoteInstant): Future[Option[MessageData]]
   def messageDeliveryFailed(convId: ConvId, msg: MessageData, error: ErrorResponse): Future[Option[MessageData]]
-  def retentionPolicy(convData: ConversationData): CancellableFuture[Retention]
   def retentionPolicy2(convData: ConversationData): Future[AssetClient2.Retention]
 }
 
@@ -461,25 +460,6 @@ class MessagesServiceImpl(selfUserId:   UserId,
         if (msg.state == Status.FAILED) msg.copy(state = Status.FAILED_READ)
         else msg
       }
-
-  //TODO Remove this method and use retentionPolicy2 instead
-  override def retentionPolicy(convData: ConversationData): CancellableFuture[Retention] = {
-    def checkConv(convId: ConvId) =
-      members
-        .activeMembers(convId)
-        .flatMap(p => Signal.sequence(p.map(usersStorage.signal).toSeq: _*)
-          .map(_.exists(_.teamId.isDefined)))
-
-    val result: Signal[Retention] = if (teamId.isDefined || convData.team.isDefined) {
-      checkConv(convData.id).map {
-        case true => Retention.EternalInfrequentAccess
-        case false => Retention.Expiring
-      }
-    } else {
-      Signal.const(Retention.Expiring)
-    }
-    CancellableFuture.lift(result.head)
-  }
 
   override def retentionPolicy2(convData: ConversationData): Future[AssetClient2.Retention] = {
     import AssetClient2.Retention

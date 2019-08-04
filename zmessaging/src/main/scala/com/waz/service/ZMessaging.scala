@@ -18,10 +18,10 @@
 package com.waz.service
 
 import java.io.File
+import java.net.Proxy
 
-import android.content.{ComponentCallbacks2, Context}
+import android.content.Context
 import com.softwaremill.macwire._
-import com.waz.log.LogSE._
 import com.waz.api.ContentSearchQuery
 import com.waz.content.{MembersStorageImpl, UsersStorageImpl, ZmsDatabase, _}
 import com.waz.log.BasicLogging.LogTag
@@ -49,7 +49,6 @@ import com.waz.sync.otr.{OtrClientsSyncHandler, OtrClientsSyncHandlerImpl, OtrSy
 import com.waz.sync.queue.{SyncContentUpdater, SyncContentUpdaterImpl}
 import com.waz.threading.{SerialDispatchQueue, Threading}
 import com.waz.ui.UiModule
-import com.waz.utils.Locales
 import com.waz.utils.crypto.ReplyHashingImpl
 import com.waz.utils.events.EventContext
 import com.waz.utils.wrappers.{AndroidContext, DB, GoogleApi}
@@ -191,6 +190,7 @@ class ZMessaging(val teamId: Option[TeamId], val clientId: ClientId, account: Ac
   lazy val eventStorage: PushNotificationEventsStorage = wire[PushNotificationEventsStorageImpl]
   lazy val readReceiptsStorage: ReadReceiptsStorage    = wire[ReadReceiptsStorageImpl]
 
+  lazy val googleMapsClient   = new GoogleMapsClientImpl()(urlCreator, httpClient, authRequestInterceptor)
   lazy val youtubeClient      = new YouTubeClientImpl()(urlCreator, httpClient, authRequestInterceptor)
   lazy val soundCloudClient   = new SoundCloudClientImpl()(urlCreator, httpClient, authRequestInterceptor)
   lazy val assetClient        = new AssetClientImpl(cache)(urlCreator, httpClientForLongRunning, authRequestInterceptor)
@@ -225,7 +225,7 @@ class ZMessaging(val teamId: Option[TeamId], val clientId: ClientId, account: Ac
   lazy val pushToken: PushTokenService                = wire[PushTokenService]
   lazy val errors                                     = wire[ErrorsServiceImpl]
   lazy val reporting                                  = new ZmsReportingService(selfUserId, global.reporting)
-  lazy val wsFactory                                  = OkHttpWebSocketFactory
+  lazy val wsFactory                                  = new OkHttpWebSocketFactory(account.global.httpProxy)
   lazy val wsPushService                              = wireWith(WSPushServiceImpl.apply _)
   lazy val userSearch                                 = wire[UserSearchService]
   lazy val assetGenerator                             = wire[ImageAssetGenerator]
@@ -250,6 +250,7 @@ class ZMessaging(val teamId: Option[TeamId], val clientId: ClientId, account: Ac
   lazy val giphy: GiphyService                        = new GiphyServiceImpl(giphyClient)(Threading.Background)
   lazy val youtubeMedia                               = wire[YouTubeMediaService]
   lazy val soundCloudMedia                            = wire[SoundCloudMediaService]
+  lazy val googleMapsMediaService                     = wire[GoogleMapsMediaServiceImpl]
   lazy val otrService: OtrServiceImpl                 = wire[OtrServiceImpl]
   lazy val genericMsgs: GenericMessageService         = wire[GenericMessageService]
   lazy val reactions: ReactionsService                = wire[ReactionsService]
@@ -393,6 +394,7 @@ object ZMessaging extends DerivedLogTag { self =>
   private var prefs:           GlobalPreferences = _
   private var googleApi:       GoogleApi = _
   private var backend:         BackendConfig = _
+  private var httpProxy:       Option[Proxy] = _
   private var syncRequests:    SyncRequestService = _
   private var notificationsUi: NotificationUiController = _
   private var assets2Module:   Assets2Module = _
@@ -400,7 +402,7 @@ object ZMessaging extends DerivedLogTag { self =>
   //var for tests - and set here so that it is globally available without the need for DI
   var clock = Clock.systemUTC()
 
-  private lazy val _global: GlobalModule = new GlobalModuleImpl(context, backend, prefs, googleApi, syncRequests, notificationsUi)
+  private lazy val _global: GlobalModule = new GlobalModuleImpl(context, backend, httpProxy, prefs, googleApi, syncRequests, notificationsUi)
   private lazy val ui: UiModule = new UiModule(_global)
 
   //Try to avoid using these - map from the futures instead.
@@ -419,6 +421,7 @@ object ZMessaging extends DerivedLogTag { self =>
   //TODO - we should probably just request the entire GlobalModule from the UI here
   def onCreate(context:        Context,
                beConfig:       BackendConfig,
+               httpProxy:      Option[Proxy],
                prefs:          GlobalPreferences,
                googleApi:      GoogleApi,
                syncRequests:   SyncRequestService,
@@ -429,6 +432,7 @@ object ZMessaging extends DerivedLogTag { self =>
     if (this.currentUi == null) {
       this.context = context.getApplicationContext
       this.backend = beConfig
+      this.httpProxy = httpProxy
       this.prefs = prefs
       this.googleApi = googleApi
       this.syncRequests = syncRequests
