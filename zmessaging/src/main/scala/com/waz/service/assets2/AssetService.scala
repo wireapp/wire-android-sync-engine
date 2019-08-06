@@ -192,34 +192,37 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
   override def loadPublicContentById(assetId: AssetId, convId: Option[ConvId], callback: Option[ProgressCallback] = None): CancellableFuture[InputStream] =
     assetClient.loadPublicAssetContent(assetId, convId, callback).flatMap{
       case Left(err) => CancellableFuture.failed(err)
-      case Right(i) => CancellableFuture.successful(i)
+      case Right(i)  => CancellableFuture.successful(i)
     }
 
   override def loadUploadContentById(uploadAssetId: UploadAssetId, callback: Option[ProgressCallback] = None): CancellableFuture[InputStream] =
     uploadAssetStorage.get(uploadAssetId).flatMap { asset =>
       (asset.assetId, asset.localSource) match {
         case (Some(aId), _) => loadContentById(aId, callback)
-        case (_, Some(ls)) => Future.fromTry(uriHelper.openInputStream(ls.uri))
-        case _ => uploadContentCache.getStream(uploadAssetId)
+        case (_, Some(ls))  => Future.fromTry(uriHelper.openInputStream(ls.uri))
+        case _              => uploadContentCache.getStream(uploadAssetId)
       }
     }.toCancellable
 
   override def loadContentById(assetId: AssetId, callback: Option[ProgressCallback] = None): CancellableFuture[InputStream] =
-    assetsStorage.get(assetId).flatMap(asset => loadContent(asset, callback)).toCancellable
+    assetsStorage.get(assetId).flatMap(asset => loadContentFromAsset(asset, callback)).toCancellable
 
   override def loadContent(asset: Asset, callback: Option[ProgressCallback] = None): CancellableFuture[InputStream] =
     assetsStorage.find(asset.id).flatMap {
       case None              => assetsStorage.save(asset).flatMap(_ => loadFromBackend(asset, callback))
-      case Some(fromStorage) => fromStorage.localSource match {
-        case None         => loadFromCache(fromStorage).recoverWith { case _ => loadFromBackend(fromStorage, callback) }
-        case Some(source) => loadFromFileSystem(source) match {
-          case Failure(t)  =>
-            verbose(l"Can not load content from file system for asset $fromStorage. ${showString(t.getMessage)}")
-            assetsStorage.save(fromStorage.copy(localSource = None)).flatMap(_ => loadFromBackend(fromStorage, callback))
-          case Success(is) => Future.successful(is)
-        }
-      }
+      case Some(fromStorage) => loadContentFromAsset(fromStorage, callback)
     }.toCancellable
+
+  private def loadContentFromAsset(asset: Asset, callback: Option[ProgressCallback] = None): Future[InputStream] =
+    asset.localSource match {
+      case None         => loadFromCache(asset).recoverWith { case _ => loadFromBackend(asset, callback) }
+      case Some(source) => loadFromFileSystem(source) match {
+        case Failure(t)  =>
+          verbose(l"Can not load content from file system for asset $asset. ${showString(t.getMessage)}")
+          assetsStorage.save(asset.copy(localSource = None)).flatMap(_ => loadFromBackend(asset, callback))
+        case Success(is) => Future.successful(is)
+      }
+    }
 
   override def uploadAsset(assetId: UploadAssetId): CancellableFuture[Asset] = {
     import com.waz.api.impl.ErrorResponse
