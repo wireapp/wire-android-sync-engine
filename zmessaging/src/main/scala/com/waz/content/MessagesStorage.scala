@@ -35,6 +35,7 @@ import com.waz.threading.{CancellableFuture, SerialDispatchQueue}
 import com.waz.utils.TrimmingLruCache.Fixed
 import com.waz.utils._
 import com.waz.utils.events.{EventStream, Signal, SourceStream}
+import com.waz.utils.wrappers.DB
 
 import scala.collection.immutable.Set
 import scala.collection._
@@ -262,15 +263,10 @@ class MessagesStorageImpl(context:     Context,
       _ = onMessagesDeletedInConversation ! msgs.map(_.convId).toSet
     } yield ()
 
-  def clear(conv: ConvId, upTo: RemoteInstant): Future[Unit] = {
+  override def clear(conv: ConvId, upTo: RemoteInstant): Future[Unit] = {
     verbose(l"clear($conv, $upTo)")
     for {
-      _ <- storage { implicit c =>
-        MessageDataDao.iterating(MessageDataDao.listUnsentMsgs(conv)).foreach(_.map(_.id).foreach { id =>
-          MessageDataDao.delete(id)
-          MessageContentIndexDao.delete(id)
-        })
-      }.future
+      _ <- storage { clearUnsentMsgs(conv)(_) }.future
       _ <- storage { MessageDataDao.deleteUpTo(conv, upTo)(_) } .future
       _ <- storage { MessageContentIndexDao.deleteUpTo(conv, upTo)(_) } .future
       _ <- deleteCached(m => m.convId == conv && ! m.time.isAfter(upTo))
@@ -304,6 +300,12 @@ class MessagesStorageImpl(context:     Context,
         true
     }
   }
+
+  private def clearUnsentMsgs(convId: ConvId)(implicit storage: DB): Unit =
+    MessageDataDao.iterating(MessageDataDao.listUnsentMsgs(convId)).foreach(_.map(_.id).foreach { id =>
+      MessageDataDao.delete(id)
+      MessageContentIndexDao.delete(id)
+    })
 }
 
 object MessagesStorage {
