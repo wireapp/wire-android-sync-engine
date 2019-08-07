@@ -144,7 +144,7 @@ lazy val zmessaging = project
       "org.scala-lang.modules"        %% "scala-async"           % "0.9.7",
       "com.squareup.okhttp3"          %  "okhttp"                % "3.10.0", // should match okhttp3's mockserver version (see test dependencies)
       "com.googlecode.libphonenumber" %  "libphonenumber"        % "7.1.1", // 7.2.x breaks protobuf
-      "com.wire"                      %  "cryptobox-android"     % "1.0.0",
+      "com.wire"                      %  "cryptobox-android"     % "1.1.1",
       "com.wire"                      %  "generic-message-proto" % "1.23.0",
       "com.wire"                      %  "backend-api-proto"     % "1.1",
       "io.circe"                      %% "circe-core"            % circeVersion,
@@ -174,9 +174,7 @@ lazy val zmessaging = project
       "org.apache.httpcomponents"     %  "httpclient"            % "4.5.3"            % Test,
       "com.typesafe.akka"             %% "akka-http"             % "10.1.8"           % Test,
       "com.typesafe.akka"             %% "akka-actor"            % "2.5.22"           % Test,
-      "com.typesafe.akka"             %% "akka-stream"           % "2.5.22"           % Test
-//      "com.wire.cryptobox" % "cryptobox-jni" % cryptoboxVersion % Test % Native classifier "darwin-x86_64",
-//      "com.wire.cryptobox" % "cryptobox-jni" % cryptoboxVersion  % Test % Native classifier "linux-x86_64",
+      "com.typesafe.akka"             %% "akka-stream"           % "2.5.22"           % Test 
     )
   )
 
