@@ -266,7 +266,7 @@ class MessagesStorageImpl(context:     Context,
   override def clear(conv: ConvId, upTo: RemoteInstant): Future[Unit] = {
     verbose(l"clear($conv, $upTo)")
     for {
-      _ <- storage { clearUnsentMsgs(conv)(_) }.future
+      _ <- storage { deleteUnsentMessages(conv)(_) }.future
       _ <- storage { MessageDataDao.deleteUpTo(conv, upTo)(_) } .future
       _ <- storage { MessageContentIndexDao.deleteUpTo(conv, upTo)(_) } .future
       _ <- deleteCached(m => m.convId == conv && ! m.time.isAfter(upTo))
@@ -301,14 +301,9 @@ class MessagesStorageImpl(context:     Context,
     }
   }
 
-  private def clearUnsentMsgs(convId: ConvId)(implicit storage: DB): Unit = {
+  private def deleteUnsentMessages(convId: ConvId)(implicit storage: DB): Unit = {
     val unsentMessages = MessageDataDao.listUnsentMsgs(convId)
-    MessageDataDao.iterating(unsentMessages).foreach(_.foreach(clearUnsentMsg))
-  }
-
-  private def clearUnsentMsg(data: MessageData)(implicit storage: DB): Unit = {
-    MessageDataDao.delete(data.id)
-    MessageContentIndexDao.delete(data.id)
+    MessageDataDao.iterating(unsentMessages).foreach(_.foreach(delete))
   }
 }
 
