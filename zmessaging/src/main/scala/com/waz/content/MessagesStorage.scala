@@ -301,11 +301,15 @@ class MessagesStorageImpl(context:     Context,
     }
   }
 
-  private def clearUnsentMsgs(convId: ConvId)(implicit storage: DB): Unit =
-    MessageDataDao.iterating(MessageDataDao.listUnsentMsgs(convId)).foreach(_.map(_.id).foreach { id =>
-      MessageDataDao.delete(id)
-      MessageContentIndexDao.delete(id)
-    })
+  private def clearUnsentMsgs(convId: ConvId)(implicit storage: DB): Unit = {
+    val unsentMessages = MessageDataDao.listUnsentMsgs(convId)
+    MessageDataDao.iterating(unsentMessages).foreach(_.foreach(clearUnsentMsg))
+  }
+
+  private def clearUnsentMsg(data: MessageData)(implicit storage: DB): Unit = {
+    MessageDataDao.delete(data.id)
+    MessageContentIndexDao.delete(data.id)
+  }
 }
 
 object MessagesStorage {
