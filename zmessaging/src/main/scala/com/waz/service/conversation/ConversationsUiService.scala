@@ -163,7 +163,7 @@ class ConversationsUiServiceImpl(selfUserId:        UserId,
     val messageId = MessageId()
     for {
       retention  <- messages.retentionPolicy2ById(convId)
-      rr <- readReceiptSettings(convId)
+      rr         <- readReceiptSettings(convId)
       rawAsset   <- assets.createAndSaveUploadAsset(content, AES_CBC_Encryption.random, public = false, retention, Some(messageId))
       message    <- messages.addAssetMessage(convId, messageId, rawAsset, rr, exp)
       _          <- updateLastRead(message)
