@@ -32,20 +32,20 @@ sealed trait MediaAssetData {
   def artist: Option[ArtistData]
   def duration: Option[Duration]
   def linkUrl: String
-  def artwork: Option[AssetId]
+  def artwork: Option[GeneralAssetId]
   def tracks: Vector[TrackData]
   def expires: Instant
 
   def hasExpired: Boolean = Instant.now isAfter expires
 }
 
-case class TrackData(provider: MediaProvider, title: String, artist: Option[ArtistData], linkUrl: String, artwork: Option[AssetId], duration: Option[Duration], streamable: Boolean, streamUrl: Option[String], previewUrl: Option[String], expires: Instant) extends MediaAssetData {
+case class TrackData(provider: MediaProvider, title: String, artist: Option[ArtistData], linkUrl: String, artwork: Option[GeneralAssetId], duration: Option[Duration], streamable: Boolean, streamUrl: Option[String], previewUrl: Option[String], expires: Instant) extends MediaAssetData {
   val kind = KindOfMedia.TRACK
 
   def tracks: Vector[TrackData] = Vector(this)
 }
 
-case class PlaylistData(provider: MediaProvider, title: String, artist: Option[ArtistData], linkUrl: String, artwork: Option[AssetId], duration: Option[Duration], tracks: Vector[TrackData], expires: Instant) extends MediaAssetData {
+case class PlaylistData(provider: MediaProvider, title: String, artist: Option[ArtistData], linkUrl: String, artwork: Option[GeneralAssetId], duration: Option[Duration], tracks: Vector[TrackData], expires: Instant) extends MediaAssetData {
   val kind = KindOfMedia.PLAYLIST
 }
 
