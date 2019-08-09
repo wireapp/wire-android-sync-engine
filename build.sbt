@@ -98,7 +98,7 @@ lazy val zmessaging = project
     libraryProject := true,
     typedResources := false,
     sourceGenerators in Compile += generateZmsVersion.taskValue,
-    ndkAbiFilter := Seq("armeabi-v7a", "x86"),
+    ndkAbiFilter := Seq("armeabi-v7a", "x86", "arm64-v8a", "x86_64"),
     nativeLibs in Global := {
       val target = crossTarget.value / "native-libs"
       target.mkdirs()
