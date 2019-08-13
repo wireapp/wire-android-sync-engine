@@ -352,14 +352,16 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
     def prepareContent(content: Content): Future[PreparedContent] = content match {
       case content: Content.Uri       => Future.successful(content)
       case Content.File(mime, file)   =>
+        val tempAssetId = UploadAssetId()
         for {
-          _         <- uploadContentCache.put(assetId, file, removeOriginal = true)
-          cacheFile <- uploadContentCache.get(assetId)
+          _         <- uploadContentCache.put(tempAssetId, file, removeOriginal = true)
+          cacheFile <- uploadContentCache.get(tempAssetId)
         } yield Content.File(mime, cacheFile)
       case Content.Bytes(mime, bytes) =>
+        val tempAssetId = UploadAssetId()
         for {
-          _    <- uploadContentCache.putBytes(assetId, bytes)
-          file <- uploadContentCache.get(assetId)
+          _    <- uploadContentCache.putBytes(tempAssetId, bytes)
+          file <- uploadContentCache.get(tempAssetId)
         } yield Content.File(mime, file)
       case Content.AsBlob(blob)       => prepareContent(blob)
     }
@@ -400,7 +402,9 @@ class AssetServiceImpl(assetsStorage: AssetStorage,
         case Some(transformation) =>
           for {
             cacheFile    <- uploadContentCache.getOrCreateEmpty(assetId)
-            mime         <- Future { transformation(() => initialContent.openInputStream(uriHelper).get, () => new FileOutputStream(cacheFile)) }
+            Success(in)  =  initialContent.openInputStream(uriHelper)
+            out          =  new FileOutputStream(cacheFile)
+            mime         <- Future { transformation(() => in, () => out) }
             content      =  Content.File(mime, cacheFile)
             (details, _) =  extractDetails(content) // mime should not change anymore
           } yield (content, mime, details)
