@@ -27,7 +27,7 @@ import com.waz.db.migrate.AccountDataMigration
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.log.LogSE._
 import com.waz.model.AccountData.AccountDataDao
-import com.waz.model.TeamData.TeamDataDoa
+import com.waz.model.TeamData.TeamDataDao
 import com.waz.model.otr.ClientId
 import com.waz.model.{AccountId, UserId}
 import com.waz.service.tracking.TrackingService
@@ -55,7 +55,7 @@ object ZGlobalDB {
   val DbName = "ZGlobal.db"
   val DbVersion = 23
 
-  lazy val daos = Seq(AccountDataDao, CacheEntryDao, TeamDataDoa)
+  lazy val daos = Seq(AccountDataDao, CacheEntryDao, TeamDataDao)
 
   object Migrations {
 

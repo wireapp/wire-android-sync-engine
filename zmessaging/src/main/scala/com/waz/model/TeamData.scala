@@ -44,7 +44,7 @@ object TeamData {
     TeamData(TeamId(id), Name(name), UserId(creator), AssetId(icon))
 
   import com.waz.db.Col._
-  implicit object TeamDataDoa extends Dao[TeamData, TeamId] {
+  implicit object TeamDataDao extends Dao[TeamData, TeamId] {
     val Id      = id[TeamId]      ('_id, "PRIMARY KEY").apply(_.id)
     val Name    = text[model.Name]('name, _.str, model.Name)(_.name)
     val Creator = id[UserId]      ('creator).apply(_.creator)
