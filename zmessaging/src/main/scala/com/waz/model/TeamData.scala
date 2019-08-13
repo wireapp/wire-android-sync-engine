@@ -19,13 +19,24 @@ package com.waz.model
 
 import com.waz.db.Dao
 import com.waz.model
+import com.waz.model.UserData.Picture
 import com.waz.utils.Identifiable
 import com.waz.utils.wrappers.DBCursor
 
 case class TeamData(override val id: TeamId,
                     name:            Name,
                     creator:         UserId,
-                    icon:            AssetId) extends Identifiable[TeamId]
+                    icon:            AssetId) extends Identifiable[TeamId] {
+
+  def picture: Option[Picture] = {
+    if (hasValidIconId) Some(Picture.Uploaded(icon))
+    else None
+  }
+
+  // Team icon is optional, but on backend it's not. A dummy value (less than 10 chars)
+  // signifies no team icon.
+  private def hasValidIconId: Boolean = icon.str.length >= 10
+}
 
 object TeamData {
 
