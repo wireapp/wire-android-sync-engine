@@ -105,21 +105,6 @@ object TeamsClient {
 
   def memberPath(teamId: TeamId, userId: UserId): String = s"${teamMembersPath(teamId)}/${userId.str}"
 
-  import JsonDecoder._
-
-  case class TeamBindingResponse(teams: Seq[(TeamData, Boolean)], hasMore: Boolean)
-
-  //TODO Remove after assets refactoring
-  object TeamBindingResponse extends DerivedLogTag {
-    def unapply(response: ResponseContent): Option[(Seq[(TeamData, Boolean)], Boolean)] =
-      response match {
-        case JsonObjectResponse(js) if js.has("teams") =>
-          Try(decodeSeq('teams)(js, TeamData.TeamBindingDecoder), decodeOptBoolean('has_more)(js).getOrElse(false)).toOption
-        case _ =>
-          warn(l"Unexpected response:")
-          None
-      }
-  }
 
   case class TeamDataResponse(id: String, name: String, creator: String, icon: String, icon_key: Option[String])
 
