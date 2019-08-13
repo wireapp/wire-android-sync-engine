@@ -33,7 +33,6 @@ import scala.util.Try
 trait TeamsClient {
   def getTeamMembers(id: TeamId): ErrorOrResponse[Seq[TeamMember]]
   def getTeamData(id: TeamId): ErrorOrResponse[TeamData]
-
   def getPermissions(teamId: TeamId, userId: UserId): ErrorOrResponse[Option[PermissionsMasks]]
   def getTeamMember(teamId: TeamId, userId: UserId): ErrorOrResponse[TeamMember]
 }
@@ -47,10 +46,6 @@ class TeamsClientImpl(implicit
   import HttpClient.AutoDerivation._
   import TeamsClient._
   import com.waz.threading.Threading.Implicits.Background
-
-  //TODO Remove after assets refactoring
-  private implicit val errorResponseDeserializer: RawBodyDeserializer[ErrorResponse] =
-    objectFromCirceJsonRawBodyDeserializer[ErrorResponse]
 
   override def getTeamMembers(id: TeamId): ErrorOrResponse[Seq[TeamMember]] = {
     Request.Get(relativePath = teamMembersPath(id))
