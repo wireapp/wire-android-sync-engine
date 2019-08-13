@@ -68,8 +68,7 @@ class TeamsClientImpl(implicit
           response.id,
           response.name,
           response.creator,
-          Some(response.icon),
-          response.icon_key)
+          response.icon)
       }
   }
 
@@ -105,8 +104,7 @@ object TeamsClient {
 
   def memberPath(teamId: TeamId, userId: UserId): String = s"${teamMembersPath(teamId)}/${userId.str}"
 
-
-  case class TeamDataResponse(id: String, name: String, creator: String, icon: String, icon_key: Option[String])
+  case class TeamDataResponse(id: String, name: String, creator: String, icon: String)
 
   case class TeamMembers(members: Seq[TeamMember])
 

@@ -19,33 +19,29 @@ package com.waz.model
 
 import com.waz.db.Dao
 import com.waz.model
-import com.waz.utils.{Identifiable, JsonDecoder}
+import com.waz.utils.Identifiable
 import com.waz.utils.wrappers.DBCursor
-import org.json.JSONObject
 
 case class TeamData(override val id: TeamId,
                     name:            Name,
                     creator:         UserId,
-                    icon:            Option[RAssetId] = None,
-                    iconKey:         Option[AESKey]  = None) extends Identifiable[TeamId]
+                    icon:            AssetId) extends Identifiable[TeamId]
 
 object TeamData {
 
-  def apply(id: String, name: String, creator: String, icon: Option[String], iconKey: Option[String]): TeamData =
-    TeamData(TeamId(id), Name(name), UserId(creator), icon.map(i => RAssetId(i)), iconKey.map(i => AESKey(i)))
-
+  def apply(id: String, name: String, creator: String, icon: String): TeamData =
+    TeamData(TeamId(id), Name(name), UserId(creator), AssetId(icon))
 
   import com.waz.db.Col._
   implicit object TeamDataDoa extends Dao[TeamData, TeamId] {
     val Id      = id[TeamId]      ('_id, "PRIMARY KEY").apply(_.id)
     val Name    = text[model.Name]('name, _.str, model.Name)(_.name)
     val Creator = id[UserId]      ('creator).apply(_.creator)
-    val Icon    = opt(id[RAssetId] ('icon))(_.icon)
-    val IconKey = opt(text[AESKey]('icon_key, _.str, AESKey))(_.iconKey)
+    val Icon    = id[AssetId]     ('icon).apply(_.icon)
 
     override val idCol = Id
-    override val table = Table("Teams", Id, Name, Creator, Icon, IconKey)
+    override val table = Table("Teams", Id, Name, Creator, Icon)
 
-    override def apply(implicit cursor: DBCursor): TeamData = new TeamData(Id, Name, Creator, Icon, IconKey)
+    override def apply(implicit cursor: DBCursor): TeamData = new TeamData(Id, Name, Creator, Icon)
   }
 }

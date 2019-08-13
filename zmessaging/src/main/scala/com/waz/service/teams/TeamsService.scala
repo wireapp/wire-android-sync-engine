@@ -84,7 +84,7 @@ class TeamsServiceImpl(selfUser:           UserId,
     val convsCreated = events.collect { case ConversationCreate(_, id) => id }.toSet
     val convsDeleted = events.collect { case ConversationDelete(_, id) => id }.toSet
     for {
-      _ <- RichFuture.traverseSequential(events.collect { case e:Update => e}) { case Update(id, name, icon, iconKey) => onTeamUpdated(id, name, icon, iconKey) }
+      _ <- RichFuture.traverseSequential(events.collect { case e:Update => e}) { case Update(id, name, icon) => onTeamUpdated(id, name, icon) }
       _ <- onMembersJoined(membersJoined -- membersLeft)
       _ <- onMembersLeft(membersLeft -- membersJoined)
       _ <- onMembersUpdated(membersUpdated)
@@ -181,13 +181,12 @@ class TeamsServiceImpl(selfUser:           UserId,
         .map(_ => ())
   }
 
-  private def onTeamUpdated(id: TeamId, name: Option[Name], icon: Option[RAssetId], iconKey: Option[AESKey]) = {
-    verbose(l"onTeamUpdated: $id, name: $name, icon: $icon, iconKey: $iconKey")
+  private def onTeamUpdated(id: TeamId, name: Option[Name], icon: AssetId) = {
+    verbose(l"onTeamUpdated: $id, name: $name, icon: $icon")
     teamStorage.update(id, team => team.copy (
       name    = name.getOrElse(team.name),
-      icon    = icon.orElse(team.icon),
-      iconKey = iconKey.orElse(team.iconKey)
-    ))
+      icon    = icon)
+    )
   }
 
   private def onMembersJoined(members: Set[UserId]) = {
