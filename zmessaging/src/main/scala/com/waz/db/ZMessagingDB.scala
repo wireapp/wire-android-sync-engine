@@ -38,6 +38,7 @@ import com.waz.model.NotificationData.NotificationDataDao
 import com.waz.model.PushNotificationEvents.PushNotificationEventsDao
 import com.waz.model.ReadReceipt.ReadReceiptDao
 import com.waz.model.SearchQueryCache.SearchQueryCacheDao
+import com.waz.model.TeamData.TeamDataDao
 import com.waz.model.UserData.UserDataDao
 import com.waz.model._
 import com.waz.model.otr.UserClients.UserClientsDao
@@ -62,7 +63,7 @@ class ZMessagingDB(context: Context, dbName: String, tracking: TrackingService) 
 }
 
 object ZMessagingDB {
-  val DbVersion = 121
+  val DbVersion = 122
 
   lazy val daos = Seq (
     UserDataDao, SearchQueryCacheDao, AssetDataDao, ConversationDataDao, ConversationMemberDataDao,
@@ -371,6 +372,11 @@ object ZMessagingDB {
             m
         }
       }
+    },
+    Migration(121, 122) { db =>
+      // Team icons are now public assets, so we no longer need the key.
+      db.execSQL(s"ALTER TABLE ${TeamDataDao.table.name} DROP COLUMN IF EXISTS icon_key")
+      db.execSQL(s"UPDATE ${KeyValueDataDao.table.name} SET ${KeyValueDataDao.Value.name} = 'true' WHERE ${KeyValueDataDao.Key.name} = 'should_sync_teams'")
     }
   )
 }
