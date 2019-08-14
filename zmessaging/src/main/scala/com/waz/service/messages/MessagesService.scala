@@ -85,6 +85,7 @@ trait MessagesService {
 
   def messageSent(convId: ConvId, msgId: MessageId, newTime: RemoteInstant): Future[Option[MessageData]]
   def messageDeliveryFailed(convId: ConvId, msg: MessageData, error: ErrorResponse): Future[Option[MessageData]]
+  def retentionPolicy2ById(convId: ConvId): Future[AssetClient2.Retention]
   def retentionPolicy2(convData: ConversationData): Future[AssetClient2.Retention]
 }
 
@@ -460,6 +461,14 @@ class MessagesServiceImpl(selfUserId:   UserId,
         if (msg.state == Status.FAILED) msg.copy(state = Status.FAILED_READ)
         else msg
       }
+
+  override def retentionPolicy2ById(convId: ConvId): Future[AssetClient2.Retention] =
+    convs.convById(convId).flatMap {
+      case Some(c) => retentionPolicy2(c)
+      case None =>
+        error(l"Failed to find conversation with id: $convId")
+        Future.failed(new IllegalArgumentException(s"No conversation with id $convId found"))
+    }
 
   override def retentionPolicy2(convData: ConversationData): Future[AssetClient2.Retention] = {
     import AssetClient2.Retention

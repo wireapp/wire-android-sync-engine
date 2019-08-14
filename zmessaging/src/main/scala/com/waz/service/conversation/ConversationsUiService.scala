@@ -27,22 +27,20 @@ import com.waz.content._
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.log.LogSE._
 import com.waz.model.ConversationData.{ConversationType, getAccessAndRoleForGroupConv}
-import com.waz.model.GenericContent.{Location, MsgEdit, Quote}
+import com.waz.model.GenericContent.{Location, MsgEdit}
 import com.waz.model.UserData.ConnectionStatus
 import com.waz.model._
 import com.waz.model.sync.ReceiptType
 import com.waz.service.AccountsService.InForeground
 import com.waz.service.ZMessaging.currentBeDrift
 import com.waz.service._
-import com.waz.service.assets2.Asset.{General, Video}
+import com.waz.service.assets2.Asset.Video
 import com.waz.service.conversation.ConversationsService.generateTempConversationId
 import com.waz.service.messages.{MessagesContentUpdater, MessagesService}
 import com.waz.service.tracking.TrackingService
 import com.waz.sync.SyncServiceHandle
 import com.waz.sync.client.{ConversationsClient, ErrorOr}
 import com.waz.threading.{CancellableFuture, Threading}
-import com.waz.utils.RichFuture.traverseSequential
-import com.waz.utils.Locales.currentLocaleOrdering
 import com.waz.utils._
 import com.waz.utils.events.EventStream
 
@@ -162,15 +160,14 @@ class ConversationsUiServiceImpl(selfUserId:        UserId,
     verbose(l"sendAssetMessage($convId, $content)")
     val messageId = MessageId()
     for {
-      conversation <- convStorage.get(convId).map(_.get) // TODO Fix force unwrapping
-      retention    <- messages.retentionPolicy2(conversation)
-      rr           <- readReceiptSettings(convId)
-      rawAsset     <- assets.createAndSaveUploadAsset(content, AES_CBC_Encryption.random, public = false, retention, Some(messageId))
-      message      <- messages.addAssetMessage(convId, messageId, rawAsset, rr, exp)
-      _            <- updateLastRead(message)
-      _            <- Future.successful(tracking.assetContribution(AssetId(rawAsset.id.str), selfUserId)) //TODO Maybe we can track raw assets contribution separately?
-      shouldSend   <- checkSize(convId, rawAsset, message, confirmation)
-      _            <- if (shouldSend) sync.postMessage(message.id, convId, message.editTime) else Future.successful(())
+      retention  <- messages.retentionPolicy2ById(convId)
+      rr         <- readReceiptSettings(convId)
+      rawAsset   <- assets.createAndSaveUploadAsset(content, AES_CBC_Encryption.random, public = false, retention, Some(messageId))
+      message    <- messages.addAssetMessage(convId, messageId, rawAsset, rr, exp)
+      _          <- updateLastRead(message)
+      _          <- Future.successful(tracking.assetContribution(AssetId(rawAsset.id.str), selfUserId)) //TODO Maybe we can track raw assets contribution separately?
+      shouldSend <- checkSize(convId, rawAsset, message, confirmation)
+      _          <- if (shouldSend) sync.postMessage(message.id, convId, message.editTime) else Future.successful(())
     } yield Some(message)
   }
 

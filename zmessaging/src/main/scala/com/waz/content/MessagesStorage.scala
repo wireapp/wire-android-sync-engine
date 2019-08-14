@@ -35,6 +35,7 @@ import com.waz.threading.{CancellableFuture, SerialDispatchQueue}
 import com.waz.utils.TrimmingLruCache.Fixed
 import com.waz.utils._
 import com.waz.utils.events.{EventStream, Signal, SourceStream}
+import com.waz.utils.wrappers.DB
 
 import scala.collection.immutable.Set
 import scala.collection._
@@ -262,9 +263,10 @@ class MessagesStorageImpl(context:     Context,
       _ = onMessagesDeletedInConversation ! msgs.map(_.convId).toSet
     } yield ()
 
-  def clear(conv: ConvId, upTo: RemoteInstant): Future[Unit] = {
+  override def clear(conv: ConvId, upTo: RemoteInstant): Future[Unit] = {
     verbose(l"clear($conv, $upTo)")
     for {
+      _ <- storage { deleteUnsentMessages(conv)(_) }.future
       _ <- storage { MessageDataDao.deleteUpTo(conv, upTo)(_) } .future
       _ <- storage { MessageContentIndexDao.deleteUpTo(conv, upTo)(_) } .future
       _ <- deleteCached(m => m.convId == conv && ! m.time.isAfter(upTo))
@@ -297,6 +299,11 @@ class MessagesStorageImpl(context:     Context,
         warn(l"Found multiple system messages with given timestamp")
         true
     }
+  }
+
+  private def deleteUnsentMessages(convId: ConvId)(implicit storage: DB): Unit = {
+    val unsentMessages = MessageDataDao.listUnsentMsgs(convId)
+    MessageDataDao.iterating(unsentMessages).foreach(_.foreach(delete))
   }
 }
 

@@ -447,6 +447,7 @@ object UserPreferences {
   lazy val VibrateEnabled                   = PrefKey[Boolean]("vibrate_enabled")
   lazy val SendButtonEnabled                = PrefKey[Boolean]("send_button_enabled", customDefault = true)
   lazy val MessagePreview                   = PrefKey[Boolean]("message_previews_enabled", customDefault = true)
+  lazy val HideScreenContent                = PrefKey[Boolean]("hide_screen_content", customDefault = false)
 
   lazy val CurrentNotifications             = PrefKey[Set[Int]]("current_notifications", customDefault = Set.empty[Int])
 

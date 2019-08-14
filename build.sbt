@@ -98,7 +98,7 @@ lazy val zmessaging = project
     libraryProject := true,
     typedResources := false,
     sourceGenerators in Compile += generateZmsVersion.taskValue,
-    ndkAbiFilter := Seq("armeabi-v7a", "x86"),
+    ndkAbiFilter := Seq("armeabi-v7a", "x86", "arm64-v8a", "x86_64"),
     nativeLibs in Global := {
       val target = crossTarget.value / "native-libs"
       target.mkdirs()
@@ -144,7 +144,7 @@ lazy val zmessaging = project
       "org.scala-lang.modules"        %% "scala-async"           % "0.9.7",
       "com.squareup.okhttp3"          %  "okhttp"                % "3.10.0", // should match okhttp3's mockserver version (see test dependencies)
       "com.googlecode.libphonenumber" %  "libphonenumber"        % "7.1.1", // 7.2.x breaks protobuf
-      "com.wire"                      %  "cryptobox-android"     % "1.1.1",
+      "com.wire"                      %  "cryptobox-android"     % "1.1.2",
       "com.wire"                      %  "generic-message-proto" % "1.23.0",
       "com.wire"                      %  "backend-api-proto"     % "1.1",
       "io.circe"                      %% "circe-core"            % circeVersion,
@@ -182,7 +182,7 @@ lazy val macrosupport = project
   .enablePlugins(AutomateHeaderPlugin).settings(licenseHeaders)
   .settings(publishSettings: _*)
   .settings(
-    version := "3.2",
+    version := "3.3",
     crossPaths := false,
     exportJars := true,
     name := "zmessaging-android-macrosupport",

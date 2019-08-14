@@ -17,6 +17,8 @@
  */
 package com.waz.sync.client
 
+import java.net.URL
+
 import com.waz.log.LogSE._
 import com.waz.api.MediaProvider
 import com.waz.api.impl.ErrorResponse
@@ -26,9 +28,10 @@ import com.waz.model.messages.media.MediaAssetData.{MediaWithImages, Thumbnail}
 import com.waz.model.messages.media._
 import com.waz.threading.Threading
 import com.waz.utils._
+import com.waz.utils.wrappers.URI
 import com.waz.znet2.AuthRequestInterceptor
 import com.waz.znet2.http.Request.UrlCreator
-import com.waz.znet2.http.{HttpClient, RawBodyDeserializer, Request}
+import com.waz.znet2.http.{HttpClient, Method, RawBodyDeserializer, Request}
 import org.json.JSONObject
 
 import scala.collection.JavaConverters._
@@ -38,6 +41,7 @@ import scala.util.control.NonFatal
 
 trait YouTubeClient {
   def loadVideo(id: String): ErrorOr[MediaWithImages[TrackData]]
+  def loadPreview(uri: URI): ErrorOr[Array[Byte]]
   def loadPlaylist(id: String): ErrorOr[MediaWithImages[PlaylistData]]
 }
 
@@ -57,6 +61,14 @@ class YouTubeClientImpl(implicit
   override def loadVideo(id: String): ErrorOr[MediaWithImages[TrackData]] = {
     Request.Get(relativePath = resourcePath("videos"), queryParameters = List("part" -> "snippet", "id" -> id))
       .withResultType[MediaWithImages[TrackData]]
+      .withErrorType[ErrorResponse]
+      .executeSafe
+      .future
+  }
+
+  override def loadPreview(uri: URI): ErrorOr[Array[Byte]] = {
+    Request.create(method = Method.Get, url = new URL(uri.toString))
+      .withResultType[Array[Byte]]
       .withErrorType[ErrorResponse]
       .executeSafe
       .future
