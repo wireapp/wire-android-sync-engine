@@ -374,8 +374,7 @@ object ZMessagingDB {
       }
     },
     Migration(121, 122) { db =>
-      // Team icons are now public assets, so we no longer need the key.
-      db.execSQL(s"ALTER TABLE ${TeamDataDao.table.name} DROP COLUMN IF EXISTS icon_key")
+      // To fetch team data to display the logo.
       db.execSQL(s"UPDATE ${KeyValueDataDao.table.name} SET ${KeyValueDataDao.Value.name} = 'true' WHERE ${KeyValueDataDao.Key.name} = 'should_sync_teams'")
     }
   )
