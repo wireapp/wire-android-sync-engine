@@ -18,7 +18,7 @@
 package com.waz.sync.handler
 
 import com.waz.api.impl.ErrorResponse
-import com.waz.model.{TeamData, TeamId, UserId}
+import com.waz.model.{AssetId, TeamData, TeamId, UserId}
 import com.waz.service.teams.TeamsService
 import com.waz.specs.AndroidFreeSpec
 import com.waz.sync.SyncResult
@@ -41,7 +41,7 @@ class TeamsSyncHandlerSpec extends AndroidFreeSpec {
 
       val teamId = TeamId()
       val teams = Seq((teamId, true))
-      val teamData = TeamData(teamId, "name", UserId())
+      val teamData = TeamData(teamId, "name", UserId(), AssetId())
       val members = Seq(
         TeamMember(UserId(), Option(Permissions(0L, 0L)), None),
         TeamMember(UserId(), Option(Permissions(0L, 0L)), None)
@@ -58,7 +58,7 @@ class TeamsSyncHandlerSpec extends AndroidFreeSpec {
     scenario("Failed members download should fail entire sync") {
 
       val teamId = TeamId()
-      val teamData = TeamData(teamId, "name", UserId())
+      val teamData = TeamData(teamId, "name", UserId(), AssetId())
 
       val timeoutError = ErrorResponse(ErrorResponse.ConnectionErrorCode, s"Request failed with timeout", "connection-error")
 
