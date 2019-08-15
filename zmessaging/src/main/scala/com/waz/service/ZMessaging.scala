@@ -49,7 +49,7 @@ import com.waz.sync.otr.{OtrClientsSyncHandler, OtrClientsSyncHandlerImpl, OtrSy
 import com.waz.sync.queue.{SyncContentUpdater, SyncContentUpdaterImpl}
 import com.waz.threading.{SerialDispatchQueue, Threading}
 import com.waz.ui.UiModule
-import com.waz.utils.crypto.{Argon2, Argon2Impl, ReplyHashingImpl}
+import com.waz.utils.crypto._
 import com.waz.utils.events.EventContext
 import com.waz.utils.wrappers.{AndroidContext, DB, GoogleApi}
 import com.waz.utils.{IoUtils, Locales}
@@ -260,6 +260,7 @@ class ZMessaging(val teamId: Option[TeamId], val clientId: ClientId, account: Ac
   lazy val ephemeral                                  = wire[EphemeralMessagesService]
   lazy val replyHashing                               = wire[ReplyHashingImpl]
   lazy val argon2: Argon2                             = wire[Argon2Impl]
+  lazy val chacha20: ChaCha20                         = wire[ChaCha20Impl]
 
   lazy val assetSync                                  = wire[AssetSyncHandler]
   lazy val usersearchSync                             = wire[UserSearchSyncHandler]
