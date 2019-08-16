@@ -54,6 +54,7 @@ class AccountManager(val userId:   UserId,
                      val teamId:   Option[TeamId],
                      val global:   GlobalModule,
                      val accounts: AccountsService,
+                     val backupManager: BackupManager,
                      val startedJustAfterBackup: Boolean,
                      initialSelf: Option[UserInfo],
                      isLogin:     Option[Boolean]) extends DerivedLogTag {
@@ -261,15 +262,16 @@ class AccountManager(val userId:   UserId,
     }
   }
 
-  def exportDatabase: Future[File] = for {
+  def exportDatabase(password: Option[Password]): Future[File] = for {
     zms     <- zmessaging
     user    <- zms.users.selfUser.head
     _       <- db.flushWALToDatabase()
-    backup  = BackupManager.exportDatabase(
+    backup  = backupManager.exportDatabase(
       userId,
       userHandle  = user.handle.map(_.string).getOrElse(""),
       databaseDir = context.getDatabasePath(userId.str).getParentFile,
-      targetDir   = context.getExternalCacheDir
+      targetDir   = context.getExternalCacheDir,
+      password    = password
     )
     _       = tracking.historyBackedUp(backup.isSuccess)
   } yield backup.get

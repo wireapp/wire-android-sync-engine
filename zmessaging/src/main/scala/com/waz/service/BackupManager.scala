@@ -25,20 +25,27 @@ import java.util.zip.{ZipFile, ZipOutputStream}
 import com.waz.db.ZMessagingDB
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.log.LogSE._
+import com.waz.model.AccountData.Password
 import com.waz.model.UserId
 import com.waz.model.otr.ClientId
+import com.waz.service.BackupManager._
 import com.waz.service.BackupManager.InvalidBackup.{DbEntryNotFound, MetadataEntryNotFound}
 import com.waz.utils.IoUtils.withResource
 import com.waz.utils.Json.syntax._
+import com.waz.utils.crypto.LibSodiumUtils
 import com.waz.utils.{IoUtils, JsonDecoder, JsonEncoder, RichTry, returning}
 import org.json.JSONObject
 import org.threeten.bp.Instant
 
 import scala.io.Source
-import scala.util.{Failure, Try}
+import scala.util.{Failure, Success, Try}
 
-object BackupManager extends DerivedLogTag {
+trait BackupManager {
+  def exportDatabase(userId: UserId, userHandle: String, databaseDir: File, targetDir: File, password: Option[Password]): Try[File]
+  def importDatabase(userId: UserId, exportFile: File, targetDir: File, currentDbVersion: Int = BackupMetadata.currentDbVersion): Try[File]
+}
 
+object BackupManager {
   sealed trait BackupError extends Exception
 
   case class UnknownBackupError(cause: Throwable) extends BackupError
@@ -56,12 +63,6 @@ object BackupManager extends DerivedLogTag {
     case object DbVersion extends InvalidMetadata
     case object Platform extends InvalidMetadata
   }
-
-  case class BackupMetadata(userId: UserId,
-                            version: Int = BackupMetadata.currentDbVersion,
-                            clientId: Option[ClientId] = None,
-                            creationTime: Instant = Instant.now(),
-                            platform: String = BackupMetadata.currentPlatform)
 
   object BackupMetadata {
 
@@ -95,6 +96,12 @@ object BackupManager extends DerivedLogTag {
     }
   }
 
+  case class BackupMetadata(userId: UserId,
+                            version: Int = BackupMetadata.currentDbVersion,
+                            clientId: Option[ClientId] = None,
+                            creationTime: Instant = Instant.now(),
+                            platform: String = BackupMetadata.currentPlatform)
+
   def backupZipFileName(userHandle: String): String = {
     val timestamp = new SimpleDateFormat("yyyyMMdd", Locale.getDefault()).format(Instant.now().getEpochSecond * 1000)
     s"Wire-$userHandle-Backup_$timestamp.android_wbu"
@@ -104,12 +111,18 @@ object BackupManager extends DerivedLogTag {
   def getDbFileName(id: UserId): String = id.str
   def getDbWalFileName(id: UserId): String = id.str + "-wal"
 
+}
+
+class BackupManagerImpl(libSodiumUtils: LibSodiumUtils) extends BackupManager with DerivedLogTag {
+
+  import BackupManager._
+
   // The current solution writes the database file(s) directly to the newly created zip file.
   // This way we save memory, but it means that it takes longer before we can release the lock.
   // If this becomes the problem, we might consider first copying the database file(s) to the
   // external storage directory, release the lock, and then safely proceed with zipping them.
-  def exportDatabase(userId: UserId, userHandle: String, databaseDir: File, targetDir: File): Try[File] =
-    Try {
+  override def exportDatabase(userId: UserId, userHandle: String, databaseDir: File, targetDir: File, password: Option[Password]): Try[File] = {
+    val backup = Try {
       returning(new File(targetDir, backupZipFileName(userHandle))) { zipFile =>
         zipFile.deleteOnExit()
 
@@ -136,8 +149,10 @@ object BackupManager extends DerivedLogTag {
         verbose(l"database export finished: $zipFile . Data contains: ${zipFile.length} bytes")
       }
     }.mapFailureIfNot[BackupError](UnknownBackupError.apply)
+    if (backup.isSuccess && password.isDefined) encryptDatabase(backup.get, password.get, userId) else backup
+  }
 
-  def importDatabase(userId: UserId, exportFile: File, targetDir: File, currentDbVersion: Int = BackupMetadata.currentDbVersion): Try[File] =
+  override def importDatabase(userId: UserId, exportFile: File, targetDir: File, currentDbVersion: Int = BackupMetadata.currentDbVersion): Try[File] =
     Try {
       withResource(new ZipFile(exportFile)) { zip =>
         val metadataEntry = Option(zip.getEntry(backupMetadataFileName)).getOrElse { throw MetadataEntryNotFound }
@@ -165,5 +180,70 @@ object BackupManager extends DerivedLogTag {
       }
     }.mapFailureIfNot[BackupError](UnknownBackupError.apply)
 
+
+  private def encryptDatabase(backup: File, password: Password, userId: UserId): Try[File] = {
+    val dbBytes = Array.ofDim[Byte](backup.length().toInt)
+    val salt = libSodiumUtils.generateSalt()
+    withResource(new FileInputStream(backup)) { unencryptedBackup =>
+      IoUtils.readFully(unencryptedBackup, dbBytes)
+    }
+
+    (libSodiumUtils.encrypt(dbBytes, password, salt), getMetaDataBytes(password, salt, userId)) match {
+      case (Some(encryptedBytes), Some(meta)) =>
+        Try {
+          val encryptedBackup = returning(new File(backup.getPath + "_encrypted")) { encryptedDbFile =>
+            encryptedDbFile.deleteOnExit()
+
+            withResource(new BufferedOutputStream(new FileOutputStream(encryptedDbFile))) { encryptedDb =>
+              encryptedDb.write(meta)
+              verbose(l"Wrote ${meta.length}")
+              verbose(l"salt: ${salt.length}")
+              encryptedDb.write(encryptedBytes)
+              verbose(l"Wrote ${encryptedBytes.length}")
+            }
+          }
+
+          backup.delete()
+          encryptedBackup.renameTo(backup)
+          new File(backup.getPath)
+        }.mapFailureIfNot[BackupError](UnknownBackupError.apply)
+      case (_, None) =>
+        Failure(new Throwable("Failed to create metadata"))
+      case (None, _) =>
+        val msg = "Failed to encrypt backup"
+        error(l"$msg")
+        Failure(new Exception(msg))
+    }
+  }
+
+  private def getMetaDataBytes(password: Password, salt: Array[Byte], userId: UserId): Option[Array[Byte]] = {
+    //This method returns the metadata in the format described here:
+    //https://github.com/wearezeta/documentation/blob/master/topics/backup/use-cases/001-export-history.md
+
+    val metadataFormatVersion: Array[Byte] = {
+      val version = Array.ofDim[Byte](2)
+      version.update(0, 0)
+      version.update(1, 1)
+      version
+    }
+    val nullByte = Array.fill[Byte](1)(0)
+    val magicNumber = "WBUA"
+    val uuidHashLen = 32
+
+    libSodiumUtils.hash(userId.str, salt) match {
+      case Some(uuidHash) if uuidHash.length == uuidHashLen =>
+        Some(magicNumber.getBytes() ++
+          nullByte ++
+          metadataFormatVersion ++
+          salt ++
+          uuidHash)
+      case Some(uuidHash) =>
+        error(l"uuidHash length invalid, expected: $uuidHashLen, got: ${uuidHash.length}")
+        None
+      case None =>
+        error(l"Failed to hash account id for backup")
+        None
+    }
+  }
 
 }

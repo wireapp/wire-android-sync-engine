@@ -20,15 +20,19 @@ package com.waz
 import java.io._
 import java.util.zip.{ZipFile, ZipOutputStream}
 
+import com.waz.model.AccountData.Password
 import com.waz.model.UserId
+import com.waz.service.BackupManagerImpl
+import com.waz.specs.AndroidFreeSpec
 import com.waz.utils.IoUtils.withResource
 import com.waz.utils.Json.syntax._
+import com.waz.utils.crypto.LibSodiumUtils
 import com.waz.utils.{IoUtils, returning}
 import org.scalatest._
 
 import scala.util.Try
 
-class BackupManagerSpec extends WordSpec with BeforeAndAfterAll with BeforeAndAfterEach with MustMatchers {
+class BackupManagerSpec extends AndroidFreeSpec with BeforeAndAfterAll with BeforeAndAfterEach {
 
   import com.waz.service.BackupManager._
 
@@ -91,17 +95,20 @@ class BackupManagerSpec extends WordSpec with BeforeAndAfterAll with BeforeAndAf
     directory.listFiles().map(_.getName).toSet
   }
 
-  "Exporting database" should {
+  private val libSodiumUtils = mock[LibSodiumUtils]
+  private def getService() = new BackupManagerImpl(libSodiumUtils)
 
-    "create an export zip file with metadata and all database related files." in {
+  feature("Exporting database") {
+
+    scenario("create an export zip file with metadata and all database related files.") {
       val fakeDatabase = createFakeDatabase()
       createFakeDatabaseWal()
-      val zipFile = exportDatabase(testUserId, userHandle = "TEST", databaseDir = fakeDatabase.getParentFile, targetDir = testDirectory).get
+      val zipFile = getService().exportDatabase(testUserId, userHandle = "TEST", databaseDir = fakeDatabase.getParentFile, targetDir = testDirectory, None).get
 
-      withClue("Zip file should exist.") { zipFile.exists() mustBe true }
+      withClue("Zip file should exist.") { zipFile.exists() shouldEqual true }
       withResource(new ZipFile(zipFile)) { zip =>
         withClue("Files inside test directory: " + getAllFileNames(testDirectory)) {
-          getZipFileEntryNames(zip) mustBe Set(
+          getZipFileEntryNames(zip) shouldEqual Set(
             backupMetadataFileName,
             getDbFileName(testUserId),
             getDbWalFileName(testUserId)
@@ -110,79 +117,123 @@ class BackupManagerSpec extends WordSpec with BeforeAndAfterAll with BeforeAndAf
       }
     }
 
+    scenario("create an encrypted export zip file with metadata and all database related files.") {
+      val fakeDatabase = createFakeDatabase()
+      createFakeDatabaseWal()
+
+      val saltLength = 32
+      val password = Password("12345678")
+      (libSodiumUtils.generateSalt _).expects().anyNumberOfTimes().returning(Array.ofDim[Byte](saltLength))
+      (libSodiumUtils.encrypt _).expects(*, *, *).anyNumberOfTimes().returning(Some(Array.ofDim[Byte](fakeDatabase.length().toInt)))
+      (libSodiumUtils.hash _).expects(*, *).anyNumberOfTimes().returning(Some(Array.ofDim[Byte](saltLength)))
+
+      val backup = getService().exportDatabase(testUserId, userHandle = "TEST", databaseDir = fakeDatabase.getParentFile, targetDir = testDirectory, password = Some(password)).get
+
+      withClue("Zip file should exist.") { backup.exists() shouldEqual true }
+      withResource(new FileInputStream(backup)) { b =>
+
+        /**
+        since we can't test the hashing because we can't load libsodium dynamically in tests yet, the
+        next best thing is to check the size of the header manually.
+        **/
+        val metadataHeaderBytes = Array.ofDim[Byte](71)
+        withClue("encrypted backup should have right header length") {
+          backup.length() shouldEqual (metadataHeaderBytes.length + fakeDatabase.length())
+        }
+
+        b.read(metadataHeaderBytes)
+        val magicNumber = metadataHeaderBytes.take(4).map(_.toChar).mkString
+        val androidMagicNumber = "WBUA"
+        val metaNullByte = metadataHeaderBytes.slice(4, 5)
+        val version = metadataHeaderBytes.slice(5, 7)
+        val expectedNullByte = Array[Byte](0)
+        expectedNullByte.update(0, 0)
+
+        withClue(s"magic number should match $androidMagicNumber") {
+          magicNumber shouldEqual androidMagicNumber
+        }
+        withClue("null byte should be present") {
+          (metaNullByte sameElements expectedNullByte) shouldEqual true
+        }
+        withClue("version should match latest version") {
+          version.sum shouldEqual 1
+        }
+      }
+    }
+
   }
 
-  "Importing database" should {
+  feature("Importing database") {
 
-    "unzip backup file and fail if metadata file and db file not found." in {
+    scenario("unzip backup file and fail if metadata file and db file not found.") {
       val fakeBackup = createFakeBackup(metadata = None, database = None)
 
-      an [InvalidBackup] should be thrownBy importDatabase(testUserId, fakeBackup, testDirectory).get
+      an [InvalidBackup] should be thrownBy getService().importDatabase(testUserId, fakeBackup, testDirectory).get
     }
 
-    "unzip backup file and fail if metadata file not found." in {
+    scenario("unzip backup file and fail if metadata file not found.") {
       val fakeBackup = createFakeBackup(metadata = None)
-      an [InvalidBackup.MetadataEntryNotFound.type] should be thrownBy importDatabase(testUserId, fakeBackup, testDirectory).get
+      an [InvalidBackup.MetadataEntryNotFound.type] should be thrownBy getService().importDatabase(testUserId, fakeBackup, testDirectory).get
     }
 
-    "unzip backup file and fail if db file not found." in {
+    scenario("unzip backup file and fail if db file not found.") {
       val fakeBackup = createFakeBackup(database = None)
-      an [InvalidBackup.DbEntryNotFound.type] should be thrownBy importDatabase(testUserId, fakeBackup, testDirectory).get
+      an [InvalidBackup.DbEntryNotFound.type] should be thrownBy getService().importDatabase(testUserId, fakeBackup, testDirectory).get
     }
 
-    "unzip backup file and fail if metadata format is invalid." in {
+    scenario("unzip backup file and fail if metadata format is invalid.") {
       val fakeBackup = createFakeBackup(metadata = Some(Array(1,2,3,4,5)))
-      an [InvalidMetadata.WrongFormat] should be thrownBy importDatabase(testUserId, fakeBackup, testDirectory).get
+      an [InvalidMetadata.WrongFormat] should be thrownBy getService().importDatabase(testUserId, fakeBackup, testDirectory).get
     }
 
-    "unzip backup file and fail if user ids are not the same." in {
+    scenario("unzip backup file and fail if user ids are not the same.") {
       val metadataWithRandomUserId = BackupMetadata(UserId())
       val fakeBackup = createFakeBackup(metadata = Some(metadataWithRandomUserId.toJsonString.getBytes("utf-8")))
 
-      an [InvalidMetadata.UserId.type] should be thrownBy importDatabase(testUserId, fakeBackup, testDirectory).get
+      an [InvalidMetadata.UserId.type] should be thrownBy getService().importDatabase(testUserId, fakeBackup, testDirectory).get
     }
 
-    "unzip backup file and fail if current database version is less then from metadata." in {
+    scenario("unzip backup file and fail if current database version is less then from metadata.") {
       val metadataWithDbVersionGreaterThenCurrent = BackupMetadata(testUserId, version = BackupMetadata.currentDbVersion + 1)
       val fakeBackup = createFakeBackup(metadata = Some(metadataWithDbVersionGreaterThenCurrent.toJsonString.getBytes("utf-8")))
 
-      an [InvalidMetadata.DbVersion.type] should be thrownBy importDatabase(testUserId, fakeBackup, testDirectory).get
+      an [InvalidMetadata.DbVersion.type] should be thrownBy getService().importDatabase(testUserId, fakeBackup, testDirectory).get
     }
 
-    "unzip backup file successfully if all needed files are present and metadata is valid." in {
+    scenario("unzip backup file successfully if all needed files are present and metadata is valid.") {
       val fakeBackup = createFakeBackup()
       val targetDirectory = new File(testDirectory, "test_target_dir")
       if (!targetDirectory.mkdir()) throw new RuntimeException("Cannot create target directory for test.")
 
-      importDatabase(testUserId, fakeBackup, targetDirectory).get
+      getService().importDatabase(testUserId, fakeBackup, targetDirectory).get
       withClue("Files inside target directory: " + getAllFileNames(targetDirectory)) {
-        getAllFileNames(targetDirectory) mustBe Set(
+        getAllFileNames(targetDirectory) shouldEqual Set(
           getDbFileName(testUserId),
           getDbWalFileName(testUserId)
         )
       }
     }
 
-    "unzip backup file successfully if all needed files (except wal file) are present and metadata is valid." in {
+    scenario("unzip backup file successfully if all needed files (except wal file) are present and metadata is valid.") {
       val fakeBackup = createFakeBackup(databaseWal = None)
       val targetDirectory = new File(testDirectory, "test_target_dir")
       if (!targetDirectory.mkdir()) throw new RuntimeException("Cannot create target directory for test.")
 
-      importDatabase(testUserId, fakeBackup, targetDirectory).get
+      getService().importDatabase(testUserId, fakeBackup, targetDirectory).get
       withClue("Files inside target directory: " + getAllFileNames(targetDirectory)) {
-        getAllFileNames(targetDirectory) mustBe Set(getDbFileName(testUserId))
+        getAllFileNames(targetDirectory) shouldEqual Set(getDbFileName(testUserId))
       }
     }
 
-    "unzip backup file successfully if all needed files are present and metadata is valid (when current db version greater then from metadata)." in {
+    scenario("unzip backup file successfully if all needed files are present and metadata is valid (when current db version greater then from metadata).") {
       val metadataWithDbVersionLessThenCurrent = BackupMetadata(testUserId, version = BackupMetadata.currentDbVersion - 1)
       val fakeBackup = createFakeBackup(metadata = Some(metadataWithDbVersionLessThenCurrent.toJsonString.getBytes("utf-8")))
       val targetDirectory = new File(testDirectory, "test_target_dir")
       if (!targetDirectory.mkdir()) throw new RuntimeException("Cannot create target directory for test.")
 
-      importDatabase(testUserId, fakeBackup, targetDirectory).get
+      getService().importDatabase(testUserId, fakeBackup, targetDirectory).get
       withClue("Files inside target directory: " + getAllFileNames(targetDirectory)) {
-        getAllFileNames(targetDirectory) mustBe Set(
+        getAllFileNames(targetDirectory) shouldEqual Set(
           getDbFileName(testUserId),
           getDbWalFileName(testUserId)
         )

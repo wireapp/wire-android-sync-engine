@@ -118,7 +118,7 @@ object AccountsService {
   case object InForeground extends Active
 }
 
-class AccountsServiceImpl(val global: GlobalModule) extends AccountsService with DerivedLogTag {
+class AccountsServiceImpl(val global: GlobalModule, val backupManager: BackupManager) extends AccountsService with DerivedLogTag {
   import AccountsService._
   import Threading.Implicits.Background
 
@@ -264,7 +264,7 @@ class AccountsServiceImpl(val global: GlobalModule) extends AccountsService with
   override def createAccountManager(userId: UserId, importDbFile: Option[File], isLogin: Option[Boolean], initialUser: Option[UserInfo] = None) = Serialized.future(AccountManagersKey) {
     async {
       if (importDbFile.nonEmpty)
-        returning(BackupManager.importDatabase(userId, importDbFile.get, context.getDatabasePath(userId.toString).getParentFile)) { restore =>
+        returning(backupManager.importDatabase(userId, importDbFile.get, context.getDatabasePath(userId.toString).getParentFile)) { restore =>
           if (restore.isFailure) global.trackingService.historyRestored(false) // HistoryRestoreSucceeded is sent from the new AccountManager
         }.get // if the import failed this will rethrow the exception
 
@@ -285,7 +285,7 @@ class AccountsServiceImpl(val global: GlobalModule) extends AccountsService with
         }
         if (account.isEmpty) warn(l"No logged in account for user: $userId, not creating account manager")
         account.map { acc =>
-          val newManager = new AccountManager(userId, acc.teamId, global, this, startedJustAfterBackup = importDbFile.nonEmpty, user, isLogin)
+          val newManager = new AccountManager(userId, acc.teamId, global, this, backupManager, startedJustAfterBackup = importDbFile.nonEmpty, user, isLogin)
           if (isLogin.isDefined) {
             accountManagers.mutateOrDefault(_ + newManager, Set(newManager))
           }
