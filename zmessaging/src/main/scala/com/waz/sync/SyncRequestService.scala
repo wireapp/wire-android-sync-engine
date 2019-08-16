@@ -80,6 +80,7 @@ class SyncRequestServiceImpl(accountId: UserId,
                           dependsOn:  Seq[SyncId]    = Nil,
                           forceRetry: Boolean        = false,
                           delay:      FiniteDuration = Duration.Zero) = {
+    verbose(l"SYNC addRequest for ${req.cmd}")
     val timestamp = SyncJob.timestamp
     content.addSyncJob(
       SyncJob(SyncId(), req, dependsOn.toSet, priority = priority, timestamp = timestamp, startTime = SyncJob.timestamp + delay.toMillis),
@@ -95,11 +96,13 @@ class SyncRequestServiceImpl(accountId: UserId,
 
   override def syncState(account: UserId, commands: Seq[SyncCommand]) = {
     implicit val logTag: LogTag = LogTag("WorkManager#syncState")
-    returning {
-      content.syncJobs
-        .map(_.values.filter(job => commands.contains(job.request.cmd)))
-        .map(jobs => if (jobs.isEmpty) SyncState.COMPLETED else jobs.minBy(_.state.ordinal()).state)
-    }(s => verbose(l"commands: $commands => state: $s"))
+    for {
+      jobs     <- content.syncJobs
+      filtered = jobs.filter { case (_, job) => commands.contains(job.request.cmd) }
+      _ = verbose(l"SYNC jobs still not completed: ${filtered.toList.mkString(",")}")
+      state    = if (filtered.isEmpty) SyncState.COMPLETED else filtered.minBy(_._2.state.ordinal())._2.state
+      _ = verbose(l"SYNC commands: $commands => state: $state")
+    } yield state
   }
 
   //only used in tests currently
