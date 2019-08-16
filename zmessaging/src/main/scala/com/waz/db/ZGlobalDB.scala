@@ -27,7 +27,7 @@ import com.waz.db.migrate.AccountDataMigration
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 import com.waz.log.LogSE._
 import com.waz.model.AccountData.AccountDataDao
-import com.waz.model.TeamData.TeamDataDoa
+import com.waz.model.TeamData.TeamDataDao
 import com.waz.model.otr.ClientId
 import com.waz.model.{AccountId, UserId}
 import com.waz.service.tracking.TrackingService
@@ -53,9 +53,9 @@ class ZGlobalDB(context: Context, dbNameSuffix: String = "", tracking: TrackingS
 
 object ZGlobalDB {
   val DbName = "ZGlobal.db"
-  val DbVersion = 23
+  val DbVersion = 24
 
-  lazy val daos = Seq(AccountDataDao, CacheEntryDao, TeamDataDoa)
+  lazy val daos = Seq(AccountDataDao, CacheEntryDao, TeamDataDao)
 
   object Migrations {
 
@@ -92,6 +92,21 @@ object ZGlobalDB {
       },
       Migration(22, 23) { db =>
         db.execSQL("ALTER TABLE ActiveAccounts ADD COLUMN sso_id TEXT DEFAULT NULL")
+      },
+      Migration(23, 24) { db =>
+        // Team icons are now public assets, so we no longer need icon_key. Sqlite doesn't support
+        // dropping columns, so we have to do it manually by renaming the table, recreating it,
+        // and finally restoring that data back into the table.
+
+        import TeamDataDao._
+        val TeamsTable = table.name
+        val BackupTable = "TeamsBackup"
+        val ColumnsToKeep = s"${Id.name}, ${Name.name}, ${Creator.name}, ${Icon.name}"
+
+        db.execSQL(s"ALTER TABLE $TeamsTable RENAME TO $BackupTable")
+        db.execSQL(s"${TeamDataDao.table.createSql}")
+        db.execSQL(s"INSERT INTO $TeamsTable SELECT $ColumnsToKeep FROM $BackupTable")
+        db.execSQL(s"DROP TABLE $BackupTable")
       }
     )
 

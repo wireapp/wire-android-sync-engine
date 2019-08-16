@@ -19,7 +19,7 @@ package com.waz.content
 
 import android.content.Context
 import com.waz.log.BasicLogging.LogTag
-import com.waz.model.TeamData.TeamDataDoa
+import com.waz.model.TeamData.TeamDataDao
 import com.waz.model._
 import com.waz.utils.TrimmingLruCache.Fixed
 import com.waz.utils.{CachedStorage, CachedStorageImpl, TrimmingLruCache}
@@ -27,5 +27,5 @@ import com.waz.utils.{CachedStorage, CachedStorageImpl, TrimmingLruCache}
 trait TeamsStorage extends CachedStorage[TeamId, TeamData]
 
 class TeamsStorageImpl(context: Context, storage: Database)
-  extends CachedStorageImpl[TeamId, TeamData](new TrimmingLruCache(context, Fixed(1024)), storage)(TeamDataDoa, LogTag("TeamStorage_Cached"))
+  extends CachedStorageImpl[TeamId, TeamData](new TrimmingLruCache(context, Fixed(1024)), storage)(TeamDataDao, LogTag("TeamStorage_Cached"))
     with TeamsStorage

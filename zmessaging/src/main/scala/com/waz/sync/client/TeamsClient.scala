@@ -33,7 +33,6 @@ import scala.util.Try
 trait TeamsClient {
   def getTeamMembers(id: TeamId): ErrorOrResponse[Seq[TeamMember]]
   def getTeamData(id: TeamId): ErrorOrResponse[TeamData]
-
   def getPermissions(teamId: TeamId, userId: UserId): ErrorOrResponse[Option[PermissionsMasks]]
   def getTeamMember(teamId: TeamId, userId: UserId): ErrorOrResponse[TeamMember]
 }
@@ -48,10 +47,6 @@ class TeamsClientImpl(implicit
   import TeamsClient._
   import com.waz.threading.Threading.Implicits.Background
 
-  //TODO Remove after assets refactoring
-  private implicit val errorResponseDeserializer: RawBodyDeserializer[ErrorResponse] =
-    objectFromCirceJsonRawBodyDeserializer[ErrorResponse]
-
   override def getTeamMembers(id: TeamId): ErrorOrResponse[Seq[TeamMember]] = {
     Request.Get(relativePath = teamMembersPath(id))
       .withResultType[TeamMembers]
@@ -61,16 +56,9 @@ class TeamsClientImpl(implicit
 
   override def getTeamData(id: TeamId): ErrorOrResponse[TeamData] = {
     Request.Get(relativePath = teamPath(id))
-      .withResultType[TeamDataResponse]
+      .withResultType[TeamData]
       .withErrorType[ErrorResponse]
-      .executeSafe { response =>
-        TeamData(
-          response.id,
-          response.name,
-          response.creator,
-          Some(response.icon),
-          response.icon_key)
-      }
+      .executeSafe
   }
 
   override def getPermissions(teamId: TeamId, userId: UserId): ErrorOrResponse[Option[PermissionsMasks]] = {
@@ -104,24 +92,6 @@ object TeamsClient {
   def teamPath(id: TeamId): String = s"$TeamsPath/${id.str}"
 
   def memberPath(teamId: TeamId, userId: UserId): String = s"${teamMembersPath(teamId)}/${userId.str}"
-
-  import JsonDecoder._
-
-  case class TeamBindingResponse(teams: Seq[(TeamData, Boolean)], hasMore: Boolean)
-
-  //TODO Remove after assets refactoring
-  object TeamBindingResponse extends DerivedLogTag {
-    def unapply(response: ResponseContent): Option[(Seq[(TeamData, Boolean)], Boolean)] =
-      response match {
-        case JsonObjectResponse(js) if js.has("teams") =>
-          Try(decodeSeq('teams)(js, TeamData.TeamBindingDecoder), decodeOptBoolean('has_more)(js).getOrElse(false)).toOption
-        case _ =>
-          warn(l"Unexpected response:")
-          None
-      }
-  }
-
-  case class TeamDataResponse(id: String, name: String, creator: String, icon: String, icon_key: Option[String])
 
   case class TeamMembers(members: Seq[TeamMember])
 

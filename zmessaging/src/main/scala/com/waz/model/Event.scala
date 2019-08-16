@@ -358,7 +358,7 @@ object TeamEvent extends DerivedLogTag {
 
   case class Create(teamId: TeamId) extends TeamEvent
   case class Delete(teamId: TeamId) extends TeamEvent
-  case class Update(teamId: TeamId, name: Option[Name], icon: Option[RAssetId], iconKey: Option[AESKey]) extends TeamEvent
+  case class Update(teamId: TeamId, name: Option[Name], icon: AssetId) extends TeamEvent
 
   sealed trait MemberEvent extends TeamEvent {
     val userId: UserId
@@ -382,7 +382,7 @@ object TeamEvent extends DerivedLogTag {
       decodeString('type) match {
         case "team.create"              => Create('team)
         case "team.delete"              => Delete('team)
-        case "team.update"              => Update('team, decodeOptName('name)('data), decodeOptString('icon)('data).map(RAssetId), decodeOptString('icon_key)('data).map(AESKey))
+        case "team.update"              => Update('team, decodeOptName('name)('data), AssetId(decodeString('icon)('data)))
         case "team.member-join"         => MemberJoin ('team, UserId(decodeString('user)('data)))
         case "team.member-leave"        => MemberLeave('team, UserId(decodeString('user)('data)))
         case "team.member-update"       => MemberUpdate('team, UserId(decodeString('user)('data)))

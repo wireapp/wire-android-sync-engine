@@ -17,10 +17,11 @@
  */
 package com.waz.sync.client
 
-import com.waz.model.UserPermissions._
+import com.waz.model.TeamData
 import com.waz.model.UserPermissions.Permission._
+import com.waz.model.UserPermissions._
 import com.waz.specs.AndroidFreeSpec
-import com.waz.sync.client.TeamsClient.{TeamDataResponse, TeamMembers}
+import com.waz.sync.client.TeamsClient.TeamMembers
 import com.waz.utils.CirceJSONSupport
 
 //TODO Replace with integration test when AuthRequestInterceptor2 is introduced
@@ -61,14 +62,14 @@ class TeamsClientSpec extends AndroidFreeSpec with CirceJSONSupport {
     scenario("Team data response decoding") {
       import io.circe.parser._
       val response = "{\"creator\":\"d22b442c-8a91-4773-8655-4d72b49b8c70\",\"icon\":\"abc\",\"name\":\"Potato\",\"id\":\"ddaad665-9227-4bd3-93d6-a3450bfbbfc7\",\"binding\": true,\"icon_key\": \"abcdefg\"}"
-      val result = decode[TeamDataResponse](response)
+      val result = decode[TeamData](response)
 
-      result shouldEqual Right(TeamDataResponse(
+      result shouldEqual Right(TeamData(
         "ddaad665-9227-4bd3-93d6-a3450bfbbfc7",
         "Potato",
         "d22b442c-8a91-4773-8655-4d72b49b8c70",
-        "abc",
-        Some("abcdefg")))
+        "abc"
+      ))
     }
   }
 }
