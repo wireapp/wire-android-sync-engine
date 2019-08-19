@@ -47,6 +47,7 @@ import org.threeten.bp.{Duration, Instant}
 import FCMNotification.{Fetched, FinishedPipeline, StartedPipeline}
 
 import scala.async.Async._
+import scala.collection.mutable
 import scala.concurrent.duration._
 import scala.concurrent.{Future, Promise}
 
@@ -112,31 +113,32 @@ class PushServiceImpl(selfUserId:           UserId,
   private val beDriftPref = prefs.preference(BackendDrift)
   override val beDrift = beDriftPref.signal.disableAutowiring()
 
-  private var fetchInProgress = Future.successful({})
-
   private lazy val idPref = userPrefs.preference(LastStableNotification)
 
   notificationStorage.registerEventHandler { () =>
     Serialized.future(PipelineKey) {
-      verbose(l"SYNC events processing started")
+      verbose(l"SYNC events processing started ($timePassed)")
       val t = System.currentTimeMillis()
       for {
         _ <- Future.successful(processing ! true)
+        _ = verbose(l"SYNC before encrypting")
         _ <- processEncryptedRows()
+        _ = verbose(l"SYNC after encrypting")
         _ <- processDecryptedRows()
+        _ = verbose(l"SYNC after decrypting")
         _ <- Future.successful(processing ! false)
-        _ = verbose(l"SYNC events processing finished, time: ${System.currentTimeMillis() - t}ms")
+        _ = verbose(l"SYNC events processing finished, time: ${System.currentTimeMillis() - t}ms (($timePassed))")
       } yield {}
     }.recover {
       case ex =>
         processing ! false
-        error(l"SYNC Unable to process events: $ex")
+        error(l"SYNC Unable to process events: $ex ($timePassed)")
     }
   }
 
   private def processEncryptedRows() =
     notificationStorage.encryptedEvents.flatMap { rows =>
-      verbose(l"Processing ${rows.size} encrypted rows")
+      verbose(l"SYNC Processing ${rows.size} encrypted rows ($timePassed)")
       Future.sequence(rows.map { row =>
         if (!isOtrEventJson(row.event)) notificationStorage.setAsDecrypted(row.index)
         else {
@@ -153,20 +155,20 @@ class PushServiceImpl(selfUserId:           UserId,
             case Right(_) => Future.successful(())
           }
         }
-      })
+      }).map(_ => verbose(l"SYNC Processing ${rows.size} encrypted rows finished ($timePassed)"))
     }
 
   private def processDecryptedRows(): Future[Unit] = {
     def decodeRow(event: PushNotificationEvent) =
       if(event.plain.isDefined && isOtrEventJson(event.event)) {
-        verbose(l"decodeRow($event) for an otr event")
+        verbose(l"decodeRow($event) for an otr event ($timePassed)")
         val msg = GenericMessage(event.plain.get)
         val msgEvent = ConversationEvent.ConversationEventDecoder(event.event)
         returning(otrService.parseGenericMessage(msgEvent.asInstanceOf[OtrMessageEvent], msg)) { event =>
-          verbose(l"decoded otr event: $event")
+          verbose(l"decoded otr event: $event ($timePassed)")
         }
       } else {
-        verbose(l"decodeRow($event) for a non-otr event")
+        verbose(l"decodeRow($event) for a non-otr event ($timePassed)")
         Some(EventDecoder(event.event))
       }
 
@@ -189,25 +191,28 @@ class PushServiceImpl(selfUserId:           UserId,
     }
   }
 
-  wsPushService.notifications() { notifications =>
-    fetchInProgress =
-      if (fetchInProgress.isCompleted) storeNotifications(notifications)
-      else fetchInProgress.flatMap(_ => storeNotifications(notifications))
-  }
+  private val timeOffset = System.currentTimeMillis()
+  @inline private def timePassed = System.currentTimeMillis() - timeOffset
+  verbose(l"SYNC PushService created with the time offset: $timeOffset")
+
+  wsPushService.notifications(storeNotifications)
 
   wsPushService.connected().onChanged.map(WebSocketChange).on(dispatcher){ source =>
-    verbose(l"sync history due to web socket change")
-    syncHistory(source)
+    verbose(l"SYNC sync history due to web socket change ($timePassed)")
+    syncHistory(source).foreach(_ => verbose(l"SYNC sync history finished ($timePassed)"))
   }
 
-  private def storeNotifications(notifications: Seq[PushNotificationEncoded]): Future[Unit] =
-    Serialized.future(PipelineKey)(async {
-      await { fcmService.markNotificationsWithState(notifications.map(_.id).toSet, Fetched) }
-      await { notificationStorage.saveAll(notifications) }
-      val res = notifications.lift(notifications.lastIndexWhere(!_.transient))
-      if (res.nonEmpty)
-        await { idPref := res.map(_.id) }
-    })
+  private def storeNotifications(nots: Seq[PushNotificationEncoded]): Future[Unit] = synchronized {
+    verbose(l"SYNC storeNotifications")
+    if (nots.nonEmpty) {
+      for {
+        _   <- fcmService.markNotificationsWithState(nots.map(_.id).toSet, Fetched)
+        _   <- notificationStorage.saveAll(nots)
+        res = nots.lift(nots.lastIndexWhere(!_.transient))
+        _   <- if (res.nonEmpty) idPref := res.map(_.id) else Future.successful(())
+      } yield ()
+    } else Future.successful(())
+  }
 
   private def isOtrEventJson(ev: JSONObject) =
     ev.getString("type").equals("conversation.otr-message-add")
@@ -224,7 +229,7 @@ class PushServiceImpl(selfUserId:           UserId,
   protected[push] val waitingForRetry: SourceSignal[Boolean] = Signal(false).disableAutowiring()
 
   override def syncHistory(source: SyncSource, withRetries: Boolean = true): Future[Unit] = {
-    verbose(l"SYNC syncHistory($source, $withRetries)")
+    verbose(l"SYNC syncHistory($source, $withRetries) ($timePassed)")
     def load(lastId: Option[Uid], firstSync: Boolean = false, attempts: Int = 0): CancellableFuture[Results] =
       (lastId match {
         case None => if (firstSync) client.loadLastNotification(clientId) else client.loadNotifications(None, clientId)
@@ -273,27 +278,26 @@ class PushServiceImpl(selfUserId:           UserId,
 
     def syncHistory(lastId: Option[Uid]): Future[Unit] =
       load(lastId, firstSync = lastId.isEmpty).future.flatMap {
-        case Results(nots, time, firstSync, historyLost) =>
-          if (firstSync) idPref := nots.headOption.map(_.id)
-          else
-            (for {
-              _ <- if (historyLost) sync.performFullSync().map(_ => onHistoryLost ! clock.instant()) else Future.successful({})
-              _ <- beDriftPref.mutate(v => time.map(clock.instant.until(_)).getOrElse(v))
-            } yield {
-              nots
-            }).flatMap(storeNotifications)
+        case Results(nots, _, true, _) =>
+          idPref := nots.headOption.map(_.id)
+        case Results(_, time, _, true) =>
+          sync.performFullSync()
+            .map(_ => onHistoryLost ! clock.instant())
+            .flatMap(_ => beDriftPref.mutate(v => time.map(clock.instant.until(_)).getOrElse(v)))
+        case Results(nots, time, _, _) if nots.nonEmpty =>
+          beDriftPref.mutate(v => time.map(clock.instant.until(_)).getOrElse(v))
+            .flatMap(_ => storeNotifications(nots))
+            .flatMap(_ => idPref().flatMap(syncHistory))
+        case Results(_, time, _, _) =>
+          beDriftPref.mutate(v => time.map(clock.instant.until(_)).getOrElse(v))
       }
 
-    if (fetchInProgress.isCompleted) {
-      verbose(l"Sync history in response to $source")
-      fetchInProgress = idPref().flatMap(syncHistory)
-    }
-    fetchInProgress
+    verbose(l"SYNC Sync history in response to $source ($timePassed)")
+    idPref().flatMap(syncHistory)
   }
 }
 
 object PushService {
-
   //These are the most important event types that generate push notifications
   val TrackingEvents = Set("conversation.otr-message-add", "conversation.create", "conversation.rename", "conversation.member-join")
 

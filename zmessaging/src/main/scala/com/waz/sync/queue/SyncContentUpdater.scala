@@ -62,7 +62,7 @@ class SyncContentUpdaterImpl(db: Database) extends SyncContentUpdater with Deriv
     // make sure no job is loaded with Syncing state, this could happen if app is killed while syncing
     jobs map { job =>
       if (job.state == SyncState.SYNCING) {
-        verbose(l"found job in state: SYNCING on initial load: $job")
+        verbose(l"SYNC found job in state: SYNCING on initial load: $job")
         job.copy(state = SyncState.WAITING)
       } else job
     }

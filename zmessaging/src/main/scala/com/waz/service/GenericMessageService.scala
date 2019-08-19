@@ -71,6 +71,8 @@ class GenericMessageService(selfUserId: UserId,
       }
     }.flatten
 
+    verbose(l"SYNC lastRead size: ${lastRead.size}, cleared size: ${cleared.size}, deleted: ${deleted.size}, incoming reactions: ${incomingReactions.size}")
+
     for {
       _ <- messages.deleteOnUserRequest(deleted)
       _ <- traverse(lastRead) { case (remoteId, timestamp) =>
