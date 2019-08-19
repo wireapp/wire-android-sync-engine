@@ -121,8 +121,11 @@ class PushServiceImpl(selfUserId:           UserId,
       val t = System.currentTimeMillis()
       for {
         _ <- Future.successful(processing ! true)
+        _ = verbose(l"SYNC before encrypting")
         _ <- processEncryptedRows()
+        _ = verbose(l"SYNC after encrypting")
         _ <- processDecryptedRows()
+        _ = verbose(l"SYNC after decrypting")
         _ <- Future.successful(processing ! false)
         _ = verbose(l"SYNC events processing finished, time: ${System.currentTimeMillis() - t}ms (($timePassed))")
       } yield {}
