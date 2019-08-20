@@ -1,4 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest package="com.waz.zms" xmlns:android="http://schemas.android.com/apk/res/android">
-    <uses-sdk android:minSdkVersion="17" android:targetSdkVersion="27"/>
+    <uses-sdk android:minSdkVersion="21" android:targetSdkVersion="27"/>
 </manifest>
