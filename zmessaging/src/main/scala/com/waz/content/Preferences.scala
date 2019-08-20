@@ -387,6 +387,8 @@ object GlobalPreferences {
   // TODO: Remove after release 3.36
   lazy val ShouldWarnAndroid4Users = PrefKey[Boolean]( "should_warn_android_4_users", customDefault = true)
 
+  lazy val AppLockEnabled: PrefKey[Boolean] = PrefKey[Boolean]("app_lock_enabled", customDefault = false)
+
   //DEPRECATED!!! Use the UserPreferences instead!!
   lazy val _ShareContacts          = PrefKey[Boolean]("PREF_KEY_PRIVACY_CONTACTS")
   lazy val _DarkTheme              = PrefKey[Boolean]("DarkTheme")
