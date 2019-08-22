@@ -41,7 +41,6 @@ import scala.concurrent.duration._
 
 class MessageEventProcessorSpec extends AndroidFreeSpec with Inside with DerivedLogTag {
 
-
   val selfUserId        = UserId("self")
   val storage           = mock[MessagesStorage]
   val convsStorage      = mock[ConversationStorage]
@@ -51,7 +50,6 @@ class MessageEventProcessorSpec extends AndroidFreeSpec with Inside with Derived
   val replyHashing      = mock[ReplyHashing]
   val msgsService       = mock[MessagesService]
   val convs             = mock[ConversationsContentUpdater]
-  val otr               = mock[OtrService]
   val convsService      = mock[ConversationsService]
   val downloadStorage   = mock[DownloadAssetStorage]
   val prefs             = new TestGlobalPreferences()
@@ -195,7 +193,7 @@ class MessageEventProcessorSpec extends AndroidFreeSpec with Inside with Derived
     //often repeated mocks
     (deletions.getAll _).expects(*).anyNumberOfTimes().returning(Future.successful(Seq.empty))
 
-    new MessageEventProcessor(selfUserId, storage, content, assets, replyHashing, msgsService, convsService, convs, otr, downloadStorage)
+    new MessageEventProcessor(selfUserId, storage, content, assets, replyHashing, msgsService, convsService, convs, downloadStorage)
   }
 
 }

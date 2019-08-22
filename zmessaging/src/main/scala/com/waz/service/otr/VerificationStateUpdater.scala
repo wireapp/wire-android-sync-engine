@@ -25,7 +25,7 @@ import com.waz.log.LogShow.SafeToLog
 import com.waz.model.ConversationData.ConversationType
 import com.waz.model._
 import com.waz.model.otr.UserClients
-import com.waz.service.messages.MessageEventProcessor
+import com.waz.service.messages.MessagesService
 import com.waz.utils.Serialized
 
 import scala.collection.breakOut
@@ -38,12 +38,12 @@ import scala.concurrent.Future
   * If conv gets unverified because new client was added, then it's state is changed to UNVERIFIED,
   * if device was manually unverified, then conv state goes to UNKNOWN
   */
-class VerificationStateUpdater(selfUserId:        UserId,
-                               usersStorage:      UsersStorage,
-                               clientsStorage:    OtrClientsStorage,
-                               convs:             ConversationStorage,
-                               membersStorage:    MembersStorage,
-                               msgEventProcessor: MessageEventProcessor) extends DerivedLogTag {
+class VerificationStateUpdater(selfUserId:     UserId,
+                               usersStorage:   UsersStorage,
+                               clientsStorage: OtrClientsStorage,
+                               convs:          ConversationStorage,
+                               msgsService:    MessagesService,
+                               membersStorage: MembersStorage) extends DerivedLogTag {
   import Verification._
   import VerificationStateUpdater._
   import com.waz.threading.Threading.Implicits.Background
@@ -52,7 +52,7 @@ class VerificationStateUpdater(selfUserId:        UserId,
   private val SerializationKey = serializationKey(selfUserId)
 
   private val updateProcessor: VerificationStateUpdate => Future[Unit] = { update =>
-    msgEventProcessor.addMessagesAfterVerificationUpdate(update.convUpdates, update.convUsers, update.changes) map { _ => Unit }
+    addMessagesAfterVerificationUpdate(update.convUpdates, update.convUsers, update.changes) map { _ => Unit }
   }
 
   clientsStorage.getClients(selfUserId).map{ clients =>
@@ -82,6 +82,29 @@ class VerificationStateUpdater(selfUserId:        UserId,
       updateConversations(members.map(_._2).distinct, members.map { _._1 -> Other } (breakOut))
     }
   }
+
+  private def addMessagesAfterVerificationUpdate(updates:   Seq[(ConversationData, ConversationData)],
+                                                 convUsers: Map[ConvId, Seq[UserData]],
+                                                 changes:   Map[UserId, VerificationChange]) =
+    Future.traverse(updates) {
+      case (_, up)    if up.verified == Verification.VERIFIED => msgsService.addOtrVerifiedMessage(up.id).map(_ => ())
+      case (prev, up) if prev.verified == Verification.VERIFIED =>
+        verbose(l"addMessagesAfterVerificationUpdate with prev=${prev.verified} and up=${up.verified}")
+        val convId = up.id
+        val changedUsers = convUsers(convId).filter(!_.isVerified).flatMap { u => changes.get(u.id).map(u.id -> _) }
+        val (users, change) =
+          if (changedUsers.forall(c => c._2 == ClientAdded)) (changedUsers map (_._1), ClientAdded)
+          else if (changedUsers.forall(c => c._2 == MemberAdded)) (changedUsers map (_._1), MemberAdded)
+          else (changedUsers collect { case (user, ClientUnverified) => user }, ClientUnverified)
+
+        val (self, other) = users.partition(_ == selfUserId)
+        for {
+          _ <- if (self.nonEmpty) msgsService.addOtrUnverifiedMessage(convId, Seq(selfUserId), change) else Future.successful(())
+          _ <- if (other.nonEmpty) msgsService.addOtrUnverifiedMessage(convId, other, change) else Future.successful(())
+        } yield ()
+      case _ =>
+        Future.successful(())
+    }
 
   private[service] def onClientsChanged(changes: Map[UserId, (UserClients, VerificationChange)]) = Serialized.future(SerializationKey) {
 
