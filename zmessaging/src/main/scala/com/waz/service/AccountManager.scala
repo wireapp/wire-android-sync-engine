@@ -32,6 +32,7 @@ import com.waz.model.otr.{Client, ClientId}
 import com.waz.service.AccountManager.ClientRegistrationState.{LimitReached, PasswordMissing, Registered, Unregistered}
 import com.waz.service.UserService.UnsplashUrl
 import com.waz.service.assets2.Content
+import com.waz.service.backup.BackupManager
 import com.waz.service.otr.OtrService.SessionId
 import com.waz.service.tracking.LoggedOutEvent
 import com.waz.sync.client.InvitationClient.ConfirmedTeamInvitation

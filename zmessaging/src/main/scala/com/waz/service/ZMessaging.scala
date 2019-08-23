@@ -32,6 +32,7 @@ import com.waz.repository.{FCMNotificationStatsRepositoryImpl, FCMNotificationsR
 import com.waz.service.EventScheduler.{Sequential, Stage}
 import com.waz.service.assets._
 import com.waz.service.assets2.{AssetService => _, AssetServiceImpl => _, _}
+import com.waz.service.backup.BackupManagerImpl
 import com.waz.service.call._
 import com.waz.service.conversation._
 import com.waz.service.downloads.{AssetLoader, AssetLoaderImpl}

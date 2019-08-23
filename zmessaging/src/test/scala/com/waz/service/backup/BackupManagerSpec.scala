@@ -15,14 +15,13 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-package com.waz
+package com.waz.service.backup
 
 import java.io._
 import java.util.zip.{ZipFile, ZipOutputStream}
 
 import com.waz.model.AccountData.Password
 import com.waz.model.UserId
-import com.waz.service.BackupManagerImpl
 import com.waz.specs.AndroidFreeSpec
 import com.waz.utils.IoUtils.withResource
 import com.waz.utils.Json.syntax._
@@ -34,7 +33,7 @@ import scala.util.Try
 
 class BackupManagerSpec extends AndroidFreeSpec with BeforeAndAfterAll with BeforeAndAfterEach {
 
-  import com.waz.service.BackupManager._
+  import com.waz.service.backup.BackupManager._
 
   private val testUserId = UserId()
   private val testDirectory =
@@ -121,11 +120,13 @@ class BackupManagerSpec extends AndroidFreeSpec with BeforeAndAfterAll with Befo
       val fakeDatabase = createFakeDatabase()
       createFakeDatabaseWal()
 
-      val saltLength = 32
+      import EncryptedBackupHeader._
       val password = Password("12345678")
       (libSodiumUtils.generateSalt _).expects().anyNumberOfTimes().returning(Array.ofDim[Byte](saltLength))
       (libSodiumUtils.encrypt _).expects(*, *, *).anyNumberOfTimes().returning(Some(Array.ofDim[Byte](fakeDatabase.length().toInt)))
       (libSodiumUtils.hash _).expects(*, *).anyNumberOfTimes().returning(Some(Array.ofDim[Byte](saltLength)))
+      (libSodiumUtils.getOpsLimit _).expects().returning(3)
+      (libSodiumUtils.getMemLimit _).expects().returning(3)
 
       val backup = getService().exportDatabase(testUserId, userHandle = "TEST", databaseDir = fakeDatabase.getParentFile, targetDir = testDirectory, password = Some(password)).get
 
@@ -136,27 +137,24 @@ class BackupManagerSpec extends AndroidFreeSpec with BeforeAndAfterAll with Befo
         since we can't test the hashing because we can't load libsodium dynamically in tests yet, the
         next best thing is to check the size of the header manually.
         **/
-        val metadataHeaderBytes = Array.ofDim[Byte](71)
+        val metadataHeaderBytes = Array.ofDim[Byte](EncryptedBackupHeader.totalHeaderlength)
         withClue("encrypted backup should have right header length") {
           backup.length() shouldEqual (metadataHeaderBytes.length + fakeDatabase.length())
         }
 
         b.read(metadataHeaderBytes)
-        val magicNumber = metadataHeaderBytes.take(4).map(_.toChar).mkString
-        val androidMagicNumber = "WBUA"
-        val metaNullByte = metadataHeaderBytes.slice(4, 5)
-        val version = metadataHeaderBytes.slice(5, 7)
-        val expectedNullByte = Array[Byte](0)
-        expectedNullByte.update(0, 0)
+        val header = EncryptedBackupHeader.parse(metadataHeaderBytes)
+
+        header should not be empty
 
         withClue(s"magic number should match $androidMagicNumber") {
-          magicNumber shouldEqual androidMagicNumber
+          metadataHeaderBytes.take(4) should contain theSameElementsInOrderAs androidMagicNumber.getBytes()
         }
         withClue("null byte should be present") {
-          (metaNullByte sameElements expectedNullByte) shouldEqual true
+          metadataHeaderBytes.slice(4, 5) should contain theSameElementsInOrderAs Array.fill[Byte](1)(0)
         }
         withClue("version should match latest version") {
-          version.sum shouldEqual 1
+          header.get.version shouldEqual currentVersion
         }
       }
     }

@@ -27,6 +27,8 @@ trait LibSodiumUtils {
   def decrypt(ciphertext: Array[Byte], password: Password, salt: Array[Byte]): Option[Array[Byte]]
   def hash(input: String, salt: Array[Byte]): Option[Array[Byte]]
   def generateSalt(): Array[Byte]
+  def getOpsLimit: Long
+  def getMemLimit: Int
 }
 
 class LibSodiumUtilsImpl() extends LibSodiumUtils with DerivedLogTag {
@@ -92,4 +94,8 @@ class LibSodiumUtilsImpl() extends LibSodiumUtils with DerivedLogTag {
   }
 
   override def generateSalt(): Array[Byte] = new RandomBytes().apply(Sodium.crypto_pwhash_saltbytes())
+
+  override def getOpsLimit: Long = Sodium.crypto_pwhash_opslimit_moderate()
+
+  override def getMemLimit: Int = Sodium.crypto_pwhash_memlimit_moderate()
 }

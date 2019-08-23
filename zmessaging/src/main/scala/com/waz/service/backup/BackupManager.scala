@@ -15,7 +15,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-package com.waz.service
+package com.waz.service.backup
 
 import java.io._
 import java.text.SimpleDateFormat
@@ -28,8 +28,8 @@ import com.waz.log.LogSE._
 import com.waz.model.AccountData.Password
 import com.waz.model.UserId
 import com.waz.model.otr.ClientId
-import com.waz.service.BackupManager._
-import com.waz.service.BackupManager.InvalidBackup.{DbEntryNotFound, MetadataEntryNotFound}
+import com.waz.service.backup.BackupManager.InvalidBackup.{DbEntryNotFound, MetadataEntryNotFound}
+import com.waz.service.backup.BackupManager._
 import com.waz.utils.IoUtils.withResource
 import com.waz.utils.Json.syntax._
 import com.waz.utils.crypto.LibSodiumUtils
@@ -38,11 +38,11 @@ import org.json.JSONObject
 import org.threeten.bp.Instant
 
 import scala.io.Source
-import scala.util.{Failure, Success, Try}
+import scala.util.{Failure, Try}
 
 trait BackupManager {
   def exportDatabase(userId: UserId, userHandle: String, databaseDir: File, targetDir: File, password: Option[Password]): Try[File]
-  def importDatabase(userId: UserId, exportFile: File, targetDir: File, currentDbVersion: Int = BackupMetadata.currentDbVersion): Try[File]
+  def importDatabase(userId: UserId, exportFile: File, targetDir: File, currentDbVersion: Int = BackupMetadata.currentDbVersion, password: Option[Password] = None): Try[File]
 }
 
 object BackupManager {
@@ -152,7 +152,24 @@ class BackupManagerImpl(libSodiumUtils: LibSodiumUtils) extends BackupManager wi
     if (backup.isSuccess && password.isDefined) encryptDatabase(backup.get, password.get, userId) else backup
   }
 
-  override def importDatabase(userId: UserId, exportFile: File, targetDir: File, currentDbVersion: Int = BackupMetadata.currentDbVersion): Try[File] =
+  private def readEncryptedMetadata(file: File): Option[Array[Byte]] = {
+    None
+  }
+
+  override def importDatabase(userId: UserId, exportFile: File, targetDir: File, currentDbVersion: Int = BackupMetadata.currentDbVersion, password: Option[Password]): Try[File] = {
+    password match {
+      case Some(p) =>
+        readEncryptedMetadata(exportFile) match {
+          case Some(metadata) =>
+            Try(new File(""))
+          case None =>
+            Try(new File(""))
+        }
+      case None => importUnencryptedDatabase(userId, exportFile, targetDir, currentDbVersion)
+    }
+  }
+
+  private def importUnencryptedDatabase(userId: UserId, exportFile: File, targetDir: File, currentDbVersion: Int = BackupMetadata.currentDbVersion): Try[File] =
     Try {
       withResource(new ZipFile(exportFile)) { zip =>
         val metadataEntry = Option(zip.getEntry(backupMetadataFileName)).getOrElse { throw MetadataEntryNotFound }
@@ -220,28 +237,18 @@ class BackupManagerImpl(libSodiumUtils: LibSodiumUtils) extends BackupManager wi
     //This method returns the metadata in the format described here:
     //https://github.com/wearezeta/documentation/blob/master/topics/backup/use-cases/001-export-history.md
 
-    val metadataFormatVersion: Array[Byte] = {
-      val version = Array.ofDim[Byte](2)
-      version.update(0, 0)
-      version.update(1, 1)
-      version
-    }
-    val nullByte = Array.fill[Byte](1)(0)
-    val magicNumber = "WBUA"
-    val uuidHashLen = 32
+    import EncryptedBackupHeader.{logTag => _, _}
 
     libSodiumUtils.hash(userId.str, salt) match {
-      case Some(uuidHash) if uuidHash.length == uuidHashLen =>
-        Some(magicNumber.getBytes() ++
-          nullByte ++
-          metadataFormatVersion ++
-          salt ++
-          uuidHash)
+      case Some(uuidHash) if uuidHash.length == uuidHashLength =>
+        val header = EncryptedBackupHeader(currentVersion, salt, uuidHash,
+          libSodiumUtils.getOpsLimit, libSodiumUtils.getMemLimit)
+        Some(serializeHeader(header))
       case Some(uuidHash) =>
-        error(l"uuidHash length invalid, expected: $uuidHashLen, got: ${uuidHash.length}")
+        error(l"uuidHash length invalid, expected: $uuidHashLength, got: ${uuidHash.length}")(logTag)
         None
       case None =>
-        error(l"Failed to hash account id for backup")
+        error(l"Failed to hash account id for backup")(logTag)
         None
     }
   }

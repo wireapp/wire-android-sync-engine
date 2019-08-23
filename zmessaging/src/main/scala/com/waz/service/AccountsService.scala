@@ -28,6 +28,7 @@ import com.waz.log.LogSE._
 import com.waz.log.LogShow.SafeToLog
 import com.waz.model.AccountData.Password
 import com.waz.model._
+import com.waz.service.backup.BackupManager
 import com.waz.service.tracking.LoggedOutEvent
 import com.waz.sync.client.AuthenticationManager.{AccessToken, Cookie}
 import com.waz.sync.client.{ErrorOr, LoginClient}

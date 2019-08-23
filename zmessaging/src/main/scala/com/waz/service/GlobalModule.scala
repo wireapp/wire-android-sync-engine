@@ -33,6 +33,7 @@ import com.waz.log.{LogsService, LogsServiceImpl}
 import com.waz.permissions.PermissionsService
 import com.waz.service.assets.{AudioTranscoder, GlobalRecordAndPlayService}
 import com.waz.service.assets2.GeneralFileCacheImpl
+import com.waz.service.backup.{BackupManager, BackupManagerImpl}
 import com.waz.service.call._
 import com.waz.service.downloads._
 import com.waz.service.images.{ImageLoader, ImageLoaderImpl}
