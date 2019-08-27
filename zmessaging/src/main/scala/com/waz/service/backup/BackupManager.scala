@@ -165,39 +165,33 @@ class BackupManagerImpl(libSodiumUtils: LibSodiumUtils) extends BackupManager wi
     }
   }
 
+  private def importEncryptedDatabase(userId: UserId, exportFile: File, targetDir: File, currentDbVersion: Int = BackupMetadata.currentDbVersion, password: Password): Try[File] = {
+    readEncryptedMetadata(exportFile) match {
+      case Some(metadata) =>
+        libSodiumUtils.hash(userId.str, metadata.salt) match {
+          case Some(hash) if hash.sameElements(metadata.uuidHash) =>
+            val encryptedBackupBytes = IoUtils.readFileBytes(exportFile, EncryptedBackupHeader.totalHeaderlength)
+            libSodiumUtils.decrypt(encryptedBackupBytes, password, metadata.salt, metadata.opslimit, metadata.memlimit) match {
+              case Some(decryptedDbBytes) =>
+                val decryptedDbExport = File.createTempFile("wire_backup", ".zip")
+                decryptedDbExport.deleteOnExit()
+                IoUtils.writeBytesToFile(decryptedDbExport, decryptedDbBytes)
+                importUnencryptedDatabase(userId, decryptedDbExport, targetDir)
+              case None =>
+                Failure(new Throwable("backup decryption failed"))
+            }
+          case Some(_) => Failure(new Throwable("Uuid hashes don't match"))
+          case None => Failure(new Throwable("Uuid hashing failed"))
+        }
+      case None =>
+        Failure(new Throwable("metadata could not be read"))
+    }
+  }
+
   override def importDatabase(userId: UserId, exportFile: File, targetDir: File, currentDbVersion: Int = BackupMetadata.currentDbVersion, password: Option[Password]): Try[File] = {
     password match {
+      case Some(p) => importEncryptedDatabase(userId, exportFile, targetDir, currentDbVersion, p)
       case None => importUnencryptedDatabase(userId, exportFile, targetDir, currentDbVersion)
-      case Some(p) =>
-        readEncryptedMetadata(exportFile) match {
-          case Some(metadata) =>
-            val uuidHash = libSodiumUtils.hash(userId.str, metadata.salt)
-            if(uuidHash.isDefined && uuidHash.get.sameElements(metadata.uuidHash)) {
-              withResource(new BufferedInputStream(new FileInputStream(exportFile))) { backup =>
-                val backupSize = exportFile.length().toInt - EncryptedBackupHeader.totalHeaderlength
-                val dbBytes = Array.ofDim[Byte](backupSize)
-                backup.skip(EncryptedBackupHeader.totalHeaderlength)
-                backup.read(dbBytes)
-                libSodiumUtils.decrypt(dbBytes, p, metadata.salt, metadata.opslimit, metadata.memlimit) match {
-                  case Some(b) =>
-                    //TODO: give bytes directly to importUnencryptedDatabase maybe?
-                    val decryptedDbExport = new File("decrypted_db.zip")
-                    decryptedDbExport.deleteOnExit()
-                    withResource(new BufferedOutputStream(new FileOutputStream(decryptedDbExport))) { decryptedZip =>
-                      decryptedZip.write(b)
-                    }
-                    importUnencryptedDatabase(userId, decryptedDbExport, targetDir)
-                  case None =>
-                    Failure(new Throwable("backup decryption failed"))
-                }
-              }
-            } else {
-              if(uuidHash.isDefined) Failure(new Throwable("Uuid hashes don't match"))
-              else Failure(new Throwable("Uuid hashing failed"))
-            }
-          case None =>
-            Failure(new Throwable("metadata could not be read"))
-        }
     }
   }
 
@@ -231,22 +225,15 @@ class BackupManagerImpl(libSodiumUtils: LibSodiumUtils) extends BackupManager wi
 
 
   private def encryptDatabase(backup: File, password: Password, userId: UserId): Try[File] = {
-    val dbBytes = Array.ofDim[Byte](backup.length().toInt)
     val salt = libSodiumUtils.generateSalt()
-    withResource(new FileInputStream(backup)) { unencryptedBackup =>
-      IoUtils.readFully(unencryptedBackup, dbBytes)
-    }
+    val backupBytes = IoUtils.readFileBytes(backup)
 
-    (libSodiumUtils.encrypt(dbBytes, password, salt), getMetaDataBytes(password, salt, userId)) match {
+    (libSodiumUtils.encrypt(backupBytes, password, salt), getMetaDataBytes(password, salt, userId)) match {
       case (Some(encryptedBytes), Some(meta)) =>
         Try {
           val encryptedBackup = returning(new File(backup.getPath + "_encrypted")) { encryptedDbFile =>
             encryptedDbFile.deleteOnExit()
-
-            withResource(new BufferedOutputStream(new FileOutputStream(encryptedDbFile))) { encryptedDb =>
-              encryptedDb.write(meta)
-              encryptedDb.write(encryptedBytes)
-            }
+            IoUtils.writeBytesToFile(encryptedDbFile, meta ++ encryptedBytes)
           }
 
           backup.delete()

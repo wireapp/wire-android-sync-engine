@@ -88,6 +88,11 @@ object IoUtils {
     }
   }
 
+  def writeBytesToFile(file: File, bytes: Array[Byte]): Unit =
+    withResource(new BufferedOutputStream(new FileOutputStream(file))) { f =>
+      f.write(bytes)
+    }
+
   // this method assumes that both streams will be properly closed outside
   @tailrec
   def write(in: InputStream, out: OutputStream, buff: Array[Byte] = buffer.get()): Unit =
@@ -126,6 +131,14 @@ object IoUtils {
     else if (skipped < count) skip(is, count - skipped)
     else true
   }
+
+  def readFileBytes(file: File, offset: Int = 0): Array[Byte] =
+    returning(Array.ofDim[Byte](file.length().toInt - offset)) { bytes =>
+      withResource(new BufferedInputStream(new FileInputStream(file))) { f =>
+        f.skip(offset)
+        readFully(f, bytes)
+      }
+    }
 
   def readFully(is: InputStream, buffer: Array[Byte], offset: Int, count: Int): Boolean = {
     val read = is.read(buffer, offset, count)

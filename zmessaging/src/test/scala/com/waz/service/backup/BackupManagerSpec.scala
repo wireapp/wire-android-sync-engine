@@ -274,10 +274,7 @@ class BackupManagerSpec extends AndroidFreeSpec with BeforeAndAfterAll with Befo
       val targetDirectory = new File(testDirectoryEncrypted, "test_target_dir")
       if (!testDirectoryEncrypted.mkdir()) throw new RuntimeException("Cannot create target directory for test.")
       val fakeBackup = createFakeEncryptedBackup(targetDirectory = testDirectoryEncrypted)
-      val fakeBackupBytes = Array.ofDim[Byte](fakeBackup.length().toInt)
-      withResource(new BufferedInputStream(new FileInputStream(fakeBackup))) { f =>
-        IoUtils.readFully(f, fakeBackupBytes)
-      }
+      val fakeBackupBytes = IoUtils.readFileBytes(fakeBackup)
       if (!targetDirectory.mkdir()) throw new RuntimeException("Cannot create target directory for test.")
 
       (libSodiumUtils.decrypt _).expects(*, *, *, *, *).anyNumberOfTimes().returning(Some(fakeBackupBytes))
