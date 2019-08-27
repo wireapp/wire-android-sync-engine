@@ -23,11 +23,11 @@ import org.libsodium.jni.Sodium
 import org.libsodium.jni.NaCl
 
 trait LibSodiumUtils {
-  def encrypt(msg: Array[Byte], password: Password, salt: Array[Byte]): Option[Array[Byte]]
-  def decrypt(ciphertext: Array[Byte], password: Password, salt: Array[Byte]): Option[Array[Byte]]
-  def hash(input: String, salt: Array[Byte]): Option[Array[Byte]]
+  def encrypt(msg: Array[Byte], password: Password, salt: Array[Byte], opslimit: Int = getOpsLimit, memlimit: Int = getMemLimit): Option[Array[Byte]]
+  def decrypt(ciphertext: Array[Byte], password: Password, salt: Array[Byte], opslimit: Int = getOpsLimit, memlimit: Int = getMemLimit): Option[Array[Byte]]
+  def hash(input: String, salt: Array[Byte], opslimit: Int = getOpsLimit, memlimit: Int = getMemLimit): Option[Array[Byte]]
   def generateSalt(): Array[Byte]
-  def getOpsLimit: Long
+  def getOpsLimit: Int
   def getMemLimit: Int
 }
 
@@ -37,11 +37,11 @@ class LibSodiumUtilsImpl() extends LibSodiumUtils with DerivedLogTag {
 
   private val sodium = NaCl.sodium() // dynamically load the libsodium library
 
-  override def encrypt(msg: Array[Byte], password: Password, salt: Array[Byte]): Option[Array[Byte]] = {
+  override def encrypt(msg: Array[Byte], password: Password, salt: Array[Byte], opslimit: Int, memlimit: Int): Option[Array[Byte]] = {
     val cipherText = Array.ofDim[Byte](msg.length + Sodium.crypto_aead_chacha20poly1305_abytes())
     val cipherTextLength = Array.ofDim[Int](1)
 
-    hash(password.str, salt) match {
+    hash(password.str, salt, opslimit, memlimit) match {
       case Some(key) =>
         if (key.length != Sodium.crypto_aead_chacha20poly1305_keybytes) {
           verbose(l"Key length invalid: ${key.length} did not match ${Sodium.crypto_aead_chacha20poly1305_keybytes}")
@@ -59,11 +59,11 @@ class LibSodiumUtilsImpl() extends LibSodiumUtils with DerivedLogTag {
     }
   }
 
-  override def decrypt(ciphertext: Array[Byte], password: Password, salt: Array[Byte]): Option[Array[Byte]] = {
+  override def decrypt(ciphertext: Array[Byte], password: Password, salt: Array[Byte], opslimit: Int, memlimit: Int): Option[Array[Byte]] = {
     val decrypted = Array.ofDim[Byte](ciphertext.length)
     val decryptedLen = Array.ofDim[Int](1)
 
-    hash(password.str, salt) match {
+    hash(password.str, salt, opslimit, memlimit) match {
       case Some(key) =>
         if (key.length != Sodium.crypto_aead_chacha20poly1305_keybytes) {
           verbose(l"Key length invalid: ${key.length} did not match ${Sodium.crypto_aead_chacha20poly1305_keybytes}")
@@ -81,13 +81,13 @@ class LibSodiumUtilsImpl() extends LibSodiumUtils with DerivedLogTag {
     }
   }
 
-  override def hash(input: String, salt: Array[Byte]): Option[Array[Byte]] = {
+  override def hash(input: String, salt: Array[Byte], opslimit: Int, memlimit: Int): Option[Array[Byte]] = {
     val outputLength = Sodium.crypto_aead_chacha20poly1305_keybytes()
     val output: Array[Byte] = Array.ofDim[Byte](outputLength)
     val passBytes: Array[Byte] = input.getBytes
     val ret: Int = Sodium.crypto_pwhash(output, output.length, passBytes, passBytes.length, salt,
-      Sodium.crypto_pwhash_opslimit_moderate(),
-      Sodium.crypto_pwhash_memlimit_min(),
+      opslimit,
+      memlimit,
       Sodium.crypto_pwhash_alg_default())
 
     if (ret == 0) Some(output) else None
@@ -95,7 +95,7 @@ class LibSodiumUtilsImpl() extends LibSodiumUtils with DerivedLogTag {
 
   override def generateSalt(): Array[Byte] = new RandomBytes().apply(Sodium.crypto_pwhash_saltbytes())
 
-  override def getOpsLimit: Long = Sodium.crypto_pwhash_opslimit_moderate()
+  override def getOpsLimit: Int = Sodium.crypto_pwhash_opslimit_moderate()
 
   override def getMemLimit: Int = Sodium.crypto_pwhash_memlimit_moderate()
 }

@@ -24,7 +24,7 @@ import com.waz.log.BasicLogging.LogTag.DerivedLogTag
 object EncryptedBackupHeader extends DerivedLogTag {
   val androidMagicNumber: String = "WBUA"
   val currentVersion: Short = 2
-  val totalHeaderlength = 83
+  val totalHeaderlength = 79
   val saltLength = 32
   val uuidHashLength = 32
 
@@ -43,7 +43,7 @@ object EncryptedBackupHeader extends DerivedLogTag {
           buffer.get(salt)
           val uuidHash = Array.ofDim[Byte](uuidHashLength)
           buffer.get(uuidHash)
-          val opslimit = buffer.getLong
+          val opslimit = buffer.getInt
           val memlimit = buffer.getInt
           Some(EncryptedBackupHeader(currentVersion, salt, uuidHash, opslimit, memlimit))
         } else {
@@ -68,7 +68,7 @@ object EncryptedBackupHeader extends DerivedLogTag {
     buffer.putShort(header.version)
     buffer.put(header.salt)
     buffer.put(header.uuidHash)
-    buffer.putLong(header.opslimit)
+    buffer.putInt(header.opslimit)
     buffer.putInt(header.memlimit)
 
     buffer.array()
@@ -79,6 +79,6 @@ object EncryptedBackupHeader extends DerivedLogTag {
 case class EncryptedBackupHeader(version: Short = EncryptedBackupHeader.currentVersion,
                                  salt: Array[Byte],
                                  uuidHash: Array[Byte],
-                                 opslimit: Long,
+                                 opslimit: Int,
                                  memlimit: Int)
 

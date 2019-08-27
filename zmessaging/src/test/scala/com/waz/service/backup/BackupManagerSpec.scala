@@ -38,7 +38,12 @@ class BackupManagerSpec extends AndroidFreeSpec with BeforeAndAfterAll with Befo
   private val testUserId = UserId()
   private val testDirectory =
     new File(s"${System.getProperty("java.io.tmpdir")}/${getClass.getSimpleName}_${System.currentTimeMillis()}")
+  private val testDirectoryEncrypted = new File(s"${testDirectory.getPath}/encrypted")
   private val testMetadata = BackupMetadata(testUserId, version = 20)
+  private val testFakeBackupFilename = "fake_backup.zip"
+
+  private val salt = Array.fill[Byte](EncryptedBackupHeader.saltLength)(1)
+  private val uuidHash = Array.fill[Byte](EncryptedBackupHeader.uuidHashLength)(2)
 
   private def createFakeDatabase(targetDirectory: File = testDirectory): File =
     returning(new File(targetDirectory, getDbFileName(testUserId))) { file =>
@@ -54,7 +59,7 @@ class BackupManagerSpec extends AndroidFreeSpec with BeforeAndAfterAll with Befo
                                database: Option[File] = Some(createFakeDatabase()),
                                databaseWal: Option[File] = Some(createFakeDatabaseWal()),
                                targetDirectory: File = testDirectory): File = {
-    returning(new File(targetDirectory, "fake_backup.zip")) { zipFile =>
+    returning(new File(targetDirectory, testFakeBackupFilename)) { zipFile =>
       withResource(new ZipOutputStream(new FileOutputStream(zipFile))) { zip =>
         metadata foreach { md =>
           withResource(new ByteArrayInputStream(md)) {
@@ -73,6 +78,26 @@ class BackupManagerSpec extends AndroidFreeSpec with BeforeAndAfterAll with Befo
             IoUtils.writeZipEntry(_, zip, getDbWalFileName(testUserId))
           }
         }
+      }
+    }
+  }
+
+  private def createFakeEncryptedBackup(file: File = new File(testFakeBackupFilename),
+                                        targetDirectory: File = testDirectoryEncrypted): File = {
+    import EncryptedBackupHeader._
+    val unencryptedFakeBackup = createFakeBackup(targetDirectory = targetDirectory)
+    val encryptedHeader = EncryptedBackupHeader(currentVersion, salt, uuidHash, 3 ,3)
+    returning(new File(targetDirectory, "fake_backup_encrypted.wbu")) { encryptedBackupFile =>
+      encryptedBackupFile.deleteOnExit()
+
+      val unencryptedBackupBytes = Array.ofDim[Byte](unencryptedFakeBackup.length().toInt)
+      withResource(new BufferedInputStream(new FileInputStream(unencryptedFakeBackup))) { unenc =>
+        IoUtils.readFully(unenc, unencryptedBackupBytes)
+      }
+
+      withResource(new BufferedOutputStream(new FileOutputStream(encryptedBackupFile))) { encryptedBackupStream =>
+        encryptedBackupStream.write(EncryptedBackupHeader.serializeHeader(encryptedHeader))
+        encryptedBackupStream.write(unencryptedBackupBytes)
       }
     }
   }
@@ -97,7 +122,7 @@ class BackupManagerSpec extends AndroidFreeSpec with BeforeAndAfterAll with Befo
   private val libSodiumUtils = mock[LibSodiumUtils]
   private def getService() = new BackupManagerImpl(libSodiumUtils)
 
-  feature("Exporting database") {
+  feature("Exporting database unencrypted") {
 
     scenario("create an export zip file with metadata and all database related files.") {
       val fakeDatabase = createFakeDatabase()
@@ -116,6 +141,10 @@ class BackupManagerSpec extends AndroidFreeSpec with BeforeAndAfterAll with Befo
       }
     }
 
+  }
+
+  feature("Exporting database unencrypted") {
+
     scenario("create an encrypted export zip file with metadata and all database related files.") {
       val fakeDatabase = createFakeDatabase()
       createFakeDatabaseWal()
@@ -123,10 +152,10 @@ class BackupManagerSpec extends AndroidFreeSpec with BeforeAndAfterAll with Befo
       import EncryptedBackupHeader._
       val password = Password("12345678")
       (libSodiumUtils.generateSalt _).expects().anyNumberOfTimes().returning(Array.ofDim[Byte](saltLength))
-      (libSodiumUtils.encrypt _).expects(*, *, *).anyNumberOfTimes().returning(Some(Array.ofDim[Byte](fakeDatabase.length().toInt)))
-      (libSodiumUtils.hash _).expects(*, *).anyNumberOfTimes().returning(Some(Array.ofDim[Byte](saltLength)))
-      (libSodiumUtils.getOpsLimit _).expects().returning(3)
-      (libSodiumUtils.getMemLimit _).expects().returning(3)
+      (libSodiumUtils.encrypt _).expects(*, *, *, *, *).anyNumberOfTimes().returning(Some(Array.ofDim[Byte](fakeDatabase.length().toInt)))
+      (libSodiumUtils.hash _).expects(*, *, *, *).anyNumberOfTimes().returning(Some(Array.ofDim[Byte](uuidHashLength)))
+      (libSodiumUtils.getOpsLimit _).expects().anyNumberOfTimes().returning(3)
+      (libSodiumUtils.getMemLimit _).expects().anyNumberOfTimes().returning(3)
 
       val backup = getService().exportDatabase(testUserId, userHandle = "TEST", databaseDir = fakeDatabase.getParentFile, targetDir = testDirectory, password = Some(password)).get
 
@@ -136,7 +165,7 @@ class BackupManagerSpec extends AndroidFreeSpec with BeforeAndAfterAll with Befo
         /**
         since we can't test the hashing because we can't load libsodium dynamically in tests yet, the
         next best thing is to check the size of the header manually.
-        **/
+          **/
         val metadataHeaderBytes = Array.ofDim[Byte](EncryptedBackupHeader.totalHeaderlength)
         withClue("encrypted backup should have right header length") {
           backup.length() shouldEqual (metadataHeaderBytes.length + fakeDatabase.length())
@@ -240,7 +269,29 @@ class BackupManagerSpec extends AndroidFreeSpec with BeforeAndAfterAll with Befo
 
   }
 
+  feature("Importing database") {
+    scenario("unzip encrypted backup file successfully if all needed files are present and metadata is valid (when current db version greater then from metadata).") {
+      val targetDirectory = new File(testDirectoryEncrypted, "test_target_dir")
+      if (!testDirectoryEncrypted.mkdir()) throw new RuntimeException("Cannot create target directory for test.")
+      val fakeBackup = createFakeEncryptedBackup(targetDirectory = testDirectoryEncrypted)
+      val fakeBackupBytes = Array.ofDim[Byte](fakeBackup.length().toInt)
+      withResource(new BufferedInputStream(new FileInputStream(fakeBackup))) { f =>
+        IoUtils.readFully(f, fakeBackupBytes)
+      }
+      if (!targetDirectory.mkdir()) throw new RuntimeException("Cannot create target directory for test.")
 
+      (libSodiumUtils.decrypt _).expects(*, *, *, *, *).anyNumberOfTimes().returning(Some(fakeBackupBytes))
+      (libSodiumUtils.hash _).expects(*, *, *, *).anyNumberOfTimes().returning(Some(uuidHash))
+      (libSodiumUtils.getOpsLimit _).expects().anyNumberOfTimes().returning(3)
+      (libSodiumUtils.getMemLimit _).expects().anyNumberOfTimes().returning(3)
 
-
+      getService().importDatabase(testUserId, fakeBackup, targetDirectory, BackupMetadata.currentDbVersion, Some(Password("test"))).get
+      withClue("Files inside target directory: " + getAllFileNames(targetDirectory)) {
+        getAllFileNames(targetDirectory) shouldEqual Set(
+          getDbFileName(testUserId),
+          getDbWalFileName(testUserId)
+        )
+      }
+    }
+  }
 }
