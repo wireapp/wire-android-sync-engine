@@ -152,6 +152,39 @@ class BackupManagerImpl(libSodiumUtils: LibSodiumUtils) extends BackupManager wi
     if (backup.isSuccess && password.isDefined) encryptDatabase(backup.get, password.get, userId) else backup
   }
 
+  private def encryptDatabase(backup: File, password: Password, userId: UserId): Try[File] = {
+    val salt = libSodiumUtils.generateSalt()
+    val backupBytes = IoUtils.readFileBytes(backup)
+
+    (libSodiumUtils.encrypt(backupBytes, password, salt), getMetaDataBytes(password, salt, userId)) match {
+      case (Some(encryptedBytes), Some(meta)) =>
+        Try {
+          val encryptedBackup = returning(new File(backup.getPath + "_encrypted")) { encryptedDbFile =>
+            encryptedDbFile.deleteOnExit()
+            IoUtils.writeBytesToFile(encryptedDbFile, meta ++ encryptedBytes)
+          }
+
+          backup.delete()
+          encryptedBackup.renameTo(backup)
+          new File(backup.getPath)
+        }.mapFailureIfNot[BackupError](UnknownBackupError.apply)
+      case (_, None) =>
+        Failure(new Throwable("Failed to create metadata"))
+      case (None, _) =>
+        val msg = "Failed to encrypt backup"
+        error(l"$msg")
+        Failure(new Exception(msg))
+    }
+  }
+
+  override def importDatabase(userId: UserId, exportFile: File, targetDir: File,
+                              currentDbVersion: Int = BackupMetadata.currentDbVersion,
+                              password: Option[Password]): Try[File] =
+    password match {
+      case Some(p) => importEncryptedDatabase(userId, exportFile, targetDir, currentDbVersion, p)
+      case None => importUnencryptedDatabase(userId, exportFile, targetDir, currentDbVersion)
+    }
+
   private def importEncryptedDatabase(userId: UserId, exportFile: File, targetDir: File,
                                       currentDbVersion: Int = BackupMetadata.currentDbVersion,
                                       password: Password): Try[File] =
@@ -174,14 +207,6 @@ class BackupManagerImpl(libSodiumUtils: LibSodiumUtils) extends BackupManager wi
         }
       case None =>
         Failure(new Throwable("metadata could not be read"))
-    }
-
-  override def importDatabase(userId: UserId, exportFile: File, targetDir: File,
-                              currentDbVersion: Int = BackupMetadata.currentDbVersion,
-                              password: Option[Password]): Try[File] =
-    password match {
-      case Some(p) => importEncryptedDatabase(userId, exportFile, targetDir, currentDbVersion, p)
-      case None => importUnencryptedDatabase(userId, exportFile, targetDir, currentDbVersion)
     }
 
   private def importUnencryptedDatabase(userId: UserId, exportFile: File, targetDir: File,
@@ -213,31 +238,6 @@ class BackupManagerImpl(libSodiumUtils: LibSodiumUtils) extends BackupManager wi
       }
     }.mapFailureIfNot[BackupError](UnknownBackupError.apply)
 
-
-  private def encryptDatabase(backup: File, password: Password, userId: UserId): Try[File] = {
-    val salt = libSodiumUtils.generateSalt()
-    val backupBytes = IoUtils.readFileBytes(backup)
-
-    (libSodiumUtils.encrypt(backupBytes, password, salt), getMetaDataBytes(password, salt, userId)) match {
-      case (Some(encryptedBytes), Some(meta)) =>
-        Try {
-          val encryptedBackup = returning(new File(backup.getPath + "_encrypted")) { encryptedDbFile =>
-            encryptedDbFile.deleteOnExit()
-            IoUtils.writeBytesToFile(encryptedDbFile, meta ++ encryptedBytes)
-          }
-
-          backup.delete()
-          encryptedBackup.renameTo(backup)
-          new File(backup.getPath)
-        }.mapFailureIfNot[BackupError](UnknownBackupError.apply)
-      case (_, None) =>
-        Failure(new Throwable("Failed to create metadata"))
-      case (None, _) =>
-        val msg = "Failed to encrypt backup"
-        error(l"$msg")
-        Failure(new Exception(msg))
-    }
-  }
 
   private def getMetaDataBytes(password: Password, salt: Array[Byte], userId: UserId): Option[Array[Byte]] = {
     //This method returns the metadata in the format described here:
