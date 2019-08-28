@@ -17,9 +17,12 @@
  */
 package com.waz.service.backup
 
-import java.nio.{ByteBuffer, ByteOrder}
+import java.io.{BufferedInputStream, File, FileInputStream}
+import java.nio.ByteBuffer
 
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
+import com.waz.utils.IoUtils
+import com.waz.utils.IoUtils.withResource
 
 object EncryptedBackupHeader extends DerivedLogTag {
   val androidMagicNumber: String = "WBUA"
@@ -73,6 +76,20 @@ object EncryptedBackupHeader extends DerivedLogTag {
 
     buffer.array()
   }
+
+  def readEncryptedMetadata(encryptedBackup: File): Option[EncryptedBackupHeader] =
+    if(encryptedBackup.length() > totalHeaderlength) {
+      val encryptedMetadataBytes = IoUtils.readFileBytes(encryptedBackup, byteCount = Some(totalHeaderlength))
+      val encryptedMetadataBytes1 = Array.ofDim[Byte](totalHeaderlength)
+      withResource(new BufferedInputStream(new FileInputStream(encryptedBackup))) { encryptedDb =>
+        encryptedDb.read(encryptedMetadataBytes1)
+      }
+      parse(encryptedMetadataBytes)
+    } else {
+      error(l"Backup file header corrupted or invalid")
+      None
+    }
+
 }
 
 //TODO: remove version from header?

@@ -152,26 +152,15 @@ class BackupManagerImpl(libSodiumUtils: LibSodiumUtils) extends BackupManager wi
     if (backup.isSuccess && password.isDefined) encryptDatabase(backup.get, password.get, userId) else backup
   }
 
-  private def readEncryptedMetadata(file: File): Option[EncryptedBackupHeader] = {
-    if(file.length() > EncryptedBackupHeader.totalHeaderlength) {
-      val encryptedMetadataBytes = Array.ofDim[Byte](EncryptedBackupHeader.totalHeaderlength)
-      withResource(new BufferedInputStream(new FileInputStream(file))) { encryptedDb =>
-        encryptedDb.read(encryptedMetadataBytes)
-      }
-      EncryptedBackupHeader.parse(encryptedMetadataBytes)
-    } else {
-      error(l"Backup file header corrupted or invalid")
-      None
-    }
-  }
-
-  private def importEncryptedDatabase(userId: UserId, exportFile: File, targetDir: File, currentDbVersion: Int = BackupMetadata.currentDbVersion, password: Password): Try[File] = {
-    readEncryptedMetadata(exportFile) match {
+  private def importEncryptedDatabase(userId: UserId, exportFile: File, targetDir: File,
+                                      currentDbVersion: Int = BackupMetadata.currentDbVersion,
+                                      password: Password): Try[File] =
+    EncryptedBackupHeader.readEncryptedMetadata(exportFile) match {
       case Some(metadata) =>
         libSodiumUtils.hash(userId.str, metadata.salt) match {
           case Some(hash) if hash.sameElements(metadata.uuidHash) =>
             val encryptedBackupBytes = IoUtils.readFileBytes(exportFile, EncryptedBackupHeader.totalHeaderlength)
-            libSodiumUtils.decrypt(encryptedBackupBytes, password, metadata.salt, metadata.opslimit, metadata.memlimit) match {
+            libSodiumUtils.decrypt(encryptedBackupBytes, password, metadata.salt) match {
               case Some(decryptedDbBytes) =>
                 val decryptedDbExport = File.createTempFile("wire_backup", ".zip")
                 decryptedDbExport.deleteOnExit()
@@ -186,16 +175,17 @@ class BackupManagerImpl(libSodiumUtils: LibSodiumUtils) extends BackupManager wi
       case None =>
         Failure(new Throwable("metadata could not be read"))
     }
-  }
 
-  override def importDatabase(userId: UserId, exportFile: File, targetDir: File, currentDbVersion: Int = BackupMetadata.currentDbVersion, password: Option[Password]): Try[File] = {
+  override def importDatabase(userId: UserId, exportFile: File, targetDir: File,
+                              currentDbVersion: Int = BackupMetadata.currentDbVersion,
+                              password: Option[Password]): Try[File] =
     password match {
       case Some(p) => importEncryptedDatabase(userId, exportFile, targetDir, currentDbVersion, p)
       case None => importUnencryptedDatabase(userId, exportFile, targetDir, currentDbVersion)
     }
-  }
 
-  private def importUnencryptedDatabase(userId: UserId, exportFile: File, targetDir: File, currentDbVersion: Int = BackupMetadata.currentDbVersion): Try[File] =
+  private def importUnencryptedDatabase(userId: UserId, exportFile: File, targetDir: File,
+                                        currentDbVersion: Int = BackupMetadata.currentDbVersion): Try[File] =
     Try {
       withResource(new ZipFile(exportFile)) { zip =>
         val metadataEntry = Option(zip.getEntry(backupMetadataFileName)).getOrElse { throw MetadataEntryNotFound }

@@ -28,7 +28,7 @@ class EncryptedBackupHeaderSpec extends AndroidFreeSpec {
       val salt = Array.fill[Byte](saltLength)(1)
       val uuidHash = Array.fill[Byte](uuidHashLength)(2)
       val opslimit = 3
-      val memlimit = 2
+      val memlimit = 3
       val header = EncryptedBackupHeader(currentVersion, salt, uuidHash, opslimit, memlimit)
 
       val result = parse(serializeHeader(header))

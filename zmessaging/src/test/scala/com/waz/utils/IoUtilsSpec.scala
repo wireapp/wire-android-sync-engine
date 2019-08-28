@@ -18,11 +18,12 @@
 package com.waz.utils
 
 import java.io.File.createTempFile
-import java.io.{File, FileOutputStream, OutputStream}
+import java.io.{BufferedOutputStream, File, FileOutputStream, OutputStream}
 
 import org.scalatest.{FeatureSpec, Ignore, Matchers}
 
 class IoUtilsSpec extends FeatureSpec with Matchers {
+
   scenario("Copy from stream to file") {
     val target = returning(createTempFile("meep", ".gif"))(_.deleteOnExit())
     val size = IoUtils.copy(getClass.getResourceAsStream("/gifs/artifacts1.gif"), target)
@@ -55,5 +56,42 @@ class IoUtilsSpec extends FeatureSpec with Matchers {
     returned shouldEqual inputSize
   }
 
+  scenario("Reading bytes with offset and byte count") {
+    val testFile = getTestFile("IoUtilsSpec_bytes_with_offset_and_byte_count")
+    val offset = 1
+    val bytesToRead = 1
+    val result = IoUtils.readFileBytes(testFile, offset, Some(bytesToRead))
+    result should contain theSameElementsInOrderAs testBytes.slice(offset, offset+bytesToRead)
+  }
+
+  scenario("Reading bytes with no offset") {
+    val testFile = getTestFile("IoUtilsSpec_bytes_no_offset")
+    val offset = 0
+    val bytesToRead = 3
+    val result = IoUtils.readFileBytes(testFile, offset, Some(bytesToRead))
+    result should contain theSameElementsInOrderAs testBytes.take(bytesToRead)
+  }
+
+  scenario("Reading bytes with offset") {
+    val testFile = getTestFile("IoUtilsSpec_bytes_with_offset")
+    val offset = 1
+    val result = IoUtils.readFileBytes(testFile, offset)
+    result should contain theSameElementsInOrderAs testBytes.drop(offset)
+  }
+
   lazy val inputSize = new File(getClass.getResource("/gifs/artifacts1.gif").getFile).length
+
+  private val testBytes = Array[Byte](1, 2, 3, 4)
+
+  private def getTestFile(prefix: String, bytes: Array[Byte] = testBytes): File = {
+    val f = File.createTempFile(prefix, "")
+    f.deleteOnExit()
+
+    import IoUtils._
+    withResource(new BufferedOutputStream(new FileOutputStream(f))) { fs =>
+      fs.write(testBytes)
+    }
+    f
+  }
+
 }
