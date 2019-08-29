@@ -27,8 +27,8 @@ import com.waz.utils.IoUtils.withResource
 object EncryptedBackupHeader extends DerivedLogTag {
   val androidMagicNumber: String = "WBUA"
   val currentVersion: Short = 2
-  val totalHeaderlength = 79
-  val saltLength = 32
+  val totalHeaderlength = 63
+  val saltLength = 16
   val uuidHashLength = 32
 
   import com.waz.log.LogSE._
