@@ -43,8 +43,8 @@ object EncryptedBackupHeader extends DerivedLogTag {
         val version = buffer.getShort()
         if(version == currentVersion) {
           val salt = Array.ofDim[Byte](saltLength)
-          buffer.get(salt)
           val uuidHash = Array.ofDim[Byte](uuidHashLength)
+          buffer.get(salt)
           buffer.get(uuidHash)
           val opslimit = buffer.getInt
           val memlimit = buffer.getInt

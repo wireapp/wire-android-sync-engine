@@ -149,7 +149,8 @@ class BackupManagerImpl(libSodiumUtils: LibSodiumUtils) extends BackupManager wi
         verbose(l"database export finished: $zipFile . Data contains: ${zipFile.length} bytes")
       }
     }.mapFailureIfNot[BackupError](UnknownBackupError.apply)
-    if (backup.isSuccess && password.isDefined) encryptDatabase(backup.get, password.get, userId) else backup
+    if (backup.isSuccess && password.isDefined) encryptDatabase(backup.get, password.get, userId)
+    else backup
   }
 
   private def encryptDatabase(backup: File, password: Password, userId: UserId): Try[File] = {

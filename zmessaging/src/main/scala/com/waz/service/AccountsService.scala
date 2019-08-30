@@ -79,7 +79,7 @@ trait AccountsService {
 
   def register(registerCredentials: Credentials, name: Name, teamName: Option[Name] = None): ErrorOr[Option[AccountManager]]
 
-  def createAccountManager(userId: UserId, dbFile: Option[File], isLogin: Option[Boolean], initialUser: Option[UserInfo] = None): Future[Option[AccountManager]] //TODO return error codes on failure?
+  def createAccountManager(userId: UserId, dbFile: Option[File], isLogin: Option[Boolean], initialUser: Option[UserInfo] = None, password: Option[Password] = None): Future[Option[AccountManager]] //TODO return error codes on failure?
 
   //Set to None in order to go to the login screen without logging out the current users
   def setAccount(userId: Option[UserId]): Future[Unit]
@@ -262,10 +262,10 @@ class AccountsServiceImpl(val global: GlobalModule, val backupManager: BackupMan
     managers <- Future.sequence(ids.map(createAccountManager(_, None, None)))
   } yield Serialized.future(AccountManagersKey)(Future[Unit](accountManagers ! managers.flatten))
 
-  override def createAccountManager(userId: UserId, importDbFile: Option[File], isLogin: Option[Boolean], initialUser: Option[UserInfo] = None) = Serialized.future(AccountManagersKey) {
+  override def createAccountManager(userId: UserId, importDbFile: Option[File], isLogin: Option[Boolean], initialUser: Option[UserInfo] = None, password: Option[Password] = None) = Serialized.future(AccountManagersKey) {
     async {
       if (importDbFile.nonEmpty)
-        returning(backupManager.importDatabase(userId, importDbFile.get, context.getDatabasePath(userId.toString).getParentFile)) { restore =>
+        returning(backupManager.importDatabase(userId, importDbFile.get, context.getDatabasePath(userId.toString).getParentFile, password = password)) { restore =>
           if (restore.isFailure) global.trackingService.historyRestored(false) // HistoryRestoreSucceeded is sent from the new AccountManager
         }.get // if the import failed this will rethrow the exception
 
