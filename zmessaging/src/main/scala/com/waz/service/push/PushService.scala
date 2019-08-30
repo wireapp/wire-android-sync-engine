@@ -116,7 +116,6 @@ class PushServiceImpl(selfUserId:           UserId,
 
   private lazy val idPref = userPrefs.preference(LastStableNotification)
 
-
   notificationStorage.registerEventHandler { () =>
     Serialized.future(PipelineKey) {
       verbose(l"SYNC events processing started")

@@ -115,9 +115,9 @@ class LibSodiumUtilsImpl() extends LibSodiumUtils with DerivedLogTag {
 
   override def generateSalt(): Array[Byte] = new RandomBytes().apply(Sodium.crypto_pwhash_saltbytes)
 
-  override def getOpsLimit: Int = Sodium.crypto_pwhash_opslimit_moderate
+  override def getOpsLimit: Int = Sodium.crypto_pwhash_opslimit_interactive
 
-  override def getMemLimit: Int = Sodium.crypto_pwhash_memlimit_moderate
+  override def getMemLimit: Int = Sodium.crypto_pwhash_memlimit_interactive
 
   private def initPull(key: Array[Byte], header: Array[Byte]): Option[Array[Byte]] =
     initializeState(key, header, Sodium.crypto_secretstream_xchacha20poly1305_init_pull)

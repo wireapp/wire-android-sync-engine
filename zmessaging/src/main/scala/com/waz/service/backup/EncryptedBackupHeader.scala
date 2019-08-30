@@ -92,7 +92,6 @@ object EncryptedBackupHeader extends DerivedLogTag {
 
 }
 
-//TODO: remove version from header?
 case class EncryptedBackupHeader(version: Short = EncryptedBackupHeader.currentVersion,
                                  salt: Array[Byte],
                                  uuidHash: Array[Byte],
