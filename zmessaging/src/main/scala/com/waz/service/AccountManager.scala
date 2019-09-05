@@ -272,7 +272,7 @@ class AccountManager(val userId:   UserId,
       userHandle  = user.handle.map(_.string).getOrElse(""),
       databaseDir = context.getDatabasePath(userId.str).getParentFile,
       targetDir   = context.getExternalCacheDir,
-      password    = password
+      backupPassword    = password
     )
     _       = tracking.historyBackedUp(backup.isSuccess)
   } yield backup.get

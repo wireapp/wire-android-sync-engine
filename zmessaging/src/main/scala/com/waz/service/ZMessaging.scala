@@ -261,7 +261,7 @@ class ZMessaging(val teamId: Option[TeamId], val clientId: ClientId, account: Ac
   lazy val ephemeral                                  = wire[EphemeralMessagesService]
   lazy val replyHashing                               = wire[ReplyHashingImpl]
   lazy val libSodiumUtils                             = wire[LibSodiumUtilsImpl]
-  lazy val backupManager                              = wire[BackupManagerImpl]//(libSodiumUtils)
+  lazy val backupManager                              = wire[BackupManagerImpl]
 
   lazy val assetSync                                  = wire[AssetSyncHandler]
   lazy val usersearchSync                             = wire[UserSearchSyncHandler]

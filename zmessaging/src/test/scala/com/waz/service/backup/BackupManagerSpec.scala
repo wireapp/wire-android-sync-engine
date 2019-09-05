@@ -143,7 +143,7 @@ class BackupManagerSpec extends AndroidFreeSpec with BeforeAndAfterAll with Befo
 
   }
 
-  feature("Exporting database unencrypted") {
+  feature("Exporting database encrypted") {
 
     scenario("create an encrypted export zip file with metadata and all database related files.") {
       val fakeDatabase = createFakeDatabase()
@@ -157,7 +157,7 @@ class BackupManagerSpec extends AndroidFreeSpec with BeforeAndAfterAll with Befo
       (libSodiumUtils.getOpsLimit _).expects().anyNumberOfTimes().returning(3)
       (libSodiumUtils.getMemLimit _).expects().anyNumberOfTimes().returning(3)
 
-      val backup = getService().exportDatabase(testUserId, userHandle = "TEST", databaseDir = fakeDatabase.getParentFile, targetDir = testDirectory, password = Some(password)).get
+      val backup = getService().exportDatabase(testUserId, userHandle = "TEST", databaseDir = fakeDatabase.getParentFile, targetDir = testDirectory, backupPassword = Some(password)).get
 
       withClue("Zip file should exist.") { backup.exists() shouldEqual true }
       withResource(new FileInputStream(backup)) { b =>
@@ -166,7 +166,7 @@ class BackupManagerSpec extends AndroidFreeSpec with BeforeAndAfterAll with Befo
         since we can't test the hashing because we can't load libsodium dynamically in tests yet, the
         next best thing is to check the size of the header manually.
           **/
-        val metadataHeaderBytes = Array.ofDim[Byte](EncryptedBackupHeader.totalHeaderlength)
+        val metadataHeaderBytes = Array.ofDim[Byte](EncryptedBackupHeader.totalHeaderLength)
         withClue("encrypted backup should have right header length") {
           backup.length() shouldEqual (metadataHeaderBytes.length + fakeDatabase.length())
         }

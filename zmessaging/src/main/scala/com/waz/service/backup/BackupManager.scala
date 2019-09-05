@@ -41,8 +41,16 @@ import scala.io.Source
 import scala.util.{Failure, Try}
 
 trait BackupManager {
-  def exportDatabase(userId: UserId, userHandle: String, databaseDir: File, targetDir: File, password: Option[Password]): Try[File]
-  def importDatabase(userId: UserId, exportFile: File, targetDir: File, currentDbVersion: Int = BackupMetadata.currentDbVersion, password: Option[Password] = None): Try[File]
+  def exportDatabase(userId: UserId,
+                     userHandle: String,
+                     databaseDir: File,
+                     targetDir: File,
+                     backupPassword: Option[Password]): Try[File]
+  def importDatabase(userId: UserId,
+                     exportFile: File,
+                     targetDir: File,
+                     currentDbVersion: Int = BackupMetadata.currentDbVersion,
+                     backupPassword: Option[Password] = None): Try[File]
 }
 
 object BackupManager {
@@ -121,7 +129,11 @@ class BackupManagerImpl(libSodiumUtils: LibSodiumUtils) extends BackupManager wi
   // This way we save memory, but it means that it takes longer before we can release the lock.
   // If this becomes the problem, we might consider first copying the database file(s) to the
   // external storage directory, release the lock, and then safely proceed with zipping them.
-  override def exportDatabase(userId: UserId, userHandle: String, databaseDir: File, targetDir: File, password: Option[Password]): Try[File] = {
+  override def exportDatabase(userId:         UserId,
+                              userHandle:     String,
+                              databaseDir:    File,
+                              targetDir:      File,
+                              backupPassword: Option[Password]): Try[File] = {
     val backup = Try {
       returning(new File(targetDir, backupZipFileName(userHandle))) { zipFile =>
         zipFile.deleteOnExit()
@@ -149,7 +161,7 @@ class BackupManagerImpl(libSodiumUtils: LibSodiumUtils) extends BackupManager wi
         verbose(l"database export finished: $zipFile . Data contains: ${zipFile.length} bytes")
       }
     }.mapFailureIfNot[BackupError](UnknownBackupError.apply)
-    if (backup.isSuccess && password.isDefined) encryptDatabase(backup.get, password.get, userId)
+    if (backup.isSuccess && backupPassword.isDefined) encryptDatabase(backup.get, backupPassword.get, userId)
     else backup
   }
 
@@ -178,10 +190,12 @@ class BackupManagerImpl(libSodiumUtils: LibSodiumUtils) extends BackupManager wi
     }
   }
 
-  override def importDatabase(userId: UserId, exportFile: File, targetDir: File,
+  override def importDatabase(userId:           UserId,
+                              exportFile:       File,
+                              targetDir:        File,
                               currentDbVersion: Int = BackupMetadata.currentDbVersion,
-                              password: Option[Password]): Try[File] =
-    password match {
+                              backupPassword:   Option[Password] = None): Try[File] =
+    backupPassword match {
       case Some(p) => importEncryptedDatabase(userId, exportFile, targetDir, currentDbVersion, p)
       case None => importUnencryptedDatabase(userId, exportFile, targetDir, currentDbVersion)
     }
@@ -193,7 +207,7 @@ class BackupManagerImpl(libSodiumUtils: LibSodiumUtils) extends BackupManager wi
       case Some(metadata) =>
         libSodiumUtils.hash(userId.str, metadata.salt) match {
           case Some(hash) if hash.sameElements(metadata.uuidHash) =>
-            val encryptedBackupBytes = IoUtils.readFileBytes(exportFile, EncryptedBackupHeader.totalHeaderlength)
+            val encryptedBackupBytes = IoUtils.readFileBytes(exportFile, EncryptedBackupHeader.totalHeaderLength)
             libSodiumUtils.decrypt(encryptedBackupBytes, password, metadata.salt) match {
               case Some(decryptedDbBytes) =>
                 val decryptedDbExport = File.createTempFile("wire_backup", ".zip")

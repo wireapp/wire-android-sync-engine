@@ -25,18 +25,21 @@ import com.waz.utils.IoUtils
 import com.waz.utils.IoUtils.withResource
 
 object EncryptedBackupHeader extends DerivedLogTag {
+  val totalHeaderLength = androidMagicNumberLength + 1 + 2 + saltLength + uuidHashLength + 4 + 4
+
   val androidMagicNumber: String = "WBUA"
   val currentVersion: Short = 2
-  val totalHeaderlength = 63
   val saltLength = 16
   val uuidHashLength = 32
+
+  private val androidMagicNumberLength = 4
 
   import com.waz.log.LogSE._
 
   def parse(bytes: Array[Byte]): Option[EncryptedBackupHeader] = {
     val buffer = ByteBuffer.wrap(bytes)
-    if(bytes.length == totalHeaderlength) {
-      val magicNumber = Array.ofDim[Byte](4)
+    if(bytes.length == totalHeaderLength) {
+      val magicNumber = Array.ofDim[Byte](androidMagicNumberLength)
       buffer.get(magicNumber)
       if(magicNumber.map(_.toChar).mkString.equals(androidMagicNumber)) {
         buffer.get() //skip null byte
@@ -64,7 +67,7 @@ object EncryptedBackupHeader extends DerivedLogTag {
   }
 
   def serializeHeader(header: EncryptedBackupHeader): Array[Byte] = {
-    val buffer = ByteBuffer.allocate(totalHeaderlength)
+    val buffer = ByteBuffer.allocate(totalHeaderLength)
 
     buffer.put(androidMagicNumber.getBytes())
     buffer.put(0.toByte)
@@ -78,12 +81,8 @@ object EncryptedBackupHeader extends DerivedLogTag {
   }
 
   def readEncryptedMetadata(encryptedBackup: File): Option[EncryptedBackupHeader] =
-    if(encryptedBackup.length() > totalHeaderlength) {
-      val encryptedMetadataBytes = IoUtils.readFileBytes(encryptedBackup, byteCount = Some(totalHeaderlength))
-      val encryptedMetadataBytes1 = Array.ofDim[Byte](totalHeaderlength)
-      withResource(new BufferedInputStream(new FileInputStream(encryptedBackup))) { encryptedDb =>
-        encryptedDb.read(encryptedMetadataBytes1)
-      }
+    if(encryptedBackup.length() > totalHeaderLength) {
+      val encryptedMetadataBytes = IoUtils.readFileBytes(encryptedBackup, byteCount = Some(totalHeaderLength))
       parse(encryptedMetadataBytes)
     } else {
       error(l"Backup file header corrupted or invalid")
