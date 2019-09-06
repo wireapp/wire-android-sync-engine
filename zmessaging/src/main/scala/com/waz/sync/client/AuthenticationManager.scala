@@ -82,6 +82,8 @@ class AuthenticationManager(id: UserId, accStorage: AccountStorage, client: Logi
 
   def isExpired(token: AccessToken): Boolean = (token.expiresAt - ExpireThreshold) isBefore clock.instant()
 
+  def isCookieValid: Future[Boolean] = cookie.map(_.isValid)
+
   /**
    * Returns current token if not expired or performs access request. Failing that, the user gets logged out
    */
