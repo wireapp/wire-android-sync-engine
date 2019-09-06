@@ -28,6 +28,7 @@ import com.waz.log.LogSE._
 import com.waz.log.LogShow.SafeToLog
 import com.waz.model.AccountData.Password
 import com.waz.model._
+import com.waz.service.backup.BackupManager
 import com.waz.service.tracking.LoggedOutEvent
 import com.waz.sync.client.AuthenticationManager.{AccessToken, Cookie}
 import com.waz.sync.client.{ErrorOr, LoginClient}
@@ -78,7 +79,11 @@ trait AccountsService {
 
   def register(registerCredentials: Credentials, name: Name, teamName: Option[Name] = None): ErrorOr[Option[AccountManager]]
 
-  def createAccountManager(userId: UserId, dbFile: Option[File], isLogin: Option[Boolean], initialUser: Option[UserInfo] = None): Future[Option[AccountManager]] //TODO return error codes on failure?
+  def createAccountManager(userId: UserId,
+                           dbFile: Option[File],
+                           isLogin: Option[Boolean],
+                           initialUser: Option[UserInfo] = None,
+                           backupPassword: Option[Password] = None): Future[Option[AccountManager]] //TODO return error codes on failure?
 
   //Set to None in order to go to the login screen without logging out the current users
   def setAccount(userId: Option[UserId]): Future[Unit]
@@ -118,7 +123,7 @@ object AccountsService {
   case object InForeground extends Active
 }
 
-class AccountsServiceImpl(val global: GlobalModule) extends AccountsService with DerivedLogTag {
+class AccountsServiceImpl(val global: GlobalModule, val backupManager: BackupManager) extends AccountsService with DerivedLogTag {
   import AccountsService._
   import Threading.Implicits.Background
 
@@ -261,10 +266,14 @@ class AccountsServiceImpl(val global: GlobalModule) extends AccountsService with
     managers <- Future.sequence(ids.map(createAccountManager(_, None, None)))
   } yield Serialized.future(AccountManagersKey)(Future[Unit](accountManagers ! managers.flatten))
 
-  override def createAccountManager(userId: UserId, importDbFile: Option[File], isLogin: Option[Boolean], initialUser: Option[UserInfo] = None) = Serialized.future(AccountManagersKey) {
+  override def createAccountManager(userId:         UserId,
+                                    importDbFile:   Option[File],
+                                    isLogin:        Option[Boolean],
+                                    initialUser:    Option[UserInfo] = None,
+                                    backupPassword: Option[Password] = None) = Serialized.future(AccountManagersKey) {
     async {
       if (importDbFile.nonEmpty)
-        returning(BackupManager.importDatabase(userId, importDbFile.get, context.getDatabasePath(userId.toString).getParentFile)) { restore =>
+        returning(backupManager.importDatabase(userId, importDbFile.get, context.getDatabasePath(userId.toString).getParentFile, backupPassword = backupPassword)) { restore =>
           if (restore.isFailure) global.trackingService.historyRestored(false) // HistoryRestoreSucceeded is sent from the new AccountManager
         }.get // if the import failed this will rethrow the exception
 
@@ -285,7 +294,7 @@ class AccountsServiceImpl(val global: GlobalModule) extends AccountsService with
         }
         if (account.isEmpty) warn(l"No logged in account for user: $userId, not creating account manager")
         account.map { acc =>
-          val newManager = new AccountManager(userId, acc.teamId, global, this, startedJustAfterBackup = importDbFile.nonEmpty, user, isLogin)
+          val newManager = new AccountManager(userId, acc.teamId, global, this, backupManager, startedJustAfterBackup = importDbFile.nonEmpty, user, isLogin)
           if (isLogin.isDefined) {
             accountManagers.mutateOrDefault(_ + newManager, Set(newManager))
           }

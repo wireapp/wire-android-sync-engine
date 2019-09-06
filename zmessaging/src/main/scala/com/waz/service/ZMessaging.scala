@@ -32,6 +32,7 @@ import com.waz.repository.{FCMNotificationStatsRepositoryImpl, FCMNotificationsR
 import com.waz.service.EventScheduler.{Sequential, Stage}
 import com.waz.service.assets._
 import com.waz.service.assets2.{AssetService => _, AssetServiceImpl => _, _}
+import com.waz.service.backup.BackupManagerImpl
 import com.waz.service.call._
 import com.waz.service.conversation._
 import com.waz.service.downloads.{AssetLoader, AssetLoaderImpl}
@@ -49,7 +50,7 @@ import com.waz.sync.otr.{OtrClientsSyncHandler, OtrClientsSyncHandlerImpl, OtrSy
 import com.waz.sync.queue.{SyncContentUpdater, SyncContentUpdaterImpl}
 import com.waz.threading.{SerialDispatchQueue, Threading}
 import com.waz.ui.UiModule
-import com.waz.utils.crypto.ReplyHashingImpl
+import com.waz.utils.crypto._
 import com.waz.utils.events.EventContext
 import com.waz.utils.wrappers.{AndroidContext, DB, GoogleApi}
 import com.waz.utils.{IoUtils, Locales}
@@ -259,6 +260,8 @@ class ZMessaging(val teamId: Option[TeamId], val clientId: ClientId, account: Ac
   lazy val receipts                                   = wire[ReceiptService]
   lazy val ephemeral                                  = wire[EphemeralMessagesService]
   lazy val replyHashing                               = wire[ReplyHashingImpl]
+  lazy val libSodiumUtils                             = wire[LibSodiumUtilsImpl]
+  lazy val backupManager                              = wire[BackupManagerImpl]
 
   lazy val assetSync                                  = wire[AssetSyncHandler]
   lazy val usersearchSync                             = wire[UserSearchSyncHandler]
