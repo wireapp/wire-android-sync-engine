@@ -34,9 +34,11 @@ case class Handle(string: String) extends AnyVal {
 }
 
 object Handle extends (String => Handle){
-  def apply(): Handle = Handle("")
-  def random: Handle = Handle(UUID.randomUUID().toString)
+  val Empty = Handle("")
   val handlePattern = """@(.+)""".r
+
+  def apply(): Handle = Empty
+  def random: Handle = Handle(UUID.randomUUID().toString)
   def transliterated(s: String): String = Locales.transliteration.transliterate(s).trim
 
   def isHandle(input: String): Boolean = input.startsWith("@")

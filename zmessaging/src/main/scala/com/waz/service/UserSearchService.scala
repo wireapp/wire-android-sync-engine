@@ -20,20 +20,23 @@ package com.waz.service
 import com.waz.content.UserPreferences.SelfPermissions
 import com.waz.content._
 import com.waz.log.BasicLogging.LogTag.DerivedLogTag
+import com.waz.log.BasicLogging.LogTag
 import com.waz.log.LogSE._
 import com.waz.log.LogShow
 import com.waz.model.UserData.{ConnectionStatus, UserDataDao}
 import com.waz.model.UserPermissions.{PartnerPermissions, decodeBitmask}
 import com.waz.model._
+import com.waz.service.UserService.AcceptedOrBlocked
 import com.waz.service.conversation.{ConversationsService, ConversationsUiService}
 import com.waz.service.teams.TeamsService
 import com.waz.sync.SyncServiceHandle
 import com.waz.sync.client.UserSearchClient.UserSearchResponse
 import com.waz.threading.Threading
+import com.waz.utils.ContentChange.{Added, Removed, Updated}
 import com.waz.utils._
 import com.waz.utils.events._
 
-import scala.collection.breakOut
+import scala.collection.{Seq, breakOut}
 import scala.collection.immutable.Set
 import scala.concurrent.Future
 import scala.concurrent.duration._
@@ -53,8 +56,14 @@ object SearchQuery {
     LogShow.create(sq => s"SearchQuery(${sq.str}, ${sq.handleOnly})")
 
   def apply(str: String): SearchQuery =
-    if (Handle.isHandle(str)) SearchQuery(Handle.stripSymbol(str), handleOnly = true)
-    else SearchQuery(str, handleOnly = false)
+    if (Handle.isHandle(str)) {
+      verbose(l"SR SearchQuery.apply, str: $str, is handle")(LogTag("SearchQuery"))
+      SearchQuery(Handle.stripSymbol(str), handleOnly = true)
+    }
+    else {
+      verbose(l"SR SearchQuery.apply, str: $str, not a handle")(LogTag("SearchQuery"))
+      SearchQuery(str, handleOnly = false)
+    }
 
   def fromCacheKey(key: String): SearchQuery =
     if (key.startsWith(recommendedPrefix)) SearchQuery(key.substring(recommendedPrefix.length))
@@ -100,7 +109,7 @@ class UserSearchService(selfUserId:           UserId,
     lazy val knownUsers = membersStorage.getByUsers(searchResults.map(_.id).toSet).map(_.map(_.userId).toSet)
     isPartner.flatMap {
       case true if teamId.isDefined =>
-        verbose(l"filterForPartner1 Q: $query, RES: ${searchResults.map(_.getDisplayName)}) with partner = true and teamId")
+        verbose(l"SR filterForPartner1 Q: $query, RES: ${searchResults.map(_.getDisplayName)}) with partner = true and teamId")
         for {
           Some(self)    <- userService.getSelfUser
           filteredUsers <- knownUsers.map(knownUsersIds =>
@@ -108,7 +117,7 @@ class UserSearchService(selfUserId:           UserId,
           )
         } yield filteredUsers
       case false if teamId.isDefined =>
-        verbose(l"filterForPartner2 Q: $query, RES: ${searchResults.map(_.getDisplayName)}) with partner = false and teamId")
+        verbose(l"SR filterForPartner2 Q: $query, RES: ${searchResults.map(_.getDisplayName)}) with partner = false and teamId")
         knownUsers.map { knownUsersIds =>
           searchResults.filter { u =>
             u.createdBy.contains(selfUserId) ||
@@ -214,6 +223,7 @@ class UserSearchService(selfUserId:           UserId,
   }
 
   def search(queryStr: String = ""): Signal[SearchResults] = {
+    verbose(l"SR search($queryStr)")
     val query = SearchQuery(queryStr)
 
     exactMatchUser ! None // reset the exact match to None on any query change
@@ -241,13 +251,12 @@ class UserSearchService(selfUserId:           UserId,
 
     val directorySearch: Signal[IndexedSeq[UserData]] =
       for {
-        dir <-
-          if (!query.isEmpty)
-            searchUserData(query)
-              .map(_.filter(u => !u.isWireBot && u.expiresAt.isEmpty))
-              .map(sortUsers(_, query))
-          else Signal.const(IndexedSeq.empty)
-        exact <- exactMatchUser
+        dir <- if (!query.isEmpty) {
+                searchUserData(query).map(_.filter(u => !u.isWireBot && u.expiresAt.isEmpty)).map(sortUsers(_, query))
+               } else Signal.const(IndexedSeq.empty[UserData])
+        _ = verbose(l"SR directory search results: $dir")
+        exact <- exactMatchUser.orElse(Signal.const(None))
+        _ = verbose(l"SR exact match: $exact")
       } yield {
         (dir, exact) match {
           case (_, None) => dir
@@ -267,7 +276,7 @@ class UserSearchService(selfUserId:           UserId,
 
   def updateSearchResults(query: SearchQuery, results: UserSearchResponse) = {
     val users = unapply(results)
-    val ids = users.map(_.id)(breakOut): Vector[UserId]
+    verbose(l"SR updateSearchResults($query), users: ${users.map(u => (u.name, u.handle))}")
 
     for {
       updated <- userService.updateUsers(users)
@@ -281,6 +290,7 @@ class UserSearchService(selfUserId:           UserId,
   }
 
   def updateExactMatch(userId: UserId) = {
+    verbose(l"SR updateExactMatch($userId)")
     usersStorage.get(userId).collect {
       case Some(user) =>
         exactMatchUser ! Some(user)
@@ -291,10 +301,30 @@ class UserSearchService(selfUserId:           UserId,
 
   // not private for tests
   def searchUserData(query: SearchQuery): Signal[IndexedSeq[UserData]] = {
-    val localResults = localSearch(query)
-    localResults.foreach(_ => sync.syncSearchQuery(query))
-    val localIds = localResults.map(_.map(_.id))
-    Signal.future(localIds).flatMap(usersStorage.listSignal).flatMap(res => Signal.future(filterForPartner(query, res)))
+    verbose(l"SR searchUserData($query)")
+    sync.syncSearchQuery(query)
+
+    val changesStream = EventStream.union[Seq[ContentChange[UserId, UserData]]](
+      usersStorage.onAdded.map(_.map(d => Added(d.id, d))),
+      usersStorage.onUpdated.map(_.map { case (prv, curr) => Updated(prv.id, prv, curr) }),
+      usersStorage.onDeleted.map(_.map(Removed(_)))
+    )
+
+    def load = localSearch(query).flatMap(filterForPartner(query, _))
+
+    new AggregatingSignal[Seq[ContentChange[UserId, UserData]], IndexedSeq[UserData]](changesStream, load, { (current, changes) =>
+      val added = changes.collect {
+        case Added(_, data) => data
+        case Updated(_, _, data) => data
+      }.toSet
+
+      val removed = changes.collect {
+        case Removed(id) => id
+        case Updated(id, _, _) => id
+      }.toSet
+
+      current.filterNot(d => removed.contains(d.id) || added.exists(_.id == d.id)) ++ added
+    })
   }
 
   private def localSearch(query: SearchQuery) = {
@@ -340,7 +370,7 @@ object UserSearchService {
   object UserSearchEntry {
     def apply(searchUser: UserSearchResponse.User): UserSearchEntry = {
       import searchUser._
-      UserSearchEntry(UserId(id), Name(name), accent_id, Handle(handle))
+      UserSearchEntry(UserId(id), Name(name), accent_id, handle.fold(Handle.Empty)(Handle(_)))
     }
   }
 

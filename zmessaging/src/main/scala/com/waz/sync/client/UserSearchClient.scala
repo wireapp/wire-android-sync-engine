@@ -47,7 +47,7 @@ class UserSearchClientImpl(implicit
     objectFromCirceJsonRawBodyDeserializer[ErrorResponse]
 
   override def getContacts(query: SearchQuery, limit: Int = DefaultLimit): ErrorOrResponse[UserSearchResponse] = {
-    debug(l"graphSearch('$query', $limit)")
+    verbose(l"SR getContacts($query, $limit)")
 
     Request
       .Get(
@@ -85,9 +85,9 @@ object UserSearchClient extends DerivedLogTag {
   // Response types
 
   case class ExactHandleResponse(user: String)
-  case class UserSearchResponse(documents: Seq[UserSearchResponse.User])
+  case class UserSearchResponse(took: Int, found: Int, returned: Int, documents: Seq[UserSearchResponse.User])
 
   object UserSearchResponse {
-    case class User(id: String, name: String, handle: String, accent_id: Option[Int])
+    case class User(id: String, name: String, handle: Option[String], accent_id: Option[Int])
   }
 }
