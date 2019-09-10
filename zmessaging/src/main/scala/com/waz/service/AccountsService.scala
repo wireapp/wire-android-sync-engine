@@ -83,7 +83,7 @@ trait AccountsService {
   //Set to None in order to go to the login screen without logging out the current users
   def setAccount(userId: Option[UserId]): Future[Unit]
 
-  def logout(userId: UserId): Future[Unit]
+  def logout(userId: UserId, reason: LogoutReason): Future[Unit]
 
   def accountManagers: Signal[Set[AccountManager]]
   def accountsWithManagers: Signal[Set[UserId]] = accountManagers.map(_.map(_.userId))
@@ -116,6 +116,13 @@ object AccountsService {
   trait Active extends AccountState
   case object InBackground extends Active
   case object InForeground extends Active
+
+  sealed trait LogoutReason
+  case object UserInitiated extends LogoutReason
+  case object InvalidCookie extends LogoutReason
+  case object InvalidCredentials extends LogoutReason
+  case object ClientDeleted extends LogoutReason
+  case object UserDeleted extends LogoutReason
 }
 
 class AccountsServiceImpl(val global: GlobalModule) extends AccountsService with DerivedLogTag {
@@ -246,13 +253,6 @@ class AccountsServiceImpl(val global: GlobalModule) extends AccountsService with
       _ <- databasesRenamedPref   := true
     } yield {}
 
-
-  storage.map(_.onDeleted(_.foreach { user =>
-    verbose(l"user logged out: $user")
-    global.trackingService.loggedOut(LoggedOutEvent.InvalidCredentials, user)
-    Serialized.future(AccountManagersKey)(Future[Unit](accountManagers.mutate(_.filterNot(_.userId == user))))
-  }))
-
   override val accountManagers = Signal[Set[AccountManager]]()
 
   //create account managers for all logged in accounts on app start, or initialise the signal to an empty set
@@ -345,19 +345,24 @@ class AccountsServiceImpl(val global: GlobalModule) extends AccountsService with
   }
 
   //TODO optional delete history (https://github.com/wireapp/android-project/issues/51)
-  def logout(userId: UserId) = {
+  def logout(userId: UserId, reason: LogoutReason): Future[Unit] = {
     verbose(l"logout: $userId")
     for {
       current       <- activeAccountId.head
       otherAccounts <- accountsWithManagers.head.map(_.filter(userId != _))
-      _ <- if (current.contains(userId)) setAccount(otherAccounts.headOption) else Future.successful(())
-      _ <- storage.flatMap(_.remove(userId)) //TODO pass Id to some sort of clean up service before removing (https://github.com/wireapp/android-project/issues/51)
-    } yield {}
+      _             <- if (current.contains(userId)) setAccount(otherAccounts.headOption) else Future.successful(())
+      _             <- storage.flatMap(_.remove(userId))
+    } yield {
+      verbose(l"user logged out: $userId. Reason: $reason")
+      // TODO: track this
+      //global.trackingService.loggedOut(reason, userId)
+      Serialized.future(AccountManagersKey)(Future[Unit](accountManagers.mutate(_.filterNot(_.userId == userId))))
+    }
   }
 
   /**
-    * Logs out of the current account and switches to another specified by the AccountId. If the other cannot be authorized
-    * (no cookie) or if anything else goes wrong, we leave the user logged out
+    * Switches the current account to the given user id. If the other account cannot be authorized
+    * (no cookie) or if anything else goes wrong, we leave the user logged out.
     */
   override def setAccount(userId: Option[UserId]) = {
     verbose(l"setAccount: $userId")
