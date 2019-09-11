@@ -33,7 +33,7 @@ import com.waz.sync.client.AuthenticationManager.{AccessToken, Cookie}
 import com.waz.sync.client.{ErrorOr, LoginClient}
 import com.waz.sync.client.LoginClient.LoginResult
 import com.waz.threading.Threading
-import com.waz.utils.events.{EventContext, Signal}
+import com.waz.utils.events.{EventContext, EventStream, Signal}
 import com.waz.utils.{Serialized, returning, _}
 
 import scala.async.Async.{async, await}
@@ -84,6 +84,7 @@ trait AccountsService {
   def setAccount(userId: Option[UserId]): Future[Unit]
 
   def logout(userId: UserId, reason: LogoutReason): Future[Unit]
+  def onAccountLoggedOut: EventStream[(UserId, LogoutReason)]
 
   def accountManagers: Signal[Set[AccountManager]]
   def accountsWithManagers: Signal[Set[UserId]] = accountManagers.map(_.map(_.userId))
@@ -344,6 +345,8 @@ class AccountsServiceImpl(val global: GlobalModule) extends AccountsService with
     zmsInstances.head.map(_.find(_.selfUserId == userId))
   }
 
+  lazy val onAccountLoggedOut = EventStream[(UserId, LogoutReason)]
+
   //TODO optional delete history (https://github.com/wireapp/android-project/issues/51)
   def logout(userId: UserId, reason: LogoutReason): Future[Unit] = {
     verbose(l"logout: $userId")
@@ -357,6 +360,8 @@ class AccountsServiceImpl(val global: GlobalModule) extends AccountsService with
       // TODO: track this
       //global.trackingService.loggedOut(reason, userId)
       Serialized.future(AccountManagersKey)(Future[Unit](accountManagers.mutate(_.filterNot(_.userId == userId))))
+
+      onAccountLoggedOut ! (userId -> reason)
     }
   }
 
