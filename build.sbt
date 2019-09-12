@@ -249,9 +249,12 @@ lazy val publishSettings = Seq(
 )
 
 def groupByPackage(tests: Seq[TestDefinition], jvmOptions: Seq[String]) =
-  tests.groupBy(t => t.name.substring(0, t.name.lastIndexOf('.'))).map {
-    case (pkg, ts) => new Group(pkg, ts, SubProcess(ForkOptions(runJVMOptions = jvmOptions ++ Seq("-Xdebug", s"-Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=${6000 + Random.nextInt % 1000}"))))
+  tests.map {
+    t => new Group(t.name, Seq(t), SubProcess(ForkOptions(runJVMOptions = jvmOptions ++ Seq("-Xdebug", s"-Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=6087"))))
   } .toSeq
+//  tests.groupBy(t => t.name.substring(0, t.name.lastIndexOf('.'))).map {
+//    case (pkg, ts) => new Group(pkg, ts, SubProcess(ForkOptions(runJVMOptions = jvmOptions ++ Seq("-Xdebug", s"-Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=${6000 + Random.nextInt % 1000}"))))
+//  } .toSeq
 
 def path(files: Seq[File]) = files.mkString(File.pathSeparator)
 def libraryPathOption(files: Classpath*) = s"-Djava.library.path=${path(files.flatMap(_.map(_.data)).distinct)}"
