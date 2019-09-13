@@ -101,8 +101,9 @@ trait AccountsService {
 
   def loginClient: LoginClient
 
-  def wipeData(): Future[Unit]
-  def isWiped: Future[Boolean]
+  def wipeData(userId: UserId): Future[Unit]
+  def wipeDataForAllAccounts(): Future[Unit]
+  def isWipedForAllAccounts: Future[Boolean]
 }
 
 object AccountsService {
@@ -124,6 +125,7 @@ object AccountsService {
   case object InvalidCredentials extends LogoutReason
   case object ClientDeleted extends LogoutReason
   case object UserDeleted extends LogoutReason
+  case object DataWiped extends LogoutReason
 }
 
 class AccountsServiceImpl(val global: GlobalModule) extends AccountsService with DerivedLogTag {
@@ -494,28 +496,30 @@ class AccountsServiceImpl(val global: GlobalModule) extends AccountsService with
     }
   }
 
-  override def wipeData(): Future[Unit] = {
+  override def wipeDataForAllAccounts(): Future[Unit] = accountManagers.head.map(_.foreach(am => wipeData(am.userId)))
+
+  override def wipeData(userId: UserId): Future[Unit] = {
     def delete(file: File) =
       if (file.exists) Try(file.delete()).isSuccess else true
 
-    accountManagers.head.map { ams =>
-      cryptoBoxDirs(ams).foreach(delete)
-      databaseFiles(ams).foreach(delete)
-      accountManagers.mutate(_ => Set.empty)
-      storage.foreach(_.removeAll(ams.map(_.userId)))
-      activeAccountPref.mutate(_ => None)
-    }
+    delete(cryptoBoxDir(userId))
+    databaseFiles(userId).foreach(delete)
+    logout(userId, DataWiped)
   }
 
-  override def isWiped: Future[Boolean] = accountManagers.head.map { ams =>
+  override def isWipedForAllAccounts: Future[Boolean] = accountManagers.head.map { ams =>
     cryptoBoxDirs(ams).forall(!_.exists) && databaseFiles(ams).forall(!_.exists)
   }
 
-  private def cryptoBoxDirs(ams: Set[AccountManager]): Set[File] =
-    ams.map(acc => new File(new File(context.getFilesDir, global.metadata.cryptoBoxDirName), acc.userId.str))
+  private def cryptoBoxDirs(ams: Set[AccountManager]): Set[File] = ams.map(acc => cryptoBoxDir(acc.userId))
 
-  private def databaseFiles(ams: Set[AccountManager]): Set[File] =
-    ams.map(acc => context.getDatabasePath(acc.userId.str))
-       .flatMap(p => DbFileExtensions.map(ext => s"${p.getAbsolutePath}$ext").map(new File(_)))
+  private def cryptoBoxDir(userId: UserId): File = new File(new File(context.getFilesDir, global.metadata.cryptoBoxDirName), userId.str)
+
+  private def databaseFiles(ams: Set[AccountManager]): Set[File] = ams.flatMap(acc => databaseFiles(acc.userId))
+
+  private def databaseFiles(userId: UserId): Set[File] = {
+    val database = context.getDatabasePath(userId.str)
+    DbFileExtensions.map(ext => new File(s"${database.getAbsolutePath}$ext")).toSet
+  }
 }
 
