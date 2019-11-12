@@ -37,8 +37,6 @@ import com.waz.model.MsgDeletion.MsgDeletionDao
 import com.waz.model.NotificationData.NotificationDataDao
 import com.waz.model.PushNotificationEvents.PushNotificationEventsDao
 import com.waz.model.ReadReceipt.ReadReceiptDao
-import com.waz.model.SearchQueryCache.SearchQueryCacheDao
-import com.waz.model.TeamData.TeamDataDao
 import com.waz.model.UserData.UserDataDao
 import com.waz.model._
 import com.waz.model.otr.UserClients.UserClientsDao
@@ -63,10 +61,10 @@ class ZMessagingDB(context: Context, dbName: String, tracking: TrackingService) 
 }
 
 object ZMessagingDB {
-  val DbVersion = 122
+  val DbVersion = 123
 
   lazy val daos = Seq (
-    UserDataDao, SearchQueryCacheDao, AssetDataDao, ConversationDataDao, ConversationMemberDataDao,
+    UserDataDao, AssetDataDao, ConversationDataDao, ConversationMemberDataDao,
     MessageDataDao, KeyValueDataDao, SyncJobDao, ErrorDataDao, NotificationDataDao,
     ContactHashesDao, ContactsOnWireDao, UserClientsDao, LikingDao, ContactsDao, EmailAddressesDao,
     PhoneNumbersDao, MsgDeletionDao, EditHistoryDao, MessageContentIndexDao,
@@ -376,6 +374,9 @@ object ZMessagingDB {
     Migration(121, 122) { db =>
       // To fetch team data to display the logo.
       db.execSQL(s"UPDATE ${KeyValueDataDao.table.name} SET ${KeyValueDataDao.Value.name} = 'true' WHERE ${KeyValueDataDao.Key.name} = 'should_sync_teams'")
+    },
+    Migration(122,123) { db =>
+      db.execSQL("DROP TABLE IF EXISTS SearchQueries")
     }
   )
 }
